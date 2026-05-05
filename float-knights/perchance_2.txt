@@ -1,0 +1,4772 @@
+<style>
+  /* ============================================================
+     FLOAT KNIGHTS — bracketed tournament edition
+     Cute mascots in medieval armor wielding futuristic weapons.
+     HP = balloons strapped to backs (Mario Kart 64 style). They
+     "float" over terrain unobstructed.
+     ============================================================ */
+  :root {
+    --bg-0: #07090c;
+    --bg-1: #0f1318;
+    --bg-2: #161c24;
+    --bg-3: #1f2731;
+    --line: #2a323d;
+    --ink: #e8eef5;
+    --dim: #8a98a8;
+    --mute: #5a6675;
+    --gold: #f7c948;
+    --red: #ef4d4d;
+    --grn: #4dd58a;
+    --blu: #4d9bef;
+    --pur: #b46df0;
+    --t-fox: #f08a3c;     /* Phoenix Furious Foxes */
+    --t-bvr: #8a5a3a;     /* Boston Brisk Beavers */
+    --t-owl: #6da9d6;     /* Seattle Sleepless Owls */
+    --t-shk: #4d7588;     /* Tampa Tornado Sharks */
+    --crt: #1a2129;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; min-height: 100%;
+    background: var(--bg-0);
+    color: var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    background:
+      radial-gradient(1200px 600px at 50% -200px, #1a2735 0%, transparent 60%),
+      var(--bg-0);
+    padding: 14px;
+  }
+  .wrap {
+    max-width: 1280px; margin: 0 auto;
+    display: grid;
+    grid-template-columns: 280px 1fr 280px;
+    gap: 14px;
+  }
+  /* Headline */
+  header.broadcast {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 14px;
+    background: linear-gradient(180deg, #11161e, #0c1117);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+  header.broadcast .logo {
+    font-weight: 900; font-size: 22px; letter-spacing: 2px;
+    color: var(--gold);
+    text-shadow: 0 0 16px rgba(247,201,72,0.25);
+    font-family: "Courier New", monospace;
+  }
+  header.broadcast .logo .live {
+    display: inline-block; margin-left: 10px;
+    padding: 2px 6px; font-size: 11px; letter-spacing: 1px;
+    background: var(--red); color: white;
+    border-radius: 3px;
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  header.broadcast .ticker {
+    color: var(--dim);
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  }
+  header.broadcast .right {
+    display: flex; gap: 12px; align-items: center;
+  }
+  .stat-pill {
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: var(--dim);
+  }
+  .stat-pill b { color: var(--ink); margin-left: 4px; font-weight: 700; }
+  .stat-pill.bits b { color: var(--gold); }
+  .stat-pill.season b { color: var(--blu); }
+
+  /* Left rail: team A roster, current matchup, league standings */
+  /* Right rail: team B roster, controls, betting */
+  aside {
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .panel {
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .panel h3 {
+    margin: 0;
+    padding: 8px 12px;
+    background: var(--bg-2);
+    border-bottom: 1px solid var(--line);
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--dim);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .panel h3 .badge {
+    font-size: 10px;
+    background: var(--bg-3);
+    color: var(--ink);
+    padding: 2px 6px;
+    border-radius: 3px;
+    letter-spacing: 0.5px;
+  }
+  .panel .body { padding: 8px 10px; }
+
+  /* Team roster panel — used in both rails for the active match teams */
+  .team-roster .header-strip {
+    padding: 10px 12px;
+    display: flex; align-items: center; gap: 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  .team-roster .team-emoji { font-size: 24px; }
+  .team-roster .team-info { flex: 1; min-width: 0; }
+  .team-roster .team-name {
+    font-weight: 700; font-size: 12px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .team-roster .team-record {
+    font-size: 10px; color: var(--dim); letter-spacing: 0.5px;
+  }
+  .team-roster .alive-count {
+    font-size: 18px; font-weight: 800;
+    font-family: "Courier New", monospace;
+  }
+  .team-roster .alive-count.green { color: var(--grn); }
+  .team-roster .alive-count.amber { color: var(--gold); }
+  .team-roster .alive-count.red { color: var(--red); }
+
+  /* Player chips — one per starter on the active team */
+  .player-list { display: flex; flex-direction: column; }
+  .player-chip {
+    display: grid;
+    grid-template-columns: 24px 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--bg-2);
+    cursor: pointer;
+    transition: background 0.15s;
+    position: relative;
+  }
+  .player-chip:hover { background: var(--bg-2); }
+  .player-chip:last-child { border-bottom: none; }
+  .player-chip.dead {
+    opacity: 0.35;
+    text-decoration: line-through;
+  }
+  .player-chip.deceased {
+    opacity: 0.25;
+    text-decoration: line-through;
+    color: var(--mute);
+  }
+  .player-chip.deceased::before {
+    content: "💀"; position: absolute; left: 4px; top: 50%; transform: translateY(-50%);
+    font-size: 10px;
+  }
+  .player-chip .pos-icon {
+    font-size: 14px; text-align: center;
+    width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg-2); border-radius: 4px;
+  }
+  .player-chip .name-block { min-width: 0; }
+  .player-chip .pname {
+    font-size: 12px; font-weight: 600;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .player-chip .psub {
+    font-size: 10px; color: var(--dim);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .player-chip .hpbar {
+    width: 50px; height: 4px;
+    background: var(--bg-3); border-radius: 2px;
+    overflow: hidden; position: relative;
+  }
+  .player-chip .hpbar > div {
+    height: 100%;
+    background: linear-gradient(90deg, var(--grn), #2a8;);
+    transition: width 0.2s;
+  }
+  .player-chip .hpbar.med > div { background: linear-gradient(90deg, var(--gold), #ca8); }
+  .player-chip .hpbar.low > div { background: linear-gradient(90deg, var(--red), #a44); }
+
+  /* Position icons get team-tinted accent */
+  .pos-tank   { color: #88c0d0; }
+  .pos-striker{ color: #ef6e6e; }
+  .pos-speed  { color: #f7c948; }
+  .pos-brawl  { color: #d8b070; }
+  .pos-sniper { color: #b46df0; }
+
+  /* Center column: arena + bracket strip + commentary */
+  main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+  /* Bracket strip across the top of the arena */
+  .bracket-strip {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    padding: 10px;
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+  .bracket-match {
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 8px 10px;
+    position: relative;
+    transition: all 0.2s;
+  }
+  .bracket-match.current {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 1px var(--gold), 0 0 16px rgba(247,201,72,0.3);
+  }
+  .bracket-match.done { opacity: 0.7; }
+  .bracket-match .label {
+    font-size: 9px; color: var(--dim);
+    letter-spacing: 1px; text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .bracket-match .team-row {
+    display: flex; align-items: center; gap: 6px;
+    padding: 2px 0;
+    font-size: 12px;
+  }
+  .bracket-match .team-row.winner {
+    color: var(--gold); font-weight: 700;
+  }
+  .bracket-match .team-row.loser {
+    color: var(--mute); text-decoration: line-through;
+  }
+  .bracket-match .team-row .em { font-size: 14px; }
+  .bracket-match .team-row .nm {
+    flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .bracket-match .team-row .sc {
+    font-family: "Courier New", monospace; font-size: 11px;
+    color: var(--dim);
+  }
+  .bracket-match .vs-divider {
+    font-size: 9px; color: var(--mute);
+    text-align: center; padding: 1px 0;
+    letter-spacing: 2px;
+  }
+
+  /* Arena */
+  .arena-wrap {
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px;
+    position: relative;
+  }
+  .arena-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--dim);
+  }
+  .arena-header .matchup {
+    font-weight: 700; color: var(--ink);
+    font-size: 13px;
+  }
+  .arena-header .matchup .vs {
+    color: var(--mute); margin: 0 8px;
+    font-weight: 400;
+  }
+  .arena-header .clock {
+    font-family: "Courier New", monospace;
+    color: var(--gold);
+  }
+  canvas#arena {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: var(--crt);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+  /* CRT scanline overlay */
+  .arena-wrap::after {
+    content: "";
+    position: absolute;
+    left: 10px; right: 10px; top: 36px;
+    height: calc(100% - 50px);
+    background:
+      repeating-linear-gradient(
+        0deg,
+        rgba(0,0,0,0) 0px,
+        rgba(0,0,0,0) 2px,
+        rgba(0,0,0,0.10) 2px,
+        rgba(0,0,0,0.10) 3px
+      );
+    pointer-events: none;
+    border-radius: 4px;
+    mix-blend-mode: multiply;
+  }
+
+  /* Speed controls */
+  .controls {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    padding: 10px 12px;
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    align-items: center;
+  }
+  .controls .grp {
+    display: flex; gap: 4px;
+    background: var(--bg-2);
+    border-radius: 6px;
+    padding: 3px;
+  }
+  .controls button {
+    background: transparent;
+    border: none;
+    color: var(--dim);
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    transition: all 0.15s;
+  }
+  .controls button:hover { color: var(--ink); }
+  .controls button.active {
+    background: var(--bg-3);
+    color: var(--gold);
+  }
+  .controls .gap { flex: 1; }
+  .controls .icon-btn {
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 6px 12px;
+    color: var(--ink);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .controls .icon-btn:hover {
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+
+  /* Commentary feed */
+  .commentary {
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .commentary-list {
+    max-height: 180px;
+    overflow-y: auto;
+    padding: 0;
+  }
+  .commentary-item {
+    padding: 6px 12px;
+    font-size: 12px;
+    border-bottom: 1px solid var(--bg-2);
+    display: flex; gap: 8px;
+    line-height: 1.4;
+  }
+  .commentary-item .ts {
+    font-family: "Courier New", monospace;
+    color: var(--mute);
+    font-size: 10px;
+    flex-shrink: 0;
+    padding-top: 2px;
+  }
+  .commentary-item.kill { color: var(--red); }
+  .commentary-item.kill .ts { color: var(--red); opacity: 0.6; }
+  .commentary-item.match { color: var(--gold); font-weight: 600; }
+  .commentary-item.season { color: var(--pur); font-weight: 700; }
+  .commentary-item.spawn { color: var(--blu); }
+  .commentary-item.item { color: var(--grn); }
+
+  /* Right rail: betting + shop + sync */
+  .bet-section { padding: 10px 12px; }
+  .bet-tabs {
+    display: flex; gap: 0;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  .bet-tab {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--dim);
+    padding: 6px 0;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .bet-tab.active {
+    color: var(--gold);
+    border-bottom-color: var(--gold);
+  }
+  .bet-team-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 8px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .bet-team-row:hover { border-color: var(--gold); }
+  .bet-team-row.selected {
+    border-color: var(--gold);
+    background: rgba(247,201,72,0.08);
+  }
+  .bet-team-row .em { font-size: 18px; }
+  .bet-team-row .info { min-width: 0; }
+  .bet-team-row .nm {
+    font-size: 12px; font-weight: 600;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .bet-team-row .od {
+    font-size: 10px; color: var(--dim);
+  }
+  .bet-team-row .od b { color: var(--gold); }
+  .bet-input-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .bet-input-row input {
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: "Courier New", monospace;
+  }
+  .bet-input-row button {
+    background: var(--gold);
+    border: none;
+    color: var(--bg-0);
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+  }
+  .bet-input-row button:disabled {
+    background: var(--mute); cursor: not-allowed;
+  }
+  .active-bet {
+    margin-top: 8px;
+    padding: 6px 8px;
+    background: var(--bg-2);
+    border-left: 2px solid var(--gold);
+    font-size: 11px;
+    color: var(--dim);
+  }
+  .active-bet b { color: var(--ink); }
+
+  /* Per-player bet picker (shown when on the player tab) */
+  .pbet-list { display: flex; flex-direction: column; gap: 4px; }
+  .pbet-row {
+    display: grid;
+    grid-template-columns: 18px 1fr auto;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 6px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    transition: all 0.15s;
+  }
+  .pbet-row:hover { border-color: var(--gold); }
+  .pbet-row.selected {
+    border-color: var(--gold);
+    background: rgba(247,201,72,0.08);
+  }
+  .pbet-row .pos { font-size: 11px; }
+  .pbet-row .nm {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .pbet-row .od { color: var(--gold); font-weight: 700; }
+
+  /* Shop items */
+  .shop-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    padding: 10px;
+  }
+  .shop-item {
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 8px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+  }
+  .shop-item:hover {
+    border-color: var(--gold);
+    transform: translateY(-1px);
+  }
+  .shop-item:disabled, .shop-item[aria-disabled="true"] {
+    opacity: 0.4; cursor: not-allowed; transform: none;
+  }
+  .shop-item .ico { font-size: 20px; }
+  .shop-item .nm {
+    font-size: 11px; font-weight: 600;
+    margin-top: 2px;
+  }
+  .shop-item .cost {
+    font-size: 10px; color: var(--gold);
+    margin-top: 2px;
+    font-family: "Courier New", monospace;
+  }
+  .shop-item .desc {
+    font-size: 9px; color: var(--dim);
+    margin-top: 2px;
+    line-height: 1.3;
+  }
+
+  /* Sync card */
+  .sync-card { padding: 10px 12px; }
+  .sync-card label {
+    display: block; font-size: 10px;
+    color: var(--dim);
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+  }
+  .sync-card input {
+    width: 100%;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: "Courier New", monospace;
+    margin-bottom: 6px;
+  }
+  .sync-card .btn-row { display: flex; gap: 6px; }
+  .sync-card button {
+    flex: 1;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    padding: 6px;
+    border-radius: 6px;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .sync-card button:hover { border-color: var(--gold); color: var(--gold); }
+  .sync-card .status {
+    font-size: 10px; color: var(--dim);
+    margin-top: 6px; min-height: 14px;
+  }
+  .sync-card .status.ok { color: var(--grn); }
+  .sync-card .status.err { color: var(--red); }
+
+  /* Modals (intermission, profiles, etc.) */
+  .modal-back {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 100;
+    padding: 20px;
+  }
+  .modal-back.show { display: flex; }
+  .modal-card {
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    max-width: 520px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  }
+  .modal-card .header {
+    padding: 14px 18px;
+    background: var(--bg-2);
+    border-bottom: 1px solid var(--line);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .modal-card .header h2 {
+    margin: 0; font-size: 16px; letter-spacing: 1px;
+    color: var(--gold);
+  }
+  .modal-card .header .close {
+    background: transparent; border: none;
+    color: var(--dim); font-size: 20px;
+    cursor: pointer; padding: 0 6px;
+  }
+  .modal-card .header .close:hover { color: var(--ink); }
+  .modal-card .body { padding: 16px 18px; }
+  .modal-card .footer {
+    padding: 12px 18px;
+    background: var(--bg-2);
+    border-top: 1px solid var(--line);
+    display: flex; justify-content: flex-end; gap: 8px;
+  }
+  .modal-card .footer button {
+    background: var(--gold);
+    border: none;
+    color: var(--bg-0);
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+  }
+  .modal-card .footer button.secondary {
+    background: var(--bg-3); color: var(--ink);
+  }
+
+  /* Intermission card content */
+  .interm-result {
+    text-align: center;
+    padding: 10px 0 20px;
+  }
+  .interm-result .winner-em { font-size: 56px; }
+  .interm-result .winner-line {
+    font-size: 18px; font-weight: 800;
+    letter-spacing: 1px;
+    margin-top: 4px;
+  }
+  .interm-result .next-line {
+    font-size: 12px; color: var(--dim);
+    margin-top: 16px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .interm-result .next-line .em { font-size: 18px; vertical-align: middle; margin: 0 4px; }
+  .interm-casualties {
+    background: var(--bg-2);
+    border-radius: 6px;
+    padding: 10px;
+    margin-top: 12px;
+  }
+  .interm-casualties .cap {
+    font-size: 10px; color: var(--mute);
+    letter-spacing: 1px; text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .interm-casualty-row {
+    font-size: 12px;
+    color: var(--dim);
+    padding: 2px 0;
+  }
+  .interm-casualty-row .name { color: var(--ink); }
+
+  /* Champion banner for season-end modal */
+  .champion-banner {
+    text-align: center;
+    padding: 30px 20px;
+    background:
+      radial-gradient(ellipse at center, rgba(247,201,72,0.15) 0%, transparent 70%);
+  }
+  .champion-banner .trophy { font-size: 80px; }
+  .champion-banner .crown {
+    font-size: 24px; font-weight: 900;
+    color: var(--gold);
+    letter-spacing: 3px;
+    margin-top: 8px;
+    text-shadow: 0 0 20px rgba(247,201,72,0.5);
+  }
+  .champion-banner .team-name {
+    font-size: 16px;
+    margin-top: 6px;
+  }
+  .champion-banner .season {
+    font-size: 11px; color: var(--dim);
+    letter-spacing: 1.5px;
+    margin-top: 12px;
+    text-transform: uppercase;
+  }
+
+  /* Profile / standings tables in modals */
+  table.dt {
+    width: 100%; border-collapse: collapse;
+    font-size: 12px;
+  }
+  table.dt th, table.dt td {
+    padding: 6px 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--bg-2);
+  }
+  table.dt th {
+    color: var(--dim);
+    font-weight: 600;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  table.dt td.num {
+    text-align: right;
+    font-family: "Courier New", monospace;
+  }
+  table.dt tr.hl { background: rgba(247,201,72,0.08); }
+
+  /* ============================================================
+     TAB NAV — Game / Bet / Store / About
+     ============================================================ */
+  .tab-nav {
+    max-width: 1280px;
+    margin: 0 auto 14px;
+    display: flex; gap: 4px;
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 4px;
+  }
+  .tab-nav button {
+    flex: 1;
+    background: transparent; border: none;
+    color: var(--dim);
+    padding: 9px 12px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .tab-nav button .ico { font-size: 14px; }
+  .tab-nav button:hover { color: var(--ink); }
+  .tab-nav button.active {
+    background: var(--bg-3);
+    color: var(--gold);
+    box-shadow: inset 0 0 0 1px rgba(247,201,72,0.3);
+  }
+  .tab-nav button .badge {
+    background: var(--red);
+    color: white;
+    font-size: 9px;
+    font-weight: 800;
+    padding: 1px 5px;
+    border-radius: 8px;
+    margin-left: 4px;
+  }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Bet page */
+  .bet-page, .store-page, .about-page {
+    max-width: 1280px;
+    margin: 0 auto;
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px;
+    min-height: 480px;
+  }
+  .bet-page h2, .store-page h2, .about-page h2 {
+    margin: 0 0 6px;
+    font-size: 20px;
+    color: var(--gold);
+    letter-spacing: 1.5px;
+  }
+  .bet-page .sub, .store-page .sub, .about-page .sub {
+    color: var(--dim);
+    font-size: 12px;
+    margin-bottom: 18px;
+  }
+  .bet-markets {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+  .bet-market {
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px;
+  }
+  .bet-market h3 {
+    margin: 0 0 10px;
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--dim);
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 6px;
+  }
+  .bet-market h3 .market-state {
+    float: right;
+    font-size: 10px;
+    color: var(--gold);
+  }
+  .bet-page .pbet-list {
+    max-height: 260px;
+    overflow-y: auto;
+  }
+  .bet-page .pbet-list .pbet-row {
+    padding: 6px 8px;
+  }
+  .bet-confirm-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 10px;
+    align-items: center;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-top: 10px;
+  }
+  .bet-confirm-row .label-block { color: var(--dim); font-size: 11px; }
+  .bet-confirm-row .label-block b { color: var(--ink); font-size: 13px; }
+  .bet-confirm-row input {
+    background: var(--bg-3);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: "Courier New", monospace;
+    width: 100px;
+  }
+  .bet-confirm-row button {
+    background: var(--gold); border: none;
+    color: var(--bg-0);
+    padding: 8px 18px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    cursor: pointer;
+  }
+  .bet-confirm-row button:disabled {
+    background: var(--mute); cursor: not-allowed;
+  }
+  .bet-history-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .bet-history-table th, .bet-history-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--bg-2);
+    text-align: left;
+  }
+  .bet-history-table th {
+    color: var(--dim);
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .bet-history-table td.win  { color: var(--grn); }
+  .bet-history-table td.lose { color: var(--red); }
+
+  /* Store page */
+  .store-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+  }
+  .store-card {
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+  }
+  .store-card:hover:not(:disabled) {
+    border-color: var(--gold);
+    transform: translateY(-2px);
+  }
+  .store-card:disabled, .store-card[aria-disabled="true"] {
+    opacity: 0.5; cursor: not-allowed; transform: none;
+  }
+  .store-card .ico { font-size: 32px; }
+  .store-card .nm { font-weight: 700; font-size: 13px; margin-top: 6px; }
+  .store-card .cost {
+    color: var(--gold);
+    font-size: 12px;
+    font-family: "Courier New", monospace;
+    margin-top: 4px;
+  }
+  .store-card .desc {
+    font-size: 10px;
+    color: var(--dim);
+    margin-top: 6px;
+    line-height: 1.4;
+  }
+  .store-card.future {
+    background: linear-gradient(135deg, var(--bg-2) 0%, #1a1f28 100%);
+    border-style: dashed;
+  }
+  .store-card.future .badge {
+    background: var(--pur);
+    color: white;
+    font-size: 9px;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-top: 4px;
+    display: inline-block;
+  }
+
+  /* About page */
+  .about-page .credits {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    margin-top: 12px;
+  }
+  .about-page .credits .block {
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px;
+  }
+  .about-page .credits .block h3 {
+    margin: 0 0 8px;
+    color: var(--gold);
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .about-page .credits .block p {
+    margin: 6px 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ink);
+  }
+  .about-page .credits .block ul {
+    margin: 6px 0; padding-left: 18px;
+    font-size: 12px; line-height: 1.6;
+    color: var(--ink);
+  }
+  .about-page a {
+    color: var(--blu);
+    text-decoration: none;
+  }
+  .about-page a:hover { text-decoration: underline; }
+
+  /* Site footer (visible on all tabs) */
+  .footer {
+    max-width: 1280px;
+    margin: 18px auto 0;
+    padding: 14px 18px;
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--dim);
+    letter-spacing: 0.5px;
+  }
+  .footer a {
+    color: var(--gold);
+    text-decoration: none;
+    margin: 0 4px;
+  }
+  .footer a:hover { text-decoration: underline; }
+  .footer span { margin: 0 6px; color: var(--mute); }
+
+  /* Lives badge on player chips */
+  .player-chip .lives {
+    display: flex; gap: 2px;
+    align-items: center;
+    font-size: 9px;
+    color: var(--gold);
+  }
+  .player-chip .lives .pip {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    box-shadow: 0 0 4px rgba(247,201,72,0.6);
+  }
+  .player-chip .lives .pip.spent {
+    background: var(--bg-3);
+    box-shadow: none;
+  }
+
+  /* Round indicator strip above the arena */
+  .round-strip {
+    display: flex; gap: 6px;
+    align-items: center;
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    font-size: 11px;
+    color: var(--dim);
+    letter-spacing: 1px;
+  }
+  .round-strip .label {
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .round-strip .pips {
+    display: flex; gap: 4px;
+    flex: 1;
+  }
+  .round-strip .pip {
+    width: 18px; height: 8px;
+    background: var(--bg-3);
+    border-radius: 2px;
+    border: 1px solid var(--line);
+  }
+  .round-strip .pip.won-a { background: var(--t-fox); border-color: var(--t-fox); }
+  .round-strip .pip.won-b { background: var(--t-owl); border-color: var(--t-owl); }
+  .round-strip .pip.current {
+    box-shadow: 0 0 0 1px var(--gold);
+    animation: pulse 1.5s infinite;
+  }
+  .round-strip .score {
+    font-family: "Courier New", monospace;
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--ink);
+  }
+
+  /* Active bets summary in right rail */
+  .bets-summary {
+    padding: 10px 12px;
+  }
+  .bets-summary .empty {
+    color: var(--dim);
+    font-size: 11px;
+    text-align: center;
+    padding: 8px;
+  }
+  .bets-summary .place-link {
+    margin-top: 8px;
+    display: block;
+    text-align: center;
+    background: var(--bg-2);
+    border: 1px solid var(--gold);
+    border-radius: 6px;
+    padding: 8px;
+    color: var(--gold);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.15s;
+  }
+  .bets-summary .place-link:hover {
+    background: var(--gold);
+    color: var(--bg-0);
+  }
+
+  /* ============================================================
+     TOAST NOTIFICATIONS — bottom-right stack
+     ============================================================ */
+  .toast-stack {
+    position: fixed;
+    bottom: 18px; right: 18px;
+    display: flex; flex-direction: column-reverse; gap: 8px;
+    z-index: 200;
+    pointer-events: none;
+    max-width: 360px;
+  }
+  .toast {
+    background: var(--bg-1);
+    border-left: 4px solid var(--gold);
+    border-radius: 6px;
+    padding: 10px 14px;
+    color: var(--ink);
+    font-size: 12px;
+    line-height: 1.4;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+    pointer-events: auto;
+    animation: toastIn 0.25s ease-out;
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  .toast.win   { border-left-color: var(--grn); }
+  .toast.lose  { border-left-color: var(--red); }
+  .toast.warn  { border-left-color: var(--gold); }
+  .toast.info  { border-left-color: var(--blu); }
+  .toast .ico  { font-size: 16px; flex-shrink: 0; }
+  .toast .body { flex: 1; }
+  .toast .body b { color: var(--ink); }
+  .toast .close-x {
+    background: none; border: none; color: var(--mute);
+    cursor: pointer; font-size: 14px; padding: 0; margin-left: 6px;
+  }
+  .toast .close-x:hover { color: var(--ink); }
+  .toast.fade-out { animation: toastOut 0.4s ease-in forwards; }
+  @keyframes toastIn {
+    from { transform: translateX(20px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  @keyframes toastOut {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(40px); opacity: 0; }
+  }
+
+  /* Auto-play countdown indicator (in arena header) */
+  .countdown-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--bg-2);
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-family: "Courier New", monospace;
+    font-weight: 700;
+    margin-left: 8px;
+  }
+  .countdown-pill.urgent { animation: pulse 0.8s infinite; }
+
+  /* "Skip" button in countdown */
+  .countdown-skip {
+    background: none; border: none;
+    color: var(--mute);
+    font-size: 10px;
+    cursor: pointer;
+    padding: 0 4px;
+    text-decoration: underline;
+  }
+  .countdown-skip:hover { color: var(--ink); }
+
+  /* Auto-play toggle in controls */
+  .autoplay-toggle {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--dim); font-size: 11px;
+    cursor: pointer;
+    padding: 4px 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    user-select: none;
+  }
+  .autoplay-toggle.on {
+    color: var(--gold);
+    border-color: var(--gold);
+  }
+  .autoplay-toggle .led {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--mute);
+  }
+  .autoplay-toggle.on .led {
+    background: var(--gold);
+    box-shadow: 0 0 6px var(--gold);
+  }
+
+  /* Responsive collapse */
+  @media (max-width: 1100px) {
+    .wrap { grid-template-columns: 240px 1fr 240px; }
+  }
+  @media (max-width: 900px) {
+    .wrap { grid-template-columns: 1fr; }
+    aside { order: 2; }
+    main { order: 1; }
+    aside.right { order: 3; }
+  }
+</style>
+</head>
+<body>
+
+<header class="broadcast">
+  <div class="logo">FLOAT KNIGHTS<span class="live">LIVE</span></div>
+  <div class="ticker" id="ticker">Tournament loading…</div>
+  <div class="right">
+    <div class="stat-pill season">SEASON<b id="seasonNum">1</b></div>
+    <div class="stat-pill bits">BITS<b id="bitsAmt">0</b></div>
+  </div>
+</header>
+
+<nav class="tab-nav" id="tabNav">
+  <button class="tab active" data-tab="game"><span class="ico">📺</span>Game</button>
+  <button class="tab" data-tab="bet"><span class="ico">🎲</span>Bet<span class="badge" id="tabBetCount" style="display:none;"></span></button>
+  <button class="tab" data-tab="store"><span class="ico">🏪</span>Store</button>
+  <button class="tab" data-tab="about"><span class="ico">ℹ️</span>About</button>
+</nav>
+
+<!-- ============== GAME TAB ============== -->
+<div class="tab-content active" data-tab="game">
+<div class="wrap">
+
+  <!-- LEFT RAIL -->
+  <aside class="left">
+    <!-- Team A roster -->
+    <div class="panel team-roster" id="teamApanel">
+      <div class="header-strip">
+        <div class="team-emoji" id="teamAemoji">🦊</div>
+        <div class="team-info">
+          <div class="team-name" id="teamAname">—</div>
+          <div class="team-record" id="teamArecord">—</div>
+        </div>
+        <div class="alive-count green" id="teamAalive">5</div>
+      </div>
+      <div class="player-list" id="teamAlist"></div>
+    </div>
+
+    <!-- League standings (compact) -->
+    <div class="panel">
+      <h3>League Standings <span class="badge" id="leagueBadge">S1</span></h3>
+      <div class="body" style="padding:0;">
+        <div id="standingsList"></div>
+      </div>
+    </div>
+
+    <!-- League office shortcuts -->
+    <div class="panel">
+      <h3>League Office</h3>
+      <div class="body" style="display:flex;flex-wrap:wrap;gap:6px;">
+        <button class="icon-btn" id="btnTeams">Teams</button>
+        <button class="icon-btn" id="btnHistory">History</button>
+        <button class="icon-btn" id="btnGraveyard">Graveyard</button>
+        <button class="icon-btn" id="btnBracket">Bracket</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- CENTER -->
+  <main>
+    <!-- Bracket strip -->
+    <div class="bracket-strip" id="bracketStrip">
+      <div class="bracket-match" data-slot="semi1"><div class="label">Semifinal 1</div></div>
+      <div class="bracket-match" data-slot="semi2"><div class="label">Semifinal 2</div></div>
+      <div class="bracket-match" data-slot="final"><div class="label">Final</div></div>
+    </div>
+
+    <!-- Round strip — best-of-N progress -->
+    <div class="round-strip" id="roundStrip">
+      <span class="label">Match Progress</span>
+      <div class="pips" id="roundPips"></div>
+      <span class="score" id="roundScore">0–0</span>
+    </div>
+
+    <!-- Arena -->
+    <div class="arena-wrap">
+      <div class="arena-header">
+        <div class="matchup">
+          <span id="matchupLabel">— vs —</span>
+        </div>
+        <div class="clock">
+          <span id="matchClock">00:00</span> · <span id="matchPhase">Pre-match</span>
+        </div>
+      </div>
+      <canvas id="arena" width="960" height="540"></canvas>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <div class="grp">
+        <button data-spd="0.5">½×</button>
+        <button data-spd="1" class="active">1×</button>
+        <button data-spd="2">2×</button>
+        <button data-spd="4">4×</button>
+        <button data-spd="0">⏸</button>
+      </div>
+      <button class="icon-btn" id="btnSkip">Skip Round</button>
+      <button class="autoplay-toggle on" id="autoplayToggle" title="Auto-advance between rounds and matches">
+        <span class="led"></span>AUTOPLAY
+      </button>
+      <div class="gap"></div>
+      <button class="icon-btn" id="btnReset">Reset League</button>
+    </div>
+
+    <!-- Commentary -->
+    <div class="commentary">
+      <h3 style="margin:0;padding:8px 12px;background:var(--bg-2);border-bottom:1px solid var(--line);font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);">Live Feed</h3>
+      <div class="commentary-list" id="commentary"></div>
+    </div>
+  </main>
+
+  <!-- RIGHT RAIL -->
+  <aside class="right">
+    <!-- Team B roster -->
+    <div class="panel team-roster" id="teamBpanel">
+      <div class="header-strip">
+        <div class="team-emoji" id="teamBemoji">🦫</div>
+        <div class="team-info">
+          <div class="team-name" id="teamBname">—</div>
+          <div class="team-record" id="teamBrecord">—</div>
+        </div>
+        <div class="alive-count green" id="teamBalive">5</div>
+      </div>
+      <div class="player-list" id="teamBlist"></div>
+    </div>
+
+    <!-- Active bets summary (read-only — full betting is on the Bet tab) -->
+    <div class="panel">
+      <h3>Your Bets <span class="badge" id="activeBetCountBadge">0</span></h3>
+      <div class="bets-summary" id="betsSummaryRail">
+        <div class="empty">No active bets.</div>
+        <a class="place-link" data-go-tab="bet">Place a bet →</a>
+      </div>
+    </div>
+
+    <!-- Sync -->
+    <div class="panel">
+      <h3>Cloud Sync</h3>
+      <div class="sync-card">
+        <label>Username</label>
+        <input id="syncName" placeholder="trainer name" />
+        <label>Sync Code (auto)</label>
+        <input id="syncCode" readonly placeholder="will appear after first save" />
+        <div class="btn-row">
+          <button id="btnPush">Save</button>
+          <button id="btnPull">Load</button>
+        </div>
+        <div class="status" id="syncStatus"></div>
+      </div>
+    </div>
+  </aside>
+</div>
+</div><!-- /game tab -->
+
+<!-- ============== BET TAB ============== -->
+<div class="tab-content" data-tab="bet">
+  <div class="bet-page">
+    <h2>🎲 Sportsbook</h2>
+    <div class="sub" id="betSubLine">Place wagers between rounds and matches. Bets resolve automatically.</div>
+
+    <div class="bet-markets">
+      <div class="bet-market">
+        <h3>Match Winner <span class="market-state" id="mwState">—</span></h3>
+        <div id="betMarketTeamRows"></div>
+      </div>
+      <div class="bet-market">
+        <h3>Next Round Winner <span class="market-state" id="rwState">—</span></h3>
+        <div id="betMarketRoundRows"></div>
+      </div>
+    </div>
+
+    <div class="bet-market" style="margin-bottom:18px;">
+      <h3>Last Knight Standing <span class="market-state" id="lsState">—</span></h3>
+      <div class="pbet-list" id="betMarketPlayerRows"></div>
+    </div>
+
+    <div class="bet-confirm-row">
+      <div class="label-block">
+        <div>Selection</div>
+        <b id="betSelectionLabel">Pick a market above</b>
+      </div>
+      <input id="betPageAmount" type="number" min="1" placeholder="Bits" value="10" />
+      <button id="betPagePlace" disabled>Place Bet</button>
+    </div>
+
+    <h2 style="margin-top:24px;font-size:14px;">Your Active Bets</h2>
+    <table class="bet-history-table" id="betHistoryTable">
+      <thead><tr><th>Round/Match</th><th>Market</th><th>Selection</th><th>Stake</th><th>Pays</th><th>Potential</th></tr></thead>
+      <tbody id="betHistoryBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ============== STORE TAB ============== -->
+<div class="tab-content" data-tab="store">
+  <div class="store-page">
+    <h2>🏪 Float Knights Store</h2>
+    <div class="sub">Pre-match boosts and (eventually) sandbags. Items must be purchased BEFORE a round begins.</div>
+    <div class="store-grid" id="storeGrid"></div>
+  </div>
+</div>
+
+<!-- ============== ABOUT TAB ============== -->
+<div class="tab-content" data-tab="about">
+  <div class="about-page">
+    <h2>ℹ️ About Float Knights</h2>
+    <div class="sub">A bracketed mascot tournament sim. Cute animals in medieval armor wielding futuristic weapons. HP = balloons. Death is permanent (eventually).</div>
+
+    <div class="credits">
+      <div class="block">
+        <h3>How it works</h3>
+        <p>Four teams of five mascot knights compete every season in a single-elimination bracket. Each match is best-of-5 rounds. Each round is a 5v5 elimination fight.</p>
+        <p>Knights have <b>3 lives per match</b>. When they're knocked out in a round, they respawn the next round — <b>unless they've used all 3 lives</b>, in which case they die permanently and their gear (weapon, armor, item) drops on the field for survivors to scavenge.</p>
+        <p>Picked-up gear is renamed <code>&#91;Owner&#93;'s &#91;Gear&#93; (scavenged)</code>. Lineage cascades through the league.</p>
+      </div>
+      <div class="block">
+        <h3>Roadmap</h3>
+        <p>Future features in the queue:</p>
+        <ul>
+          <li><b>Auto-play mode</b> — the league plays itself in the background while you make money on bets and shop purchases.</li>
+          <li><b>Sandbags</b> — high-cost item that you literally attach to a specific knight to slow them down. Subtle match-weighting for the discerning bettor.</li>
+          <li><b>Round-bet odds updates</b> — odds re-compute live based on current life counts.</li>
+          <li><b>Knight memorial pages</b> — full career obituary for each fallen knight.</li>
+        </ul>
+      </div>
+      <div class="block">
+        <h3>Inspirations</h3>
+        <ul>
+          <li><i>Blaseball</i> — permanent mortality + emergent narrative</li>
+          <li><i>Mario Kart 64 Battle Mode</i> — balloons as HP</li>
+          <li><i>Worms</i> — gear pickup chaos</li>
+          <li><i>Salem / UO</i> — items naming after dead players</li>
+        </ul>
+      </div>
+      <div class="block">
+        <h3>Credits</h3>
+        <p>Built by <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">therealwestninja</a>.</p>
+        <p>Random-name generator is the four-syllable algorithm by @WestNinja (Feb 2020), originally adapted from a Shakespearean insult generator by Darren G. Holloway, Jerry Maguire, and J. Kessels.</p>
+        <p>Mascot surnames are a custom mix designed for sports-broadcast vibes.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Footer (visible on all tabs) -->
+<div class="footer">
+  <span>© 2026 therealwestninja.</span> ·
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> ·
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</div>
+
+<!-- Generic modal (reused for bracket, history, graveyard, profiles, intermission, season-end) -->
+<div class="modal-back" id="modalBack">
+  <div class="modal-card">
+    <div class="header">
+      <h2 id="modalTitle">—</h2>
+      <button class="close" id="modalClose">×</button>
+    </div>
+    <div class="body" id="modalBody"></div>
+    <div class="footer" id="modalFooter"></div>
+  </div>
+</div>
+
+<!-- Toast notifications (bottom-right) -->
+<div class="toast-stack" id="toastStack"></div>
+
+<!-- ============================================================
+     SIMULATION — Part A
+     Constants, name generator, position archetypes, league state
+     ============================================================ -->
+<script>
+'use strict';
+
+/* ============================================================
+   RNG + MATH HELPERS
+   ============================================================ */
+function R(min, max) { return Math.random() * (max - min) + min; }
+function RI(min, max) { return Math.floor(R(min, max + 1)); }
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function pickN(arr, n) {
+  const c = arr.slice();
+  const out = [];
+  for (let i = 0; i < n && c.length; i++) {
+    out.push(c.splice(Math.floor(Math.random() * c.length), 1)[0]);
+  }
+  return out;
+}
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function distance(a, b) {
+  const dx = a.x - b.x, dy = a.y - b.y;
+  return Math.sqrt(dx*dx + dy*dy);
+}
+
+/* ============================================================
+   NAME GENERATOR
+   Embedded from user's "simple random name generator" (4-syllable
+   fantasy-style: Capital + lowercase + middle syllable + ending).
+   Produces names like "Qarchlut", "Bearson", "Acackadain".
+
+   To swap in a different generator:
+     - Replace the four arrays below, OR
+     - Replace genFirstName() to call your source.
+   ============================================================ */
+const NG_W1 = ["Q","A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","R","S","T","U","V","W","X","Y","Z"];
+const NG_W2 = ["a","c","e","f","h","l","m","n","o","r","s","t","u","x","y"];
+const NG_W3 = ["rch","a","ack","ad","agg","ah","ai","al","an","ana","ar","ara","as","b","c","ch","ck","d","dwyn","e","ea","ear","ee","eira","ek","el","end","er","ex","ey","f","g","gn","h","i","iar","ig","il","ill","im","imma","in","in","inu","io","ion","ip","ir","iri","irm","irsa","is","ish","isil","ito","iz","izu","j","ka","ko","l","la","lar","lbor","le","le","les","ll","lm","ln","ls","m","me","mm","mo","n","na","nd","ne","nk","nt","nt","ntin","o","ock","og","om","on","oo","ory","our","p","ph","r","ra","rc","re","ren","ri","rn","ro","rr","rra","rv","s","se","sh","sh","sl","so","t","ta","te","tz","u","ull","us","us","ve","x","y","ynn","yo","zer"];
+const NG_W4 = ["lut","aam","adain","adon","ain","aira","ais","ako","alary","ald","aliam","aline","ama","amari","ami","an","anan","ander","ankem","ano","aot","ar","ari","aroch","aron","ary","as","asha","asia","ay","azan","bbert","brone","cinbe","ck","cko","dai","dain","dalis","ddery","den","dian","dor","eah","eal","eam","ean","edain","ee","een","eif","enain","enar","enard","endon","eous","era","erm","eron","ery","ery","ethel","eve","even","eybol","fer","fir","firem","frey","gal","garom","gawa","gen","ggy","gil","gin","gon","gout","ham","haru","haun","helle","heo","hera","hina","hon","ht","iador","iam","ian","ias","iba","ice","igan","iko","ill","ilus","imor","ine","inus","ion","ira","is","ita","ka","katt","ker","ket","key","ku","la","lain","lash","ld","le","lem","ley","liaf","ll","lliden","loki","ma","main","mar","mara","maros","mer","mi","mie","mon","mor","morn","ndus","ndy","nell","ner","net","nny","nor","ntz","nuary","oconi","odenn","odor","off","old","om","omi","omoru","onton","onus","oole","oot","oot","oram","orm","orn","ory","ouhm","oum","ouos","ous","pher","pike","ra","rah","ran","rd","rea","ree","rem","ren","ri","rio","rlie","rom","ron","ros","rot","rry","run","rynn","shima","shin","son","sose","ta","tac","tain","tall","tar","ter","terian","thain","thor","thorne","tide","to","tone","tor","uce","udain","uib","ull","us","use","use","va","vid","von","wran","wrath","xander","xia","xieam","xoust","yle","zell","zuo"];
+
+function genFirstName() {
+  return pick(NG_W1) + pick(NG_W2) + pick(NG_W3) + pick(NG_W4);
+}
+
+/* Mascot surnames — give the fantasy first name a sports-flavored last name */
+const SURNAMES = [
+  "Whiskers","Pawington","Snouter","Furr","Nibbles","Talons","Scales","Thunderclaw",
+  "Finsworth","Tailwhip","Brushfoot","Glimmerfang","Hootington","Bubblesnap","Dustfeather",
+  "Bristle","Mossback","Quillbeard","Velvetfoot","Pebble","Ironclaw","Dapplecoat",
+  "Wartooth","Fizzlepaw","Marshmallow","Pricklesnoot","Chompers","Whisper",
+  "Hopstride","Dribblepaw","Snufflenose","Crashfoot"
+];
+const SUFFIXES = ["", "", "", "", "", "II", "III", "Jr.", "the Bold", "the Ferocious", "the Cute"];
+
+function genFullName() {
+  let parts = [genFirstName(), pick(SURNAMES)];
+  const sx = pick(SUFFIXES);
+  if (sx) parts.push(sx);
+  return parts.join(" ");
+}
+
+/* ============================================================
+   TEAMS — fixed league of 4 teams
+   ============================================================ */
+const TEAMS = [
+  { id: "fox", emoji: "🦊", short: "FOX", name: "Phoenix Furious Foxes",   color: "#f08a3c" },
+  { id: "bvr", emoji: "🦫", short: "BVR", name: "Boston Brisk Beavers",    color: "#8a5a3a" },
+  { id: "owl", emoji: "🦉", short: "OWL", name: "Seattle Sleepless Owls",  color: "#6da9d6" },
+  { id: "shk", emoji: "🦈", short: "SHK", name: "Tampa Tornado Sharks",    color: "#4d7588" },
+];
+const TEAM_BY_ID = Object.fromEntries(TEAMS.map(t => [t.id, t]));
+
+/* ============================================================
+   POSITION ARCHETYPES — 5 distinct roles, one per team slot
+   Each archetype has stat-tendency offsets applied AFTER random
+   base rolls, so individual variance is preserved.
+
+   Stats: HP (cap 150), DMG (cap 40), DEF (cap 50), SPD (cap 4)
+   Crit chance is 8% baseline; sniper raises it.
+   ============================================================ */
+const POSITIONS = [
+  { id: "tank",    icon: "🛡️", label: "Tank",      cls: "pos-tank",
+    bias: { hp: +35, dmg: -6, def: +14, spd: -0.6, crit: 0    } },
+  { id: "striker", icon: "⚔️", label: "Striker",   cls: "pos-striker",
+    bias: { hp:  +5, dmg: +8, def:  +2, spd:  0,   crit: +0.02 } },
+  { id: "speed",   icon: "💨", label: "Speedster", cls: "pos-speed",
+    bias: { hp: -20, dmg: +3, def:  -8, spd: +1.2, crit: +0.04 } },
+  { id: "brawl",   icon: "👊", label: "Brawler",   cls: "pos-brawl",
+    bias: { hp: +12, dmg: +3, def:  +5, spd: +0.1, crit: +0.01 } },
+  { id: "sniper",  icon: "🎯", label: "Sniper",    cls: "pos-sniper",
+    bias: { hp: -25, dmg: +14, def: -10, spd: +0.2, crit: +0.10 } },
+];
+const POS_BY_ID = Object.fromEntries(POSITIONS.map(p => [p.id, p]));
+
+/* ============================================================
+   COMBAT CAPS & TUNABLES
+   ============================================================ */
+const CAPS = { hp: 150, dmg: 40, def: 50, spd: 4 };
+const COMBAT = {
+  baseCrit: 0.08,
+  rngSpread: 0.5,    // ±50% damage roll
+  hitRange: 18,      // pixels — melee range
+  arenaW: 960,       // 16:9 canvas
+  arenaH: 540,
+  arenaSize: 960,    // back-compat alias (used by some helpers — equals arenaW)
+  frameMs: 50,       // sim tick at 1×
+  roundMaxFrames: 800, // safety cap on a single ROUND (longer for bigger arena)
+  matchMaxFrames: 800, // alias kept for back-compat
+  spawnRadius: 380,  // distance from center where teams spawn (wider arena)
+};
+
+/* ============================================================
+   MATCH STRUCTURE — best-of-N rounds + lives per match
+   Each "match" in the bracket (semifinal, final) is best-of-5
+   rounds. Each round is a 5v5 elimination fight. Knights have
+   3 lives per match — a round-loss costs them one. Run out of
+   lives and they die permanently, dropping their gear.
+   ============================================================ */
+const MATCH = {
+  bestOf: 5,           // number of rounds total
+  roundsToWin: 3,      // first-to-N (must be ceil(bestOf/2))
+  startingLives: 3,    // each player gets this many lives per match
+  interRoundDelay: 0,  // milliseconds (0 = pause for user input)
+};
+
+/* ============================================================
+   EQUIPMENT — weapons, armor, items
+   Each player carries a loadout {weapon, armor, item}. When they
+   die, the loadout drops at their corpse and surviving players
+   may scavenge it. Picked-up gear is renamed
+     "<owner>'s <gear name> (scavenged)"
+   and persists with that name (cascading if scavenged again).
+   ============================================================ */
+
+// Each weapon defines combat modifiers and reach. `range` 0-30 = melee
+// instant-hit; >30 = projectile-based ranged. `projSpeed` = px/frame for
+// the projectile. `inacc` = baseline aim cone in radians (more = wilder).
+const WEAPONS = [
+  { id: "shield",  ico: "🛡",  name: "Riot Shield",   defMod: +6, dmgMod: -2, cdMod:  0,    critMod:  0,    stun: 0,    range: 22,  projSpeed: 0,  inacc: 0,    flavorPos: "tank" },
+  { id: "baton",   ico: "🔱", name: "Stun Baton",    defMod:  0, dmgMod:  0, cdMod:  0,    critMod:  0,    stun: 0.18, range: 22,  projSpeed: 0,  inacc: 0,    flavorPos: "striker" },
+  { id: "laser",   ico: "🔫", name: "Laser Pistol",  defMod:  0, dmgMod: -1, cdMod: -0.30, critMod:  0,    stun: 0,    range: 230, projSpeed: 14, inacc: 0.05, flavorPos: "speed" },
+  { id: "mace",    ico: "🔨", name: "Plasma Mace",   defMod:  0, dmgMod: +3, cdMod:  0,    critMod: +0.02, stun: 0,    range: 26,  projSpeed: 0,  inacc: 0,    flavorPos: "brawl" },
+  { id: "railgun", ico: "📡", name: "Railgun Rifle", defMod: -2, dmgMod: +6, cdMod: +0.30, critMod: +0.05, stun: 0,    range: 460, projSpeed: 22, inacc: 0.025, flavorPos: "sniper" },
+];
+const WEAPON_BY_ID = Object.fromEntries(WEAPONS.map(w => [w.id, w]));
+
+const ARMORS = [
+  { id: "plate",   ico: "🪖", name: "Plate Cuirass",   defMod: +10, spdMod:  0,    critMod:  0,    flavorPos: "tank" },
+  { id: "brig",    ico: "🎽", name: "Brigandine",      defMod:  +5, spdMod:  0,    critMod:  0,    flavorPos: "striker" },
+  { id: "leather", ico: "🧣", name: "Padded Leathers", defMod:  +2, spdMod: +0.3,  critMod:  0,    flavorPos: "speed" },
+  { id: "chain",   ico: "⛓",  name: "Chainmail",       defMod:  +6, spdMod: -0.1,  critMod:  0,    flavorPos: "brawl" },
+  { id: "cloak",   ico: "🧥", name: "Stealth Cloak",   defMod:  +3, spdMod: +0.1,  critMod: +0.05, flavorPos: "sniper" },
+];
+const ARMOR_BY_ID = Object.fromEntries(ARMORS.map(a => [a.id, a]));
+
+// Items have a trigger: "start" (fires once at match begin),
+// "passive" (active for whole match), "lowHP" (fires once when HP <30%).
+const ITEMS = [
+  { id: "stim",      ico: "🍶", name: "Healing Stim",    trigger: "lowHP",   desc: "Restores 25 HP at <30%" },
+  { id: "booster",   ico: "💨", name: "Booster Pack",    trigger: "start",   desc: "+0.5 SPD for 12s" },
+  { id: "visor",     ico: "🎯", name: "Targeting Visor", trigger: "passive", desc: "+5% crit chance" },
+  { id: "grenade",   ico: "🧨", name: "Frag Grenade",    trigger: "lowHP",   desc: "Hits nearest enemy for 18 at <25%" },
+  { id: "powercell", ico: "🔋", name: "Power Cell",      trigger: "start",   desc: "+25% DMG for 15s" },
+];
+const ITEM_BY_ID = Object.fromEntries(ITEMS.map(i => [i.id, i]));
+
+// "Score" a piece of gear so the AI can compare its current piece to
+// a scavengable upgrade. Higher = better for that slot.
+// Crucially, this is now POSITIONAL — a Sniper values a Railgun more than
+// a stronger-on-paper weapon they don't know how to use, so we don't get
+// every survivor swapping to the absolute strongest piece.
+function gearScore(slot, gear, ownerPosition) {
+  if (!gear) return 0;
+  if (slot === "weapon") {
+    let s = gear.dmgMod * 2.5 + gear.defMod * 1.2 + (-gear.cdMod) * 6 + gear.critMod * 80 + gear.stun * 25;
+    // +5 if this weapon matches the owner's natural archetype
+    if (ownerPosition && gear.flavorPos === ownerPosition) s += 5;
+    // Snipers like long-range; Tanks/Brawlers like melee
+    if (ownerPosition === "sniper" && gear.range > 200) s += 4;
+    if (ownerPosition === "speed"  && gear.range > 100) s += 2;
+    if ((ownerPosition === "tank" || ownerPosition === "brawl") && gear.range < 50) s += 3;
+    return s;
+  } else if (slot === "armor") {
+    let s = gear.defMod * 1.5 + gear.spdMod * 6 + gear.critMod * 80;
+    if (ownerPosition && gear.flavorPos === ownerPosition) s += 4;
+    return s;
+  } else if (slot === "item") {
+    return 5;
+  }
+  return 0;
+}
+
+// Equip gear on a player and stamp the scavenged name if applicable.
+// `gear` is a clone of a base WEAPON/ARMOR/ITEM definition with optional
+// `displayName` and `originalOwner` fields when scavenged.
+function gearDisplayName(gear) {
+  if (!gear) return "";
+  return gear.displayName || gear.name;
+}
+
+/* ============================================================
+   PLAYER FACTORY (updated)
+   Each new player spawns with a loadout matching their position by
+   default — Tanks get Riot Shields & Plate Cuirass, Snipers get
+   Railguns & Stealth Cloaks, etc. Items are randomized for variety.
+   ============================================================ */
+let _idCounter = 1;
+
+function rollBaseStats() {
+  return {
+    hp:  RI(70, 120),
+    dmg: RI(8, 22),
+    def: RI(5, 25),
+    spd: +(R(1.4, 2.6).toFixed(2)),
+  };
+}
+
+function makePlayer(teamId, position) {
+  const base = rollBaseStats();
+  const bias = position.bias;
+  const stats = {
+    hp:  clamp(base.hp + bias.hp, 30, CAPS.hp),
+    dmg: clamp(base.dmg + bias.dmg, 4, CAPS.dmg),
+    def: clamp(base.def + bias.def, 0, CAPS.def),
+    spd: clamp(+(base.spd + bias.spd).toFixed(2), 0.6, CAPS.spd),
+    crit: clamp(COMBAT.baseCrit + bias.crit, 0.02, 0.30),
+  };
+  // Default loadout by position (with a fresh cloned object so scavenged
+  // copies can be renamed without mutating the catalog).
+  const defaultWeapon = WEAPONS.find(w => w.flavorPos === position.id) || WEAPONS[0];
+  const defaultArmor  = ARMORS.find(a => a.flavorPos === position.id)  || ARMORS[0];
+  const randomItem    = pick(ITEMS);
+  return {
+    id: _idCounter++,
+    name: genFullName(),
+    teamId,
+    position: position.id,
+    stats,
+    // Loadout — start with default gear for the position
+    weapon: { ...defaultWeapon },
+    armor:  { ...defaultArmor },
+    item:   { ...randomItem },
+    // Career stats (persist across matches/seasons)
+    career: { kills: 0, matchesPlayed: 0, matchesWon: 0, seasonsPlayed: 0, scavenged: 0 },
+    // Mortality
+    deceased: false,
+    deceasedSeason: null,
+    deceasedBy: null,
+    debutSeason: 1,
+    // Match-time fields (reset per match)
+    x: 0, y: 0, vx: 0, vy: 0,
+    hp: stats.hp,
+    alive: true,
+    lives: MATCH.startingLives, // per-match lives (resets at match start)
+    target: null,
+    stunned: 0,        // frames remaining stunned (skip attacks)
+    itemUsed: false,   // whether the consumable has fired this match
+    boostMods: null,   // {dmg, spd, life} active boost from item
+  };
+}
+
+/* ============================================================
+   LEAGUE STATE — top-level game state
+   ============================================================ */
+const LEAGUE = {
+  season: 1,
+  bits: 0,
+  // Roster: { fox: [5 players], bvr: [5 players], owl: [5 players], shk: [5 players] }
+  rosters: {},
+  // Permanent graveyard: array of deceased players (never reaped)
+  graveyard: [],
+  // Team records: { teamId: { wins, losses, championships } }
+  records: {},
+  // Bracket for current season:
+  // { semi1: {teamA, teamB, winner|null, kills}, semi2: {...}, final: {...} }
+  bracket: null,
+  // Match in progress (live state during a fight)
+  match: null,
+  // Active match index in bracket order: "semi1" | "semi2" | "final" | null
+  currentSlot: null,
+  // History of past seasons: [{season, champion, runnerup, casualties}]
+  history: [],
+  // Active bets (cleared after each match resolves)
+  bets: [],
+  // Shop boosts pending: { teamId: { dmg, def, spd, ... } } — applied next match
+  pendingBoosts: {},
+};
+
+function initLeague() {
+  // Build initial 4-team x 5-position rosters
+  for (const team of TEAMS) {
+    LEAGUE.rosters[team.id] = POSITIONS.map(p => makePlayer(team.id, p));
+    LEAGUE.records[team.id] = { wins: 0, losses: 0, championships: 0 };
+  }
+  LEAGUE.season = 1;
+  LEAGUE.bits = 0;
+  LEAGUE.graveyard = [];
+  LEAGUE.history = [];
+  LEAGUE.bets = [];
+  LEAGUE.pendingBoosts = {};
+  buildBracket();
+}
+
+/* ============================================================
+   BRACKET SCHEDULER — random seeding each season
+   4 teams → 2 semifinals → 1 final
+   ============================================================ */
+function buildBracket() {
+  const seeded = shuffle(TEAMS.map(t => t.id));
+  LEAGUE.bracket = {
+    semi1: { teamA: seeded[0], teamB: seeded[1], winner: null, casualties: [] },
+    semi2: { teamA: seeded[2], teamB: seeded[3], winner: null, casualties: [] },
+    final: { teamA: null, teamB: null, winner: null, casualties: [] },
+  };
+  LEAGUE.currentSlot = "semi1";
+}
+
+function advanceBracket() {
+  // Called when a match resolves. Sets up the next match or marks season complete.
+  const b = LEAGUE.bracket;
+  if (LEAGUE.currentSlot === "semi1") {
+    LEAGUE.currentSlot = "semi2";
+    b.final.teamA = b.semi1.winner;
+  } else if (LEAGUE.currentSlot === "semi2") {
+    LEAGUE.currentSlot = "final";
+    b.final.teamB = b.semi2.winner;
+  } else if (LEAGUE.currentSlot === "final") {
+    LEAGUE.currentSlot = null; // season complete
+  }
+}
+
+function activeMatchTeams() {
+  if (!LEAGUE.currentSlot) return null;
+  const m = LEAGUE.bracket[LEAGUE.currentSlot];
+  return { slot: LEAGUE.currentSlot, teamA: m.teamA, teamB: m.teamB, match: m };
+}
+
+/* ============================================================
+   ROSTER MAINTENANCE — replacement of deceased between matches
+   Mortality is permanent; rookies replace dead at the SAME position
+   so each team always has one of each archetype.
+   ============================================================ */
+function reapDeceased() {
+  // Move dead players from active rosters to graveyard, then call up rookies.
+  const callups = [];
+  for (const team of TEAMS) {
+    const roster = LEAGUE.rosters[team.id];
+    for (let i = 0; i < roster.length; i++) {
+      const p = roster[i];
+      if (p.deceased) {
+        // Already dead — make sure they're in graveyard, then replace
+        const pos = POS_BY_ID[p.position];
+        const rookie = makePlayer(team.id, pos);
+        rookie.debutSeason = LEAGUE.season;
+        roster[i] = rookie;
+        callups.push({ team: team.id, rookie, replaced: p });
+      }
+    }
+  }
+  return callups;
+}
+
+/* ============================================================
+   ITEM SYSTEM (shop boosts)
+   Carried over from v2 — purchased between matches, applied once.
+   ============================================================ */
+const SHOP_ITEMS = [
+  { id: "armor",   ico: "🛡️", nm: "Iron Plating",  cost: 25, desc: "+10 DEF, whole team",    apply: (boost) => { boost.def = (boost.def||0)+10; } },
+  { id: "blade",   ico: "⚔️", nm: "Sharpener",     cost: 30, desc: "+5 DMG, whole team",     apply: (boost) => { boost.dmg = (boost.dmg||0)+5; } },
+  { id: "boots",   ico: "👟", nm: "Track Spikes",  cost: 35, desc: "+0.6 SPD, whole team",   apply: (boost) => { boost.spd = (boost.spd||0)+0.6; } },
+  { id: "potion",  ico: "🧪", nm: "Healing Tonic", cost: 40, desc: "+25 HP, whole team",     apply: (boost) => { boost.hp = (boost.hp||0)+25; } },
+  { id: "lucky",   ico: "🍀", nm: "Lucky Charm",   cost: 50, desc: "+5% crit, whole team",   apply: (boost) => { boost.crit = (boost.crit||0)+0.05; } },
+  { id: "sabot",   ico: "🩹", nm: "Saboteur",      cost: 30, desc: "Opponent: -3 DMG",       apply: (boost) => { boost.dmg = (boost.dmg||0)-3; }, target: "opp" },
+];
+const SHOP_BY_ID = Object.fromEntries(SHOP_ITEMS.map(s => [s.id, s]));
+
+function applyBoosts(teamId, players) {
+  // Apply pending boost (if any) to a team's players for this match.
+  const boost = LEAGUE.pendingBoosts[teamId];
+  if (!boost) return;
+  for (const p of players) {
+    if (boost.hp)   p.hp = Math.min(CAPS.hp, p.hp + boost.hp);
+    if (boost.dmg)  p.stats = { ...p.stats, dmg:  clamp(p.stats.dmg + boost.dmg,  1, CAPS.dmg) };
+    if (boost.def)  p.stats = { ...p.stats, def:  clamp(p.stats.def + boost.def,  0, CAPS.def) };
+    if (boost.spd)  p.stats = { ...p.stats, spd:  clamp(+(p.stats.spd + boost.spd).toFixed(2), 0.6, CAPS.spd) };
+    if (boost.crit) p.stats = { ...p.stats, crit: clamp(p.stats.crit + boost.crit, 0.02, 0.50) };
+  }
+  // Boosts consumed
+  delete LEAGUE.pendingBoosts[teamId];
+}
+
+</script>
+
+<!-- ============================================================
+     SIMULATION — Part B
+     Match init, team-aware AI, combat, match-end, bracket flow
+     ============================================================ -->
+<script>
+'use strict';
+
+/* ============================================================
+   COMMENTARY FEED (in-memory, capped)
+   ============================================================ */
+const FEED = [];
+const FEED_MAX = 60;
+
+function feed(kind, msg) {
+  const ts = LEAGUE.match
+    ? `${String(Math.floor(LEAGUE.match.frame / 20)).padStart(2,"0")}:${String(LEAGUE.match.frame % 20 * 5).padStart(2,"0")}`
+    : "--:--";
+  FEED.unshift({ kind, msg, ts });
+  if (FEED.length > FEED_MAX) FEED.length = FEED_MAX;
+  if (typeof renderFeed === "function") renderFeed();
+}
+
+/* Phrase pools */
+const PHRASE_KILL = [
+  "{a} drops {b} like a bag of bricks!",
+  "{a} bodies {b} clean off the field!",
+  "{b} eats turf — {a} stands tall!",
+  "{a} sends {b} to the great beyond!",
+  "{b} is no more. {a} marches on!",
+  "{a} ends {b}'s career permanently!",
+  "{a} POPS {b} like a balloon!",
+];
+const PHRASE_CRIT = [
+  "CRITICAL HIT — {a} just ROCKED {b}!",
+  "DEVASTATING blow from {a}!",
+  "{a} found a weak spot on {b}!",
+];
+const PHRASE_LOWHP = [
+  "{p} is barely standing!",
+  "{p} is on death's door!",
+];
+const PHRASE_MATCH_START = [
+  "Whistle blows — {a} vs {b} is LIVE!",
+  "Five-on-five action begins between {a} and {b}!",
+  "{a} and {b} square up at the center circle!",
+];
+const PHRASE_MATCH_WIN = [
+  "{w} take the W with {alive} still standing!",
+  "It's over! {w} advance!",
+  "{w} clinch the match {alive}-to-zero!",
+];
+function phrasePick(pool, vars) {
+  let s = pick(pool);
+  for (const k of Object.keys(vars)) {
+    s = s.replaceAll("{" + k + "}", vars[k]);
+  }
+  return s;
+}
+
+/* ============================================================
+   MATCH INITIALIZATION (best-of-N rounds)
+   - startMatch() sets up match-level state, resets lives, then
+     immediately starts round 1.
+   - startRound() fields all eligible players (lives > 0, !deceased),
+     positions them, fires "start" items on round 1, sets phase = "round".
+   ============================================================ */
+function startMatch() {
+  if (!LEAGUE.currentSlot) return;
+  const b = LEAGUE.bracket[LEAGUE.currentSlot];
+  if (!b.teamA || !b.teamB) return;
+
+  const teamA = LEAGUE.rosters[b.teamA].filter(p => !p.deceased);
+  const teamB = LEAGUE.rosters[b.teamB].filter(p => !p.deceased);
+
+  // Reset match-level state on every player going into this match
+  for (const p of [...teamA, ...teamB]) {
+    p.lives = MATCH.startingLives;
+    p.itemUsed = false;
+    p.boostMods = null;
+    p.balloonsPopped = 0;
+  }
+
+  // Apply pending shop boosts (consumed once per match)
+  applyBoosts(b.teamA, teamA);
+  applyBoosts(b.teamB, teamB);
+
+  LEAGUE.match = {
+    slot: LEAGUE.currentSlot,
+    teamAId: b.teamA, teamBId: b.teamB,
+    teamAplayers: teamA, teamBplayers: teamB,
+    bestOf: MATCH.bestOf,
+    roundsToWin: MATCH.roundsToWin,
+    roundsWonA: 0, roundsWonB: 0,
+    rounds: [],
+    currentRoundIndex: 0,
+    phase: "preRound",
+    frame: 0,
+    roundFrame: 0,
+    killsByTeam: { [b.teamA]: 0, [b.teamB]: 0 },
+    blood: [],
+    corpses: [],
+    floats: [],
+    drops: [],
+    projectiles: [],
+    terrain: generateTerrain(),  // randomized obstacles for this match
+    winnerId: null,
+  };
+
+  feed("match", phrasePick(PHRASE_MATCH_START, {
+    a: TEAM_BY_ID[b.teamA].emoji + " " + TEAM_BY_ID[b.teamA].short,
+    b: TEAM_BY_ID[b.teamB].emoji + " " + TEAM_BY_ID[b.teamB].short,
+  }));
+
+  // Begin round 1 immediately
+  startRound();
+}
+
+function startRound() {
+  const m = LEAGUE.match;
+  if (!m) return;
+  m.currentRoundIndex++;
+  m.phase = "round";
+  m.roundFrame = 0;
+  m.projectiles = m.projectiles || []; // ensure projectile array exists
+
+  // Eligible players: not deceased AND have lives remaining
+  const eligibleA = m.teamAplayers.filter(p => !p.deceased && p.lives > 0);
+  const eligibleB = m.teamBplayers.filter(p => !p.deceased && p.lives > 0);
+
+  if (!eligibleA.length || !eligibleB.length) {
+    finalizeRound(/*forfeit*/ true);
+    return;
+  }
+
+  layoutTeam(eligibleA, "left");
+  layoutTeam(eligibleB, "right");
+
+  // Spawn neutral items on the field. Round 1 gets the full set (3 Health
+  // Packs + 2 Armor + 3 random); later rounds refresh if the field is
+  // sparse (re-stock so survivors don't fight over scraps).
+  if (m.currentRoundIndex === 1) {
+    spawnNeutralItems(m, 8);
+  } else {
+    if (m.drops.length < 4) spawnNeutralItems(m, 4);
+  }
+
+  if (m.currentRoundIndex === 1) {
+    for (const p of [...eligibleA, ...eligibleB]) {
+      if (p.item && p.item.trigger === "start" && !p.itemUsed) {
+        applyItemTrigger(p);
+      }
+    }
+  }
+
+  feed("match", `🔔 Round ${m.currentRoundIndex} of ${m.bestOf} — fight!`);
+}
+
+/* Spawn neutral items at match start. Mix:
+   - Health Packs (instant +30 HP on pickup, NOT a gear slot)
+   - Armor pieces (random armor — instant equip if upgrade)
+   - General loot (random weapon/armor/item)
+   This gives the AI reasons to scout the map besides chasing each other. */
+function spawnNeutralItems(m, n) {
+  const margin = 60;
+  const safeSpawn = () => {
+    let x, y, attempts = 0;
+    do {
+      x = R(margin, COMBAT.arenaW - margin);
+      y = R(margin, COMBAT.arenaH - margin);
+      attempts++;
+    } while (m.terrain && collidesTerrain(x, y, m.terrain) && attempts < 12);
+    return { x, y };
+  };
+
+  // Always spawn 2-3 Health Packs (consumable HP boost)
+  const healthCount = Math.min(n, 3);
+  for (let i = 0; i < healthCount; i++) {
+    const { x, y } = safeSpawn();
+    m.drops.push({
+      x, y,
+      slot: "health",
+      gear: { id: "healthpack", ico: "❤", name: "Health Pack", heal: 30 },
+      fromName: null, neutral: true,
+    });
+  }
+
+  // Always spawn 2 Armor pieces (equip if upgrade)
+  for (let i = 0; i < 2; i++) {
+    const { x, y } = safeSpawn();
+    m.drops.push({
+      x, y,
+      slot: "armor",
+      gear: { ...pick(ARMORS) },
+      fromName: null, neutral: true,
+    });
+  }
+
+  // Fill the rest with general loot (random slot)
+  const rest = Math.max(0, n - healthCount - 2);
+  for (let i = 0; i < rest; i++) {
+    const { x, y } = safeSpawn();
+    const slot = pick(["weapon", "armor", "item"]);
+    const catalog = slot === "weapon" ? WEAPONS : slot === "armor" ? ARMORS : ITEMS;
+    m.drops.push({
+      x, y, slot,
+      gear: { ...pick(catalog) },
+      fromName: null, neutral: true,
+    });
+  }
+}
+
+/* ============================================================
+   TERRAIN GENERATION
+   3-7 square obstacle blocks clustered near the center vertical
+   line of the arena. Each block is randomly nudged left/right so
+   no two matches feel identical. Blocks are ~36×36px (roughly 2×
+   a player's footprint) and AI must path around them.
+   ============================================================ */
+function generateTerrain() {
+  const blocks = [];
+  const count = RI(3, 7);
+  const SIZE = 36;
+  const cx = COMBAT.arenaW / 2;
+  const usable = COMBAT.arenaH - 80;
+  // Distribute vertically with even spacing, then jitter
+  for (let i = 0; i < count; i++) {
+    const yFrac = (i + 1) / (count + 1);
+    const y = Math.round(40 + usable * yFrac - SIZE / 2);
+    // Cluster near center line, with x-nudge of ±90px
+    const x = Math.round(cx - SIZE / 2 + R(-90, 90));
+    blocks.push({ x, y, size: SIZE });
+  }
+  return blocks;
+}
+
+function layoutTeam(players, side) {
+  const cx = COMBAT.arenaW / 2;
+  const cy = COMBAT.arenaH / 2;
+  const baseX = side === "left" ? cx - COMBAT.spawnRadius : cx + COMBAT.spawnRadius;
+  const spacing = 70;
+  const startY = cy - (players.length - 1) * spacing / 2;
+  for (let i = 0; i < players.length; i++) {
+    const p = players[i];
+    p.hp = p.stats.hp;
+    p.alive = true;
+    p.x = baseX + R(-12, 12);
+    p.y = startY + i * spacing + R(-8, 8);
+    p.vx = 0; p.vy = 0;
+    p.target = null;
+    p.attackCooldown = 0;
+    p.facing = side === "left" ? 1 : -1;
+    p.stunned = 0;
+    p.balloonsPopped = 0;
+    p.aiState = "ENGAGE";   // SEEK_ITEM | ENGAGE | FLEE | FINISH_OFF
+    p.attackedBy = null;    // who hit me last (for mercy/aggro)
+    p.attackedByExpires = 0;
+  }
+}
+
+/* ============================================================
+   ITEM TRIGGERS — fired by "start" or "lowHP" conditions
+   Sets temporary boostMods or applies one-shot effects.
+   ============================================================ */
+function applyItemTrigger(p) {
+  if (!p.item || p.itemUsed) return;
+  const id = p.item.id || (p.item.name && ITEMS.find(i => i.name === p.item.name)?.id);
+  switch (id) {
+    case "booster":
+      p.boostMods = { spd: 0.5, life: 240 }; // 12s @ 50ms tick
+      feed("item", `💨 ${p.name} engages booster pack!`);
+      break;
+    case "powercell":
+      p.boostMods = { dmgMult: 1.25, life: 300 }; // 15s
+      feed("item", `🔋 ${p.name} overcharges power cell!`);
+      break;
+    case "stim":
+      p.hp = Math.min(p.stats.hp, p.hp + 25);
+      feed("item", `🍶 ${p.name} jabs a healing stim — ${p.hp}/${p.stats.hp} HP.`);
+      break;
+    case "grenade": {
+      // Hit nearest living enemy for 18
+      const m = LEAGUE.match;
+      if (!m) break;
+      const enemies = (p.teamId === m.teamAId ? m.teamBplayers : m.teamAplayers).filter(e => e.alive);
+      let best = null, bestD = Infinity;
+      for (const e of enemies) { const d = distance(p, e); if (d < bestD) { bestD = d; best = e; } }
+      if (best) {
+        const grenadeDmg = 18;
+        best.hp -= grenadeDmg;
+        m.floats.push({ x: best.x, y: best.y - 14, text: `-${grenadeDmg}💥`, life: 30, color: "#f7c948" });
+        feed("item", `🧨 ${p.name} chucks a frag grenade at ${best.name}!`);
+        if (best.hp <= 0) {
+          best.hp = 0;
+          best.alive = false;
+          best.balloonsPopped = 3;
+          best.lives = Math.max(0, (best.lives || 0) - 1);
+          p.career.kills++;
+          m.killsByTeam[p.teamId]++;
+          if (best.lives > 0) {
+            feed("kill", `💥 ${p.name}'s grenade KOs ${best.name}! (${best.lives} ${best.lives===1?"life":"lives"} left)`);
+            m.floats.push({ x: best.x, y: best.y - 16, text: "DOWN", life: 24, color: "#ef4d4d" });
+          } else {
+            best.deceased = true;
+            best.deceasedSeason = LEAGUE.season;
+            best.deceasedBy = p.name + " (grenade)";
+            LEAGUE.graveyard.push({
+              name: best.name, teamId: best.teamId, position: best.position,
+              season: LEAGUE.season, killer: p.name + " (grenade)",
+              killerTeam: p.teamId, slot: m.slot, round: m.currentRoundIndex,
+            });
+            m.corpses.push({ x: best.x, y: best.y, color: TEAM_BY_ID[best.teamId].color });
+            dropGear(best, m);
+            feed("kill", `💥 ${p.name} EXPLODES ${best.name} with the grenade!`);
+          }
+        }
+      }
+      break;
+    }
+    case "visor":
+      // passive, handled in damage calc — just mark as "active" for the match
+      // (no boostMods — crit bonus is read directly from the equipped item)
+      break;
+  }
+  p.itemUsed = true;
+}
+
+/* ============================================================
+   AI / TICK — team-aware
+   - Targets only living opponents
+   - Approaches & attacks within hit range
+   - Crit + RNG damage roll
+   ============================================================ */
+/* ============================================================
+   AI / TICK — state-machine driven
+   States per player:
+     ENGAGE      — pursue target, attack when in range
+     SEEK_ITEM   — walk toward a desirable nearby drop
+     FLEE        — low HP, run away from threats
+     FINISH_OFF  — stick on a target that's actively attacking us (mercy)
+   Combat:
+     - Melee weapons (range <= 30) hit instantly when in range
+     - Ranged weapons spawn projectiles with accuracy = f(distance, target velocity)
+     - Projectiles are fire-and-forget; targets can dodge
+   ============================================================ */
+function tickMatch() {
+  const m = LEAGUE.match;
+  if (!m || m.phase !== "round") return;
+
+  m.frame++;
+  m.roundFrame++;
+
+  // Decay floats and blood
+  for (let i = m.floats.length - 1; i >= 0; i--) {
+    m.floats[i].life--;
+    m.floats[i].y -= 0.7;
+    if (m.floats[i].life <= 0) m.floats.splice(i, 1);
+  }
+  for (let i = m.blood.length - 1; i >= 0; i--) {
+    m.blood[i].life--;
+    if (m.blood[i].life <= 0) m.blood.splice(i, 1);
+  }
+
+  // Tick projectiles BEFORE players move so dodging is fair
+  tickProjectiles(m);
+
+  const allA = m.teamAplayers, allB = m.teamBplayers;
+
+  // Per-player AI tick
+  for (const list of [allA, allB]) {
+    const enemies = list === allA ? allB : allA;
+    const allies = list;
+    const enemyAlive = enemies.filter(e => e.alive);
+    for (const p of list) {
+      if (!p.alive) continue;
+
+      // Decay timers
+      if (p.stunned > 0) p.stunned--;
+      if (p.boostMods) {
+        p.boostMods.life--;
+        if (p.boostMods.life <= 0) p.boostMods = null;
+      }
+      if (p.attackedByExpires > 0) p.attackedByExpires--;
+      else p.attackedBy = null;
+
+      // Low-HP item trigger
+      if (p.item && !p.itemUsed && p.item.trigger === "lowHP") {
+        const hpFrac = p.hp / p.stats.hp;
+        const itemId = p.item.id || (p.item.name && ITEMS.find(i => i.name === p.item.name)?.id);
+        const threshold = itemId === "grenade" ? 0.25 : 0.30;
+        if (hpFrac < threshold && hpFrac > 0) applyItemTrigger(p);
+      }
+
+      // Decide AI state
+      decideAIState(p, enemyAlive, m);
+
+      // Execute state
+      executeAIState(p, enemyAlive, m);
+    }
+  }
+
+  // Round end condition
+  const aAlive = allA.filter(p => p.alive).length;
+  const bAlive = allB.filter(p => p.alive).length;
+  if (aAlive === 0 || bAlive === 0 || m.roundFrame >= COMBAT.roundMaxFrames) {
+    finalizeRound();
+  }
+}
+
+/* ============================================================
+   AI STATE SELECTION
+   Picks the highest-priority state for this tick. Preference:
+     1. Stunned → stay put
+     2. Low HP (<25%) AND no one closely engaging me → FLEE
+     3. Recently attacked (within 90 frames) → FINISH_OFF the attacker (mercy)
+     4. Useful drop within 120px AND no enemy within 80px → SEEK_ITEM
+     5. Default → ENGAGE nearest enemy
+   ============================================================ */
+function decideAIState(p, enemyAlive, m) {
+  if (p.stunned > 0) { p.aiState = "ENGAGE"; return; }
+
+  const hpFrac = p.hp / p.stats.hp;
+  const myWpn = p.weapon || {};
+  const ranged = (myWpn.range || 0) > 30;
+
+  // Find nearest enemy
+  let nearest = null, nearestD = Infinity;
+  for (const e of enemyAlive) {
+    const d = distance(p, e);
+    if (d < nearestD) { nearestD = d; nearest = e; }
+  }
+
+  // Mercy / "finish-off the attacker" — if someone is actively shooting us,
+  // and they're close, prefer engaging THEM over chasing a fleeing weakling.
+  if (p.attackedBy) {
+    const attacker = enemyAlive.find(e => e.id === p.attackedBy);
+    if (attacker && distance(p, attacker) < (ranged ? myWpn.range : 220)) {
+      p.aiState = "FINISH_OFF";
+      p.target = attacker;
+      return;
+    }
+  }
+
+  // FLEE — low HP and not currently in melee range of any enemy
+  if (hpFrac < 0.25 && nearest && nearestD > 40) {
+    p.aiState = "FLEE";
+    p.target = nearest; // remember who we're fleeing FROM
+    return;
+  }
+
+  // SEEK_ITEM — useful drop within reach AND no immediate threat
+  const wantedDrop = findBestDropFor(p, m);
+  if (wantedDrop && (!nearest || nearestD > 90)) {
+    p.aiState = "SEEK_ITEM";
+    p.itemTarget = wantedDrop;
+    return;
+  }
+
+  // Default: engage the nearest enemy
+  p.aiState = "ENGAGE";
+  if (nearest) p.target = nearest;
+}
+
+function findBestDropFor(p, m) {
+  if (!m.drops.length) return null;
+  // Vector toward current target (used to prefer drops along the path)
+  let tx = 0, ty = 0, hasDir = false;
+  if (p.target && p.target.alive) {
+    const dx = p.target.x - p.x, dy = p.target.y - p.y;
+    const len = Math.sqrt(dx*dx + dy*dy) || 1;
+    tx = dx / len; ty = dy / len; hasDir = true;
+  }
+  let best = null, bestScore = 0;
+  for (const d of m.drops) {
+    const dx = d.x - p.x, dy = d.y - p.y;
+    const dist2 = dx*dx + dy*dy;
+    if (dist2 > 220*220) continue;
+    const dist = Math.sqrt(dist2);
+
+    let upgrade;
+    if (d.slot === "health") {
+      // Skip if at full HP. Otherwise the value scales with how hurt we are.
+      if (p.hp >= p.stats.hp) continue;
+      const hpFrac = p.hp / p.stats.hp;
+      upgrade = 4 + (1 - hpFrac) * 14; // 4 at full → 18 at near-dead
+    } else {
+      const cur = gearScore(d.slot, p[d.slot], p.position);
+      const newScore = gearScore(d.slot, d.gear, p.position);
+      upgrade = newScore - cur;
+      if (upgrade <= 1.5) continue;
+    }
+
+    // Bonus for "along the way" — drops in the direction of our target
+    // are worth detouring for; drops behind us require a real detour.
+    let alignment = 0;
+    if (hasDir) {
+      const ux = dx / dist, uy = dy / dist;
+      alignment = Math.max(0, ux * tx + uy * ty); // 0..1
+    }
+    const utility = upgrade + alignment * 6 - dist * 0.025;
+    if (utility > bestScore) { bestScore = utility; best = d; }
+  }
+  return best;
+}
+
+/* ============================================================
+   AI STATE EXECUTION
+   ============================================================ */
+function executeAIState(p, enemyAlive, m) {
+  const effSpd = (p.stats.spd + (p.boostMods?.spd || 0)) * 1.4;
+  const wpn = p.weapon || {};
+  const ranged = (wpn.range || 0) > 30;
+
+  switch (p.aiState) {
+    case "FLEE": {
+      // First try to flee TOWARD a health pickup — far better than just running
+      let bestHP = null, bestHPd = Infinity;
+      for (const d of m.drops) {
+        if (d.slot !== "health") continue;
+        const dx = p.x - d.x, dy = p.y - d.y;
+        const dist2 = dx*dx + dy*dy;
+        if (dist2 < 320*320 && dist2 < bestHPd) { bestHPd = dist2; bestHP = d; }
+      }
+      if (bestHP) {
+        const ang = Math.atan2(bestHP.y - p.y, bestHP.x - p.x);
+        moveAlong(p, ang, effSpd * 1.15); // adrenaline + medkit hope
+      } else if (p.target && p.target.alive) {
+        // No health nearby — run AWAY from threat
+        const ang = Math.atan2(p.y - p.target.y, p.x - p.target.x);
+        moveAlong(p, ang, effSpd * 1.1);
+      } else {
+        p.aiState = "ENGAGE";
+        break;
+      }
+      // Maybe fire a desperate parting shot
+      if (ranged && p.target && p.attackCooldown <= 0 && p.stunned <= 0
+          && hasLineOfSight(p.x, p.y, p.target.x, p.target.y, m.terrain)) {
+        fireAttack(p, p.target, m);
+        p.attackCooldown = computeCooldown(p, effSpd);
+      }
+      break;
+    }
+    case "SEEK_ITEM": {
+      const drop = p.itemTarget;
+      if (!drop || !m.drops.includes(drop)) {
+        p.aiState = "ENGAGE";
+        break;
+      }
+      const ang = Math.atan2(drop.y - p.y, drop.x - p.x);
+      moveAlong(p, ang, effSpd);
+      break;
+    }
+    case "FINISH_OFF":
+    case "ENGAGE":
+    default: {
+      if (!p.target || !p.target.alive) {
+        let nearest = null, nearestD = Infinity;
+        for (const e of enemyAlive) {
+          const d = distance(p, e);
+          if (d < nearestD) { nearestD = d; nearest = e; }
+        }
+        p.target = nearest;
+      }
+      if (!p.target) break;
+
+      const d = distance(p, p.target);
+      // Ranged knights prefer to maintain a comfortable distance — UNLESS
+      // there's terrain between them and the target, in which case they
+      // need to close to get a shot.
+      const losClear = !ranged || hasLineOfSight(p.x, p.y, p.target.x, p.target.y, m.terrain);
+      const idealDist = ranged ? Math.min(wpn.range * 0.6, 220) : 18;
+      const tooClose = ranged && d < 80 && losClear;
+      if (tooClose) {
+        // Back-step (only if we have line of sight, otherwise close instead)
+        const ang = Math.atan2(p.y - p.target.y, p.x - p.target.x);
+        moveAlong(p, ang, effSpd * 0.7);
+      } else if (d > idealDist || !losClear) {
+        // Move toward (closing the distance, also tries to clear sight lines)
+        const ang = Math.atan2(p.target.y - p.y, p.target.x - p.x);
+        const moved = moveAlong(p, ang, effSpd);
+        // If movement was blocked by terrain (corner-stuck), strafe perpendicular
+        // for ~15 frames to round the corner.
+        if (!moved && m.terrain) {
+          if (!p.navAvoidanceFrames || p.navAvoidanceFrames <= 0) {
+            p.navAvoidanceFrames = 18;
+            p.navAvoidanceDir = Math.random() < 0.5 ? 1 : -1;
+          }
+        }
+      }
+      if (p.navAvoidanceFrames > 0) {
+        const baseAng = Math.atan2(p.target.y - p.y, p.target.x - p.x);
+        const perpAng = baseAng + (Math.PI / 2) * p.navAvoidanceDir;
+        moveAlong(p, perpAng, effSpd);
+        p.navAvoidanceFrames--;
+      }
+
+      // Attempt attack if in range AND we have line of sight
+      const inRange = ranged
+        ? (d <= wpn.range && hasLineOfSight(p.x, p.y, p.target.x, p.target.y, m.terrain))
+        : d <= COMBAT.hitRange;
+      if (inRange && p.attackCooldown <= 0 && p.stunned <= 0) {
+        fireAttack(p, p.target, m);
+        p.attackCooldown = computeCooldown(p, effSpd);
+      }
+      break;
+    }
+  }
+  if (p.attackCooldown > 0) p.attackCooldown--;
+
+  // Auto-pickup if walking over a drop (any slot, any score — if you're on
+  // top of it, take it and worry about the swap later)
+  attemptScavenge(p, m);
+}
+
+function moveAlong(p, ang, speed) {
+  const startX = p.x, startY = p.y;
+  let nx = p.x + Math.cos(ang) * speed;
+  let ny = p.y + Math.sin(ang) * speed;
+
+  // Apply separation push from nearby allies + enemies (boids-style)
+  const m = LEAGUE.match;
+  if (m) {
+    const all = m.teamAplayers.concat(m.teamBplayers);
+    const SEP_RADIUS = 22;
+    let pushX = 0, pushY = 0;
+    for (const o of all) {
+      if (o === p || !o.alive) continue;
+      const dx = nx - o.x, dy = ny - o.y;
+      const d2 = dx*dx + dy*dy;
+      if (d2 < SEP_RADIUS * SEP_RADIUS && d2 > 0.01) {
+        const d = Math.sqrt(d2);
+        const force = (SEP_RADIUS - d) / SEP_RADIUS;
+        pushX += (dx / d) * force * speed * 0.6;
+        pushY += (dy / d) * force * speed * 0.6;
+      }
+    }
+    nx += pushX;
+    ny += pushY;
+  }
+
+  // Terrain collision — wall-slide if blocked
+  if (m && m.terrain) {
+    if (collidesTerrain(nx, ny, m.terrain)) {
+      // Try X-only
+      if (!collidesTerrain(nx, p.y, m.terrain)) {
+        ny = p.y;
+      } else if (!collidesTerrain(p.x, ny, m.terrain)) {
+        nx = p.x;
+      } else {
+        nx = p.x; ny = p.y;
+      }
+    }
+  }
+
+  p.vx = nx - p.x;
+  p.vy = ny - p.y;
+  p.x = clamp(nx, 12, COMBAT.arenaW - 12);
+  p.y = clamp(ny, 12, COMBAT.arenaH - 12);
+  p.facing = p.vx >= 0 ? 1 : -1;
+
+  // Did we actually move? (Returns false if fully stuck — caller can fall
+  // back to perpendicular strafe to round corners.)
+  return Math.abs(p.x - startX) > 0.1 || Math.abs(p.y - startY) > 0.1;
+}
+
+// Test whether a point (with player half-size ~10px) collides with any
+// terrain block. Terrain blocks are squares with x,y as top-left + size.
+function collidesTerrain(x, y, terrain) {
+  const PAD = 10;
+  for (const t of terrain) {
+    if (x + PAD > t.x && x - PAD < t.x + t.size &&
+        y + PAD > t.y && y - PAD < t.y + t.size) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Liang-Barsky segment-vs-AABB test. Returns true if the segment from
+// (x0,y0) to (x1,y1) intersects the axis-aligned rect at (rx,ry,rw,rh).
+// Used for swept projectile collision and line-of-sight checks.
+function segmentHitsRect(x0, y0, x1, y1, rx, ry, rw, rh) {
+  const dx = x1 - x0, dy = y1 - y0;
+  let tEnter = 0, tExit = 1;
+  const tests = [[-dx, x0 - rx], [dx, rx + rw - x0], [-dy, y0 - ry], [dy, ry + rh - y0]];
+  for (const [p, q] of tests) {
+    if (p === 0) {
+      if (q < 0) return false;
+    } else {
+      const t = q / p;
+      if (p < 0) {
+        if (t > tExit) return false;
+        if (t > tEnter) tEnter = t;
+      } else {
+        if (t < tEnter) return false;
+        if (t < tExit) tExit = t;
+      }
+    }
+  }
+  return tEnter <= tExit;
+}
+
+// Does the line from a→b cross any terrain block?
+function hasLineOfSight(ax, ay, bx, by, terrain) {
+  if (!terrain || !terrain.length) return true;
+  for (const t of terrain) {
+    if (segmentHitsRect(ax, ay, bx, by, t.x, t.y, t.size, t.size)) return false;
+  }
+  return true;
+}
+
+function computeCooldown(p, effSpd) {
+  const baseCd = Math.max(6, Math.round(18 / Math.max(0.6, effSpd / 1.4)));
+  const cdScale = 1 + (p.weapon?.cdMod || 0);
+  return Math.max(4, Math.round(baseCd * cdScale));
+}
+
+/* ============================================================
+   FIRE ATTACK — branches melee vs projectile
+   ============================================================ */
+function fireAttack(attacker, target, m) {
+  const wpn = attacker.weapon || {};
+  const range = wpn.range || 0;
+
+  if (range <= 30) {
+    // Melee — instant resolve as before
+    resolveAttack(attacker, target, m);
+    return;
+  }
+
+  // Ranged — spawn a projectile with accuracy spread
+  const dx = target.x - attacker.x, dy = target.y - attacker.y;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  const baseAng = Math.atan2(dy, dx);
+
+  // Inaccuracy scales with: weapon baseline, distance, target velocity
+  const targetSpeed = Math.sqrt(target.vx*target.vx + target.vy*target.vy);
+  const distFactor = (dist / wpn.range) * 0.18;             // out to weapon range adds spread
+  const velFactor = Math.min(targetSpeed * 0.04, 0.15);     // fast targets harder to track
+  const spread = (wpn.inacc || 0.05) + distFactor + velFactor;
+  const aimAng = baseAng + (Math.random() - 0.5) * 2 * spread;
+
+  const speed = wpn.projSpeed || 12;
+  m.projectiles.push({
+    x: attacker.x + Math.cos(baseAng) * 8,
+    y: attacker.y + Math.sin(baseAng) * 8 - 4,
+    vx: Math.cos(aimAng) * speed,
+    vy: Math.sin(aimAng) * speed,
+    dmg: attacker.stats.dmg + (wpn.dmgMod || 0),
+    fromId: attacker.id,
+    teamId: attacker.teamId,
+    ttl: Math.ceil(wpn.range / speed) + 4,
+    wpn,
+    isCrit: Math.random() < clamp(attacker.stats.crit + (wpn.critMod || 0) + (attacker.armor?.critMod || 0) + ((attacker.item?.id === "visor" || attacker.item?.name === "Targeting Visor") ? 0.05 : 0), 0.02, 0.5),
+  });
+  // Muzzle flash
+  m.floats.push({ x: attacker.x, y: attacker.y - 2, text: "•", life: 6, color: "#ffd96b" });
+}
+
+/* ============================================================
+   PROJECTILE PHYSICS — fly along path, collide with first enemy
+   ============================================================ */
+function tickProjectiles(m) {
+  if (!m.projectiles || !m.projectiles.length) return;
+  const enemies = (teamId) => teamId === m.teamAId ? m.teamBplayers : m.teamAplayers;
+
+  for (let i = m.projectiles.length - 1; i >= 0; i--) {
+    const pr = m.projectiles[i];
+    const oldX = pr.x, oldY = pr.y;
+    pr.x += pr.vx;
+    pr.y += pr.vy;
+    pr.ttl--;
+
+    // Off-arena or expired
+    if (pr.ttl <= 0 || pr.x < 0 || pr.x > COMBAT.arenaW || pr.y < 0 || pr.y > COMBAT.arenaH) {
+      m.projectiles.splice(i, 1);
+      continue;
+    }
+
+    // Terrain — SWEPT check against the segment (oldX,oldY)→(x,y) so fast
+    // projectiles can't tunnel through a 36px block in a single tick.
+    if (m.terrain) {
+      let blocked = null;
+      for (const t of m.terrain) {
+        if (segmentHitsRect(oldX, oldY, pr.x, pr.y, t.x, t.y, t.size, t.size)) {
+          blocked = t; break;
+        }
+      }
+      if (blocked) {
+        // Spark visual at the entry point of the block (approx)
+        m.floats.push({ x: pr.x, y: pr.y, text: "✦", life: 8, color: "#f7c948" });
+        m.projectiles.splice(i, 1);
+        continue;
+      }
+    }
+
+    // Collision with any enemy of the firing team
+    let hit = null;
+    for (const e of enemies(pr.teamId)) {
+      if (!e.alive) continue;
+      const dx = e.x - pr.x, dy = e.y - pr.y;
+      if (dx*dx + dy*dy < 11*11) { hit = e; break; }
+    }
+    if (hit) {
+      const attacker = (m.teamAplayers.concat(m.teamBplayers)).find(x => x.id === pr.fromId);
+      if (attacker) applyProjectileHit(attacker, hit, pr, m);
+      m.projectiles.splice(i, 1);
+    }
+  }
+}
+
+function applyProjectileHit(attacker, defender, pr, m) {
+  // Defense: scale damage down by def/(def+50)
+  const arm = defender.armor || {};
+  const effDef = clamp(defender.stats.def + (arm.defMod || 0) + (defender.weapon?.defMod || 0), 0, CAPS.def + 20);
+  const dmgMult = attacker.boostMods?.dmgMult || 1;
+  const rng = R(1 - COMBAT.rngSpread, 1 + COMBAT.rngSpread);
+  const raw = pr.dmg * dmgMult * rng * (pr.isCrit ? 2.0 : 1.0);
+  const reduction = effDef / (effDef + 50);
+  const dmg = Math.max(1, Math.round(raw * (1 - reduction)));
+
+  // Track attacker-of-record on defender (for mercy state)
+  defender.attackedBy = attacker.id;
+  defender.attackedByExpires = 90;
+
+  applyDamage(attacker, defender, dmg, pr.isCrit, m);
+}
+
+/* Shared damage / death pipeline for both melee and projectile hits */
+function applyDamage(attacker, defender, dmg, isCrit, m) {
+  const hpFracBefore = defender.hp / defender.stats.hp;
+  defender.hp -= dmg;
+  const hpFracAfter = defender.hp / defender.stats.hp;
+  // Balloon pop thresholds at 2/3 and 1/3
+  for (const t of [2/3, 1/3]) {
+    if (hpFracBefore > t && hpFracAfter <= t && defender.hp > 0) {
+      defender.balloonsPopped = (defender.balloonsPopped || 0) + 1;
+      m.floats.push({ x: defender.x, y: defender.y - 18, text: "POP!", life: 22, color: "#fff" });
+    }
+  }
+  m.floats.push({
+    x: defender.x, y: defender.y - 10,
+    text: isCrit ? `${dmg}!` : String(dmg),
+    life: 20,
+    color: isCrit ? "#f7c948" : "#ef4d4d",
+  });
+  for (let i = 0; i < (isCrit ? 6 : 3); i++) {
+    m.blood.push({
+      x: defender.x + R(-6, 6), y: defender.y + R(-6, 6),
+      life: 60 + RI(0, 30),
+      color: pick(["#a01818", "#831010", "#7a0c0c", "#bf2020"]),
+    });
+  }
+  // Stun chance from attacker's weapon
+  const wpn = attacker.weapon || {};
+  if ((wpn.stun || 0) > 0 && Math.random() < wpn.stun) {
+    defender.stunned = 30;
+    m.floats.push({ x: defender.x, y: defender.y - 14, text: "STUN", life: 18, color: "#88c0d0" });
+  }
+  if (isCrit) feed("kill", phrasePick(PHRASE_CRIT, { a: attacker.name, b: defender.name }));
+
+  if (defender.hp <= 0) handleKO(attacker, defender, m);
+}
+
+function handleKO(attacker, defender, m) {
+  defender.alive = false;
+  defender.hp = 0;
+  defender.balloonsPopped = 3;
+  defender.lives = Math.max(0, (defender.lives || 0) - 1);
+  attacker.career.kills++;
+  m.killsByTeam[attacker.teamId]++;
+
+  if (defender.lives > 0) {
+    feed("kill", `💢 ${attacker.name} KOs ${defender.name}! (${defender.lives} ${defender.lives === 1 ? "life" : "lives"} left)`);
+    m.floats.push({ x: defender.x, y: defender.y - 14, text: "DOWN", life: 24, color: "#ef4d4d" });
+  } else {
+    defender.deceased = true;
+    defender.deceasedSeason = LEAGUE.season;
+    defender.deceasedBy = attacker.name;
+    LEAGUE.graveyard.push({
+      name: defender.name, teamId: defender.teamId, position: defender.position,
+      season: LEAGUE.season, killer: attacker.name, killerTeam: attacker.teamId,
+      slot: m.slot, round: m.currentRoundIndex,
+    });
+    m.corpses.push({ x: defender.x, y: defender.y, color: TEAM_BY_ID[defender.teamId].color });
+    dropGear(defender, m);
+    feed("kill", phrasePick(PHRASE_KILL, { a: attacker.name, b: defender.name }));
+  }
+}
+
+/* Melee instant-hit path — kept for backwards-compat with applyItemTrigger
+   (grenade) and for melee weapons. */
+function resolveAttack(attacker, defender, m) {
+  const wpn = attacker.weapon || {};
+  const arm = defender.armor || {};
+  const visorBonus = (attacker.item && (attacker.item.id === "visor" || attacker.item.name === "Targeting Visor")) ? 0.05 : 0;
+  const dmgMult = attacker.boostMods?.dmgMult || 1;
+  const effDmg  = clamp(attacker.stats.dmg + (wpn.dmgMod || 0), 1, CAPS.dmg + 20) * dmgMult;
+  const effDef  = clamp(defender.stats.def + (arm.defMod || 0) + (defender.weapon?.defMod || 0), 0, CAPS.def + 20);
+  const effCrit = clamp(attacker.stats.crit + (wpn.critMod || 0) + (arm.critMod || 0) + visorBonus, 0.02, 0.50);
+  const rng = R(1 - COMBAT.rngSpread, 1 + COMBAT.rngSpread);
+  const isCrit = Math.random() < effCrit;
+  const raw = effDmg * rng * (isCrit ? 2.0 : 1.0);
+  const reduction = effDef / (effDef + 50);
+  const dmg = Math.max(1, Math.round(raw * (1 - reduction)));
+
+  // Track attacker-of-record (mercy state)
+  defender.attackedBy = attacker.id;
+  defender.attackedByExpires = 90;
+
+  applyDamage(attacker, defender, dmg, isCrit, m);
+}
+
+/* ============================================================
+   GEAR DROPS & SCAVENGING
+   When a knight falls, their loadout (weapon/armor/item) drops
+   at the corpse. Living players who walk within range auto-pickup
+   any upgrade. Picked-up gear is renamed
+     "<owner>'s <gear> (scavenged)"
+   and re-drops with that scavenged name if its new owner dies.
+   ============================================================ */
+function dropGear(deadPlayer, m) {
+  const owner = deadPlayer.name;
+  // Drop weapon
+  if (deadPlayer.weapon) {
+    m.drops.push({
+      x: deadPlayer.x + R(-6, 6),
+      y: deadPlayer.y + R(-6, 6),
+      slot: "weapon",
+      gear: { ...deadPlayer.weapon, displayName: scavengedName(deadPlayer.weapon, owner), originalOwner: deadPlayer.weapon.originalOwner || owner },
+      fromName: owner,
+    });
+  }
+  // Drop armor
+  if (deadPlayer.armor) {
+    m.drops.push({
+      x: deadPlayer.x + R(-6, 6),
+      y: deadPlayer.y + R(-6, 6),
+      slot: "armor",
+      gear: { ...deadPlayer.armor, displayName: scavengedName(deadPlayer.armor, owner), originalOwner: deadPlayer.armor.originalOwner || owner },
+      fromName: owner,
+    });
+  }
+  // Drop item only if not yet used (a used consumable is gone)
+  if (deadPlayer.item && !deadPlayer.itemUsed) {
+    m.drops.push({
+      x: deadPlayer.x + R(-6, 6),
+      y: deadPlayer.y + R(-6, 6),
+      slot: "item",
+      gear: { ...deadPlayer.item, displayName: scavengedName(deadPlayer.item, owner), originalOwner: deadPlayer.item.originalOwner || owner },
+      fromName: owner,
+    });
+  }
+}
+
+function scavengedName(gear, owner) {
+  // Strip any existing possessive prefix so we don't get "X's Y's Z's ... (scavenged)"
+  const base = gear.name; // canonical name from catalog (never mutated)
+  return `${owner}'s ${base} (scavenged)`;
+}
+
+function attemptScavenge(p, m) {
+  if (!m.drops.length) return;
+  const RANGE = 22;
+  for (let i = 0; i < m.drops.length; i++) {
+    const d = m.drops[i];
+    const dx = p.x - d.x, dy = p.y - d.y;
+    if (dx*dx + dy*dy > RANGE*RANGE) continue;
+
+    // Health Pack — instant heal, no slot swap
+    if (d.slot === "health") {
+      // Skip if already at full HP
+      if (p.hp >= p.stats.hp) continue;
+      const heal = d.gear.heal || 30;
+      const before = p.hp;
+      p.hp = Math.min(p.stats.hp, p.hp + heal);
+      const actual = p.hp - before;
+      feed("item", `❤ ${p.name} grabs a Health Pack (+${actual} HP → ${p.hp}/${p.stats.hp})`);
+      m.floats.push({ x: p.x, y: p.y - 16, text: `+${actual}♥`, life: 22, color: "#ef4d4d" });
+      m.drops.splice(i, 1);
+      return;
+    }
+
+    // Compare scores using THIS player's archetype preference
+    const slot = d.slot;
+    const currentScore = gearScore(slot, p[slot], p.position);
+    const newScore     = gearScore(slot, d.gear,   p.position);
+
+    // Pick up if it's an upgrade for THIS player. Items always swap.
+    const shouldPickUp = (slot === "item" && !p.itemUsed) ? newScore >= currentScore
+                                                          : newScore > currentScore + 0.5;
+    if (!shouldPickUp) continue;
+
+    // Pick it up — replace gear, mark scavenge stat
+    d.gear.scavengedCount = (d.gear.scavengedCount || 0) + 1;
+    p[slot] = d.gear;
+    if (slot === "item") p.itemUsed = false;
+    p.career.scavenged = (p.career.scavenged || 0) + 1;
+    const legendary = d.gear.scavengedCount >= 3 ? " ⭐LEGENDARY⭐" : "";
+    feed("item", `🎒 ${p.name} scavenges ${gearDisplayName(d.gear)}!${legendary}`);
+    m.floats.push({ x: p.x, y: p.y - 16, text: "+gear", life: 22, color: "#4dd58a" });
+    m.drops.splice(i, 1);
+    return;
+  }
+}
+
+/* ============================================================
+   ROUND FINALIZATION
+   Determines round winner (the team with at least one alive player).
+   Increments round score. Checks for match end (best-of-N reached
+   OR a team has no fielded players for the next round). Otherwise
+   transitions to "betweenRounds" so the user can place bets / shop.
+   ============================================================ */
+function finalizeRound(forfeit) {
+  const m = LEAGUE.match;
+  if (!m) return;
+
+  const aAlive = m.teamAplayers.filter(p => p.alive).length;
+  const bAlive = m.teamBplayers.filter(p => p.alive).length;
+  let roundWinnerId, roundLoserId;
+  if (forfeit) {
+    // One team can't field anyone — the other team wins by forfeit
+    const eligibleA = m.teamAplayers.filter(p => !p.deceased && p.lives > 0);
+    const eligibleB = m.teamBplayers.filter(p => !p.deceased && p.lives > 0);
+    roundWinnerId = eligibleA.length ? m.teamAId : m.teamBId;
+    roundLoserId  = eligibleA.length ? m.teamBId : m.teamAId;
+    feed("match", `⚐ ${TEAM_BY_ID[roundLoserId].short} cannot field a roster — ${TEAM_BY_ID[roundWinnerId].short} wins by forfeit!`);
+  } else if (aAlive > bAlive) {
+    roundWinnerId = m.teamAId; roundLoserId = m.teamBId;
+  } else if (bAlive > aAlive) {
+    roundWinnerId = m.teamBId; roundLoserId = m.teamAId;
+  } else {
+    // Mutual wipe / timeout — coin flip
+    if (Math.random() < 0.5) { roundWinnerId = m.teamAId; roundLoserId = m.teamBId; }
+    else { roundWinnerId = m.teamBId; roundLoserId = m.teamAId; }
+  }
+
+  if (roundWinnerId === m.teamAId) m.roundsWonA++;
+  else m.roundsWonB++;
+
+  // Settle "round winner" bets immediately
+  settleRoundBets(roundWinnerId);
+
+  // Round log
+  m.rounds.push({
+    index: m.currentRoundIndex,
+    winner: roundWinnerId,
+    aAlive, bAlive,
+  });
+
+  feed("match", `🏁 Round ${m.currentRoundIndex} won by ${TEAM_BY_ID[roundWinnerId].emoji} ${TEAM_BY_ID[roundWinnerId].short} (${m.roundsWonA}–${m.roundsWonB} match score).`);
+
+  // Check for match end
+  const matchOver =
+    m.roundsWonA >= m.roundsToWin ||
+    m.roundsWonB >= m.roundsToWin ||
+    forfeit;
+  if (matchOver) {
+    finalizeMatch();
+    return;
+  }
+
+  // Otherwise: between-rounds intermission
+  m.phase = "betweenRounds";
+  if (typeof showRoundIntermission === "function") showRoundIntermission();
+}
+
+function continueAfterRound() {
+  // Called from the round-intermission "Begin Next Round" button.
+  const m = LEAGUE.match;
+  if (!m) return;
+  startRound();
+}
+
+/* ============================================================
+   MATCH FINALIZATION
+   Reached when one team wins `roundsToWin` rounds OR by forfeit.
+   ============================================================ */
+function finalizeMatch() {
+  const m = LEAGUE.match;
+  if (!m) return;
+
+  const winnerId = m.roundsWonA > m.roundsWonB ? m.teamAId : m.teamBId;
+  const loserId = winnerId === m.teamAId ? m.teamBId : m.teamAId;
+  m.winnerId = winnerId;
+  m.phase = "post";
+
+  // Career stats: matchesPlayed for everyone, matchesWon for winners who survived
+  for (const p of [...m.teamAplayers, ...m.teamBplayers]) {
+    p.career.matchesPlayed++;
+  }
+  for (const p of (winnerId === m.teamAId ? m.teamAplayers : m.teamBplayers)) {
+    if (!p.deceased) p.career.matchesWon++;
+  }
+
+  // Records
+  LEAGUE.records[winnerId].wins++;
+  LEAGUE.records[loserId].losses++;
+
+  // Bracket result
+  LEAGUE.bracket[m.slot].winner = winnerId;
+  LEAGUE.bracket[m.slot].casualties = LEAGUE.graveyard
+    .filter(g => g.season === LEAGUE.season && g.slot === m.slot);
+
+  // Settle match-level bets
+  settleBets(winnerId);
+
+  feed("match", `🏆 ${TEAM_BY_ID[winnerId].emoji} ${TEAM_BY_ID[winnerId].name} WIN the match ${m.roundsWonA}–${m.roundsWonB}!`);
+
+  if (typeof showIntermission === "function") showIntermission();
+}
+
+function continueAfterMatch() {
+  // Called from the intermission "Continue" button.
+  const wasFinal = LEAGUE.currentSlot === "final";
+  advanceBracket();
+
+  if (wasFinal || !LEAGUE.currentSlot) {
+    // Season complete
+    finalizeSeason();
+    return;
+  }
+
+  // Reap deceased and build the next match
+  const callups = reapDeceased();
+  for (const c of callups) {
+    feed("spawn", `📣 Rookie call-up: ${c.rookie.name} replaces ${c.replaced.name} (${TEAM_BY_ID[c.team].name}).`);
+  }
+  LEAGUE.match = null;
+  startMatch();
+}
+
+/* ============================================================
+   SEASON FINALIZATION
+   - Champion crowned
+   - History recorded
+   - All deceased reaped, rookies called up
+   - New bracket built for next season
+   ============================================================ */
+function finalizeSeason() {
+  const champion = LEAGUE.bracket.final.winner;
+  const runnerup = champion === LEAGUE.bracket.final.teamA
+    ? LEAGUE.bracket.final.teamB
+    : LEAGUE.bracket.final.teamA;
+  if (champion) {
+    LEAGUE.records[champion].championships++;
+    feed("season",
+      `🏆 SEASON ${LEAGUE.season} CHAMPION: ${TEAM_BY_ID[champion].emoji} ${TEAM_BY_ID[champion].name}!`);
+  }
+
+  const seasonCasualties = LEAGUE.graveyard.filter(g => g.season === LEAGUE.season);
+  LEAGUE.history.push({
+    season: LEAGUE.season,
+    champion, runnerup,
+    semi1Winner: LEAGUE.bracket.semi1.winner,
+    semi2Winner: LEAGUE.bracket.semi2.winner,
+    casualties: seasonCasualties.length,
+  });
+
+  // Show season-end modal; user clicks "Begin Next Season"
+  if (typeof showSeasonEnd === "function") showSeasonEnd(champion, runnerup, seasonCasualties.length);
+}
+
+function beginNextSeason() {
+  // Reap and replace
+  const callups = reapDeceased();
+  for (const p of Object.values(LEAGUE.rosters).flat()) {
+    p.career.seasonsPlayed++;
+  }
+  if (callups.length) {
+    feed("season", `📣 Off-season call-ups: ${callups.length} rookies join the league.`);
+  }
+  LEAGUE.season++;
+  LEAGUE.match = null;
+  buildBracket();
+  startMatch();
+}
+
+/* ============================================================
+   BETTING — both team-level and per-player (last-standing)
+   Odds are computed from rough roster strength.
+   ============================================================ */
+function teamStrength(teamId) {
+  const r = (LEAGUE.rosters[teamId] || []).filter(p => !p.deceased);
+  let s = 0;
+  for (const p of r) {
+    s += p.stats.hp + p.stats.dmg * 4 + p.stats.def + p.stats.spd * 8;
+  }
+  return Math.max(1, s);
+}
+
+function teamOdds(teamA, teamB) {
+  const sA = teamStrength(teamA), sB = teamStrength(teamB);
+  const total = sA + sB;
+  const probA = sA / total, probB = sB / total;
+  // Convert to payout multiplier (with a small house edge of 5%)
+  const margin = 0.95;
+  return {
+    [teamA]: +(margin / probA).toFixed(2),
+    [teamB]: +(margin / probB).toFixed(2),
+  };
+}
+
+function playerOdds(teamA, teamB) {
+  // Probability of "last standing" (or last-killed) for each player.
+  // Crude: stat strength relative to the entire match pool, weighted toward survivors.
+  const all = [
+    ...(LEAGUE.rosters[teamA] || []).filter(p => !p.deceased),
+    ...(LEAGUE.rosters[teamB] || []).filter(p => !p.deceased),
+  ];
+  const strengths = all.map(p =>
+    p.stats.hp / 100 + p.stats.dmg / 8 + p.stats.def / 20 + p.stats.spd / 1.5);
+  const total = strengths.reduce((a,b)=>a+b, 0);
+  const odds = {};
+  for (let i = 0; i < all.length; i++) {
+    const prob = strengths[i] / total;
+    odds[all[i].id] = +(0.85 / Math.max(0.01, prob)).toFixed(2);
+  }
+  return odds;
+}
+
+function placeBet(kind, target, amount) {
+  // kind: "team"  → target is teamId, resolves at MATCH end
+  // kind: "round" → target is teamId, resolves at end of NEXT round
+  // kind: "player" → target is playerId, resolves at MATCH end
+  if (amount <= 0 || amount > LEAGUE.bits) return false;
+  if (!LEAGUE.currentSlot) return false;
+  const slotData = LEAGUE.bracket[LEAGUE.currentSlot];
+  if (!slotData || !slotData.teamA || !slotData.teamB) return false;
+
+  let payoutMult = 1;
+  if (kind === "team" || kind === "round") {
+    const o = teamOdds(slotData.teamA, slotData.teamB);
+    payoutMult = o[target] || 0;
+    if (!payoutMult) return false;
+    // Round bets pay slightly less (resolves faster, less risk)
+    if (kind === "round") payoutMult = +(payoutMult * 0.85).toFixed(2);
+  } else if (kind === "player") {
+    const o = playerOdds(slotData.teamA, slotData.teamB);
+    payoutMult = o[target] || 0;
+    if (!payoutMult) return false;
+  } else return false;
+
+  LEAGUE.bits -= amount;
+  // For round bets, tag them with the upcoming round index so they only resolve once
+  const m = LEAGUE.match;
+  const roundIndex = (kind === "round" && m) ? (m.currentRoundIndex + (m.phase === "betweenRounds" || m.phase === "preRound" ? 1 : 0)) : null;
+  LEAGUE.bets.push({ kind, target, amount, payoutMult, slot: LEAGUE.currentSlot, roundIndex });
+  feed("item", `💰 Bet placed: ${amount} bits on ${kind}=${target} @ ${payoutMult}x`);
+  return true;
+}
+
+// Resolves "round winner" bets after each round.
+function settleRoundBets(roundWinnerTeamId) {
+  const m = LEAGUE.match;
+  if (!m) return;
+  const remaining = [];
+  for (const bet of LEAGUE.bets) {
+    if (bet.kind !== "round" || bet.slot !== m.slot) {
+      remaining.push(bet);
+      continue;
+    }
+    if (bet.roundIndex !== m.currentRoundIndex) {
+      remaining.push(bet);
+      continue;
+    }
+    const tName = TEAM_BY_ID[bet.target]?.short || "?";
+    if (bet.target === roundWinnerTeamId) {
+      const payout = Math.round(bet.amount * bet.payoutMult);
+      LEAGUE.bits += payout;
+      feed("item", `💸 Round bet won! +${payout} bits (round ${m.currentRoundIndex})`);
+      if (typeof window !== "undefined" && window.toast)
+        window.toast(`Round ${m.currentRoundIndex} bet WON: <b>+${payout}</b> bits on ${tName}`, "win");
+    } else {
+      feed("item", `💔 Round bet lost: ${bet.amount} bits.`);
+      if (typeof window !== "undefined" && window.toast)
+        window.toast(`Round ${m.currentRoundIndex} bet lost: <b>-${bet.amount}</b> bits on ${tName}`, "lose");
+    }
+  }
+  LEAGUE.bets = remaining;
+}
+
+// Resolves match-level bets ("team" + "player") after a match concludes.
+function settleBets(winnerTeamId) {
+  const m = LEAGUE.match;
+  if (!m) return;
+  const lastStanding = (() => {
+    const all = [...m.teamAplayers, ...m.teamBplayers]
+      .filter(p => !p.deceased && p.lives > 0);
+    if (!all.length) return null;
+    all.sort((a,b) => (b.lives - a.lives) || (b.career.kills - a.career.kills));
+    return all[0];
+  })();
+
+  const remaining = [];
+  for (const bet of LEAGUE.bets) {
+    if (bet.slot !== m.slot) {
+      remaining.push(bet);
+      continue;
+    }
+    if (bet.kind === "round") {
+      LEAGUE.bits += bet.amount;
+      feed("item", `↩️ Unsettled round bet refunded: ${bet.amount} bits.`);
+      if (typeof window !== "undefined" && window.toast)
+        window.toast(`Round bet refunded: <b>+${bet.amount}</b> bits (match ended early)`, "warn");
+      continue;
+    }
+    let win = false;
+    let label = "";
+    if (bet.kind === "team") {
+      label = TEAM_BY_ID[bet.target]?.short || "?";
+      if (bet.target === winnerTeamId) win = true;
+    }
+    if (bet.kind === "player") {
+      const p = Object.values(LEAGUE.rosters).flat().find(x => x.id === bet.target);
+      label = p ? p.name : "?";
+      if (lastStanding && bet.target === lastStanding.id) win = true;
+    }
+    if (win) {
+      const payout = Math.round(bet.amount * bet.payoutMult);
+      LEAGUE.bits += payout;
+      feed("item", `💸 Bet won! +${payout} bits (${bet.kind})`);
+      if (typeof window !== "undefined" && window.toast)
+        window.toast(`Match bet WON: <b>+${payout}</b> bits on ${label}`, "win");
+    } else {
+      feed("item", `💔 Bet lost: ${bet.amount} bits on ${bet.kind}.`);
+      if (typeof window !== "undefined" && window.toast)
+        window.toast(`Match bet lost: <b>-${bet.amount}</b> bits on ${label}`, "lose");
+    }
+  }
+  LEAGUE.bets = remaining;
+
+  // Always award some bits for watching
+  const watchReward = 5 + RI(0, 5);
+  LEAGUE.bits += watchReward;
+  feed("item", `🪙 +${watchReward} bits (broadcast tip)`);
+}
+
+/* ============================================================
+   SHOP
+   ============================================================ */
+function buyItem(itemId, teamId) {
+  const item = SHOP_BY_ID[itemId];
+  if (!item) return false;
+  if (LEAGUE.bits < item.cost) return false;
+  if (LEAGUE.match && LEAGUE.match.phase === "round") return false; // can't buy during a live round
+
+  // Saboteur targets the OPPONENT in the next active match
+  let appliedToTeam = teamId;
+  if (item.target === "opp") {
+    if (!LEAGUE.currentSlot) return false;
+    const m = LEAGUE.bracket[LEAGUE.currentSlot];
+    appliedToTeam = (teamId === m.teamA) ? m.teamB : m.teamA;
+  }
+
+  const boost = LEAGUE.pendingBoosts[appliedToTeam] || (LEAGUE.pendingBoosts[appliedToTeam] = {});
+  item.apply(boost);
+  LEAGUE.bits -= item.cost;
+  feed("item", `🛒 Purchased ${item.nm} for ${TEAM_BY_ID[appliedToTeam].name}.`);
+  return true;
+}
+
+</script>
+
+<!-- ============================================================
+     UI — Part A
+     Canvas pixel-art renderer + DOM render functions
+     ============================================================ -->
+<script>
+'use strict';
+
+/* ============================================================
+   ELEMENT REFS
+   ============================================================ */
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+const arenaCanvas = $("#arena");
+const ctx = arenaCanvas.getContext("2d");
+ctx.imageSmoothingEnabled = false;
+
+/* Decorative scenery — fixed positions for 16:9 arena (960×540) */
+const SCENERY = [
+  { type: "pillar", x: 200, y: 130 },
+  { type: "pillar", x: 760, y: 130 },
+  { type: "pillar", x: 200, y: 410 },
+  { type: "pillar", x: 760, y: 410 },
+  { type: "banner", x: 480, y:  60 },
+  { type: "banner", x: 480, y: 480 },
+  { type: "rubble", x: 340, y: 280 },
+  { type: "rubble", x: 620, y: 280 },
+  { type: "rubble", x: 480, y: 200 },
+  { type: "rubble", x: 480, y: 340 },
+];
+
+function drawScenery() {
+  for (const s of SCENERY) {
+    if (s.type === "pillar") {
+      // Stone pillar with shadow
+      ctx.fillStyle = "rgba(0,0,0,0.35)";
+      ctx.beginPath();
+      ctx.ellipse(s.x + 2, s.y + 14, 8, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#3a4555";
+      ctx.fillRect(s.x - 6, s.y - 12, 12, 24);
+      ctx.fillStyle = "#4d5a6c";
+      ctx.fillRect(s.x - 6, s.y - 12, 12, 3);
+      ctx.fillRect(s.x - 6, s.y + 9,  12, 3);
+      ctx.fillStyle = "#2a323d";
+      ctx.fillRect(s.x - 7, s.y - 14, 14, 2);
+      ctx.fillRect(s.x - 7, s.y + 12, 14, 2);
+    } else if (s.type === "banner") {
+      ctx.fillStyle = "#2a323d";
+      ctx.fillRect(s.x - 1, s.y - 14, 2, 28);
+      ctx.fillStyle = "#7a2828";
+      ctx.fillRect(s.x - 8, s.y - 8, 16, 12);
+      ctx.fillStyle = "#f7c948";
+      ctx.fillRect(s.x - 2, s.y - 4, 4, 4);
+    } else if (s.type === "rubble") {
+      ctx.fillStyle = "#2a323d";
+      ctx.fillRect(s.x - 4, s.y, 8, 4);
+      ctx.fillStyle = "#3a4555";
+      ctx.fillRect(s.x - 6, s.y + 2, 4, 3);
+      ctx.fillRect(s.x + 2, s.y + 1, 4, 3);
+    }
+  }
+}
+
+function drawDrops(m) {
+  for (const d of m.drops) {
+    const bob = Math.sin((m.frame + d.x) * 0.12) * 1.5;
+    const legendary = (d.gear.scavengedCount || 0) >= 3;
+
+    if (d.slot === "health") {
+      // Pulsing red cross — visually distinct from gear drops
+      const pulse = 0.7 + 0.3 * Math.sin(m.frame * 0.18 + d.x);
+      ctx.fillStyle = `rgba(239,77,77,${0.25 * pulse})`;
+      ctx.beginPath();
+      ctx.arc(d.x, d.y + bob, 11, 0, Math.PI * 2);
+      ctx.fill();
+      // White cross plate
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(d.x - 6, d.y - 6 + bob, 12, 12);
+      ctx.fillStyle = "#ef4d4d";
+      ctx.fillRect(d.x - 5, d.y - 1 + bob, 10, 2); // horizontal bar
+      ctx.fillRect(d.x - 1, d.y - 5 + bob, 2, 10); // vertical bar
+      continue;
+    }
+
+    // Gear drops (weapon/armor/item)
+    ctx.fillStyle = legendary ? "rgba(180,109,240,0.35)" : "rgba(247,201,72,0.2)";
+    ctx.beginPath();
+    ctx.arc(d.x, d.y + bob, legendary ? 11 : 9, 0, Math.PI * 2);
+    ctx.fill();
+    const bgColor =
+      d.slot === "weapon" ? "#5a3030" :
+      d.slot === "armor"  ? "#304a5a" : "#3a5a30";
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(d.x - 5, d.y - 5 + bob, 10, 10);
+    if (legendary) {
+      ctx.strokeStyle = "#b46df0";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(d.x - 6, d.y - 6 + bob, 12, 12);
+    }
+    ctx.fillStyle = "#fff";
+    ctx.font = "9px ui-sans-serif, system-ui";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(d.gear.ico || "?", d.x, d.y + bob);
+    ctx.textBaseline = "alphabetic";
+  }
+}
+
+function drawProjectiles(m) {
+  if (!m.projectiles) return;
+  for (const pr of m.projectiles) {
+    const team = TEAM_BY_ID[pr.teamId];
+    const isRailgun = pr.wpn?.id === "railgun";
+    if (isRailgun) {
+      // Trace a thin bright line for railgun shots
+      ctx.strokeStyle = team.color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(pr.x - pr.vx * 1.5, pr.y - pr.vy * 1.5);
+      ctx.lineTo(pr.x, pr.y);
+      ctx.stroke();
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(pr.x - 1, pr.y - 1, 2, 2);
+    } else {
+      // Laser pistol — small glowing dot with trail
+      ctx.fillStyle = "rgba(239,77,77,0.5)";
+      ctx.fillRect(pr.x - pr.vx * 0.6 - 1, pr.y - pr.vy * 0.6 - 1, 2, 2);
+      ctx.fillStyle = "#ef4d4d";
+      ctx.fillRect(pr.x - 1, pr.y - 1, 2, 2);
+      ctx.fillStyle = "#ff8b8b";
+      ctx.fillRect(pr.x, pr.y, 1, 1);
+    }
+  }
+}
+
+function drawTerrain(m) {
+  if (!m.terrain) return;
+  for (const t of m.terrain) {
+    // Drop shadow under block
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fillRect(t.x + 2, t.y + 2, t.size, t.size);
+    // Stone face
+    ctx.fillStyle = "#3a4555";
+    ctx.fillRect(t.x, t.y, t.size, t.size);
+    // Top + left highlights
+    ctx.fillStyle = "#5a6678";
+    ctx.fillRect(t.x, t.y, t.size, 4);
+    ctx.fillRect(t.x, t.y, 4, t.size);
+    // Bottom + right shadow
+    ctx.fillStyle = "#2a323d";
+    ctx.fillRect(t.x + t.size - 4, t.y, 4, t.size);
+    ctx.fillRect(t.x, t.y + t.size - 4, t.size, 4);
+    // Mortar cross (gives the "2x2 cells" feel)
+    ctx.fillStyle = "#1f2630";
+    ctx.fillRect(t.x + t.size / 2 - 1, t.y + 4, 2, t.size - 8);
+    ctx.fillRect(t.x + 4, t.y + t.size / 2 - 1, t.size - 8, 2);
+  }
+}
+
+/* ============================================================
+   CANVAS RENDERER
+   Pixel-art arena: turf, scenery, players (team-colored knights
+   with balloon HP), blood, corpses, drops, floating dmg numbers.
+   ============================================================ */
+function drawArena() {
+  const W = arenaCanvas.width, H = arenaCanvas.height;
+  // Turf — pixel-art pattern
+  ctx.fillStyle = "#0e1820";
+  ctx.fillRect(0, 0, W, H);
+  // Subtle grid (broadcast aesthetic)
+  ctx.strokeStyle = "rgba(255,255,255,0.025)";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < W; i += 30) {
+    ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, H); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(W, i); ctx.stroke();
+  }
+  // Center circle
+  ctx.strokeStyle = "rgba(247,201,72,0.15)";
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(W/2, H/2, 60, 0, Math.PI * 2); ctx.stroke();
+  // Center cross
+  ctx.beginPath(); ctx.moveTo(W/2 - 6, H/2); ctx.lineTo(W/2 + 6, H/2);
+  ctx.moveTo(W/2, H/2 - 6); ctx.lineTo(W/2, H/2 + 6); ctx.stroke();
+
+  // Scenery (mascots float OVER this — drawn before mascots)
+  drawScenery();
+
+  if (!LEAGUE.match) {
+    ctx.fillStyle = "#5a6675";
+    ctx.font = "16px ui-sans-serif, system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText("Awaiting next match…", W/2, H/2 - 80);
+    return;
+  }
+
+  const m = LEAGUE.match;
+
+  // Blood spatter (under players)
+  for (const b of m.blood) {
+    ctx.fillStyle = b.color;
+    ctx.fillRect(Math.floor(b.x), Math.floor(b.y), 2, 2);
+  }
+  // Corpse markers
+  for (const c of m.corpses) {
+    ctx.fillStyle = "#2a2a2a";
+    ctx.fillRect(c.x - 5, c.y - 2, 10, 4);
+    ctx.fillStyle = c.color;
+    ctx.globalAlpha = 0.4;
+    ctx.fillRect(c.x - 6, c.y - 6, 12, 12);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(c.x - 4, c.y - 4); ctx.lineTo(c.x + 4, c.y + 4);
+    ctx.moveTo(c.x + 4, c.y - 4); ctx.lineTo(c.x - 4, c.y + 4);
+    ctx.stroke();
+  }
+
+  // Terrain obstacles (drawn over corpses but under drops/players;
+  // mascots float OVER them via balloons but bodies clip on the side)
+  drawTerrain(m);
+
+  // Drops (gear lying on the field)
+  drawDrops(m);
+
+  // Players — pixel-art mascot knights
+  for (const list of [m.teamAplayers, m.teamBplayers]) {
+    for (const p of list) {
+      if (!p.alive) continue;
+      drawMascot(p);
+    }
+  }
+
+  // Projectiles (drawn over players so they're visible)
+  drawProjectiles(m);
+
+  // Floating damage numbers / status pings
+  for (const f of m.floats) {
+    ctx.fillStyle = f.color;
+    ctx.font = "bold 11px 'Courier New', monospace";
+    ctx.textAlign = "center";
+    ctx.globalAlpha = clamp(f.life / 22, 0, 1);
+    ctx.fillText(f.text, f.x, f.y);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawMascot(p) {
+  const team = TEAM_BY_ID[p.teamId];
+  const pos = POS_BY_ID[p.position];
+  // Float bob — gentle vertical motion to sell the balloons-on-back fiction
+  const t = (LEAGUE.match?.frame || 0);
+  const bob = Math.sin((t + p.id * 7) * 0.08) * 1.5;
+  const x = Math.floor(p.x);
+  const y = Math.floor(p.y + bob);
+
+  // ----- Drop shadow (on the ground, doesn't bob) -----
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  ctx.beginPath();
+  ctx.ellipse(x, Math.floor(p.y) + 14, 11, 3.5, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // ----- Balloons (HP) attached to the helmet, popping at 2/3 and 1/3 -----
+  const popped = p.balloonsPopped || 0;
+  const balloonY = y - 32;
+  const balloonOffsets = [-6, 0, 6];
+  ctx.strokeStyle = "rgba(220,220,220,0.6)";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 3; i++) {
+    if (i < popped) continue;
+    const bx = x + balloonOffsets[i];
+    ctx.beginPath();
+    ctx.moveTo(x, y - 18);
+    ctx.lineTo(bx, balloonY + 4);
+    ctx.stroke();
+  }
+  for (let i = 0; i < 3; i++) {
+    if (i < popped) continue;
+    const bx = x + balloonOffsets[i];
+    ctx.fillStyle = team.color;
+    ctx.beginPath();
+    ctx.ellipse(bx, balloonY, 3.5, 4.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
+    ctx.fillRect(bx - 1, balloonY - 2, 1, 1);
+    ctx.fillStyle = team.color;
+    ctx.fillRect(bx, balloonY + 4, 1, 1);
+  }
+
+  // ----- Team-color halo behind the avatar -----
+  ctx.fillStyle = team.color;
+  ctx.globalAlpha = 0.32;
+  ctx.beginPath();
+  ctx.arc(x, y, 13, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // ----- Robot body (emoji) -----
+  ctx.font = "16px ui-sans-serif, system-ui, 'Apple Color Emoji', 'Segoe UI Emoji'";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("🤖", x, y + 3);
+
+  // ----- Team Mascot Helmet (stacked above robot, like a costume head) -----
+  ctx.font = "14px ui-sans-serif, system-ui, 'Apple Color Emoji', 'Segoe UI Emoji'";
+  ctx.fillText(team.emoji, x, y - 9);
+
+  // ----- Weapon icon (small, to the side, follows facing) -----
+  const wxSign = p.facing >= 0 ? 1 : -1;
+  const wpnIco = p.weapon?.ico;
+  if (wpnIco) {
+    ctx.font = "10px ui-sans-serif, system-ui, 'Apple Color Emoji', 'Segoe UI Emoji'";
+    ctx.fillText(wpnIco, x + 11 * wxSign, y + 2);
+  }
+
+  // ----- Position dot (tiny tag to identify archetype) -----
+  const posColor =
+    pos.id === "tank"    ? "#88c0d0" :
+    pos.id === "striker" ? "#ef6e6e" :
+    pos.id === "speed"   ? "#f7c948" :
+    pos.id === "brawl"   ? "#d8b070" : "#b46df0";
+  ctx.fillStyle = posColor;
+  ctx.fillRect(x - 1, y - 22, 2, 2);
+
+  // ----- AI state badge (subtle, only for non-default states) -----
+  if (p.aiState && p.aiState !== "ENGAGE") {
+    const badge =
+      p.aiState === "FLEE"       ? "🏃" :
+      p.aiState === "SEEK_ITEM"  ? "🎒" :
+      p.aiState === "FINISH_OFF" ? "🎯" : "";
+    if (badge) {
+      ctx.font = "9px ui-sans-serif, system-ui, 'Apple Color Emoji', 'Segoe UI Emoji'";
+      ctx.fillText(badge, x + 10, y - 14);
+    }
+  }
+
+  // ----- Stunned indicator -----
+  if (p.stunned > 0) {
+    ctx.fillStyle = "#88c0d0";
+    ctx.font = "bold 10px 'Courier New', monospace";
+    ctx.fillText("⚡", x, y - 26);
+  }
+
+  // ----- Boost glow ring -----
+  if (p.boostMods) {
+    ctx.strokeStyle = "rgba(247,201,72,0.7)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(x, y, 14, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // ----- Attack flicker (white outline pulse just after firing) -----
+  if (p.attackCooldown > 12) {
+    ctx.strokeStyle = "rgba(255,255,255,0.5)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x - 9, y - 9, 18, 18);
+  }
+
+  ctx.textBaseline = "alphabetic";
+  ctx.textAlign = "left";
+}
+
+
+function lighten(hex, amt) {
+  const c = hex.replace("#", "");
+  const r = parseInt(c.substr(0,2), 16);
+  const g = parseInt(c.substr(2,2), 16);
+  const b = parseInt(c.substr(4,2), 16);
+  const f = (v) => clamp(Math.round(v + (255 - v) * amt), 0, 255);
+  return `rgb(${f(r)}, ${f(g)}, ${f(b)})`;
+}
+
+/* ============================================================
+   DOM RENDERERS
+   ============================================================ */
+function renderHeader() {
+  $("#bitsAmt").textContent = LEAGUE.bits;
+  $("#seasonNum").textContent = LEAGUE.season;
+  $("#leagueBadge").textContent = "S" + LEAGUE.season;
+  // Ticker shows current matchup or next-up cue
+  const am = activeMatchTeams();
+  if (LEAGUE.match && LEAGUE.match.phase === "round") {
+    $("#ticker").textContent = `LIVE · R${LEAGUE.match.currentRoundIndex}/${LEAGUE.match.bestOf} · ${TEAM_BY_ID[LEAGUE.match.teamAId].name} ${LEAGUE.match.roundsWonA}–${LEAGUE.match.roundsWonB} ${TEAM_BY_ID[LEAGUE.match.teamBId].name}`;
+  } else if (LEAGUE.match && LEAGUE.match.phase === "betweenRounds") {
+    $("#ticker").textContent = `INTERMISSION · ${LEAGUE.match.roundsWonA}–${LEAGUE.match.roundsWonB} · place bets between rounds →`;
+  } else if (am) {
+    $("#ticker").textContent = `NEXT: ${am.slot.toUpperCase()} · ${TEAM_BY_ID[am.teamA]?.name || "?"} vs ${TEAM_BY_ID[am.teamB]?.name || "?"}`;
+  } else {
+    $("#ticker").textContent = `Season ${LEAGUE.season} complete. Begin next season →`;
+  }
+}
+
+function renderTeamPanel(side) {
+  const am = activeMatchTeams();
+  if (!am) return;
+  const teamId = side === "A" ? am.teamA : am.teamB;
+  const team = TEAM_BY_ID[teamId];
+  const players = LEAGUE.rosters[teamId];
+
+  $("#team" + side + "emoji").textContent = team.emoji;
+  $("#team" + side + "name").textContent = team.name;
+  const rec = LEAGUE.records[teamId];
+  $("#team" + side + "record").textContent =
+    `${rec.wins}–${rec.losses} · ${rec.championships} 🏆`;
+
+  // Alive count (active match only; otherwise show roster size)
+  let alive = 0;
+  if (LEAGUE.match && (LEAGUE.match.teamAId === teamId || LEAGUE.match.teamBId === teamId)) {
+    const list = LEAGUE.match.teamAId === teamId ? LEAGUE.match.teamAplayers : LEAGUE.match.teamBplayers;
+    alive = list.filter(p => p.alive).length;
+  } else {
+    alive = players.filter(p => !p.deceased).length;
+  }
+  const aliveEl = $("#team" + side + "alive");
+  aliveEl.textContent = alive;
+  aliveEl.className = "alive-count " + (alive >= 4 ? "green" : alive >= 2 ? "amber" : "red");
+
+  // Player chips
+  const list = $("#team" + side + "list");
+  list.innerHTML = "";
+  for (const p of players) {
+    const pos = POS_BY_ID[p.position];
+    const chip = document.createElement("div");
+    chip.className = "player-chip" + (p.deceased ? " deceased" : "");
+    const liveP = LEAGUE.match
+      ? (LEAGUE.match.teamAplayers.concat(LEAGUE.match.teamBplayers)).find(x => x.id === p.id)
+      : null;
+    // KO'd this round but still has lives → "dead" class (faded, not deceased)
+    if (liveP && !liveP.alive && !p.deceased) chip.classList.add("dead");
+    const hpFrac = liveP ? clamp(liveP.hp / liveP.stats.hp, 0, 1) : 1;
+    const hpCls = hpFrac > 0.6 ? "" : hpFrac > 0.3 ? "med" : "low";
+
+    // Lives pips (only show when in an active match)
+    let livesHTML = "";
+    if (liveP && !p.deceased && LEAGUE.match) {
+      const totalLives = MATCH.startingLives;
+      const remaining = liveP.lives;
+      let pips = "";
+      for (let i = 0; i < totalLives; i++) {
+        pips += `<div class="pip${i >= remaining ? " spent" : ""}"></div>`;
+      }
+      livesHTML = `<div class="lives" title="${remaining}/${totalLives} lives">${pips}</div>`;
+    }
+
+    chip.innerHTML = `
+      <div class="pos-icon ${pos.cls}" title="${pos.label}">${pos.icon}</div>
+      <div class="name-block">
+        <div class="pname">${escapeHTML(p.name)}</div>
+        <div class="psub">${pos.label} · K:${p.career.kills}${livesHTML ? "" : ""}</div>
+      </div>
+      ${livesHTML || `<div class="hpbar ${hpCls}"><div style="width:${Math.round(hpFrac * 100)}%"></div></div>`}
+    `;
+    chip.addEventListener("click", () => showPlayerProfile(p));
+    list.appendChild(chip);
+  }
+}
+
+function renderBracketStrip() {
+  const slots = ["semi1", "semi2", "final"];
+  const labels = { semi1: "Semifinal 1", semi2: "Semifinal 2", final: "Final" };
+  for (const slot of slots) {
+    const el = $(`.bracket-match[data-slot="${slot}"]`);
+    if (!el) continue;
+    const m = LEAGUE.bracket[slot];
+    el.classList.toggle("current", LEAGUE.currentSlot === slot);
+    el.classList.toggle("done", !!m.winner);
+
+    const aId = m.teamA, bId = m.teamB;
+    const aTeam = aId ? TEAM_BY_ID[aId] : null;
+    const bTeam = bId ? TEAM_BY_ID[bId] : null;
+    const aClass = m.winner === aId ? "winner" : (m.winner && m.winner !== aId ? "loser" : "");
+    const bClass = m.winner === bId ? "winner" : (m.winner && m.winner !== bId ? "loser" : "");
+
+    // Score: kills if match was played, else "—"
+    let aScore = "—", bScore = "—";
+    if (m.winner && LEAGUE.match && LEAGUE.match.slot === slot) {
+      aScore = LEAGUE.match.killsByTeam[aId] || 0;
+      bScore = LEAGUE.match.killsByTeam[bId] || 0;
+    }
+
+    el.innerHTML = `
+      <div class="label">${labels[slot]}</div>
+      <div class="team-row ${aClass}">
+        <span class="em">${aTeam?.emoji || "❓"}</span>
+        <span class="nm">${aTeam?.short || "TBD"}</span>
+        <span class="sc">${aScore}</span>
+      </div>
+      <div class="vs-divider">VS</div>
+      <div class="team-row ${bClass}">
+        <span class="em">${bTeam?.emoji || "❓"}</span>
+        <span class="nm">${bTeam?.short || "TBD"}</span>
+        <span class="sc">${bScore}</span>
+      </div>
+    `;
+  }
+}
+
+function renderStandings() {
+  const list = $("#standingsList");
+  list.innerHTML = "";
+  const sorted = TEAMS.slice().sort((a, b) => {
+    const ra = LEAGUE.records[a.id], rb = LEAGUE.records[b.id];
+    if (rb.championships !== ra.championships) return rb.championships - ra.championships;
+    if (rb.wins !== ra.wins) return rb.wins - ra.wins;
+    return ra.losses - rb.losses;
+  });
+  for (let i = 0; i < sorted.length; i++) {
+    const t = sorted[i];
+    const r = LEAGUE.records[t.id];
+    const row = document.createElement("div");
+    row.style.cssText = "display:grid;grid-template-columns:18px 1fr auto;gap:6px;padding:5px 10px;font-size:11px;border-bottom:1px solid var(--bg-2);";
+    row.innerHTML = `
+      <span style="color:var(--mute);">${i+1}</span>
+      <span>${t.emoji} ${escapeHTML(t.short)}</span>
+      <span style="font-family:'Courier New',monospace;color:var(--dim);">${r.wins}-${r.losses} · ${r.championships}🏆</span>
+    `;
+    list.appendChild(row);
+  }
+}
+
+function renderArenaHeader() {
+  if (!LEAGUE.match) {
+    $("#matchupLabel").textContent = LEAGUE.currentSlot
+      ? `${TEAM_BY_ID[LEAGUE.bracket[LEAGUE.currentSlot]?.teamA]?.short || "?"} vs ${TEAM_BY_ID[LEAGUE.bracket[LEAGUE.currentSlot]?.teamB]?.short || "?"}`
+      : "— vs —";
+    $("#matchClock").textContent = "00:00";
+    renderPhasePill();
+    return;
+  }
+  const m = LEAGUE.match;
+  $("#matchupLabel").textContent =
+    `${TEAM_BY_ID[m.teamAId].emoji} ${TEAM_BY_ID[m.teamAId].short} vs ${TEAM_BY_ID[m.teamBId].short} ${TEAM_BY_ID[m.teamBId].emoji}`;
+  const seconds = Math.floor((m.roundFrame || 0) * COMBAT.frameMs / 1000);
+  $("#matchClock").textContent = `R${m.currentRoundIndex}/${m.bestOf} ${String(Math.floor(seconds/60)).padStart(2,"0")}:${String(seconds%60).padStart(2,"0")}`;
+  renderPhasePill();
+}
+
+function renderPhasePill() {
+  const phaseEl = $("#matchPhase");
+  if (!phaseEl) return;
+  const m = LEAGUE.match;
+  const baseLabel = m
+    ? ({"preRound":"Pre-round", "round":"LIVE", "betweenRounds":"INTERMISSION", "post":"POST"}[m.phase] || m.phase)
+    : "Pre-match";
+
+  // Add the autoplay countdown pill if there is one
+  let pill = "";
+  if (typeof AUTOPLAY_PENDING !== "undefined" && AUTOPLAY_PENDING) {
+    const ms = Math.max(0, AUTOPLAY_PENDING.remainingMs);
+    const sec = Math.ceil(ms / 1000);
+    const urgent = sec <= 5 ? " urgent" : "";
+    const labelMap = { round: "Next round", match: "Next match", season: "Next season" };
+    const label = labelMap[AUTOPLAY_PENDING.kind] || "Next";
+    const apOff = (typeof AUTOPLAY !== "undefined" && !AUTOPLAY.enabled) ? "(paused)" : `${sec}s`;
+    pill = ` <span class="countdown-pill${urgent}" id="cdPill" title="Click to skip">${label}: ${apOff} <button class="countdown-skip" id="cdSkipBtn">skip ▸</button></span>`;
+  }
+  phaseEl.innerHTML = baseLabel + pill;
+  // Re-bind skip button each frame (cheap)
+  const skipBtn = $("#cdSkipBtn");
+  if (skipBtn) skipBtn.onclick = (e) => { e.stopPropagation(); skipCountdown(); };
+}
+
+function renderRoundStrip() {
+  const stripEl = $("#roundStrip");
+  if (!stripEl) return;
+  const m = LEAGUE.match;
+  if (!m) {
+    stripEl.style.display = "none";
+    return;
+  }
+  stripEl.style.display = "";
+  const pipsEl = $("#roundPips");
+  pipsEl.innerHTML = "";
+  // Build pips for each round in best-of-N
+  // Pip filled with team color if won by that team; current round pulses gold.
+  for (let i = 1; i <= m.bestOf; i++) {
+    const pip = document.createElement("div");
+    pip.className = "pip";
+    const round = m.rounds.find(r => r.index === i);
+    if (round) {
+      pip.classList.add(round.winner === m.teamAId ? "won-a" : "won-b");
+      pip.style.backgroundColor = TEAM_BY_ID[round.winner].color;
+      pip.style.borderColor = TEAM_BY_ID[round.winner].color;
+    }
+    if (m.phase === "round" && i === m.currentRoundIndex) {
+      pip.classList.add("current");
+    }
+    pipsEl.appendChild(pip);
+  }
+  $("#roundScore").textContent = `${m.roundsWonA}–${m.roundsWonB}`;
+}
+
+function renderFeed() {
+  const el = $("#commentary");
+  el.innerHTML = "";
+  for (const item of FEED) {
+    const div = document.createElement("div");
+    div.className = "commentary-item " + item.kind;
+    div.innerHTML = `<span class="ts">${item.ts}</span><span>${escapeHTML(item.msg)}</span>`;
+    el.appendChild(div);
+  }
+}
+
+/* ============================================================
+   BET RENDERING
+   - renderBetSummaryRail: read-only summary of active bets in right rail
+   - renderBetTab: full betting interface on the Bet tab
+   ============================================================ */
+function renderBetSummaryRail() {
+  const el = $("#betsSummaryRail");
+  if (!el) return;
+  const countEl = $("#activeBetCountBadge");
+  const tabBadge = $("#tabBetCount");
+  const count = LEAGUE.bets.length;
+  if (countEl) countEl.textContent = count;
+  if (tabBadge) {
+    tabBadge.textContent = count;
+    tabBadge.style.display = count > 0 ? "" : "none";
+  }
+  el.innerHTML = "";
+  if (!count) {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = "No active bets.";
+    el.appendChild(empty);
+  } else {
+    for (const bet of LEAGUE.bets) {
+      const div = document.createElement("div");
+      div.className = "active-bet";
+      const label = betLabelFor(bet);
+      const tag = bet.kind === "round" ? `<span style="color:var(--blu);font-size:9px;">[round ${bet.roundIndex}]</span> ` : "";
+      div.innerHTML = `${tag}<b>${bet.amount}</b> bits on ${label} @ ${bet.payoutMult}× → <b>${Math.round(bet.amount * bet.payoutMult)}</b>`;
+      el.appendChild(div);
+    }
+  }
+  const link = document.createElement("a");
+  link.className = "place-link";
+  link.dataset.goTab = "bet";
+  link.textContent = (count ? "Manage / place more bets →" : "Place a bet →");
+  link.addEventListener("click", (e) => { e.preventDefault(); switchTab("bet"); });
+  el.appendChild(link);
+}
+
+function betLabelFor(bet) {
+  if (bet.kind === "team" || bet.kind === "round") {
+    const t = TEAM_BY_ID[bet.target];
+    return t ? `${t.emoji} ${escapeHTML(t.short)}` : "?";
+  }
+  if (bet.kind === "player") {
+    const p = Object.values(LEAGUE.rosters).flat().find(x => x.id === bet.target);
+    return p ? escapeHTML(p.name) : "?";
+  }
+  return "?";
+}
+
+function renderBetTab() {
+  const am = activeMatchTeams();
+  const subEl = $("#betSubLine");
+  if (!am) {
+    subEl.textContent = "No match is set up. Bets unavailable.";
+    $("#betMarketTeamRows").innerHTML = "";
+    $("#betMarketRoundRows").innerHTML = "";
+    $("#betMarketPlayerRows").innerHTML = "";
+    $("#betPagePlace").disabled = true;
+    $("#betSelectionLabel").textContent = "Pick a market above";
+    renderBetHistory();
+    return;
+  }
+  const aId = am.teamA, bId = am.teamB;
+  const m = LEAGUE.match;
+  const phase = m?.phase || "preRound";
+
+  // Sub-line states
+  const matchInProgress = phase === "round" || phase === "betweenRounds";
+  subEl.textContent = matchInProgress
+    ? `Round ${m.currentRoundIndex} / ${m.bestOf} — ${TEAM_BY_ID[aId].short} ${m.roundsWonA}–${m.roundsWonB} ${TEAM_BY_ID[bId].short}.`
+    : `Pre-match betting open for ${TEAM_BY_ID[aId].short} vs ${TEAM_BY_ID[bId].short}.`;
+
+  const matchOver = phase === "post";
+  const roundLocked = phase === "round"; // round bets locked while round is live
+  $("#mwState").textContent = matchOver ? "CLOSED" : "OPEN";
+  $("#rwState").textContent = roundLocked ? "LOCKED (round live)" : matchOver ? "CLOSED" : "OPEN";
+  $("#lsState").textContent = matchOver ? "CLOSED" : "OPEN";
+
+  // Match Winner market
+  const teamRows = $("#betMarketTeamRows");
+  teamRows.innerHTML = "";
+  const odds = teamOdds(aId, bId);
+  for (const tid of [aId, bId]) {
+    const t = TEAM_BY_ID[tid];
+    const row = document.createElement("div");
+    row.className = "bet-team-row" + (BET_PICK.kind === "team" && BET_PICK.target === tid ? " selected" : "");
+    row.innerHTML = `
+      <div class="em">${t.emoji}</div>
+      <div class="info">
+        <div class="nm">${escapeHTML(t.name)}</div>
+        <div class="od">Pays <b>${odds[tid]}×</b></div>
+      </div>
+      <div style="font-size:11px;color:var(--dim);font-family:'Courier New',monospace;">${LEAGUE.records[tid].wins}-${LEAGUE.records[tid].losses}</div>
+    `;
+    if (!matchOver) row.addEventListener("click", () => { BET_PICK = { kind: "team", target: tid }; refreshBetSelection(); });
+    teamRows.appendChild(row);
+  }
+
+  // Round Winner market (same teams, slightly lower payout)
+  const roundRows = $("#betMarketRoundRows");
+  roundRows.innerHTML = "";
+  for (const tid of [aId, bId]) {
+    const t = TEAM_BY_ID[tid];
+    const roundPay = +(odds[tid] * 0.85).toFixed(2);
+    const row = document.createElement("div");
+    row.className = "bet-team-row" + (BET_PICK.kind === "round" && BET_PICK.target === tid ? " selected" : "");
+    row.innerHTML = `
+      <div class="em">${t.emoji}</div>
+      <div class="info">
+        <div class="nm">Next: ${escapeHTML(t.short)}</div>
+        <div class="od">Pays <b>${roundPay}×</b></div>
+      </div>
+    `;
+    if (!matchOver && !roundLocked) row.addEventListener("click", () => { BET_PICK = { kind: "round", target: tid }; refreshBetSelection(); });
+    if (matchOver || roundLocked) row.style.opacity = "0.5";
+    roundRows.appendChild(row);
+  }
+
+  // Last Standing player market
+  const pOdds = playerOdds(aId, bId);
+  const playerRows = $("#betMarketPlayerRows");
+  playerRows.innerHTML = "";
+  for (const tid of [aId, bId]) {
+    const players = (LEAGUE.rosters[tid] || []).filter(p => !p.deceased);
+    for (const p of players) {
+      const pos = POS_BY_ID[p.position];
+      const row = document.createElement("div");
+      row.className = "pbet-row" + (BET_PICK.kind === "player" && BET_PICK.target === p.id ? " selected" : "");
+      const livesText = m && p.lives !== undefined ? ` · ${p.lives}♥` : "";
+      row.innerHTML = `
+        <span class="pos ${pos.cls}">${pos.icon}</span>
+        <span class="nm">${TEAM_BY_ID[tid].emoji} ${escapeHTML(p.name)}<span style="color:var(--dim);font-size:10px;">${livesText}</span></span>
+        <span class="od">${pOdds[p.id]}×</span>
+      `;
+      if (!matchOver) row.addEventListener("click", () => { BET_PICK = { kind: "player", target: p.id }; refreshBetSelection(); });
+      playerRows.appendChild(row);
+    }
+  }
+
+  refreshBetSelection();
+  renderBetHistory();
+}
+
+function refreshBetSelection() {
+  const labelEl = $("#betSelectionLabel");
+  const placeBtn = $("#betPagePlace");
+  if (!BET_PICK.kind) {
+    labelEl.textContent = "Pick a market above";
+    placeBtn.disabled = true;
+    return;
+  }
+  if (BET_PICK.kind === "team") {
+    const t = TEAM_BY_ID[BET_PICK.target];
+    labelEl.innerHTML = `Match Winner: ${t.emoji} ${escapeHTML(t.name)}`;
+  } else if (BET_PICK.kind === "round") {
+    const t = TEAM_BY_ID[BET_PICK.target];
+    labelEl.innerHTML = `Round Winner: ${t.emoji} ${escapeHTML(t.name)}`;
+  } else if (BET_PICK.kind === "player") {
+    const p = Object.values(LEAGUE.rosters).flat().find(x => x.id === BET_PICK.target);
+    labelEl.innerHTML = `Last Standing: ${escapeHTML(p?.name || "?")}`;
+  }
+  placeBtn.disabled = false;
+}
+
+function renderBetHistory() {
+  const body = $("#betHistoryBody");
+  body.innerHTML = "";
+  if (!LEAGUE.bets.length) {
+    body.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--dim);padding:14px;">No active bets. Place one above.</td></tr>`;
+    return;
+  }
+  for (const bet of LEAGUE.bets) {
+    const tr = document.createElement("tr");
+    const market = bet.kind === "team" ? "Match Winner" : bet.kind === "round" ? `Round ${bet.roundIndex || "?"} Winner` : "Last Standing";
+    tr.innerHTML = `
+      <td>${bet.kind === "round" ? "Round " + (bet.roundIndex || "?") : "Match"}</td>
+      <td>${market}</td>
+      <td>${betLabelFor(bet)}</td>
+      <td style="text-align:right;font-family:'Courier New',monospace;">${bet.amount}</td>
+      <td style="text-align:right;font-family:'Courier New',monospace;">${bet.payoutMult}×</td>
+      <td style="text-align:right;font-family:'Courier New',monospace;color:var(--gold);">${Math.round(bet.amount * bet.payoutMult)}</td>
+    `;
+    body.appendChild(tr);
+  }
+}
+
+/* ============================================================
+   STORE RENDERING — full grid on the Store tab
+   ============================================================ */
+function renderStore() {
+  const grid = $("#storeGrid");
+  if (!grid) return;
+  grid.innerHTML = "";
+  const am = activeMatchTeams();
+  const roundLive = LEAGUE.match && LEAGUE.match.phase === "round";
+
+  for (const item of SHOP_ITEMS) {
+    const btn = document.createElement("button");
+    btn.className = "store-card";
+    btn.disabled = LEAGUE.bits < item.cost || roundLive || !am;
+    if (btn.disabled) btn.setAttribute("aria-disabled", "true");
+    btn.innerHTML = `
+      <div class="ico">${item.ico}</div>
+      <div class="nm">${escapeHTML(item.nm)}</div>
+      <div class="cost">${item.cost} bits</div>
+      <div class="desc">${escapeHTML(item.desc)}</div>
+    `;
+    btn.addEventListener("click", () => {
+      if (!am) return;
+      const ok = buyItem(item.id, am.teamA);
+      if (ok) renderAll();
+    });
+    grid.appendChild(btn);
+  }
+
+  // "Coming soon" sandbag placeholder card
+  const future = document.createElement("button");
+  future.className = "store-card future";
+  future.disabled = true;
+  future.setAttribute("aria-disabled", "true");
+  future.innerHTML = `
+    <div class="ico">🪨</div>
+    <div class="nm">Sandbag</div>
+    <div class="cost">~150 bits</div>
+    <div class="desc">Literally tie a sandbag to a specific knight to slow them down — subtle match-weighting for high cost. Pick your target. Pick your price. Live with the consequences.</div>
+    <div class="badge">COMING SOON</div>
+  `;
+  grid.appendChild(future);
+}
+
+function renderAll() {
+  renderHeader();
+  renderTeamPanel("A");
+  renderTeamPanel("B");
+  renderBracketStrip();
+  renderRoundStrip();
+  renderStandings();
+  renderArenaHeader();
+  renderFeed();
+  renderBetSummaryRail();
+  renderBetTab();
+  renderStore();
+}
+
+/* ============================================================
+   UTILS
+   ============================================================ */
+function escapeHTML(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"
+  }[c]));
+}
+
+let BET_PICK = { kind: null, target: null };
+
+</script>
+
+<!-- ============================================================
+     UI — Part B
+     Event handlers, modals, cloud sync, main loop, bootstrap
+     ============================================================ -->
+<script>
+'use strict';
+
+/* ============================================================
+   SPEED CONTROL
+   ============================================================ */
+let SPEED = 1;
+let lastTick = 0;
+let pendingTickAcc = 0;
+
+function setSpeed(s) {
+  SPEED = s;
+  $$(".controls .grp button").forEach(btn => {
+    btn.classList.toggle("active", parseFloat(btn.dataset.spd) === s);
+  });
+}
+
+/* ============================================================
+   MODAL SYSTEM
+   ============================================================ */
+let MODAL_AFTER_CLOSE = null;
+
+function openModal(title, bodyHTML, footerHTML, onCloseCallback) {
+  $("#modalTitle").textContent = title;
+  $("#modalBody").innerHTML = bodyHTML;
+  $("#modalFooter").innerHTML = footerHTML || "";
+  $("#modalBack").classList.add("show");
+  MODAL_AFTER_CLOSE = onCloseCallback || null;
+}
+function closeModal() {
+  $("#modalBack").classList.remove("show");
+  const cb = MODAL_AFTER_CLOSE;
+  MODAL_AFTER_CLOSE = null;
+  if (cb) cb();
+}
+
+$("#modalClose").addEventListener("click", closeModal);
+$("#modalBack").addEventListener("click", (e) => {
+  if (e.target.id === "modalBack") closeModal();
+});
+
+/* ============================================================
+   INTERMISSION OVERLAY (after each match)
+   ============================================================ */
+/* ============================================================
+   ROUND INTERMISSION — non-blocking
+   Posts a summary to the commentary feed, fires toast notifications,
+   and schedules an auto-advance countdown. User can manually skip
+   via the countdown pill in the arena header.
+   ============================================================ */
+function showRoundIntermission() {
+  const m = LEAGUE.match;
+  if (!m) return;
+  const lastRound = m.rounds[m.rounds.length - 1];
+  if (!lastRound) return;
+  const winner = TEAM_BY_ID[lastRound.winner];
+
+  // Summary in feed
+  feed("match", `📊 Match score after R${m.currentRoundIndex}: ${TEAM_BY_ID[m.teamAId].short} ${m.roundsWonA}–${m.roundsWonB} ${TEAM_BY_ID[m.teamBId].short}.`);
+
+  // Permanent casualties this round → individual toasts
+  const thisRoundCasualties = LEAGUE.graveyard
+    .filter(g => g.season === LEAGUE.season && g.slot === m.slot && g.round === m.currentRoundIndex);
+  for (const c of thisRoundCasualties) {
+    toast(`☠️ <b>${escapeHTML(c.name)}</b> (${TEAM_BY_ID[c.teamId].short}) ran out of lives. Slain by ${escapeHTML(c.killer)}.`, "lose", { ico: "☠️", ttl: 8000 });
+  }
+
+  // Schedule next round (auto-advances after 60s if AUTOPLAY enabled)
+  scheduleAutoAdvance("round", () => {
+    continueAfterRound();
+    renderAll();
+  });
+}
+
+/* ============================================================
+   MATCH INTERMISSION — non-blocking
+   ============================================================ */
+function showIntermission() {
+  const m = LEAGUE.match;
+  if (!m) return;
+  const winner = TEAM_BY_ID[m.winnerId];
+  const isFinal = m.slot === "final";
+  const matchLabel = m.slot === "semi1" ? "Semifinal 1" : m.slot === "semi2" ? "Semifinal 2" : "Final";
+
+  // Match-end toast: green if user won bets on this team
+  toast(`🏆 ${winner.emoji} <b>${escapeHTML(winner.name)}</b> win ${matchLabel} ${m.roundsWonA}–${m.roundsWonB}.`, "info", { ico: "🏆", ttl: 8000 });
+
+  if (isFinal) {
+    // Season end will trigger from finalizeSeason; auto-schedule there.
+    scheduleAutoAdvance("match", () => {
+      continueAfterMatch();
+      renderAll();
+    });
+  } else {
+    scheduleAutoAdvance("match", () => {
+      continueAfterMatch();
+      renderAll();
+    });
+  }
+}
+
+/* ============================================================
+   SEASON-END MODAL (champion banner)
+   ============================================================ */
+function showSeasonEnd(championId, runnerupId, casualtyCount) {
+  const champ = TEAM_BY_ID[championId];
+  // Big celebratory toast (longer TTL)
+  toast(`🏆 SEASON ${LEAGUE.season} CHAMPIONS: ${champ.emoji} <b>${escapeHTML(champ.name)}</b>! ${casualtyCount} knights buried this season.`, "info", { ico: "🏆", ttl: 10000 });
+  // Schedule next season
+  scheduleAutoAdvance("season", () => {
+    beginNextSeason();
+    renderAll();
+  });
+}
+
+/* ============================================================
+   PLAYER PROFILE MODAL
+   ============================================================ */
+function showPlayerProfile(p) {
+  const team = TEAM_BY_ID[p.teamId];
+  const pos = POS_BY_ID[p.position];
+  const status = p.deceased
+    ? `<span style="color:var(--red);">DECEASED · S${p.deceasedSeason} · slain by ${escapeHTML(p.deceasedBy || "?")}</span>`
+    : `<span style="color:var(--grn);">ACTIVE</span>`;
+  const w = p.weapon, a = p.armor, it = p.item;
+  const gearRow = (g, slotLabel) => {
+    if (!g) return "";
+    const dn = g.displayName || g.name;
+    const scavenged = !!g.displayName;
+    return `<tr>
+      <th>${slotLabel}</th>
+      <td>${g.ico || "·"} ${escapeHTML(dn)}${scavenged ? ` <span style="color:var(--gold);font-size:9px;">●</span>` : ""}</td>
+    </tr>`;
+  };
+  const body = `
+    <div style="text-align:center;font-size:48px;">${pos.icon}</div>
+    <div style="text-align:center;font-size:14px;font-weight:700;">${escapeHTML(p.name)}</div>
+    <div style="text-align:center;font-size:11px;color:var(--dim);margin-bottom:14px;">
+      ${team.emoji} ${escapeHTML(team.name)} · ${pos.label} · Debut S${p.debutSeason}
+    </div>
+    <table class="dt">
+      <tr><th>Status</th><td>${status}</td></tr>
+      ${gearRow(w, "Weapon")}
+      ${gearRow(a, "Armor")}
+      ${gearRow(it, "Item")}
+      <tr><th>HP</th><td class="num">${p.stats.hp}</td></tr>
+      <tr><th>DMG (base)</th><td class="num">${p.stats.dmg}${w?.dmgMod ? ` (${w.dmgMod>=0?"+":""}${w.dmgMod} from ${w.ico})` : ""}</td></tr>
+      <tr><th>DEF (base)</th><td class="num">${p.stats.def}${(a?.defMod||0)+(w?.defMod||0) ? ` (+${(a?.defMod||0)+(w?.defMod||0)} from gear)` : ""}</td></tr>
+      <tr><th>SPD (base)</th><td class="num">${p.stats.spd.toFixed(2)}${a?.spdMod ? ` (${a.spdMod>=0?"+":""}${a.spdMod} from ${a.ico})` : ""}</td></tr>
+      <tr><th>Crit (base)</th><td class="num">${(p.stats.crit * 100).toFixed(1)}%</td></tr>
+      <tr><th>Kills (career)</th><td class="num">${p.career.kills}</td></tr>
+      <tr><th>Scavenged (career)</th><td class="num">${p.career.scavenged || 0}</td></tr>
+      <tr><th>Matches played</th><td class="num">${p.career.matchesPlayed}</td></tr>
+      <tr><th>Matches won</th><td class="num">${p.career.matchesWon}</td></tr>
+      <tr><th>Seasons played</th><td class="num">${p.career.seasonsPlayed}</td></tr>
+    </table>
+    <div style="font-size:10px;color:var(--dim);margin-top:8px;text-align:center;">
+      <span style="color:var(--gold);">●</span> = scavenged from a fallen knight
+    </div>
+  `;
+  openModal("Knight Profile", body, `<button onclick="closeModal()" class="secondary">Close</button>`);
+}
+
+/* ============================================================
+   TEAMS DIRECTORY MODAL
+   ============================================================ */
+function showTeams() {
+  let html = "";
+  for (const t of TEAMS) {
+    const r = LEAGUE.records[t.id];
+    const roster = LEAGUE.rosters[t.id];
+    const aliveCount = roster.filter(p => !p.deceased).length;
+    html += `
+      <div style="margin-bottom:14px;">
+        <div style="display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding-bottom:6px;margin-bottom:6px;">
+          <span style="font-size:24px;">${t.emoji}</span>
+          <div style="flex:1;">
+            <div style="font-weight:700;">${escapeHTML(t.name)}</div>
+            <div style="font-size:11px;color:var(--dim);">${r.wins}–${r.losses} · ${r.championships}🏆 · ${aliveCount}/5 alive</div>
+          </div>
+        </div>
+        <table class="dt">
+          <tr><th>Pos</th><th>Name</th><th>HP</th><th>DMG</th><th>DEF</th><th>SPD</th><th>K</th></tr>
+          ${roster.map(p => {
+            const pos = POS_BY_ID[p.position];
+            const cls = p.deceased ? `style="color:var(--mute);text-decoration:line-through;"` : "";
+            return `<tr ${cls}>
+              <td>${pos.icon}</td>
+              <td>${escapeHTML(p.name)}</td>
+              <td class="num">${p.stats.hp}</td>
+              <td class="num">${p.stats.dmg}</td>
+              <td class="num">${p.stats.def}</td>
+              <td class="num">${p.stats.spd.toFixed(1)}</td>
+              <td class="num">${p.career.kills}</td>
+            </tr>`;
+          }).join("")}
+        </table>
+      </div>
+    `;
+  }
+  openModal("Teams", html, `<button onclick="closeModal()" class="secondary">Close</button>`);
+}
+
+/* ============================================================
+   HISTORY MODAL
+   ============================================================ */
+function showHistory() {
+  if (!LEAGUE.history.length) {
+    openModal("History", `<div style="color:var(--dim);text-align:center;padding:20px;">No completed seasons yet.</div>`,
+      `<button onclick="closeModal()" class="secondary">Close</button>`);
+    return;
+  }
+  let html = `<table class="dt">
+    <tr><th>Season</th><th>Champion</th><th>Runner-up</th><th>Casualties</th></tr>`;
+  for (const h of LEAGUE.history.slice().reverse()) {
+    const c = TEAM_BY_ID[h.champion], r = TEAM_BY_ID[h.runnerup];
+    html += `<tr>
+      <td>${h.season}</td>
+      <td>${c.emoji} ${escapeHTML(c.short)}</td>
+      <td>${r.emoji} ${escapeHTML(r.short)}</td>
+      <td class="num">${h.casualties}</td>
+    </tr>`;
+  }
+  html += `</table>`;
+  openModal("League History", html, `<button onclick="closeModal()" class="secondary">Close</button>`);
+}
+
+/* ============================================================
+   GRAVEYARD MODAL
+   ============================================================ */
+function showGraveyard() {
+  if (!LEAGUE.graveyard.length) {
+    openModal("Graveyard", `<div style="color:var(--dim);text-align:center;padding:20px;">No casualties yet. The carnage begins soon.</div>`,
+      `<button onclick="closeModal()" class="secondary">Close</button>`);
+    return;
+  }
+  let html = `<table class="dt">
+    <tr><th>Season</th><th>Name</th><th>Team</th><th>Slain by</th></tr>`;
+  for (const g of LEAGUE.graveyard.slice().reverse()) {
+    const t = TEAM_BY_ID[g.teamId];
+    html += `<tr>
+      <td>S${g.season}</td>
+      <td>${escapeHTML(g.name)}</td>
+      <td>${t.emoji} ${escapeHTML(t.short)}</td>
+      <td>${escapeHTML(g.killer)}</td>
+    </tr>`;
+  }
+  html += `</table>`;
+  openModal("Graveyard (" + LEAGUE.graveyard.length + ")", html, `<button onclick="closeModal()" class="secondary">Close</button>`);
+}
+
+/* ============================================================
+   BRACKET MODAL (full-size view)
+   ============================================================ */
+function showBracket() {
+  const b = LEAGUE.bracket;
+  const matchHTML = (slot, label) => {
+    const m = b[slot];
+    const aT = m.teamA ? TEAM_BY_ID[m.teamA] : null;
+    const bT = m.teamB ? TEAM_BY_ID[m.teamB] : null;
+    const aCls = m.winner === m.teamA ? "winner" : (m.winner ? "loser" : "");
+    const bCls = m.winner === m.teamB ? "winner" : (m.winner ? "loser" : "");
+    const isCurrent = LEAGUE.currentSlot === slot;
+    return `
+      <div class="bracket-match ${isCurrent ? 'current' : ''} ${m.winner ? 'done' : ''}" style="margin:0;">
+        <div class="label">${label}${isCurrent ? ' · LIVE' : ''}</div>
+        <div class="team-row ${aCls}">
+          <span class="em">${aT?.emoji || "❓"}</span>
+          <span class="nm">${aT?.name || "TBD"}</span>
+        </div>
+        <div class="vs-divider">VS</div>
+        <div class="team-row ${bCls}">
+          <span class="em">${bT?.emoji || "❓"}</span>
+          <span class="nm">${bT?.name || "TBD"}</span>
+        </div>
+      </div>
+    `;
+  };
+  const body = `
+    <div style="display:grid;grid-template-columns:1fr;gap:12px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        ${matchHTML("semi1", "Semifinal 1")}
+        ${matchHTML("semi2", "Semifinal 2")}
+      </div>
+      <div style="text-align:center;color:var(--dim);font-size:11px;letter-spacing:1px;">↓</div>
+      ${matchHTML("final", "Final")}
+    </div>
+  `;
+  openModal(`Season ${LEAGUE.season} Bracket`, body, `<button onclick="closeModal()" class="secondary">Close</button>`);
+}
+
+/* ============================================================
+   CLOUD SYNC (Perchance uploadPlugin)
+   ============================================================ */
+function serializeLeague() {
+  // Strip transient match-time fields (target, x, y, etc.) — they reset per match
+  // and `target` causes circular references between live players.
+  // Weapon/armor/item gear IS persistent (scavenged names cascade across matches).
+  const cleanRosters = {};
+  for (const tid of Object.keys(LEAGUE.rosters)) {
+    cleanRosters[tid] = LEAGUE.rosters[tid].map(p => ({
+      id: p.id,
+      name: p.name,
+      teamId: p.teamId,
+      position: p.position,
+      stats: p.stats,
+      weapon: p.weapon,
+      armor: p.armor,
+      item: p.item,
+      career: p.career,
+      deceased: p.deceased,
+      deceasedSeason: p.deceasedSeason,
+      deceasedBy: p.deceasedBy,
+      debutSeason: p.debutSeason,
+    }));
+  }
+  return JSON.stringify({
+    v: 4,
+    season: LEAGUE.season,
+    bits: LEAGUE.bits,
+    rosters: cleanRosters,
+    graveyard: LEAGUE.graveyard,
+    records: LEAGUE.records,
+    bracket: LEAGUE.bracket,
+    currentSlot: LEAGUE.currentSlot,
+    history: LEAGUE.history,
+    pendingBoosts: LEAGUE.pendingBoosts,
+    bets: LEAGUE.bets,
+    syncName: ($("#syncName") && $("#syncName").value) || "",
+  });
+}
+
+function deserializeLeague(jsonStr) {
+  const data = JSON.parse(jsonStr);
+  LEAGUE.season = data.season || 1;
+  LEAGUE.bits = data.bits || 0;
+  // Rehydrate rosters with default match-time fields
+  LEAGUE.rosters = {};
+  for (const tid of Object.keys(data.rosters || {})) {
+    LEAGUE.rosters[tid] = data.rosters[tid].map(p => ({
+      ...p,
+      // Match-time fields reset on load
+      x: 0, y: 0, vx: 0, vy: 0,
+      hp: p.stats ? p.stats.hp : 100,
+      alive: !p.deceased,
+      target: null,
+      attackCooldown: 0,
+      facing: 1,
+      stunned: 0,
+      itemUsed: false,
+      boostMods: null,
+      balloonsPopped: 0,
+      // Backfill gear if a v3 save is loaded into v4
+      weapon: p.weapon || { ...(WEAPONS.find(w => w.flavorPos === p.position) || WEAPONS[0]) },
+      armor:  p.armor  || { ...(ARMORS.find(a => a.flavorPos === p.position)  || ARMORS[0]) },
+      item:   p.item   || { ...pick(ITEMS) },
+      career: p.career
+        ? { scavenged: 0, ...p.career }
+        : { kills: 0, matchesPlayed: 0, matchesWon: 0, seasonsPlayed: 0, scavenged: 0 },
+    }));
+  }
+  LEAGUE.graveyard = data.graveyard || [];
+  LEAGUE.records = data.records || {};
+  LEAGUE.bracket = data.bracket || null;
+  LEAGUE.currentSlot = data.currentSlot || null;
+  LEAGUE.history = data.history || [];
+  LEAGUE.pendingBoosts = data.pendingBoosts || {};
+  LEAGUE.bets = data.bets || [];
+  LEAGUE.match = null;
+  // Recompute _idCounter from highest player id
+  let maxId = 0;
+  for (const r of Object.values(LEAGUE.rosters)) {
+    for (const p of r) if (p.id > maxId) maxId = p.id;
+  }
+  _idCounter = maxId + 1;
+  if ($("#syncName") && data.syncName) $("#syncName").value = data.syncName;
+}
+
+function setSyncStatus(msg, kind) {
+  const el = $("#syncStatus");
+  el.textContent = msg;
+  el.className = "status" + (kind ? " " + kind : "");
+}
+
+async function pushSave() {
+  if (typeof uploadPlugin === "undefined") {
+    setSyncStatus("uploadPlugin not loaded — top editor needs uploadPlugin import", "err");
+    return;
+  }
+  const name = $("#syncName").value.trim();
+  if (!name) {
+    setSyncStatus("Pick a username first", "err");
+    return;
+  }
+  setSyncStatus("Saving…");
+  try {
+    const blob = serializeLeague();
+    const filename = `float-knights-${name.replace(/[^a-z0-9]/gi,"_")}.json`;
+    const result = await uploadPlugin.upload(blob, filename);
+    if (result.error) {
+      setSyncStatus("Upload failed: " + result.error, "err");
+      return;
+    }
+    $("#syncCode").value = result.url;
+    try { localStorage.setItem("fk_syncUrl", result.url); } catch {}
+    try { localStorage.setItem("fk_syncName", name); } catch {}
+    setSyncStatus(`Saved (${result.size} bytes). Sync code is the URL.`, "ok");
+  } catch (e) {
+    setSyncStatus("Save error: " + (e.message || e), "err");
+  }
+}
+
+async function pullSave() {
+  const url = $("#syncCode").value.trim();
+  if (!url) {
+    setSyncStatus("Paste a sync code (URL) first", "err");
+    return;
+  }
+  setSyncStatus("Loading…");
+  try {
+    const fetchFn = (typeof superFetch === "function") ? superFetch : fetch;
+    const res = await fetchFn(url);
+    const text = await res.text();
+    deserializeLeague(text);
+    try { localStorage.setItem("fk_syncUrl", url); } catch {}
+    setSyncStatus("Loaded successfully.", "ok");
+    LEAGUE.match = null;
+    if (LEAGUE.currentSlot) startMatch();
+    renderAll();
+  } catch (e) {
+    setSyncStatus("Load failed: " + (e.message || e), "err");
+  }
+}
+
+/* ============================================================
+   EVENT BINDINGS
+   ============================================================ */
+function bindEvents() {
+  // Speed buttons
+  $$(".controls .grp button").forEach(btn => {
+    btn.addEventListener("click", () => setSpeed(parseFloat(btn.dataset.spd)));
+  });
+
+  // Skip / reset — skip fast-forwards the CURRENT round only (matches are
+  // best-of-N now; user gets a chance to bet between rounds).
+  $("#btnSkip").addEventListener("click", () => {
+    if (!LEAGUE.match) return;
+    if (LEAGUE.match.phase === "round") {
+      let safety = 0;
+      while (LEAGUE.match && LEAGUE.match.phase === "round" && safety < COMBAT.roundMaxFrames) {
+        tickMatch();
+        safety++;
+      }
+      renderAll();
+    }
+  });
+  $("#btnReset").addEventListener("click", () => {
+    if (!confirm("Reset the entire league? All rosters, history, and bits will be wiped.")) return;
+    initLeague();
+    LEAGUE.match = null;
+    FEED.length = 0;
+    feed("season", "🚨 League reset. New season begins.");
+    startMatch();
+    renderAll();
+  });
+
+  // Top-level tab navigation (Game / Bet / Store / About)
+  $$(".tab-nav button").forEach(btn => {
+    btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+  });
+  // Any element with data-go-tab="..." also switches tab on click
+  document.addEventListener("click", (e) => {
+    const t = e.target.closest("[data-go-tab]");
+    if (t) { e.preventDefault(); switchTab(t.dataset.goTab); }
+  });
+
+  // Place bet (Bet tab)
+  const placeBtn = $("#betPagePlace");
+  if (placeBtn) {
+    placeBtn.addEventListener("click", () => {
+      const amt = parseInt($("#betPageAmount").value, 10);
+      if (!amt || amt <= 0) {
+        setSyncStatus("Invalid bet amount", "err");
+        return;
+      }
+      if (!BET_PICK.kind || BET_PICK.target == null) return;
+      const ok = placeBet(BET_PICK.kind, BET_PICK.target, amt);
+      if (ok) {
+        BET_PICK = { kind: null, target: null };
+        placeBtn.disabled = true;
+        renderAll();
+      }
+    });
+  }
+
+  // Modal triggers
+  $("#btnTeams").addEventListener("click", showTeams);
+  $("#btnHistory").addEventListener("click", showHistory);
+  $("#btnGraveyard").addEventListener("click", showGraveyard);
+  $("#btnBracket").addEventListener("click", showBracket);
+
+  // Autoplay toggle
+  const apToggle = $("#autoplayToggle");
+  if (apToggle) {
+    apToggle.addEventListener("click", () => {
+      AUTOPLAY.enabled = !AUTOPLAY.enabled;
+      apToggle.classList.toggle("on", AUTOPLAY.enabled);
+      toast(AUTOPLAY.enabled ? "Autoplay <b>ON</b> — game advances on its own." : "Autoplay <b>OFF</b> — countdown paused.", AUTOPLAY.enabled ? "info" : "warn");
+    });
+  }
+
+  // Sync
+  $("#btnPush").addEventListener("click", pushSave);
+  $("#btnPull").addEventListener("click", pullSave);
+
+  // Restore last sync URL/name from localStorage
+  try {
+    const u = localStorage.getItem("fk_syncUrl");
+    const n = localStorage.getItem("fk_syncName");
+    if (u) $("#syncCode").value = u;
+    if (n) $("#syncName").value = n;
+  } catch {}
+}
+
+/* ============================================================
+   TOAST NOTIFICATION SYSTEM
+   Bottom-right stack. Kinds: "win" (green), "lose" (red),
+   "warn" / "info" (yellow / blue). Auto-dismisses after 6s.
+   ============================================================ */
+function toast(msg, kind, opts) {
+  kind = kind || "info";
+  opts = opts || {};
+  const stack = $("#toastStack");
+  if (!stack) return;
+  const el = document.createElement("div");
+  el.className = "toast " + kind;
+  const icoMap = { win: "💸", lose: "💔", warn: "⚠️", info: "ℹ️" };
+  el.innerHTML = `
+    <span class="ico">${opts.ico || icoMap[kind] || "ℹ️"}</span>
+    <div class="body">${msg}</div>
+    <button class="close-x" aria-label="dismiss">×</button>
+  `;
+  const dismiss = () => {
+    el.classList.add("fade-out");
+    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 380);
+  };
+  el.querySelector(".close-x").addEventListener("click", dismiss);
+  stack.appendChild(el);
+  const ttl = opts.ttl || 6000;
+  setTimeout(dismiss, ttl);
+}
+// Make available to the simulation layer
+window.toast = toast;
+
+/* ============================================================
+   AUTO-PLAY — countdown between rounds/matches/seasons
+   ============================================================ */
+const AUTOPLAY = {
+  enabled: true,
+  cooldownRoundMs: 60000,   // 1 minute between rounds
+  cooldownMatchMs: 60000,   // 1 minute between matches
+  cooldownSeasonMs: 60000,  // 1 minute between seasons
+};
+// Pending auto-action: {kind: "round"|"match"|"season", remainingMs, action}
+let AUTOPLAY_PENDING = null;
+
+function scheduleAutoAdvance(kind, action) {
+  const cd = kind === "round"  ? AUTOPLAY.cooldownRoundMs  :
+             kind === "match"  ? AUTOPLAY.cooldownMatchMs  :
+                                 AUTOPLAY.cooldownSeasonMs;
+  AUTOPLAY_PENDING = { kind, remainingMs: cd, totalMs: cd, action };
+  renderArenaHeader();
+}
+function skipCountdown() {
+  if (!AUTOPLAY_PENDING) return;
+  const a = AUTOPLAY_PENDING.action;
+  AUTOPLAY_PENDING = null;
+  try { a(); } catch (e) { console.error(e); }
+  renderAll();
+}
+function tickAutoplay(dt) {
+  if (!AUTOPLAY_PENDING) return;
+  if (!AUTOPLAY.enabled) return; // user turned it off — wait for click
+  AUTOPLAY_PENDING.remainingMs -= dt;
+  if (AUTOPLAY_PENDING.remainingMs <= 0) skipCountdown();
+}
+
+/* ============================================================
+   TAB SWITCHING — Game / Bet / Store / About
+   ============================================================ */
+function switchTab(tabId) {
+  $$(".tab-content").forEach(el => el.classList.toggle("active", el.dataset.tab === tabId));
+  $$(".tab-nav button").forEach(btn => btn.classList.toggle("active", btn.dataset.tab === tabId));
+  if (tabId === "bet" && typeof renderBetTab === "function") renderBetTab();
+  if (tabId === "store" && typeof renderStore === "function") renderStore();
+  if (tabId === "game" && typeof renderAll === "function") renderAll();
+}
+
+/* ============================================================
+   MAIN GAME LOOP
+   ============================================================ */
+function loop(ts) {
+  if (!lastTick) lastTick = ts;
+  const dt = ts - lastTick;
+  lastTick = ts;
+
+  // Auto-advance countdown ticks in real-time, regardless of match state
+  tickAutoplay(dt);
+
+  if (SPEED > 0 && LEAGUE.match && LEAGUE.match.phase === "round") {
+    pendingTickAcc += dt * SPEED;
+    while (pendingTickAcc >= COMBAT.frameMs) {
+      tickMatch();
+      pendingTickAcc -= COMBAT.frameMs;
+      if (!LEAGUE.match || LEAGUE.match.phase !== "round") {
+        pendingTickAcc = 0;
+        break;
+      }
+    }
+  } else {
+    pendingTickAcc = 0;
+  }
+
+  drawArena();
+  // Lightweight UI updates each frame
+  renderArenaHeader();
+  // Throttled full UI render (every ~250ms)
+  if (!loop._lastFull || ts - loop._lastFull > 250) {
+    loop._lastFull = ts;
+    renderTeamPanel("A");
+    renderTeamPanel("B");
+    renderHeader();
+  }
+
+  requestAnimationFrame(loop);
+}
+
+/* ============================================================
+   PUBLIC API (for debugging / Perchance integration)
+   ============================================================ */
+window.FLOAT_KNIGHTS = {
+  league: LEAGUE,
+  startMatch, beginNextSeason, finalizeSeason,
+  placeBet, buyItem, pushSave, pullSave,
+  feed, renderAll,
+  reset: () => {
+    initLeague(); FEED.length = 0; LEAGUE.match = null; startMatch(); renderAll();
+  },
+};
+
+/* ============================================================
+   BOOTSTRAP
+   ============================================================ */
+function boot() {
+  initLeague();
+  bindEvents();
+  feed("season", `Season ${LEAGUE.season} begins. Bracket set.`);
+  startMatch();
+  renderAll();
+  requestAnimationFrame(loop);
+}
+
+document.addEventListener("DOMContentLoaded", boot);
+if (document.readyState !== "loading") boot();
+
+</script>
