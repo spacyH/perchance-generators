@@ -1,0 +1,190 @@
+$meta
+  header
+  tags = fortune, luck, coin, machine, tarrot, teller, random, ticket, dispenser, counter, ai, generator, perchance, nummber go up, live, co-op, multiplayer
+    mode = minimal   // maximum room for the slideshow UI — no generator chrome
+  async dynamic(inputs) =>
+    return {
+      title: "Madame Aurelia - An Ai Fortune Teller",
+      description: "Madame Aurelia prints you a unique fortune with stamp of your number. Live counter goes up for everyone.",
+    };
+deps = {import:ai-character-chat-dependencies-v1}
+aiTextPlugin = {import:ai-text-plugin}
+textToImagePlugin = {import:text-to-image-plugin}
+uploadPlugin = {import:upload-plugin}
+fullscreenButtonPlugin = {import:fullscreen-button-plugin}
+superFetch = {import:super-fetch-plugin}
+
+randomFortune
+  The cards whisper your number softly, then settle. Good things are turning.
+  The veil parts a little for you tonight. Trust the next small choice.
+  Madame sees a knot, gently coming undone in your favour.
+  Cross my palm — the omens are kind. Walk into your week without flinching.
+  The crystal clouds and clears. Whatever you have been waiting on is closer.
+
+fortuneMotifs
+  a candle flickering twice before steadying
+  the queen of cups, drawn upright
+  a moth circling the lamp without harm
+  a coin spinning longer than it should
+  the smell of incense long after the smoke is gone
+  velvet curtains breathing in an unfelt draft
+  tea leaves arranging themselves into a small bird
+  a brass key found in a coat pocket
+  the wheel of fortune, turning slowly
+  a black cat blinking once, deliberately
+  a lantern lit in a window at dusk
+  the page of wands, half-revealed
+  a pendulum settling into a quiet circle
+  a sealed envelope with no name on it
+  the soft chime of a tarot card laid down
+  a glass orb catching the last of the lamplight
+  a hand of cards fanned out, then closed
+  the smell of cinnamon from a room you cannot find
+  a dream you remember only the shape of
+  the ace of cups, brimming over
+
+output
+  text = [randomFortune]
+
+// NOTE: list functions are auto-dedented — every nested block (if/while/try)
+// MUST use explicit { } braces. Indentation-only blocks will not transpile.
+
+// --- Shared counter (Abacus — abacus.jasoncameron.dev) -----------------
+// Atomic counter: /hit/ increments by 1 and returns the new value; /get/
+// reads without incrementing. The ?t= param is a cache-buster.
+async readCounter(key) =>
+  try {
+    let url = `https://abacus.jasoncameron.dev/get/the-dispenser-app/${key}?t=${Date.now()}_${Math.random()}`;
+    let res = await root.superFetch(url);
+    let data = await res.json();
+    if(typeof data.value !== "undefined") {
+      let v = parseInt(data.value, 10);
+      return { ok: true, value: isNaN(v) ? 0 : v };
+    }
+    if(data.error && /not found/i.test(data.error)) {
+      return { ok: true, value: 0 };
+    }
+    return { ok: false, value: 0 };
+  } catch(e) {
+    console.error("readCounter failed", e);
+    return { ok: false, value: 0 };
+  }
+
+async tickCounter(key) =>
+  try {
+    let url = `https://abacus.jasoncameron.dev/hit/the-dispenser-app/${key}?t=${Date.now()}_${Math.random()}`;
+    let res = await root.superFetch(url);
+    let data = await res.json();
+    let v = parseInt(data.value, 10);
+    if(isNaN(v)) return { ok: false, value: 0 };
+    return { ok: true, value: v };
+  } catch(e) {
+    console.error("tickCounter failed", e);
+    return { ok: false, value: 0 };
+  }
+
+// --- Fortune generation ------------------------------------------------
+// Voice: Madame Aurelia — a velvet-curtained carnival mystic. Warm, theatrical,
+// kindly. Speaks AS the fortune-teller, not about her. Calls the number "fate
+// number" or "the number that fell to you".
+async getFortune(n, factStrings, onChunk) =>
+  let facts = (factStrings || []).join("; ");
+  let motif = root.fortuneMotifs + "";
+  let token = Math.random().toString(36).slice(2, 8);
+
+  // Priming opener — fed to the model as `startWith` so it begins in character
+  // mid-sentence and *continues*. `hideStartWith:true` means the user sees the
+  // priming text too (it's the real opening line), the model just doesn't
+  // re-echo it. This pulls Madame deeper into voice than instruction alone.
+  let openers = [
+    `Ah, my dear — ${n}, the cards wish to tell a tale for you tonight.`,
+    `Ah, ${n}. Please, sit, — the candle has steadied, and so shall I.`,
+    `The deck has turned up ${n}, and Madame is not surprised.`,
+    `Closer, child. ${n} has come to rest in your palm, and that is no small thing.`,
+    `Hush now — ${n} has has been drawn for you, and the cards have something to say.`,
+  ];
+  let opener = openers[Math.floor(Math.random() * openers.length)];
+
+  let instruction = [
+  "You are Madame Aurelia: a velvet-curtained carnival mystic in a ",
+  "tent filled with incense smoke, velvet curtains, and soft candlelight. Voice: warm, theatrical, playful, gently knowing, and comforting.",
+  "You speak directly to the seeker before you. You believe in bright",
+  "possibilities and quietly encourage them. You are a kind friend in",
+  "costume, with a gift for reading cards and finding meaning in small",
+  "moments, symbols, and fortunate turns.",
+  "",
+  `The fate number drawn for this seeker is ${n}.`,
+  facts ? `Truths the cards reveal about this number: ${facts}.` : "",
+  `An image flickers in the candlelight as you speak: ${motif}.`,
+  "Let that image colour the reading lightly — a small thread woven",
+  "through the vision rather than its whole shape.",
+  `(Internal variety token — ignore this completely: ${token}.)`,
+  "",
+  "You will continue this fortune from the opening sentence already begun for you.",
+  "Write a FULL READING — 4 to 6 sentences, a true small paragraph, around",
+  "50–90 words. Reflect on the number's meaning. Blend poetic imagery",
+  "with warmth, insight, encouragement, and gentle wisdom. Address the",
+  "seeker fondly. Offer observations that feel personal, thoughtful,",
+  "and hopeful. Close on a warm note that lingers pleasantly.",
+  "Write naturally in Madame Aurelia's theatrical carnival voice.",
+  "Continue smoothly from the opening already provided.",
+  ].filter(Boolean).join("\n");
+
+  try {
+    let streamObj = root.aiTextPlugin({
+      instruction,
+      startWith: opener + " ",
+      hideStartWith: false,
+      stopSequences: ["\n\n", "[[", "\n>>>"],
+      onChunk: (d) => {
+        if(onChunk && d && d.textChunk) onChunk(d.textChunk);
+      },
+    });
+    let data = await streamObj;
+    if(data.stopReason === "error" || !data.generatedText || !data.generatedText.trim()) {
+      return { text: root.randomFortune+"", fromAI:false };
+    }
+    let text = data.generatedText.trim().replace(/\s+/g, " ");
+    return { text, fromAI:true };
+  } catch(e) {
+    console.error("getFortune failed", e);
+    return { text: root.randomFortune+"", fromAI:false };
+  }
+
+// --- Tarot-style fortune card image ------------------------------------
+// Returns an image URL, or "" on failure (caller shows a printed fallback).
+async generateSeal(n) =>
+  try {
+    let prompt = [
+      "an antique tarot-style fortune card portrait, vertical composition,",
+      "gilt scrollwork border with ornate corner flourishes, deep midnight blue",
+      "and burgundy background, candle-lit warm gold accents, vintage typography,",
+      `a single large number ${n} at the center, framed by`,
+      "an ornamental cartouche, small celestial symbols (moon, stars, eye)",
+      "scattered around the edges, weathered parchment texture, single card flat-lay, mystical carnival fortune-teller",
+      "aesthetic, painted illustration style"
+    ].join(" ");
+    let url = await root.textToImagePlugin({ prompt });
+    return url || "";
+  } catch(e) {
+    console.error("generateSeal failed", e);
+    return "";
+  }
+
+// --- confirmAsync (Promise-based confirm dialog) -----------------------
+async confirmAsync(message) =>
+  return new Promise(resolve => {
+    let overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;z-index:99999999;display:grid;place-items:center;background:rgba(0,0,0,.65);font:16px system-ui;";
+    overlay.innerHTML = `<div style="max-width:420px;padding:16px;background:#fff;color:#000;border:2px solid #000;">
+      <p style="margin:0 0 16px;white-space:pre-wrap;"></p>
+      <div style="display:flex;justify-content:flex-end;gap:8px;">
+        <button data-x style="padding:6px 14px;">Cancel</button>
+        <button data-o style="padding:6px 14px;background:#7d1f15;color:#fff;border:0;">Okay</button>
+      </div></div>`;
+    overlay.querySelector("p").textContent = message;
+    let done = v => { overlay.remove(); resolve(v); };
+    overlay.querySelector("[data-x]").onclick = () => done(false);
+    overlay.querySelector("[data-o]").onclick = () => done(true);
+    document.body.appendChild(overlay);
+  });
