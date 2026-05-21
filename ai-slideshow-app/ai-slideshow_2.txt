@@ -1228,6 +1228,8 @@
               <option value="long">long</option>
             </select>
             <button type="button" class="btn-mini alt" id="ideaBtn" title="Insert a random curated starter prompt">🎲 idea</button>
+            <button type="button" class="btn-mini alt" id="ideaRefreshBtn" title="Use AI to refresh the pool of random ideas (replaces the built-in list)">↻ ideas</button>
+            <button type="button" class="btn-mini" id="sharePromptBtn" title="Copy a shareable URL for your current prompt">🔗 share</button>
             <button type="button" class="btn-mini" id="enhanceBtn" title="Rewrite your prompt as an optimized AI image prompt">✨ enhance</button>
           </div>
         </div>
@@ -1269,15 +1271,17 @@
         <input type="range" id="steps" min="15" max="50" step="1" value="30">
       </div>
     </div>
-    <!-- Free Perchance plugin only honors {prompt, negative}; the other params
-         are sent only as a best-effort hint and may not change output. -->
+    <!-- Per the platform reference, the text-to-image plugin honors:
+         prompt, negativePrompt, resolution, guidanceScale. seed is echoed
+         in inputs but not reliably honored. Quality steps is not a
+         documented plugin parameter and is shown for reference only. -->
     <div class="advanced-note">
-      ⓘ Orientation, prompt strength, and quality steps are best-effort hints — Perchance's free image plugin only documents <em>prompt</em> and <em>negative</em>. They're sent regardless and may take effect on plugin updates or alternate routes.
+      ⓘ Orientation, prompt strength, and the negative prompt are honored by the Perchance image plugin and will affect the output. Seed is recorded for sorting but the backend may not always respect it. Quality steps is not a documented plugin parameter — left here as a recorded preference for future use.
     </div>
 
     <div class="btn-row">
       <button class="btn" id="gen1">+1 image</button>
-      <button class="btn" id="gen5">+5 images</button>
+      <button class="btn" id="gen10">+10 images</button>
       <button class="btn ghost tiny" id="qRemove" style="display:none">−1 queued</button>
       <button class="btn ghost tiny" id="qClear" style="display:none">clear queue</button>
       <span class="queue-status hidden" id="queueStatus"></span>
@@ -1544,6 +1548,24 @@
   'use strict';
 
   // ══════════════════════════════════════════════════════════════════════
+  // Defensive plugin accessor — covers three failure modes documented in
+  // the Perchance platform reference §2.2 + §7.1:
+  //   1. `root` may be undefined if the DSL hasn't bootstrapped yet
+  //   2. A plugin handle may not yet be registered on `root`
+  //   3. `root` is a Proxy whose ownKeys trap is non-spec-compliant —
+  //      property reads can throw if the Proxy was ever called as
+  //      `root()` somewhere upstream (which silently corrupts it)
+  // Falling back to `window[name]` covers older Perchance generators
+  // that exposed plugins as globals. Returns undefined if nothing works
+  // so callers can feature-detect with a simple `if (!plugin) return`.
+  // ══════════════════════════════════════════════════════════════════════
+  function grab(name) {
+    try { if (typeof root !== 'undefined' && root[name] !== undefined) return root[name]; } catch {}
+    try { if (typeof window !== 'undefined' && window[name] !== undefined) return window[name]; } catch {}
+    return undefined;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
   // IndexedDB — single kv-style store for image Blobs + manifest
   // ══════════════════════════════════════════════════════════════════════
   const DB_NAME = 'slideshow-db';
@@ -1556,7 +1578,7 @@
   // This cap is also the hard ceiling for total in-flight work — the
   // queue runner refuses to schedule more than (MAX_IMAGES - cached -
   // active - pending) at any time, so the user can never overshoot.
-  const MAX_IMAGES = 150;
+  const MAX_IMAGES = 350;
   let _db = null, _dbP = null;
 
   function openDb() {
@@ -1608,20 +1630,32 @@
 
   // ══════════════════════════════════════════════════════════════════════
   // Cache — image Blobs stored individually; manifest tracks order +
-  // metadata. Each entry: { id, prompt, createdAt, seed?, favorited? }
+  // metadata. Each entry shape:
+  //   { id, prompt, negative?, seed?, resolution?, guidanceScale?,
+  //     createdAt, favorited? }
   //
-  // `seed` and `favorited` are optional — entries persisted before this
-  // feature shipped won't have them, so all readers use `?? null` /
-  // `=== true` patterns rather than expecting them to be present.
+  // `negative`, `seed`, `resolution`, `guidanceScale`, and `favorited`
+  // are optional — entries persisted before these fields shipped won't
+  // have them, so all readers use defensive `?? null` / `=== true`
+  // patterns rather than expecting them to be present.
   //
   // Eviction: when the cache is full, prefer non-favorited oldest entries
   // for eviction. Only evict a favorited entry as a last resort (every
   // slot is favorited). The new image is appended AFTER eviction so it
   // can never become its own eviction target.
+  //
+  // `cacheStore` accepts a Blob directly (not a dataUrl). The previous
+  // dataUrl path forced a base64 round-trip through `fetch(dataUrl)` —
+  // taking the Blob straight from `canvas.toBlob()` is meaningfully
+  // faster, especially when generating in batches of 10.
   // ══════════════════════════════════════════════════════════════════════
-  async function cacheStore(dataUrl, prompt, seed) {
+  async function cacheStore(blob, meta) {
+    if (!(blob instanceof Blob)) {
+      console.warn('[cache] cacheStore expects a Blob');
+      return null;
+    }
+    meta = meta || {};
     const id = 'img_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
-    const blob = await fetch(dataUrl).then(r => r.blob());
     const manifest = (await idbGet(MANIFEST_KEY)) || [];
 
     // Step 1 — save the new blob first. If anything fails after this
@@ -1646,13 +1680,17 @@
     }
 
     // Step 3 — append + persist manifest. After this write the cache
-    // is fully consistent.
+    // is fully consistent. Only persist fields with sensible values;
+    // strings default to '' so renderers don't have to null-check.
     manifest.push({
       id,
-      prompt: prompt || '',
-      createdAt: Date.now(),
-      seed: (typeof seed === 'number' && Number.isFinite(seed)) ? seed : null,
-      favorited: false,
+      prompt:        meta.prompt || '',
+      negative:      meta.negative || '',
+      createdAt:     Date.now(),
+      seed:          (typeof meta.seed === 'number' && Number.isFinite(meta.seed)) ? meta.seed : null,
+      resolution:    meta.resolution || null,
+      guidanceScale: (typeof meta.guidanceScale === 'number' && Number.isFinite(meta.guidanceScale)) ? meta.guidanceScale : null,
+      favorited:     false,
     });
     await idbSet(MANIFEST_KEY, manifest);
 
@@ -1730,9 +1768,11 @@
    *  duplicate downloads of the same image. Cleared 1.5s after click. */
   const _downloadInflight = new Set();
   function _extFromMime(mime) {
-    // Perchance's text-to-image plugin defaults to JPEG. Older blobs
-    // may be PNG. Detect from the blob's actual type rather than
-    // guessing — saves the user from a wrongly-extensioned file.
+    // canvas.toBlob() in the generate path always emits JPEG, so new
+    // entries are uniformly JPEG. Older entries from pre-rewrite saves
+    // may have been PNG (data-URL parsed) or webp. Detect from the
+    // blob's actual type rather than guessing — saves the user from a
+    // wrongly-extensioned file.
     if (!mime || typeof mime !== 'string') return 'jpg';
     const m = mime.toLowerCase();
     if (m.includes('jpeg') || m.includes('jpg')) return 'jpg';
@@ -1801,6 +1841,8 @@
       musicLoop:          true,
       musicVol:           60,
       musicName:          '',          // remembered filename only; blob is at key 'music'
+      // ── AI prompt-idea pool ──────────────────────────────────────
+      aiPromptIdeas:      [],          // refreshed via ↻ ideas button
     };
   }
 
@@ -1886,6 +1928,13 @@
         updateMusicUI(null);
       }
     } catch (e) { console.warn('[music] restore failed:', e); }
+
+    // Restore AI-refreshed prompt-idea pool. Defensive filter so a
+    // corrupted entry (non-string or absurdly long) can't poison the
+    // picker.
+    aiPromptIdeas = Array.isArray(s.aiPromptIdeas)
+      ? s.aiPromptIdeas.filter(x => typeof x === 'string' && x.length >= 8 && x.length <= 240).slice(-100)
+      : [];
   }
 
   let _saveTimer = null;
@@ -1917,6 +1966,8 @@
         musicLoop:          $('musicLoop')?.checked !== false,
         musicVol:           Number($('musicVol')?.value) || 60,
         musicName:          _musicName || '',
+        // ── AI prompt-idea pool ────────────────────────────────────
+        aiPromptIdeas:      aiPromptIdeas.slice(),
       };
       idbSet(SETTINGS_KEY, payload);
     }, delay);
@@ -2084,13 +2135,19 @@
   }
 
   // ══════════════════════════════════════════════════════════════════════
-  // Random prompt ideas — curated atmospheric starters. Picking one
-  // replaces the prompt textarea (with confirm if non-empty).
+  // Random prompt ideas — built-in evocative starters PLUS an optional
+  // AI-generated pool that the user can refresh on demand (↻ ideas
+  // button next to 🎲 idea). The two pools concatenate so a refresh
+  // adds to, rather than replaces, the built-in defaults.
   //
+  // Picking one replaces the prompt textarea (with confirm if non-empty).
   // These are intentionally short evocative seeds — the user can then
-  // press ✨ enhance to expand them into a full prompt if they want.
+  // press ✨ enhance to expand them into a full prompt.
+  //
+  // The AI-refreshed pool lives in settings under `aiPromptIdeas` so it
+  // persists across reloads.
   // ══════════════════════════════════════════════════════════════════════
-  const PROMPT_IDEAS = [
+  const BUILT_IN_IDEAS = [
     'rain-soaked neon alley, reflective puddles, late-night solitude',
     'misty forest at dawn, shafts of golden light through tall pines',
     'abandoned cathedral overgrown with vines, broken stained glass, soft sun',
@@ -2133,17 +2190,20 @@
     'snow-covered Japanese garden, wooden bridge, silent stillness',
   ];
 
-  function _ideaShuffleIndex() {
-    return Math.floor(Math.random() * PROMPT_IDEAS.length);
-  }
+  // Live pool — built-ins plus whatever the user has accumulated via
+  // AI-refresh. Reassigned (not mutated) when the AI pool changes so
+  // the picker's "avoid last index" trick keeps working sensibly.
+  let aiPromptIdeas = [];
+  function promptIdeaPool() { return BUILT_IN_IDEAS.concat(aiPromptIdeas); }
+
   let _lastIdeaIdx = -1;
   function pickIdea() {
-    // Avoid repeating the immediately-previous suggestion if possible.
-    if (PROMPT_IDEAS.length < 2) return PROMPT_IDEAS[0] || '';
-    let idx = _ideaShuffleIndex();
-    if (idx === _lastIdeaIdx) idx = (idx + 1) % PROMPT_IDEAS.length;
+    const pool = promptIdeaPool();
+    if (pool.length < 2) return pool[0] || '';
+    let idx = Math.floor(Math.random() * pool.length);
+    if (idx === _lastIdeaIdx) idx = (idx + 1) % pool.length;
     _lastIdeaIdx = idx;
-    return PROMPT_IDEAS[idx];
+    return pool[idx];
   }
 
   async function runIdea() {
@@ -2164,6 +2224,163 @@
     ta.style.boxShadow = '0 0 14px rgba(255,45,149,0.6)';
     setTimeout(() => { ta.style.boxShadow = ''; }, 700);
     toast('🎲 New prompt idea — try ✨ enhance to expand it.');
+  }
+
+  // ── AI-refreshed prompt ideas ───────────────────────────────────────
+  // Asks aiTextPlugin to write 10 fresh atmospheric ideas in the same
+  // style as the built-in list. Parses them out of the response (one
+  // per line, optional leading number) and appends to the pool. Result
+  // persists in settings.aiPromptIdeas so reloads keep the additions.
+  let _ideaRefreshRunning = false;
+  async function refreshAiPromptIdeas() {
+    const btn = $('ideaRefreshBtn');
+    if (_ideaRefreshRunning) return; // single-flight
+    const ai = grab('aiTextPlugin');
+    if (!ai) {
+      toast('AI ideas need aiTextPlugin in the top-editor DSL.', 'warn');
+      return;
+    }
+    _ideaRefreshRunning = true;
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ ideas…'; }
+
+    // Show a few existing ideas so the model matches their voice.
+    const examples = BUILT_IN_IDEAS
+      .slice()
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 5)
+      .map((s, i) => `${i + 1}. ${s}`)
+      .join('\n');
+
+    const instruction = [
+      'TASK: Write 10 evocative, atmospheric image-prompt seeds for an AI image slideshow.',
+      'FORMAT: One per line, numbered 1-10, no preamble, no commentary, no quotes.',
+      'STYLE: Each line is a short comma-separated mood — a place, a time, a feeling. 8-18 words.',
+      'AVOID: numbered headers, explanations, "Here are", "Sure!", or quotes around the lines.',
+      '',
+      'EXAMPLES (match this exact style):',
+      examples,
+      '',
+      'Now write 10 NEW ideas in the same style, themed around natural, urban, fantastical, and historical settings:',
+    ].join('\n');
+
+    try {
+      const result = await ai({
+        instruction,
+        startWith: '1.',
+        // Generous stop sequences — model sometimes wants to add a
+        // commentary line after the list. "11." is the natural end
+        // marker once it tries to write a follow-up.
+        stopSequences: ['\n11.', '\n\nNote', '\n\nThese', '\n\nThose', '\n\nLet me'],
+      });
+
+      if (result?.stopReason === 'error') {
+        toast('AI ideas failed — the plugin reported a request error.', 'err');
+        return;
+      }
+      // Parse: prepend "1." since startWith stripped it, then collect
+      // every "N. text" line. Reuse the platform-reference §3.9 memory
+      // extraction pattern.
+      const raw = '1.' + (result?.generatedText || '');
+      const parsed = raw
+        .split('\n')
+        .map(l => l.trim())
+        .filter(l => /^\d{1,2}\. .+/.test(l))
+        .map(l => l.replace(/^\d{1,2}\. /, '').replace(/^["']|["']$/g, '').trim())
+        .filter(l => l.length >= 12 && l.length <= 240);
+
+      if (parsed.length === 0) {
+        toast('AI returned no usable ideas. Try again.', 'warn');
+        return;
+      }
+      // Append; dedupe against the union of pools (cheap O(n²) since
+      // pools are tiny). Cap the AI pool at 100 entries so it doesn't
+      // grow unbounded across many refreshes.
+      const seen = new Set(promptIdeaPool().map(s => s.toLowerCase()));
+      const added = parsed.filter(s => !seen.has(s.toLowerCase()));
+      aiPromptIdeas = aiPromptIdeas.concat(added).slice(-100);
+      saveSettings(0);
+      toast(`✨ ${added.length} fresh idea${added.length === 1 ? '' : 's'} added — try 🎲 idea.`);
+    } catch (e) {
+      console.warn('[ideas] refresh failed:', e);
+      toast('AI ideas failed — try again later.', 'err');
+    } finally {
+      _ideaRefreshRunning = false;
+      if (btn) { btn.disabled = false; btn.textContent = '↻ ideas'; }
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // Share-prompt URL — builds a ?p=<encoded> link that, when loaded,
+  // prefills the prompt textarea. The $meta.dynamic block in the
+  // top-editor DSL renders a custom social-card preview for these
+  // URLs (see ai-slideshow_1.txt). Hardcodes the perchance.org host
+  // since location.origin inside the sandbox is the per-generator hex
+  // subdomain (platform ref §1.1).
+  // ══════════════════════════════════════════════════════════════════════
+  const SHARE_URL_BASE = 'https://perchance.org/ai-slideshow';
+
+  function buildSharePromptUrl(promptText) {
+    const txt = (promptText || '').trim();
+    if (!txt) return null;
+    // Cap to keep URLs sane — long prompts get truncated rather than
+    // producing 4KB URLs that break some clipboard implementations.
+    const capped = txt.length > 500 ? txt.slice(0, 500) : txt;
+    return `${SHARE_URL_BASE}?p=${encodeURIComponent(capped)}`;
+  }
+
+  /** Open the share dialog for the current prompt. Surface the URL in a
+   *  copyable text field plus a one-click copy button — same UX pattern
+   *  as the Perchance ai-character-chat share dialog. */
+  async function runSharePrompt() {
+    const txt = ($('promptPos')?.value || '').trim();
+    if (!txt) {
+      toast('Type a prompt first — then you can share it.', 'warn');
+      return;
+    }
+    const url = buildSharePromptUrl(txt);
+    if (!url) return;
+
+    // Try modern clipboard first; fall back to manual selection.
+    let copied = false;
+    try {
+      await navigator.clipboard.writeText(url);
+      copied = true;
+    } catch {}
+
+    if (copied) {
+      toast('🔗 Share URL copied to clipboard.');
+      return;
+    }
+    // Clipboard blocked — pop a prompt() so the user can copy manually
+    // (prompt() is the lowest-common-denominator copyable surface).
+    window.prompt('Copy this share URL:', url);
+  }
+
+  /** On page load: if URL has ?p=, prefill the prompt textarea (only
+   *  when it's currently empty — don't clobber a saved draft). Strips
+   *  the query string after consuming it so a reload doesn't keep
+   *  re-prefilling. */
+  function consumeSharedPromptParam() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const p = params.get('p');
+      if (!p) return;
+      const ta = $('promptPos');
+      if (!ta) return;
+      const cur = (ta.value || '').trim();
+      if (cur) return; // don't overwrite user's saved draft
+      ta.value = String(p).slice(0, 500);
+      saveSettings(0);
+      toast('💌 Loaded shared prompt — press +1 image to generate.');
+      // Remove ?p= from the URL without a reload so further saves
+      // don't accidentally re-load it.
+      params.delete('p');
+      const newQs = params.toString();
+      const newUrl = window.location.pathname + (newQs ? '?' + newQs : '') + window.location.hash;
+      try { window.history.replaceState({}, '', newUrl); } catch {}
+    } catch (e) {
+      console.debug('[share] consume failed:', e);
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -2274,7 +2491,8 @@
       'Reset all settings to defaults?\n\n' +
       '• Prompts will be cleared\n' +
       '• Style chips will be deselected\n' +
-      '• Slideshow + transition settings will reset\n\n' +
+      '• Slideshow + transition settings will reset\n' +
+      '• AI-refreshed prompt ideas will be cleared\n\n' +
       'Your gallery, favorites, and music track will be kept.'
     );
     if (!ok) return;
@@ -2284,6 +2502,7 @@
     activeStyleIds = [];
     gallerySort = 'newest';
     favOnly = false;
+    aiPromptIdeas = [];
     // Re-load defaults into the UI without a page refresh.
     await loadSettings();
     buildStyleChips();
@@ -2343,16 +2562,32 @@
   const STYLE_PRESET_MAP = Object.fromEntries(STYLE_PRESETS.map(p => [p.id, p]));
 
   // ══════════════════════════════════════════════════════════════════════
-  // Generator — parallel-capable, clamped to MAX_PARALLEL (= Perchance's limit)
+  // Generator — strictly serial per the platform reference §3.6 + §4
   // ══════════════════════════════════════════════════════════════════════
-  const MAX_PARALLEL = 4;
+  // The image broker handles one request at a time; concurrent calls
+  // queue inside the broker rather than running truly in parallel.
+  // Setting MAX_PARALLEL above 1 only adds local scheduler noise
+  // without buying throughput. Kept as a named constant so future
+  // multi-broker support (when text+image+upload run in parallel) is
+  // easy to opt into.
+  const MAX_PARALLEL = 1;
   const RESOLUTIONS = {
-    default:   null,           // plugin picks
+    default:   null,        // plugin picks 512x512 if nothing supplied
     square:    '512x512',
     portrait:  '512x768',
     landscape: '768x512',
   };
   let activeGens = 0;
+
+  // Strip the plugin's (key:::value) inline params from a prompt and
+  // return what real description text remains. Per the platform
+  // reference §4.4: a prompt that consists *only* of inline params
+  // (or is empty) passes client-side validation but the backend
+  // never responds — the call hangs forever and never times out.
+  // Calling code must check this BEFORE every textToImagePlugin call.
+  function stripInlineParams(text) {
+    return String(text || '').replace(/\([a-zA-Z]+:::[^)]*\)/g, '').trim();
+  }
 
   /** Compose the final generation params from the user's textareas plus
    *  any active style chips. Pure — no side effects.
@@ -2368,7 +2603,9 @@
    *
    *  A fresh client-side seed is generated each call (signed-32-bit
    *  positive) and stored on the manifest entry so the gallery can sort
-   *  by it and a future "regen with same seed" feature has the value. */
+   *  by it. The plugin echoes it in `inputs` but doesn't reliably
+   *  honor it (platform ref §4.4) — recording it locally is still
+   *  useful for the gallery sort and the info overlay. */
   function currentParams() {
     const userPrompt = ($('promptPos').value || '').trim();
     const userNeg = ($('promptNeg').value || '').trim();
@@ -2385,43 +2622,79 @@
       : 'text, watermark, deformed';
 
     const seed = Math.floor(Math.random() * 2147483647);
+    const guidanceScale = Number($('guidance').value);
 
     return {
-      prompt: finalPrompt,
-      negative: finalNeg,
-      resolution: RESOLUTIONS[$('orientation').value] || null,
-      guidance: Number($('guidance').value),
-      steps: Number($('steps').value),
+      prompt:        finalPrompt,
+      negativePrompt: finalNeg,
+      resolution:    RESOLUTIONS[$('orientation').value] || null,
+      guidanceScale: Number.isFinite(guidanceScale) ? guidanceScale : 7,
       seed,
     };
   }
 
+  /** Convert the canvas the plugin returns into a JPEG Blob. Skips the
+   *  base64 round-trip that the old `fetch(dataUrl).then(r => r.blob())`
+   *  path performed — meaningfully faster when generating in batches.
+   *  Falls back to the dataUrl path if canvas is absent (older plugin
+   *  versions only populated dataUrl). */
+  async function imagePluginResultToBlob(result) {
+    if (result?.canvas && typeof result.canvas.toBlob === 'function') {
+      return await new Promise(res => result.canvas.toBlob(res, 'image/jpeg', 0.92));
+    }
+    if (result?.dataUrl && String(result.dataUrl).startsWith('data:')) {
+      return await fetch(String(result.dataUrl)).then(r => r.blob());
+    }
+    return null;
+  }
+
   async function generateOne() {
-    if (typeof root === 'undefined' || !root.textToImagePlugin) {
+    const t2i = grab('textToImagePlugin');
+    if (!t2i) {
       toast('textToImagePlugin not loaded. Check the top-editor DSL.', 'err');
       return null;
     }
-    // Cooperative queueing so 5+ callers don't all hammer the plugin at once
+    // Cooperative queueing so multiple callers serialize cleanly
     while (activeGens >= MAX_PARALLEL) await sleep(150);
     activeGens++;
     try {
       const p = currentParams();
-      // The text-to-image-plugin's documented contract is {prompt,
-      // negative, style}. Sending undocumented extras like
-      // numInferenceSteps / guidanceScale / seed / resolution routes
-      // their values through Perchance's DSL evaluator, which parses
-      // `{listName}` as a list reference and throws on
-      // brace-containing user input. We pass ONLY the documented
-      // fields here, and capture the seed locally for the manifest.
-      // (HNE makes the same call shape; see bgEngine.generateOne.)
+      // Hang-forever guard (platform ref §4.4): a prompt that's empty
+      // or contains only inline params makes the backend never respond.
+      // currentParams() already supplies a fallback prompt, so this
+      // should only trigger when a user-typed prompt is somehow all
+      // inline params with no other text — but check anyway, since
+      // the cost of being wrong is a permanently-stuck queue slot.
+      if (!stripInlineParams(p.prompt)) {
+        toast('Prompt needs at least some description text.', 'warn');
+        return null;
+      }
+      // Build the call with ONLY documented plugin parameters (platform
+      // ref §4.4). The previous code used `negative` and `guidance` —
+      // both undocumented and silently dropped. Sending `seed` even
+      // though it isn't reliably honored: still echoed in `inputs`
+      // and useful if the backend ever starts honoring it.
       const call = {
-        prompt: p.prompt,
-        negative: p.negative,
+        prompt:         p.prompt,
+        negativePrompt: p.negativePrompt,
       };
-      const result = await root.textToImagePlugin(call);
-      const dataUrl = result?.dataUrl || String(result);
-      if (!dataUrl || !dataUrl.startsWith('data:')) return null;
-      const id = await cacheStore(dataUrl, p.prompt, p.seed);
+      if (p.resolution)    call.resolution    = p.resolution;
+      if (p.guidanceScale) call.guidanceScale = p.guidanceScale;
+      if (p.seed)          call.seed          = p.seed;
+
+      const result = await t2i(call);
+      const blob = await imagePluginResultToBlob(result);
+      if (!blob) {
+        console.warn('[generateOne] plugin returned no canvas/dataUrl', result);
+        return null;
+      }
+      const id = await cacheStore(blob, {
+        prompt:        p.prompt,
+        negative:      p.negativePrompt,
+        seed:          p.seed,
+        resolution:    p.resolution,
+        guidanceScale: p.guidanceScale,
+      });
       _bumpQueueUI();
       return id;
     } catch (e) {
@@ -2440,10 +2713,12 @@
 
   /** Reroll — generate a new image using a SPECIFIC prompt (typically
    *  copied from an existing gallery entry), bypassing the textarea.
-   *  Fresh seed, same prompt. Wired into the lightbox's "🔄 reroll"
-   *  button. The result lands in the gallery normally and is cap-aware. */
+   *  Fresh seed, same prompt + negative. Wired into the lightbox's
+   *  "🔄 reroll" button. The result lands in the gallery normally and
+   *  is cap-aware (the caller checks headroom before calling). */
   async function rerollFromPrompt(promptText, negativeText) {
-    if (typeof root === 'undefined' || !root.textToImagePlugin) {
+    const t2i = grab('textToImagePlugin');
+    if (!t2i) {
       toast('textToImagePlugin not loaded.', 'err');
       return null;
     }
@@ -2453,14 +2728,36 @@
     try {
       const promptStr = (promptText || '').trim() || 'abstract dreamlike ethereal';
       const negStr = (negativeText || '').trim() || 'text, watermark, deformed';
+      if (!stripInlineParams(promptStr)) {
+        toast('Prompt needs at least some description text.', 'warn');
+        return null;
+      }
       const seed = Math.floor(Math.random() * 2147483647);
-      const result = await root.textToImagePlugin({
-        prompt: promptStr,
-        negative: negStr,
+      const call = {
+        prompt:         promptStr,
+        negativePrompt: negStr,
+      };
+      // Inherit the current orientation + strength from the controls so
+      // a reroll matches what the user is currently set up to generate.
+      const orientation = RESOLUTIONS[$('orientation')?.value] || null;
+      const guidance = Number($('guidance')?.value);
+      if (orientation)         call.resolution    = orientation;
+      if (Number.isFinite(guidance)) call.guidanceScale = guidance;
+      call.seed = seed;
+
+      const result = await t2i(call);
+      const blob = await imagePluginResultToBlob(result);
+      if (!blob) {
+        toast('Reroll failed — no image returned.', 'err');
+        return null;
+      }
+      const id = await cacheStore(blob, {
+        prompt:        promptStr,
+        negative:      negStr,
+        seed,
+        resolution:    orientation,
+        guidanceScale: Number.isFinite(guidance) ? guidance : null,
       });
-      const dataUrl = result?.dataUrl || String(result);
-      if (!dataUrl || !dataUrl.startsWith('data:')) return null;
-      const id = await cacheStore(dataUrl, promptStr, seed);
       renderGallery();
       return id;
     } catch (e) {
@@ -2705,7 +3002,8 @@ OUTPUT: ONLY the final raw prompt string. No preamble. No quotes.`,
       return;
     }
 
-    if (typeof root === 'undefined' || !root.aiTextPlugin) {
+    const ai = grab('aiTextPlugin');
+    if (!ai) {
       toast('Prompt enhancer needs aiTextPlugin in the top-editor DSL.', 'warn');
       return;
     }
@@ -2714,6 +3012,26 @@ OUTPUT: ONLY the final raw prompt string. No preamble. No quotes.`,
     if (!userInput) {
       toast('Type a casual idea first — I\'ll engineer it into an optimized image prompt.', 'warn');
       return;
+    }
+
+    // Token-count guard (platform ref §3.5). countTokens is approximate
+    // but fast and local. Refuse to send anything over 30% of the budget
+    // so the model has plenty of room for its response. The actual
+    // ceiling is ~6000 tokens; 30% leaves ~4000 for the enhanced prompt
+    // plus the instruction template.
+    try {
+      const meta = ai({ getMetaObject: true });
+      if (meta?.countTokens && meta?.idealMaxContextTokens) {
+        const tokens = meta.countTokens(userInput);
+        const ceiling = meta.idealMaxContextTokens * 0.3;
+        if (tokens > ceiling) {
+          toast(`Prompt is too long (~${tokens} tokens, max ~${Math.round(ceiling)}). Try a shorter idea.`, 'warn');
+          return;
+        }
+      }
+    } catch (e) {
+      // Meta object may not be available — proceed without the guard
+      console.debug('[enhance] token count unavailable:', e?.message || e);
     }
 
     const length = $('enhanceLength')?.value || 'medium';
@@ -2727,7 +3045,7 @@ OUTPUT: ONLY the final raw prompt string. No preamble. No quotes.`,
     let acc = '';
 
     try {
-      const streamObj = root.aiTextPlugin({
+      const streamObj = ai({
         instruction: `${instr}\n\nUser Input: ${original}`,
         onChunk: (data) => {
           if (myToken !== _enhanceToken) {
@@ -2741,6 +3059,15 @@ OUTPUT: ONLY the final raw prompt string. No preamble. No quotes.`,
       });
       const result = await streamObj;
       if (myToken !== _enhanceToken) return;
+
+      // Platform ref §3.4: stopReason === "error" means the request
+      // was malformed and generatedText is "". Surface this rather
+      // than silently using empty output.
+      if (result?.stopReason === 'error') {
+        input.value = original;
+        toast('Enhance failed — the AI plugin reported a request error.', 'err');
+        return;
+      }
 
       // Some flows return the whole text on result.generatedText
       // without ever firing onChunk; pick whichever's non-empty.
@@ -3211,10 +3538,14 @@ OUTPUT: ONLY the final raw prompt string. No preamble. No quotes.`,
   // ══════════════════════════════════════════════════════════════════════
   // Generation queue — split pending vs active, hard-capped at MAX_IMAGES
   // ══════════════════════════════════════════════════════════════════════
-  // The +1 / +5 buttons add to a pending counter; a runner drains the
+  // The +1 / +10 buttons add to a pending counter; a runner drains the
   // pending queue by launching up to MAX_PARALLEL generations at a time.
-  // The status bar shows both counters separately so the user can tell
-  // "queued but not started" from "currently generating".
+  // With MAX_PARALLEL=1 (broker is strictly serial — platform ref §3.6)
+  // this is effectively a FIFO with concurrency=1, but the structure is
+  // preserved so future text+image broker parallelism is trivial to opt
+  // into. The status bar shows pending and active counters separately
+  // so the user can tell "queued but not started" from "currently
+  // generating".
   //
   // Hard cap: gallery + pending + active is never allowed to exceed
   // MAX_IMAGES. Every queue-add intent is clamped against the
@@ -3252,11 +3583,11 @@ OUTPUT: ONLY the final raw prompt string. No preamble. No quotes.`,
     // accurate clamp happens inside _qAdd(); we leave +5 enabled with
     // 1+ slots available so it can partially-accept and warn the user
     // rather than hiding the option entirely.
-    const gen1 = $('gen1'); const gen5 = $('gen5');
+    const gen1 = $('gen1'); const gen10 = $('gen10');
     const knownTotal = _lastKnownCacheCount + _qPending + activeGens;
     const atCap = knownTotal >= MAX_IMAGES;
     if (gen1) gen1.disabled = atCap;
-    if (gen5) gen5.disabled = atCap;
+    if (gen10) gen10.disabled = atCap;
   }
 
   // Last-known cached image count, refreshed on every render and on
@@ -4703,6 +5034,13 @@ OUTPUT: ONLY the final raw prompt string. No preamble. No quotes.`,
   // ✨ Prompt enhancer — toggle-cancel handled inside runEnhance()
   $('enhanceBtn')?.addEventListener('click', runEnhance);
 
+  // ↻ AI prompt-ideas refresh — appends fresh ideas to the pool via
+  // aiTextPlugin. Result persists in settings.
+  $('ideaRefreshBtn')?.addEventListener('click', refreshAiPromptIdeas);
+
+  // 🔗 Share prompt — copies a ?p=<encoded> URL to the clipboard.
+  $('sharePromptBtn')?.addEventListener('click', runSharePrompt);
+
   // Style chips — clear-all wipes selections (individual chips wire
   // themselves inside buildStyleChips() since they're rebuilt on toggle)
   $('chipsClear')?.addEventListener('click', () => {
@@ -4755,7 +5093,7 @@ OUTPUT: ONLY the final raw prompt string. No preamble. No quotes.`,
 
   // Generation buttons — queue-based, hard-capped at MAX_IMAGES
   $('gen1').addEventListener('click', () => _qAdd(1));
-  $('gen5').addEventListener('click', () => _qAdd(5));
+  $('gen10').addEventListener('click', () => _qAdd(10));
   $('qRemove')?.addEventListener('click', _qRemoveOne);
   $('qClear') ?.addEventListener('click', _qClearAll);
 
@@ -5016,11 +5354,15 @@ OUTPUT: ONLY the final raw prompt string. No preamble. No quotes.`,
   //   1. Build transition grid (creates checkbox DOM)
   //   2. Build style chips (creates chip DOM — needed before loadSettings
   //      can sync the active state into them)
-  //   3. Load persisted settings (populates inputs, checks boxes)
+  //   3. Load persisted settings (populates inputs, checks boxes,
+  //      restores AI-ideas pool)
   //   4. Re-render style chips with the loaded active set
-  //   5. Render gallery (async, independent of settings)
-  //   6. Refresh queue UI (so cap-headroom is reflected immediately)
-  //   7. Best-effort: ask browser to keep our IndexedDB around
+  //   5. Consume ?p= URL param (only if prompt is empty after load)
+  //   6. Render gallery (async, independent of settings)
+  //   7. Refresh queue UI (so cap-headroom is reflected immediately)
+  //   8. Best-effort: ask browser to keep our IndexedDB around
+  //   9. Preload AI text + image plugins so the first user call is warm
+  //      (platform ref §3.6: text broker has a ~4s cold-start TTFT)
   // ══════════════════════════════════════════════════════════════════════
 
   // iOS Safari: stop the browser from auto-zooming when the user focuses
@@ -5039,14 +5381,38 @@ OUTPUT: ONLY the final raw prompt string. No preamble. No quotes.`,
     }
   } catch (e) { console.error(e); }
 
+  /** Preload the AI text + image plugins so the first user call hits a
+   *  warm broker. The text broker has a ~4s cold-start TTFT (platform
+   *  ref §3.6); preloading hides that latency behind the page load.
+   *  On mobile, delay it to avoid competing with the initial paint —
+   *  the SKILL.md recommends a 5s delay below ~500px viewport widths. */
+  function preloadPlugins() {
+    const ai = grab('aiTextPlugin');
+    if (ai) {
+      try { ai({ preload: true }); } catch (e) { console.debug('[preload] aiTextPlugin:', e); }
+    }
+    // No documented preload mode for the image plugin — but reading the
+    // accessor at startup forces Perchance to wire up the broker iframe
+    // so the FIRST generate call only pays for the actual request.
+    try { grab('textToImagePlugin'); } catch {}
+  }
+
   (async () => {
     buildTransitionGrid();
     buildStyleChips();
     try { await loadSettings(); } catch (e) { console.error('loadSettings:', e); }
     buildStyleChips(); // re-render after settings populated activeStyleIds
+    consumeSharedPromptParam(); // ?p= URL prefill — after loadSettings so we can check for an empty prompt
     await renderGallery();
     _bumpQueueUI();
     tryPersistBrowserStorageData();
+
+    // Defer preload so it doesn't compete with the first paint
+    if (window.innerWidth < 500) {
+      setTimeout(preloadPlugins, 5000);
+    } else {
+      setTimeout(preloadPlugins, 800);
+    }
   })();
 })();
 </script>
