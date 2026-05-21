@@ -1,0 +1,1530 @@
+# Perchance Platform — Technical Reference
+
+A complete technical reference for building on Perchance.org: generators, AI chat
+applications, plugins, and any JavaScript that runs inside a Perchance generator.
+
+This document covers the platform architecture, the four core plugins (`ai-text-plugin`,
+`text-to-image-plugin`, `upload-plugin`, `super-fetch-plugin`), the Perchance DSL, the
+`root` bridge, the public HTTP API, the AI character-chat data model, and the patterns
+used in production Perchance applications.
+
+Where the behavior described here differs from Perchance's official plugin documentation,
+this document reflects the observed runtime behavior.
+
+---
+
+## Table of Contents
+
+1. [Platform Architecture](#1--platform-architecture)
+2. [Perchance DSL Fundamentals](#2--perchance-dsl-fundamentals)
+3. [ai-text-plugin](#3--ai-text-plugin)
+4. [text-to-image-plugin](#4--text-to-image-plugin)
+5. [upload-plugin](#5--upload-plugin)
+6. [super-fetch-plugin](#6--super-fetch-plugin)
+7. [The `root` Proxy](#7--the-root-proxy)
+8. [Public HTTP API](#8--public-http-api)
+9. [Sandbox Capabilities](#9--sandbox-capabilities)
+10. [AI Character-Chat Data Model](#10--ai-character-chat-data-model)
+11. [Message Format & Wire Protocol](#11--message-format--wire-protocol)
+12. [Hierarchical Summarization](#12--hierarchical-summarization)
+13. [Memory & Lore](#13--memory--lore)
+14. [File Hosting & Share Links](#14--file-hosting--share-links)
+15. [Sandboxed Custom Code](#15--sandboxed-custom-code)
+16. [UI Utilities](#16--ui-utilities)
+17. [Page Initialization](#17--page-initialization)
+18. [Common Patterns](#18--common-patterns)
+19. [Security Notes](#19--security-notes)
+20. [Common Pitfalls](#20--common-pitfalls)
+21. [Quick Reference](#21--quick-reference)
+
+---
+
+## 1 · Platform Architecture
+
+A Perchance generator has two authoring zones and a backend broker layer.
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  perchance.org  (parent frame, cross-origin from the sandbox)     │
+│                                                                   │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │  Sandbox iframe — <hex>.perchance.org/slug                  │ │
+│  │                                                             │ │
+│  │  ┌──────────────────┐   ┌──────────────────────────────┐   │ │
+│  │  │ Top editor       │   │ HTML panel                   │   │ │
+│  │  │ (Perchance DSL)  │   │ (standard HTML + CSS + JS)   │   │ │
+│  │  │ lists, functions │   │ application code             │   │ │
+│  │  │ plugin imports   │   │ accesses plugins via root.x  │   │ │
+│  │  └──────────────────┘   └──────────────────────────────┘   │ │
+│  │                                                             │ │
+│  │  <iframe src="text-generation.perchance.org/embed">  ◄──────┼─┼─ broker
+│  └─────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### 1.1 The Sandbox
+
+The HTML panel runs in a sandboxed iframe served from a per-generator 32-hex subdomain:
+
+```
+https://<32-hex-id>.perchance.org/your-slug
+```
+
+| Property | Value |
+|----------|-------|
+| Parent origin | `https://perchance.org` |
+| `crossOriginIsolated` | `false` — `SharedArrayBuffer` is unavailable |
+| `window.top === window` | `false` — the panel is nested inside the parent frame |
+| Storage quota | ~10 GB, already persisted |
+| Sandbox flags | `allow-scripts allow-same-origin` |
+
+`location.search` carries Perchance boot parameters such as `?__generatorLastEditTime=...`.
+Never use `location.origin` to build share links — always hardcode `https://perchance.org`,
+because `location.origin` inside the panel is the per-generator hex subdomain.
+
+### 1.2 Backend Topology — the Broker Model
+
+Plugins do **not** call the AI backend directly from the panel frame. They communicate by
+`postMessage` RPC with dedicated broker iframes that the runtime injects into the sandbox
+document:
+
+```
+panel JS  →  root.aiTextPlugin({...})
+          →  plugin postMessages  →  text-generation.perchance.org/embed  (broker iframe)
+                                  →  broker performs the real backend request
+          ←  postMessage replies stream back  ←
+```
+
+No `fetch`, `XHR`, `WebSocket`, or `SSE` traffic leaves the sandbox during an AI call —
+all transport is `postMessage`. The broker iframe is visible in the panel's DOM:
+
+```js
+document.querySelector('iframe').getAttribute('src')
+// → "https://text-generation.perchance.org/embed"
+```
+
+The brokers are independent services, so calls to different services run in parallel:
+
+| Service | Broker origin |
+|---------|---------------|
+| Text generation | `text-generation.perchance.org/embed` |
+| Image generation | `image-generation.perchance.org` |
+| File upload | `upload.perchance.org` |
+| CORS proxy (`superFetch`) | `fetch-plugin.perchance.org` |
+
+**Message protocol for one text-generation call:**
+
+| Step | `type` | Other fields | Meaning |
+|------|--------|--------------|---------|
+| 1 | `embedIsReady` | — | Broker iframe finished loading |
+| 2–3 | `verified` | — | Auth handshake (fires twice; subsequent calls reuse it) |
+| 4…N | `streamData` | `requestId`, `value.text` | One token chunk each |
+| N+1 | `streamData` | `requestId`, `value.text`, `value.final`, `value.stopReason` | Final chunk |
+| N+2 | `streamEnd` | `requestId` | Stream closed |
+
+Every AI call is internally a stream, even non-streaming ones. The `requestId` format is
+`aiTextCompletion` followed by 17 digits. The broker silently ignores malformed or unknown
+messages — there is no error-reply surface.
+
+### 1.3 Generator Serving & Stale Builds
+
+Generator HTML is served with:
+
+```
+Cache-Control: public, max-age=0, s-maxage=31104000
+```
+
+`max-age=0` means browsers always revalidate, but `s-maxage=31104000` means the Cloudflare
+edge may hold a build for up to 360 days. When a generator is saved, Perchance purges the
+edge cache; if that purge is delayed, the edge can serve a stale HTML panel. No service
+worker is involved — stale builds are always a CDN purge-delay issue. The actual
+invalidation is performed by the `clearCacheIfGeneratorOrImportsHaveBeenUpdated` endpoint
+(see [§8](#8--public-http-api)).
+
+---
+
+## 2 · Perchance DSL Fundamentals
+
+The top editor uses the Perchance domain-specific language: indentation-structured lists,
+functions, and plugin imports.
+
+### 2.1 List & Function Syntax
+
+```
+listName
+  item one
+  item two
+  {nestedList}           // embed another list
+  {import:plugin-name}   // import a plugin
+
+// Single-line function — expression only, no `return` keyword:
+myFunc(x) => "result: " + x
+
+// Multi-line async function — body indented under the signature:
+async myFunc(opts) =>
+  if(!opts) opts = {};
+  let result = await someAsyncThing();
+  return result;
+```
+
+**Naming rules** (enforced by the engine — violations are errors):
+
+- List names may contain letters, numbers, and underscores only — no spaces, hyphens, or
+  parentheses.
+- A name cannot start with a number.
+- A name cannot be a JavaScript reserved word (`return`, `function`, `for`, `let`,
+  `const`, …).
+- Function bodies must be indented relative to the signature.
+- Single-line functions must be `name(args) => expression` on one physical line.
+
+### 2.2 Core Plugin Imports
+
+```
+aiTextPlugin      = {import:ai-text-plugin}
+textToImagePlugin = {import:text-to-image-plugin}
+uploadPlugin      = {import:upload-plugin}
+superFetch        = {import:super-fetch-plugin}
+loadDependencies  = {import:ai-character-chat-dependencies-v1}   // Dexie, DOMPurify, etc.
+commentsPlugin    = {import:comments-plugin}
+dynamicImport     = {import:dynamic-import-plugin}
+bugReport         = {import:bug-report-plugin}
+```
+
+**Defensive plugin access from panel JS** — handles the case where a plugin handle is not
+yet present:
+
+```js
+function grab(name) {
+  try { if (typeof root !== 'undefined' && root[name] !== undefined) return root[name]; } catch (e) {}
+  try { if (window[name] !== undefined) return window[name]; } catch (e) {}
+  return undefined;
+}
+const plugin = grab('aiTextPlugin');
+if (typeof plugin !== 'function') { /* not loaded yet */ }
+```
+
+### 2.3 `$meta.dynamic`
+
+The `$meta.dynamic` function generates page metadata. It must be fully self-contained — it
+cannot reference `root.*` or external globals, so any list data it needs must be duplicated
+as a literal inside it:
+
+```
+$meta
+  header
+    mode = minimal
+  async dynamic(inputs) =>
+    let urlNamedCharacters = { "ai-adventure": "abc123.gz" };  // duplicated inline
+    return { title: "...", description: "..." };
+```
+
+### 2.4 `dynamicImport` — Lazy Loading
+
+```
+customBots
+  ExtraBots = [dynamicImport('some-generator-id')]
+```
+
+Use `dynamicImport` for optional or large dependencies; use `{import:...}` for required
+ones. `dynamicImport` lazy-loads another generator on demand.
+
+---
+
+## 3 · ai-text-plugin
+
+The text-generation plugin. The underlying model is a DeepSeek model, which accounts for
+its characteristically direct, informal response style.
+
+### 3.1 Call Signature
+
+```js
+// Non-streaming:
+const result = await root.aiTextPlugin({
+  instruction:   "System prompt / task description",
+  startWith:     "Text the model continues from",
+  stopSequences: ["\n\n[[", "\n[["],
+  hideStartWith: true,   // exclude startWith from generatedText
+});
+const text       = String(result);        // always String() — see §3.2
+const stopReason = result.stopReason;      // see §3.3
+
+// Streaming:
+const handle = root.aiTextPlugin({
+  instruction, startWith, stopSequences, hideStartWith,
+  onChunk: ({ textChunk, isFromStartWith, fullTextSoFar }) => {
+    if (isFromStartWith) return;
+    updateUI(textChunk);
+  },
+});
+const final = await handle;
+
+// Token utilities:
+const { countTokens, idealMaxContextTokens } = root.aiTextPlugin({ getMetaObject: true });
+```
+
+The options that take effect are `instruction`, `startWith`, `hideStartWith`,
+`stopSequences`, and `onChunk`. Fields such as `temperature`, `model`/`modelName`, `topP`,
+`frequencyPenalty`, and `maxTokens` are accepted without error but have **no effect** —
+they are stored in the character-chat UI and database but never passed to the plugin.
+`instruction`, `startWith`, and `stopSequences` may each also be a function returning the
+value.
+
+### 3.2 The Return Value is a Boxed String
+
+The awaited return is **not** a plain string or plain object — it is a `String` object
+(`new String(text)`) with extra named properties. This is the most common source of silent
+bugs in Perchance code.
+
+```js
+typeof result                          // "object"
+result instanceof String               // true
+Object.prototype.toString.call(result) // "[object String]"
+result.valueOf()                       // the primitive string
+
+result.text            // trimmed output text
+result.generatedText   // full output text — use this
+result.stopReason      // see §3.3
+result.length          // string length (works correctly)
+```
+
+Safe access:
+
+```js
+// Correct:
+const text = String(result);
+const text = result.generatedText;
+if (String(result) === "hello") { }
+if (result.generatedText === "hello") { }
+
+// Wrong — an object reference never strict-equals a primitive string:
+if (result === "hello") { }
+```
+
+The same rule applies to `uploadPlugin` (`result.url` is a boxed String) and to
+`textToImagePlugin` (the awaited result is a boxed String).
+
+### 3.3 The Synchronous Handle
+
+`aiTextPlugin(...)` returns two different things at two different times. After `await` you
+receive the boxed String above. The value returned *synchronously* — the awaitable handle —
+is an extended **Promise** carrying additional properties:
+
+```js
+const handle = root.aiTextPlugin({ instruction: "..." });
+// Object.getPrototypeOf(handle) === Promise.prototype
+
+handle.stop                  // function — abort generation (resolved stopReason → "user")
+handle.inputs                // object  — { instruction, startWith, stopSequences }
+handle.liveResponseText      // string  — current text; updates live, includes user edits
+handle.textStream            // ReadableStream — yields plain string chunks
+handle.onFinishPromise       // Promise — resolves to { text, generatedText, stopReason }
+handle.id                    // string  — completion id: "aiTextCompletion" + 17 digits
+handle.loadingIndicatorHtml  // string  — inline SVG spinner markup (~519 chars)
+handle.submitUserRating      // async function — submit a response-quality rating
+
+const result = await handle; // → the boxed String
+```
+
+**`textStream`** is a standard web `ReadableStream` of plain string chunks — a cleaner
+alternative to the `onChunk` callback:
+
+```js
+const handle = root.aiTextPlugin({ instruction: "Write a story." });
+for await (const chunk of handle.textStream) {
+  process(chunk);            // chunk is a bare string fragment
+}
+const result = await handle; // boxed String, as usual
+// handle.textStream.getReader() is also available
+```
+
+**`submitUserRating`** is an `async` function feeding the response-quality system:
+
+```js
+await handle.submitUserRating({ score: 0.8, reason: "optional explanation" });
+// score:  number from 0 (bad) to 1 (good), e.g. 0.4 or 0.8 — out-of-range values are rejected
+// reason: optional string
+// It refuses (logs an error) if generation has not finished or ended with an error.
+// It performs a network round-trip and resolves to undefined.
+```
+
+Note: `handle.inputs.instruction` holds the original instruction text you passed. The
+plugin applies a small mutation (see §3.7) to the internal wire payload only, not to
+`handle.inputs`.
+
+### 3.4 `stopReason` Vocabulary
+
+| Value | Meaning |
+|-------|---------|
+| `"natural"` | The model finished on its own |
+| `"artificial"` | A stop sequence was hit, or the output token limit was reached — both map here |
+| `"error"` | Malformed request; `generatedText` is `""` |
+| `"user"` | Generation was stopped via `handle.stop()` or an aborted stream |
+
+`"stop_sequence"` and `"max_tokens"` are never returned — code branching on those strings
+is dead. `"artificial"` cannot distinguish a stop-sequence hit from a token-limit hit.
+`"user"` appears on the resolved result's `stopReason`; the `onChunk` callback's
+`stopReason` stays `null` when a stream is stopped.
+
+```js
+if (result.stopReason === "error") {
+  // malformed request — generatedText is empty
+  return;
+}
+```
+
+### 3.5 Context Window
+
+`idealMaxContextTokens` is `6000`. It is advisory, not server-enforced — inputs well beyond
+it (10,000+ tokens) are processed without truncation. Use `idealMaxContextTokens - 800` as
+a practical prompt budget; the 800-token buffer keeps a single new message or summary
+update from invalidating the backend prefix cache on every send.
+
+`countTokens(str)` is an **approximate** token counter — a fast bigram statistical
+estimator (a small embedded model), not a true tokenizer. Every value it returns is the
+ceiling of an estimate. It runs locally with no network call, so token counts are
+approximate but instant.
+
+### 3.6 Concurrency & Performance
+
+```
+Concurrency:        1 call at a time per broker (strictly serial)
+Cross-service:      text, image, and upload brokers are independent — they run in parallel
+Rate limiting:      none observed across sequential calls
+```
+
+| Metric | Approximate value |
+|--------|-------------------|
+| Round-trip, short output | ~2,000 ms |
+| Time-to-first-token | ~4,200 ms |
+| Inter-chunk gap | ~286 ms average; first chunk up to ~2,300 ms |
+| Output throughput | ~6 tokens/second |
+| Practical output ceiling | ~900 tokens (~146 s), then `stopReason: "artificial"` |
+
+The ~900-token ceiling is backend-enforced but not a hard limit — the model sometimes
+stops naturally earlier. For longer output, chain sequential calls.
+
+### 3.7 Streaming Details
+
+Two streaming approaches are available — the `onChunk` callback and `handle.textStream`
+(§3.3). The `onChunk` payload:
+
+```js
+{
+  textChunk:       "...",  // the new delta
+  isFromStartWith: false,  // true while echoing startWith
+  fullTextSoFar:   "...",  // accumulated text so far
+}
+```
+
+Aborting:
+
+```js
+handle.stop();
+// → the promise resolves (it does not reject)
+// → stopReason becomes "user"
+// → onChunk fires zero more times after stop() returns
+// → the queue slot is freed immediately; the next call starts at normal latency
+```
+
+**Instruction mutation:** every `instruction` is silently rewritten before being sent — the
+first space becomes a non-breaking space (`\u00a0`), and if no regular space remains, a
+trailing space is appended (so single-word instructions are padded). This applies to the
+wire payload, not to `handle.inputs`.
+
+### 3.8 Input Validation
+
+| Input | Result |
+|-------|--------|
+| Numeric `instruction` | Coerced to string; `stopReason: "natural"` |
+| Object or array as `instruction` | Throws a `TypeError` inside plugin code |
+| Empty `{}` | Accepted; the model free-runs |
+| 21+ `stopSequences` | `stopReason: "error"`, empty `generatedText` — the maximum is **20** |
+| Null byte in instruction | Accepted (appears stripped) |
+
+After a `stopReason: "error"` or an uncaught throw, the queue recovers cleanly — a bad
+request cannot wedge the pipeline for later callers.
+
+### 3.9 Instruction Patterns
+
+**Chat completion:**
+
+```js
+const instruction = `
+<MESSAGES>
+[[User]]: Hello!
+[[Chloe]]: Hi, how can I help?
+</MESSAGES>
+REMINDER: Keep replies short and in character.
+>>> TASK: Write the next 3 messages.
+`.trim();
+const startWith = `[[Chloe]]:`;
+const stopSequences = ["\n\n[[", "\n[["];
+```
+
+**Summarization:**
+
+```js
+const startWith = `
+>>> FULL TEXT of [C]: ${messagesToSummarize}
+>>> SUMMARY of [C]: (full, natural, readable sentences):`.trim();
+const stopSequences = ["\n\n", "\n---", "\n>>> FULL TEXT", "FULL TEXT"];
+const summary = result.generatedText.trim()
+  .replace(/\n+/g, " ").replace(/---$/, "")
+  .replace(">>> FULL TEXT", "").replace("FULL TEXT", "").trim()
+  .replaceAll(/ *[—–] */g, ", ").trim();
+```
+
+**Memory extraction:**
+
+```js
+const instruction = `
+@@@ TASK: Condense *NEW_TEXT* into up to 3 lore/memory/fact entries.
+- Timeless facts only ("Bob was born in Paris", not "Bob is hungry").
+- Each entry fully self-contained; use real names not pronouns.
+# NEW_TEXT: ${messagesSummarizedText}
+`.trim();
+const startWith = `# Lore/memory entries from NEW_TEXT:\n1.`;
+const stopSequences = ["\n4."];
+const memories = ("1." + result.generatedText).trim()
+  .split("\n").map(l => l.trim())
+  .filter(l => /^[0-9]\. .+/.test(l))
+  .map(l => l.replace(/^[0-9]\. /, "").replaceAll(/ *[—–] */g, ", "));
+```
+
+**Shared prefix cache** — structure related calls so they begin with an identical prefix;
+the backend caches the token sequence and tokenizes the shared segment only once:
+
+```js
+const sharedPrefix = `# Context:\n${extraContext}\n# Prior summary:\n${priorSummary}`;
+// Both the summary call and the memory call start with sharedPrefix.
+```
+
+---
+
+## 4 · text-to-image-plugin
+
+The image-generation plugin.
+
+### 4.1 Call Modes
+
+`textToImagePlugin(...)` returns two things at two times. The **synchronous return** is a
+plain object (not a boxed String) with four own properties: `iframeHtml`, `evaluateItem`,
+`onFinishPromise`, `toString`. After `await`, the result is a boxed String with three own
+properties: `canvas`, `dataUrl`, `inputs`.
+
+```js
+// Template-injection mode — inject the iframe HTML directly:
+container.innerHTML = `${root.textToImagePlugin(options)}`;
+// String(result) is the raw iframe HTML (also result.iframeHtml / result.evaluateItem)
+
+// Recommended — await the result directly:
+const result = root.textToImagePlugin({ prompt, resolution, negativePrompt });
+const data = await result;
+// data.canvas   — HTMLCanvasElement
+// data.dataUrl  — canvas.toDataURL("image/jpeg")
+// data.inputs   — echoed options (prompt, resolution, guidanceScale, seed, width, style, save*)
+// the awaited result has exactly these three own keys — there is no data.iframe
+
+// Advanced — manual iframe injection. The iframe MUST be appended directly to
+// document.body (not inside a hidden or clipped wrapper) or onFinishPromise hangs forever:
+const raw = root.textToImagePlugin(options);
+const tmp = document.createElement("div");
+tmp.innerHTML = raw.iframeHtml;
+const iframeEl = tmp.firstElementChild;
+document.body.appendChild(iframeEl);
+const data2 = await raw.onFinishPromise;
+// after generation, the iframe ELEMENT gains a .textToImagePluginOutput property:
+//   iframeEl.textToImagePluginOutput.canvas / .dataUrl / .inputs
+iframeEl.remove();
+```
+
+### 4.2 Resolution
+
+Only four resolution strings are accepted; any other value is silently dropped client-side
+(0×0 canvas, `inputs.resolution` absent):
+
+```
+"512x512"   "512x768"   "768x512"   "768x768"
+```
+
+| Scenario | Resolution |
+|----------|-----------|
+| Plugin called with no `resolution` option | 512×512 (bare default) |
+| AI character chat, no orientation keywords | 768×768 |
+| `portrait` or `selfie` in the prompt | 512×768 |
+| `landscape` or `wide angle` in the prompt | 768×512 |
+
+The AI character chat resolves orientation before calling the plugin:
+
+```js
+if (!prompt.includes("(resolution:::")) {
+  if (/\b(portrait|selfie)\b/i.test(prompt))            options.resolution = "512x768";
+  else if (/\b(landscape|wide.?angle)\b/i.test(prompt)) options.resolution = "768x512";
+  else                                                  options.resolution = "768x768";
+}
+if (!prompt.includes("(negativePrompt:::")) {
+  options.negativePrompt = "low quality, worst quality, blurry";
+}
+```
+
+### 4.3 Inline Prompt Parameters
+
+The plugin parses a fixed set of `(key:::value)` parameters embedded anywhere in the prompt
+text. They are extracted into `inputs` and stripped from the prompt before it reaches the
+model:
+
+```
+A beautiful sunset (resolution:::768x512) (negativePrompt:::cars, buildings) (seed:::42)
+```
+
+| Inline parameter | Type | Notes |
+|------------------|------|-------|
+| `(seed:::N)` | number | `-1` = random |
+| `(resolution:::WxH)` | string | one of the four valid sizes |
+| `(negativePrompt:::text)` | string | bracket-depth parser; a missing `)` makes the rest of the string the negative prompt |
+| `(guidanceScale:::N)` | number | 1–30, default 7 |
+| `(size:::N)` | number | square size |
+| `(width:::N)`, `(height:::N)` | number | echoed as a `"512px"` CSS string in `inputs` |
+| `(style:::CSS)` | string | CSS for the iframe DOM element |
+| `(saveTitle:::text)`, `(saveDescription:::text)` | string | public-gallery metadata |
+
+### 4.4 Options & Behavior
+
+| Option / property | Behavior |
+|-------------------|----------|
+| `negativePrompt` | Honored — measurably changes output |
+| `seed` | Echoed in `inputs` but not reliably honored — output varies regardless |
+| `guidanceScale` | Default 7, range 1–30; reaches the backend |
+| `style` | CSS string applied to the iframe DOM element — not an image-style preset |
+| `removeBackground: true` | Runs client-side (see below) |
+| Generation time | ~13–14 s |
+| Queue | Independent from text generation — image and text run in parallel |
+
+**`removeBackground: true`** runs entirely client-side: it downloads the `briaai/RMBG-1.4`
+model via transformers.js (q8 quantization, WASM backend) and strips the background
+in-browser. The server generates a normal image; the device removes the background. Output
+is a **PNG with alpha** rather than JPEG. The option is not echoed in `inputs` because it
+is a post-process, not a server parameter. The first call is slow (model download); later
+calls reuse the cached model.
+
+**Empty or inline-only prompts hang forever.** A `prompt` of `""`, or one consisting only
+of inline parameters, passes client-side validation but the backend never responds — the
+call never resolves and never times out. Always pass real description text:
+
+```js
+// Hangs — never resolves:
+await t2i({ prompt: '', resolution: '512x512' });
+await t2i({ prompt: '(resolution:::512x768)' });
+
+// Fine — both accepted, generate normally:
+await t2i({ prompt: 'a red apple', negativePrompt: '' });
+await t2i({ prompt: 'a red apple', negativePrompt: null });
+```
+
+The AI character chat guards against this by stripping empty `<image></image>` tags before
+rendering — custom code must do the same.
+
+### 4.5 Image Persistence
+
+Images regenerate by default on every render. A "Keep" button saves the JPEG to
+`message.customData.__savedImages[corePrompt]` in IndexedDB. Including `@noKeepButton`
+anywhere in an image description suppresses the keep/delete UI (useful for transient
+images).
+
+### 4.6 The `<image>` Tag in AI Chat
+
+When an AI message contains `<image>description</image>`, the character chat extracts the
+description, applies `imagePromptPrefix` / `imagePromptSuffix` / `imagePromptTriggers`,
+resolves the resolution, calls `textToImagePlugin`, and injects the iframe.
+
+The model only knows about the `<image>` syntax when it is explicitly told. Without the
+hint, the model either ignores image requests or refuses them outright. Provide the hint in
+the instruction whenever image generation should be available:
+
+```js
+const IMAGE_TAG_HINT =
+  'Note: You can embed an AI-generated image in your reply using this exact syntax: ' +
+  '`<image>A detailed description of the scene or subject</image>` ' +
+  '— the content inside the tag will be used to generate an actual image. ' +
+  'Use this when the user asks for an image or when an image would enhance the reply.';
+```
+
+Once the hint is given, the model reliably produces well-formed single and multiple
+`<image>...</image>` tags. Structural priming with `startWith: '<image>'` does not work —
+the model writes the description but never closes the tag.
+
+`imagePromptTriggers` syntax (one rule per line; values may contain Perchance
+`{option|option}` syntax):
+
+```
+CharacterName: physical description to append when the name appears in the prompt
+/regex/flags: text to append when the regex matches the prompt
+keyword: @prepend description    ← @ prefix prepends instead of appending
+```
+
+---
+
+## 5 · upload-plugin
+
+Anonymous file hosting on Perchance's content-addressed CDN.
+
+```js
+const result = await root.uploadPlugin(blob);
+const url = String(result.url);   // String() required — url is a boxed String
+const { size, error, deletionUrl } = result;
+```
+
+### 5.1 Return Shape
+
+```js
+{
+  url:         BoxedString,   // "https://user.uploads.dev/file/<hash>.<ext>"
+  size:        number,        // file size in bytes
+  error:       string | null,
+  deletionUrl: string,        // GET this URL to permanently delete the file
+}
+```
+
+### 5.2 Content Addressing
+
+The CDN is content-addressed, but the hash covers **bytes plus MIME type**, not bytes
+alone:
+
+```js
+const a = await uploadPlugin(new Blob([data], { type: 'text/plain' }));
+const b = await uploadPlugin(new Blob([data], { type: 'application/octet-stream' }));
+String(a.url) !== String(b.url);   // different hash and different extension
+```
+
+Identical bytes with an identical MIME type deduplicate to the same URL.
+
+### 5.3 Deletion
+
+```js
+// deletionUrl format:
+// https://upload.perchance.org/api/delete?fileId=<id>&deletionKey=<key>
+await fetch(result.deletionUrl);
+// The file is deleted immediately; subsequent requests to the file URL return 404.
+```
+
+### 5.4 MIME Type Coverage
+
+| MIME type | Result | Served as |
+|-----------|--------|-----------|
+| `text/plain` | accepted | `.txt` |
+| `image/png`, `image/jpeg`, `image/gif`, `image/webp` | accepted | matching |
+| `image/svg+xml` | accepted — see [§19](#19--security-notes) | `.svg` |
+| `application/json` | accepted | `.json` |
+| `application/pdf` | accepted | `.pdf` |
+| `application/javascript` | accepted, stored as `.bin` (served as `application/octet-stream`, not executable) | `.bin` |
+| `application/octet-stream` | accepted | `.bin` |
+| `video/mp4` | accepted | `.mp4` |
+| `audio/mpeg` | accepted | `.mp3` |
+| `text/html` | **rejected** → `invalid_filetype` | — |
+
+The service is very permissive. `text/html` is the only confirmed rejection. JavaScript is
+accepted but defanged to `.bin`. SVG is accepted and is script-capable — see the security
+notes.
+
+### 5.5 Size Limits
+
+| Item | Value |
+|------|-------|
+| Maximum accepted | 5 MB |
+| Rejected | 6 MB → `file_too_big` |
+| Zero-byte blob | accepted |
+
+### 5.6 Anti-Abuse & the `expires` Option
+
+The upload broker runs a Cloudflare Turnstile verification before the first anonymous
+upload of a session. It is usually invisible, but it is a real anti-abuse gate that can
+challenge automated upload pipelines. The first upload of a session is slow (it includes
+the verification); subsequent uploads reuse the token and are fast.
+
+`uploadPlugin(blob, { expires: ... })` accepts an `expires` option that is passed through
+to the upload backend. It is validated client-side and is format-strict — plain numbers and
+duration strings are rejected with `invalid_expiry`. The accepted format is a timestamp.
+
+### 5.7 Error Handling
+
+```js
+if (result.error) {
+  alert(`Upload error: ${result.error}${
+    result.error === "disallowed_content"
+      ? ". Edit the character description to explicitly state the character is 18+ —"
+        + " the moderation system can flag ambiguous descriptions."
+      : ""
+  }`);
+  return;
+}
+```
+
+---
+
+## 6 · super-fetch-plugin
+
+A server-side CORS proxy. Requests egress from Cloudflare infrastructure rather than the
+user's browser, which bypasses CORS restrictions inside the sandbox.
+
+```js
+const response = await root.superFetch(url, init);
+// Returns a standard Response-like object:
+const data = await response.json();
+const text = await response.text();
+const buf  = await response.arrayBuffer();
+```
+
+### 6.1 Behavior
+
+| Feature | Result |
+|---------|--------|
+| GET, POST, PUT, DELETE | All work; correct status codes are returned |
+| POST/PUT request body | Forwarded to the upstream |
+| Redirects | Followed; the final status code is returned |
+| Status passthrough | Yes (e.g. 418 → 418) |
+| `data:` URLs | Handled |
+| Slow upstreams | The proxy waits; no client-side timeout was observed |
+| Custom request headers | **Stripped** — they never reach the upstream |
+| Cookie jar | **None** — each call is cookie-isolated |
+| Response size | **No general cap** — large files (hundreds of KB and up) return in full |
+| Caching | By full URL including query string |
+
+For authenticated requests, put credentials in URL parameters rather than headers — custom
+headers are stripped:
+
+```js
+// Wrong — the header never arrives:
+root.superFetch(url, { headers: { Authorization: 'Bearer token' } });
+// Correct:
+root.superFetch(url + '?token=' + encodeURIComponent(token));
+
+// Cache-bust when fresh data is required:
+const fresh = await root.superFetch(`${url}?_=${Date.now()}`);
+```
+
+### 6.2 Proxy Bypass List
+
+Requests to a small set of origins are sent via plain `window.fetch`, skipping the proxy
+entirely (faster, no header handling):
+
+- `*.jsdelivr.net`
+- `*.catbox.moe`
+- `raw.githubusercontent.com`
+- `huggingface.co` URLs containing `/resolve/`
+
+The upload origins (`user-uploads.perchance.org`, `user.uploads.dev`, `aigc.uploads.dev`)
+attempt a direct fetch first and fall back to the proxy on failure.
+
+### 6.3 SSRF Protection
+
+Requests to internal and private addresses fail immediately (`Failed to fetch`, within
+~65–160 ms): `localhost`, `127.0.0.1`, `0.0.0.0`, `169.254.169.254` (cloud metadata), and
+RFC-1918 ranges (`192.168.x.x`, `10.x.x.x`, `172.16.x.x`). The proxy attempts the request,
+but Cloudflare cannot route to private addresses. There is no SSRF exposure via
+`superFetch`.
+
+---
+
+## 7 · The `root` Proxy
+
+`root` is a JavaScript `Proxy` wrapping a callable function target. It is the bridge
+between the Perchance DSL (top editor) and panel JavaScript.
+
+### 7.1 Proxy Characteristics
+
+```js
+typeof root              // "function" — a callable Proxy
+'aiTextPlugin' in root   // true — the in-operator works
+root.__nonexistent__     // undefined — safe for feature detection
+Reflect.ownKeys(root)    // THROWS — the ownKeys trap is non-spec-compliant
+JSON.stringify(root)     // undefined — no enumerable keys
+root[Symbol.iterator]    // undefined — not iterable
+root()                   // THROWS, and corrupts the Proxy for all subsequent reads
+```
+
+**Never call `root()` directly.** Doing so throws and also leaves the Proxy in a broken
+state where every later `root.x` read throws as well. Only ever read properties from
+`root`.
+
+### 7.2 DSL List Objects
+
+`root.myList` returns the internal Perchance List object, not an evaluated string:
+
+```js
+const list = root.myList;
+
+// Own keys:
+// $root, $declarationLineNumber, $moduleName, $valueChildren, $functionChildren,
+// $allKeys, $allKeysSet, $perchanceCode, $odds,
+// getOdds, getName, getParent, getLength, getRawListText, getSelf,
+// getPropertyKeys, getPropertyNames, getChildNames, getFunctionNames, getAllKeys
+
+list.toString()        // the list name as a string
+list.evaluateItem      // a STRING — a pre-evaluated item snapshot, not a callable
+list[Symbol.iterator]  // undefined — not iterable
+```
+
+### 7.3 DSL Functions — a One-Way Bridge
+
+Functions defined in the top editor are exposed as callable properties, but their return
+values do not cross back to panel JavaScript:
+
+```js
+// Top editor:  greet(name) => "Hello " + name
+const fn = root.greet;
+typeof fn      // "function"
+fn.length      // 1 — arity is passed through
+fn("world")    // undefined — the return value is dropped at the bridge boundary
+```
+
+The Perchance engine executes the DSL function, but the result stays on the DSL side. Any
+logic that must return a value should be written directly in the panel script.
+
+---
+
+## 8 · Public HTTP API
+
+Server-callable endpoints on `https://perchance.org/api/`. They require no broker handshake
+and work from anywhere — a server, a script, or another origin. They expose generator
+**metadata and source only**; they do not run the AI plugins.
+
+| Endpoint | Returns |
+|----------|---------|
+| `getGeneratorStats?name=NAME` | JSON: views, last-edit time, public id, metadata |
+| `getGeneratorStats?names=N1,N2` | JSON array for multiple generators |
+| `getGeneratorList?max=N&tags=...` | JSON: recently-edited generators |
+| `downloadGenerator?generatorName=NAME` | The full generator as HTML |
+| `downloadGenerator?...&listsOnly=true` | DSL lists only, without the HTML wrapper |
+| `getGeneratorsAndDependencies?generatorNames=...` | JSON: generators plus their imports |
+| `getGeneratorScreenshot?generatorName=NAME` | `image/jpeg` |
+| `upload.perchance.org/api/fileInfo?url=...` or `?id=...` | JSON file information |
+
+`downloadGenerator` carries an explicit backwards-compatibility guarantee and is the safe
+endpoint to build on. The older `generateList.php` endpoint is legacy and unreliable —
+prefer `downloadGenerator` with client-side DSL evaluation, or `getGeneratorStats` /
+`getGeneratorList` for metadata.
+
+None of these endpoints can drive AI generation. `aiTextPlugin` and `textToImagePlugin`
+require the in-page broker handshake, which requires a real browser loading a real
+generator page.
+
+The generator page itself also calls a few platform-internal endpoints on load —
+`getCommunityData`, `checkGeneratorOwnership`, and
+`clearCacheIfGeneratorOrImportsHaveBeenUpdated` (the CDN edge-cache invalidation mechanism
+behind stale builds). These are internal and not a stable API.
+
+---
+
+## 9 · Sandbox Capabilities
+
+The sandbox iframe (`allow-scripts allow-same-origin`) exposes a wider capability set than
+many developers expect:
+
+| Capability | Available | Notes |
+|-----------|-----------|-------|
+| Popups (`window.open`) | No | Returns `null` |
+| Notifications | API present | Permission pre-denied |
+| Fullscreen | Yes | |
+| Cache Storage | Yes | `caches.open()` succeeds |
+| OPFS (`storage.getDirectory`) | Yes | |
+| Geolocation | Present | State `prompt` — the user can be asked |
+| Camera / microphone | Present | State `prompt` — the user can be asked |
+| Clipboard read | Present | Denied by default |
+| `localStorage` / `indexedDB` | Yes | Functional |
+| `document.cookie` | Yes | Readable and writable |
+| `SharedArrayBuffer` | No | `crossOriginIsolated` is `false` |
+| Child iframes with scripts | Yes | Inherit `allow-scripts` |
+
+---
+
+## 10 · AI Character-Chat Data Model
+
+The AI character chat persists state in IndexedDB via Dexie.js:
+
+```js
+const db = new Dexie("chatbot-ui-v1");
+db.version(N).stores({
+  characters: "++id, name, uuid",
+  threads:    "++id, characterId, lastViewTime, lastMessageTime",
+  messages:   "++id, threadId, characterId, order",
+  memories:   "++id, threadId",
+  lore:       "++id, bookId, bookUrl",
+  summaries:  "hash",
+  usageStats: "++id, threadId",
+  misc:       "key",
+});
+```
+
+### 10.1 Character
+
+```js
+{
+  id, uuid,
+  name: "Chloe",
+  roleInstruction: "...",            // < 1000 words
+  reminderMessage: "...",            // < 100 words
+  generalWritingInstructions: "@roleplay1" | "@roleplay2" | "custom text",
+  initialMessages: [{ author: "user"|"ai"|"system", content: "..." }],
+  avatar: { url: "https://...", size: 1, shape: "square" },
+  userCharacter: { name, roleInstruction, reminderMessage, avatar: { url } },
+  systemCharacter: { avatar: {} },
+  modelName: "good" | "great",       // stored and shown in UI, but not passed to aiTextPlugin
+  scene: { background: { url }, music: { url } },
+  loreBookUrls: ["https://user.uploads.dev/file/xxx.txt"],
+  autoGenerateMemories: "none" | "enabled",
+  textEmbeddingModelName: "default",
+  maxParagraphCountPerMessage: null | 1 | 2 | 3 | 4,
+  streamingResponse: true,
+  customCode: "",
+  imagePromptPrefix: "",             // prepended to every image prompt; supports Perchance syntax
+  imagePromptSuffix: "",             // appended to every image prompt; supports Perchance syntax
+  imagePromptTriggers: "",           // conditional appends — see §4.6
+  metaTitle: "", metaDescription: "", metaImage: "",
+  customData: {}, folderPath: "",
+  creationTime: Date.now(), lastMessageTime: Date.now(),
+}
+```
+
+`temperature`, `modelName`, `topP`, and `frequencyPenalty` are stored on characters and
+threads but are never passed to `aiTextPlugin` — they are effectively inert in the current
+implementation.
+
+### 10.2 Message
+
+```js
+{
+  id, threadId, characterId,
+  message: "Text of the message",
+  name: null,
+  order: id,
+  hiddenFrom: [],                // [] | ["ai"] | ["user"]
+  expectsReply: undefined | true | false,
+  variants: [null],
+  summariesEndingHere: {},       // { level: "summary text" }
+  memoriesEndingHere: {},        // { level: [{ text, embedding }] }
+  memoryIdBatchesUsed: [],
+  loreIdsUsed: [],
+  memoryQueriesUsed: [],
+  messageIdsUsed: [],
+  scene: null, avatar: {}, customData: {}, wrapperStyle: "",
+  instruction: null,
+}
+```
+
+### 10.3 Thread
+
+```js
+{
+  id, characterId,
+  name: "Thread name",
+  modelName, textEmbeddingModelName,
+  character: {},
+  userCharacter: { name, roleInstruction, reminderMessage, avatar: {} },
+  systemCharacter: { avatar: {} },
+  isFav: false, folderPath: "",
+  lastViewTime, lastMessageTime,
+  currentSummaryHashChain: [],
+  customCodeWindow: { visible: false, width: null },
+  customData: {},
+}
+```
+
+---
+
+## 11 · Message Format & Wire Protocol
+
+The AI character chat serializes conversation history into a simple bracketed format:
+
+```
+[[CharacterName]]: Message content here.
+
+[[AnotherCharacter]]: Their reply.
+```
+
+- Messages are separated by `\n\n`.
+- Standard stop sequences are `["\n\n[[", "\n[["]`; add `"\n\n"` to limit output to a
+  single paragraph.
+- Messages with `hiddenFrom: ["ai"]` are filtered out before sending.
+- `<!--hidden-from-ai-start-->…<!--hidden-from-ai-end-->` strips inline sections from what
+  the AI sees.
+- Template variables: `{{user}}` → the user's name, `{{char}}` → the character's name.
+
+---
+
+## 12 · Hierarchical Summarization
+
+Long conversations are compressed with multi-level summarization:
+
+```
+Level 0 = raw messages
+Level 1 = summaries of ~1500-character blocks of level 0
+Level 2 = summaries of level-1 summaries
+...
+```
+
+**When to summarize** — compare the current conversation length against a token budget:
+
+```js
+const { countTokens, idealMaxContextTokens } = root.aiTextPlugin({ getMetaObject: true });
+const budget = idealMaxContextTokens - 800;   // the 800-token buffer protects the prefix cache
+const currentLength = countTokens(messageText + extraTextForAccurateTokenCount);
+if (currentLength < budget) return;
+(async () => { /* background summarization — non-blocking */ })();
+```
+
+**Batch injection** — write summaries to the database only once several are ready, so the
+backend prefix cache is not invalidated on every message:
+
+```js
+if (window.__aiHierarchicalSummaryStuff[threadId].summariesReadyToInject.length >= 3) {
+  for (const m of messagesToUpdate) {
+    await db.messages.update(m.id, { summariesEndingHere: m.summariesEndingHere });
+  }
+  window.__aiHierarchicalSummaryStuff[threadId].summariesReadyToInject = [];
+}
+```
+
+**Block size** — summarize ~1500 characters at a time. Larger blocks risk overflowing the
+context when summarizing summaries at deeper levels.
+
+```js
+const numCharsToSummarizeAtATime = 1500;
+```
+
+**Context reconstruction** — walk backward through messages, collecting them while
+monotonically climbing summary levels; a higher-level summary covers all the lower-level
+raw messages it replaced:
+
+```js
+let highestLevelSeen = 0;
+while (messages.length > 0) {
+  const m = messages.pop();
+  const level = m.summariesEndingHere
+    ? Math.max(...Object.keys(m.summariesEndingHere).map(Number))
+    : 0;
+  if (level >= highestLevelSeen) { result.unshift(m); highestLevelSeen = level; }
+}
+```
+
+---
+
+## 13 · Memory & Lore
+
+**Associative memory** — timeless facts extracted from conversations, stored in
+`db.memories`. Embeddings are computed lazily at database-write time:
+
+```js
+if (window.textEmbedderFunction && m.memoriesEndingHere) {
+  for (const lvl in m.memoriesEndingHere) {
+    for (const mem of m.memoriesEndingHere[lvl]) {
+      if (!mem.embedding) {
+        [mem.embedding] = await window.embedTexts({
+          textArr: [mem.text],
+          modelName: thread.textEmbeddingModelName,
+        });
+      }
+    }
+  }
+}
+```
+
+**Lorebooks** — static fact files hosted on `user.uploads.dev`, loaded and embedded at
+thread start.
+
+**Text embedding** — requires `{import:ai-character-chat-dependencies-v1}`:
+
+```js
+if (window.textEmbedderFunction) {
+  const [vector] = await window.embedTexts({ textArr: ["text"], modelName: "default" });
+  const dist = cosineDistance(vec1, vec2);   // lower = more similar
+}
+```
+
+**Injection format** — retrieved memories and lore are wrapped so the model can disregard
+them when irrelevant:
+
+```
+<ignore_this_if_irrelevant>
+[MEMORIES & LORE]
+• Bob was born in Paris (memory)
+• The castle has three towers (lore)
+</ignore_this_if_irrelevant>
+```
+
+---
+
+## 14 · File Hosting & Share Links
+
+Share links pack application state into a gzip-compressed upload and reference it by URL:
+
+```js
+async function generateShareLink(json) {
+  if (!window.CompressionStream) {
+    alert("Share links require a modern browser.");
+    return;
+  }
+  const blob = await fetch("data:text/plain;charset=utf-8,"
+    + JSON.stringify(json).replace(/#/g, "%23")).then(r => r.blob());
+  const compressed = await compressBlobWithGzip(blob);
+  const result = await root.uploadPlugin(compressed);
+  if (result.error) { /* handle */ return; }
+  const fileName = String(result.url)   // String() — url is a boxed String
+    .replace("https://user.uploads.dev/file/", "");
+  const charName = json.addCharacter.name.replace(/\s+/g, "_").replaceAll("~", "");
+  return `https://perchance.org/${window.generatorName}?data=${charName}~${fileName}`;
+}
+
+async function loadDataFromShareUrl() {
+  const dataParam = new URL(window.location.href).searchParams.get("data");
+  const fileName = dataParam.split("~").slice(-1)[0];
+  const blob = await fetch("https://user.uploads.dev/file/" + fileName, {
+    signal: AbortSignal.timeout ? AbortSignal.timeout(15000) : null,
+  }).then(r => r.ok ? r.blob() : null).catch(console.error);
+  if (!blob) { return null; }
+  return JSON.parse(await (await decompressBlobWithGzip(blob)).text());
+}
+
+async function compressBlobWithGzip(blob) {
+  const cs = new CompressionStream("gzip");
+  return new Blob([await new Response(blob.stream().pipeThrough(cs)).blob()],
+                  { type: "application/gzip" });
+}
+async function decompressBlobWithGzip(blob) {
+  return new Response(blob.stream().pipeThrough(new DecompressionStream("gzip"))).blob();
+}
+```
+
+---
+
+## 15 · Sandboxed Custom Code
+
+User-supplied code is evaluated inside a separate sandboxed iframe with a strict origin
+check and a timeout:
+
+```js
+const result = await root.evaluatePerchanceTextInSandbox(codeString, { timeout: 5000 });
+
+async function evaluatePerchanceTextInSandbox(text, opts = {}) {
+  const SANDBOX_ORIGIN = 'https://<sandbox-hex-id>.perchance.org';
+  let iframe = document.querySelector('#perchanceCodeEvaluationSandboxIframe');
+  if (!iframe) {
+    iframe = document.createElement("iframe");
+    iframe.src = SANDBOX_ORIGIN + "/ai-character-chat-sandboxed-executor";
+    iframe.id = "perchanceCodeEvaluationSandboxIframe";
+    iframe.sandbox = "allow-scripts allow-same-origin";
+    iframe.style.cssText =
+      "position:fixed;width:1px;height:1px;opacity:0.01;top:-10px;right:-10px;"
+      + "pointer-events:none;border:0;";
+    document.body.append(iframe);
+    iframe._resolvers = {};
+    let readyResolve;
+    const ready = new Promise(r => readyResolve = r);
+    window.addEventListener('message', event => {
+      if (event.origin !== SANDBOX_ORIGIN) return;          // origin check is mandatory
+      if (event.data.finishedLoading) { readyResolve(); return; }
+      const { requestId, text } = event.data;
+      if (iframe._resolvers[requestId]) {
+        iframe._resolvers[requestId](text);
+        delete iframe._resolvers[requestId];
+      }
+    });
+    await ready;
+  }
+  const requestId = Math.random().toString();
+  return new Promise((resolve, reject) => {
+    iframe._resolvers[requestId] = resolve;
+    if (opts.timeout) setTimeout(() => {
+      if (iframe._resolvers[requestId]) reject("Sandbox timeout");
+    }, opts.timeout);
+    iframe.contentWindow.postMessage({ text, requestId }, SANDBOX_ORIGIN);
+  });
+}
+```
+
+Always verify `event.origin` against the expected sandbox origin before trusting a message.
+
+---
+
+## 16 · UI Utilities
+
+**`confirmAsync`** — a promise-returning confirmation modal:
+
+```js
+async function confirmAsync(message, opts = {}) {
+  return new Promise(resolve => {
+    const overlay = Object.assign(document.createElement("div"), { tabIndex: 0 });
+    overlay.style.cssText =
+      "position:fixed;inset:0;z-index:99999999;display:grid;place-items:center;"
+      + "background:rgba(0,0,0,.65);font:16px/1.4 system-ui";
+    overlay.innerHTML = `<div style="max-width:min(97vw,450px);padding:15px;border-radius:8px;
+      background:light-dark(#fff,#222);color:light-dark(#000,#fff);">
+      <p style="margin:0 0 20px;white-space:pre-wrap;">${
+        message.replace(/[<>&]/g, m => ({ '<':'&lt;','&':'&amp;','>':'&gt;' }[m]))}</p>
+      <div style="display:flex;justify-content:flex-end;gap:8px;">
+        <button ${opts.hideCancel ? "hidden" : ""}>Cancel</button>
+        <button autofocus>Okay</button>
+      </div></div>`;
+    const [cancelBtn, okBtn] = overlay.querySelectorAll("button");
+    const done = val => { overlay.remove(); resolve(val); };
+    cancelBtn.onclick = () => done(false);
+    okBtn.onclick = () => done(true);
+    overlay.onkeydown = e => {
+      if (e.key === "Escape") done(false);
+      else if (e.key === "Enter") done(true);
+    };
+    document.body.append(overlay);
+    overlay.focus({ preventScroll: true });
+  });
+}
+```
+
+**`prompt2`** — a rich form modal:
+
+```js
+const result = await window.prompt2({
+  fieldName: { type: "textLine", label: "Name", placeholder: "...", defaultValue: "" },
+  bio:       { type: "text",     label: "Bio",  placeholder: "..." },
+  model:     { type: "select",   label: "Model", options: ["good", "great"] },
+  extra:     { type: "textLine", show: (v) => v.model === "great" },
+});
+// Returns null if cancelled, otherwise { fieldName: "...", ... }
+```
+
+**Loading and floating windows:**
+
+```js
+const modal = createLoadingModal("Processing...");
+modal.delete();
+const win = createFloatingWindow({
+  header: "Title", body: element, initialWidth: 400, initialHeight: 300,
+});
+```
+
+---
+
+## 17 · Page Initialization
+
+A typical AI-chat generator initializes in this order:
+
+```
+1. Open the IndexedDB database
+2. Parse the URL for hash/data commands
+3. Render the thread list
+4. Auto-open the most recent thread (or add a starter character)
+5. Reveal the UI, hide the loading modal
+6. Persist browser storage
+7. Preload the AI plugin
+```
+
+```js
+async function checkForHashCommand() {
+  let urlHashJson = null;
+  try { urlHashJson = JSON.parse(decodeURIComponent(window.location.hash.slice(1))); }
+  catch (e) {}
+  if (urlHashJson?.addCharacter
+      || new URL(window.location.href).searchParams.get("data")) {
+    const data = await loadDataFromShareUrl();
+    const character = data?.addCharacter;
+    if (character) {
+      const confirmed = await confirmAsync(
+        "You've visited a character sharing link. This character may discuss sensitive"
+        + " themes — please click cancel if you are under 18."
+      );
+      if (confirmed) {
+        const result = await characterDetailsPrompt(character,
+          { autoSubmit: urlHashJson?.quickAdd });
+        if (result) {
+          const newChar = await addCharacter(result);
+          await createNewThreadWithCharacterId(newChar.id);
+        }
+      }
+    }
+    if (window.location.hash) { window.location.hash = ""; }
+  }
+}
+
+async function tryPersistBrowserStorageData() {
+  if (navigator.storage?.persist) await navigator.storage.persist();
+}
+```
+
+Preload the AI plugin once at the end of initialization with
+`root.aiTextPlugin({ preload: true })`.
+
+---
+
+## 18 · Common Patterns
+
+**CORS bypass:**
+
+```js
+const r = await root.superFetch("https://api.example.com/data");
+const text = await r.text();
+const fresh = await root.superFetch(`https://api.example.com/data?_=${Date.now()}`);
+```
+
+**Conditional image generation** — only tell the model about the `<image>` tag when an
+image is likely wanted:
+
+```js
+const imageKeywords = /\b(images?|pics?|photos?|selfie|draw|paint|generate)\b/i;
+if (imageKeywords.test(fullContext)) {
+  // append the IMAGE_TAG_HINT from §4.6 to the instruction
+}
+```
+
+**iOS Safari viewport fix** — prevent auto-zoom when an input is focused:
+
+```js
+try {
+  if (navigator.vendor?.includes('Apple') && window.innerWidth < 800
+      && window.matchMedia("(pointer: coarse)").matches) {
+    const m = document.querySelector("[name=viewport]");
+    if (!m.content.includes("maximum-scale")) m.content += ", maximum-scale=1";
+  }
+} catch (e) {}
+```
+
+**Token budget management:**
+
+```js
+const { countTokens, idealMaxContextTokens } = root.aiTextPlugin({ getMetaObject: true });
+const budget = idealMaxContextTokens - 800;
+if (countTokens(roleInstructionText) > budget * 0.3) {
+  roleInstructionText = truncateRoleInstruction(roleInstructionText, 3000);
+}
+// Drop the oldest messages first until the conversation fits within budget.
+```
+
+---
+
+## 19 · Security Notes
+
+### 19.1 SVG Uploads — Stored XSS Risk
+
+`uploadPlugin` accepts SVG files and the CDN serves them verbatim as `image/svg+xml` with
+no sanitization, no `Content-Disposition: attachment`, and no `Content-Security-Policy`. An
+SVG can carry script (`<svg onload="...">`), and that script executes on the
+`user.uploads.dev` origin when the file URL is opened directly in a browser. The `text/html`
+MIME type is rejected, but SVG is an equally capable script-execution context and is not
+filtered.
+
+Implications for generators that allow user-controlled SVG uploads:
+
+- Never surface a raw `user.uploads.dev` SVG URL for direct navigation by untrusted users.
+- Embed uploaded images with `<img src="...">` rather than direct links — browsers do not
+  execute scripts in SVGs loaded via `<img>`.
+
+### 19.2 Plugin Input Validation
+
+Passing a plain object or array as `instruction` to `ai-text-plugin` throws an uncaught
+`TypeError` from inside the plugin. The plugin expects `instruction` to be a string (or a
+Perchance DSL object). Always pass a string.
+
+### 19.3 Camera & Microphone
+
+A generator can call `navigator.mediaDevices.getUserMedia()` and prompt the user for camera
+or microphone access — the sandbox does not block these requests. Users visiting
+third-party generators should be aware that generators are able to make such prompts.
+
+---
+
+## 20 · Common Pitfalls
+
+| Pitfall | Fix |
+|---------|-----|
+| `result === "string"` never matches | `String(result) === "string"` |
+| `result.url === otherUrl` always false | `String(result.url) === otherUrl` |
+| `stopReason === "stop_sequence"` always false | Use `"artificial"` |
+| `stopReason === "max_tokens"` always false | Use `"artificial"` |
+| Calling `root()` corrupts the Proxy | Only ever read `root.propertyName` |
+| `root.myFunc()` returns `undefined` | The DSL→JS bridge is one-way; no return values cross |
+| Output truncates silently near ~900 tokens | Chain sequential calls for longer output |
+| `superFetch` auth header never arrives | Put credentials in URL parameters |
+| Empty or inline-only image prompt hangs forever | Always pass real description text |
+| Uploaded SVG is a stored-XSS vector | Never serve raw SVG CDN URLs; embed via `<img>` |
+| `temperature` / `model` / `topP` have no effect | They are inert; not passed to the plugin |
+| `idealMaxContextTokens` treated as a hard limit | It is advisory; use it for budget planning |
+| HTML panel stale after saving | CDN edge cache; wait for the purge or hard-refresh |
+| `countTokens` treated as exact | It is an approximate estimate |
+| 21+ `stopSequences` causes an error | The maximum is 20 |
+
+---
+
+## 21 · Quick Reference
+
+**ai-text-plugin**
+
+```
+Effective options : instruction, startWith, hideStartWith, stopSequences, onChunk
+Inert options     : temperature, model/modelName, topP, frequencyPenalty, maxTokens
+Awaited result    : boxed String — use String(r) or r.generatedText
+Sync handle       : Promise + stop, inputs, liveResponseText, textStream,
+                    onFinishPromise, id, loadingIndicatorHtml, submitUserRating
+stopReason        : "natural" | "artificial" | "error" | "user"
+onChunk payload   : { textChunk, isFromStartWith, fullTextSoFar }
+Context           : idealMaxContextTokens = 6000 (advisory; real window is larger)
+stopSequences max : 20
+Output ceiling    : ~900 tokens — chain calls for more
+Concurrency       : 1 per broker; text + image + upload run in parallel
+Abort             : handle.stop() — resolves, stopReason "user", frees the slot
+```
+
+**text-to-image-plugin**
+
+```
+Sync return   : { iframeHtml, evaluateItem, onFinishPromise, toString }
+Awaited result: boxed String — { canvas, dataUrl, inputs }
+Resolutions   : 512x512, 512x768, 768x512, 768x768 (others silently rejected)
+Defaults      : 512x512 bare; 768x768 in the AI chat
+Orientation   : portrait/selfie → 512x768; landscape/wide-angle → 768x512
+Inline params : (resolution:::) (negativePrompt:::) (seed:::) (guidanceScale:::)
+                (size:::) (width:::) (height:::) (style:::) (saveTitle:::) (saveDescription:::)
+negativePrompt: honored;  seed: not reliably honored
+removeBackground: client-side (RMBG-1.4 via transformers.js); PNG output
+Generation    : ~13–14 s
+Empty prompt  : hangs forever — always pass real description text
+```
+
+**upload-plugin**
+
+```
+result.url   : boxed String — String(result.url) before any comparison
+Hash         : bytes + MIME type (not bytes alone)
+Size         : 5 MB accepted, 6 MB rejected (file_too_big)
+Rejected MIME: text/html only
+deletionUrl  : GET it to permanently delete the file
+expires      : timestamp-format option, passed to the backend
+SVG          : accepted but a stored-XSS vector — never serve raw SVG URLs
+First upload : slow — runs a Turnstile verification
+```
+
+**super-fetch-plugin**
+
+```
+Methods      : GET / POST / PUT / DELETE — all work; bodies and redirects forwarded
+Headers      : custom request headers are stripped — put auth in URL params
+Cookies      : none — each call is cookie-isolated
+Response size: no general cap
+Caching      : by full URL — add ?_=Date.now() to bust
+Bypass list  : jsdelivr, catbox, raw.githubusercontent, huggingface /resolve/ URLs
+SSRF         : private/internal addresses are blocked
+```
+
+**root Proxy**
+
+```
+typeof root  : "function" — but NEVER call root()
+root.missing : undefined — safe for feature detection
+root.myList  : internal List object ($root, evaluateItem string, getName(), …)
+root.myFunc(): undefined — the DSL→JS bridge is one-way
+```
+
+**Backend RPC**
+
+```
+Broker     : text-generation.perchance.org/embed (an iframe in the panel DOM)
+Transport  : postMessage only — no fetch/XHR/WebSocket leaves the sandbox
+Sequence   : embedIsReady → verified ×2 → streamData ×N → streamEnd
+requestId  : "aiTextCompletion" + 17 digits
+```
