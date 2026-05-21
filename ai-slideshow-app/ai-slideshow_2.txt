@@ -2227,21 +2227,37 @@
   }
 
   // ── AI-refreshed prompt ideas ───────────────────────────────────────
-  // Asks aiTextPlugin to write 10 fresh atmospheric ideas in the same
-  // style as the built-in list. Parses them out of the response (one
-  // per line, optional leading number) and appends to the pool. Result
-  // persists in settings.aiPromptIdeas so reloads keep the additions.
+  // Asks aiTextPlugin for 10 fresh atmospheric ideas in the voice of
+  // the built-in pool, parses them (numbered-list pattern from platform
+  // ref §3.9 memory extraction), and appends to a persisted pool capped
+  // at 100. Cancellable via toggle: click while running calls
+  // handle.stop() on the streaming text plugin (platform ref §3.3 —
+  // promise resolves with stopReason="user", broker slot is freed
+  // immediately per §3.7).
+  let _ideaRefreshToken = 0;
   let _ideaRefreshRunning = false;
+
   async function refreshAiPromptIdeas() {
     const btn = $('ideaRefreshBtn');
-    if (_ideaRefreshRunning) return; // single-flight
+
+    // Toggle-cancel: clicking while running bumps the token so the
+    // in-flight call's onChunk sees a stale token and bails.
+    if (_ideaRefreshRunning) {
+      _ideaRefreshToken++;
+      _ideaRefreshRunning = false;
+      if (btn) { btn.disabled = false; btn.textContent = '↻ ideas'; }
+      return;
+    }
+
     const ai = grab('aiTextPlugin');
     if (!ai) {
       toast('AI ideas need aiTextPlugin in the top-editor DSL.', 'warn');
       return;
     }
+
+    const myToken = ++_ideaRefreshToken;
     _ideaRefreshRunning = true;
-    if (btn) { btn.disabled = true; btn.textContent = '⏳ ideas…'; }
+    if (btn) { btn.disabled = false; btn.textContent = '⏹ stop'; }
 
     // Show a few existing ideas so the model matches their voice.
     const examples = BUILT_IN_IDEAS
@@ -2263,15 +2279,27 @@
       'Now write 10 NEW ideas in the same style, themed around natural, urban, fantastical, and historical settings:',
     ].join('\n');
 
+    let streamObj;
     try {
-      const result = await ai({
+      streamObj = ai({
         instruction,
         startWith: '1.',
         // Generous stop sequences — model sometimes wants to add a
         // commentary line after the list. "11." is the natural end
         // marker once it tries to write a follow-up.
         stopSequences: ['\n11.', '\n\nNote', '\n\nThese', '\n\nThose', '\n\nLet me'],
+        onChunk: () => {
+          // Bail immediately if our token has been bumped (cancel
+          // clicked). Call .stop() to release the broker slot per
+          // platform ref §3.7, then throw to break out of the await.
+          if (myToken !== _ideaRefreshToken) {
+            try { streamObj?.stop?.(); } catch {}
+            throw new Error('cancelled');
+          }
+        },
       });
+      const result = await streamObj;
+      if (myToken !== _ideaRefreshToken) return;
 
       if (result?.stopReason === 'error') {
         toast('AI ideas failed — the plugin reported a request error.', 'err');
@@ -2301,11 +2329,17 @@
       saveSettings(0);
       toast(`✨ ${added.length} fresh idea${added.length === 1 ? '' : 's'} added — try 🎲 idea.`);
     } catch (e) {
-      console.warn('[ideas] refresh failed:', e);
-      toast('AI ideas failed — try again later.', 'err');
+      if (e?.message === 'cancelled') {
+        toast('AI ideas cancelled.');
+      } else {
+        console.warn('[ideas] refresh failed:', e);
+        toast('AI ideas failed — try again later.', 'err');
+      }
     } finally {
-      _ideaRefreshRunning = false;
-      if (btn) { btn.disabled = false; btn.textContent = '↻ ideas'; }
+      if (myToken === _ideaRefreshToken) {
+        _ideaRefreshRunning = false;
+        if (btn) { btn.disabled = false; btn.textContent = '↻ ideas'; }
+      }
     }
   }
 
@@ -2741,7 +2775,7 @@
       // a reroll matches what the user is currently set up to generate.
       const orientation = RESOLUTIONS[$('orientation')?.value] || null;
       const guidance = Number($('guidance')?.value);
-      if (orientation)         call.resolution    = orientation;
+      if (orientation)               call.resolution    = orientation;
       if (Number.isFinite(guidance)) call.guidanceScale = guidance;
       call.seed = seed;
 
