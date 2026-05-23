@@ -5,17 +5,20 @@
 <style>
   /* === Carnival Mystic — Madame Aurelia's Fortune Booth === */
   :root {
-    --night:    #0e0a16;       /* deep velvet shadow */
-    --plum:     #1a0e22;       /* booth interior */
-    --burgundy: #5a1024;       /* curtain */
+    --night:    #0e0a16;
+    --plum:     #1a0e22;
+    --burgundy: #5a1024;
     --burgundy-deep: #2b0810;
-    --gold:     #d4a548;       /* gilt brass */
-    --gold-hi:  #f3d77a;       /* candlelight on gold */
-    --gold-dim: #8c6a2a;       /* shadowed gilt */
-    --ivory:    #f4e4c1;       /* old parchment */
-    --ember:    #ff8a3c;       /* candle flame */
-    --orb:      #b66cff;       /* crystal glow */
+    --gold:     #d4a548;
+    --gold-hi:  #f3d77a;
+    --gold-dim: #8c6a2a;
+    --ivory:    #f4e4c1;
+    --ember:    #ff8a3c;
+    --orb:      #b66cff;
+    --err:      #ff6b6b;
+    --err-bg:   #2a0a0a;
   }
+  * { box-sizing: border-box; }
   html, body { background: var(--night); }
   body {
     margin: 0; min-height: 100vh; color: var(--ivory);
@@ -28,12 +31,10 @@
     background-attachment: fixed;
   }
 
-  /* booth: outer wooden cabinet */
   #booth {
-    width: min(475px, 100vw); margin: 0; box-sizing: border-box;
-    padding: 10px 10px 0px;
-    background:
-      linear-gradient(180deg, #2a1612 0%, #1a0d0a 60%, #0c0605 100%);
+    width: min(475px, 100vw); margin: 0; position: relative;
+    padding: 10px 10px 0;
+    background: linear-gradient(180deg, #2a1612 0%, #1a0d0a 60%, #0c0605 100%);
     border: 3px solid #1a0a05;
     box-shadow:
       inset 0 0 0 2px var(--gold-dim),
@@ -41,203 +42,387 @@
       inset 0 0 0 5px var(--gold),
       0 24px 60px rgba(0,0,0,0.6),
       0 0 80px rgba(214,165,72,0.06);
-    position: relative;
+    overflow: hidden;
   }
-  /* pediment SVG sits on top of cabinet */
   #pediment { display: block; width: 100%; height: auto; margin-bottom: 6px; }
   #pediment .gilt { fill: var(--gold); }
   #pediment .gilt-hi { fill: var(--gold-hi); }
   #pediment .dim { fill: var(--gold-dim); }
-  #pediment .name { font-family:'Merienda',serif; font-weight:700; fill: var(--gold-hi);
-                    letter-spacing: 3px; }
-  #pediment .sub  { font-family:'IM Fell English',serif; font-style:italic;
-                    fill: var(--gold); letter-spacing: 1px; }
+  #pediment .name { font-family:'Merienda',serif; font-weight:700; fill: var(--gold-hi); letter-spacing: 3px; }
+  #pediment .sub  { font-family:'IM Fell English',serif; font-style:italic; fill: var(--gold); letter-spacing: 1px; }
 
-  /* the curtained window where Madame appears */
   #window {
-    position: relative; padding: 15px;
-    background:
-      radial-gradient(ellipse at center 40%, #2a0b18 0%, #160510 60%, #0a0306 100%);
+    position: relative; padding: 14px 12px;
+    background: radial-gradient(ellipse at center 40%, #2a0b18 0%, #160510 60%, #0a0306 100%);
     border: 2px solid var(--burgundy-deep);
     box-shadow:
       inset 0 0 0 2px var(--gold-dim),
       inset 0 0 30px rgba(0,0,0,0.7),
       inset 0 0 80px rgba(255,138,60,0.06);
   }
-  /* velvet curtains — pure CSS pleating using stripes */
   #window::before, #window::after {
-    content: ""; position: absolute; top: 0; bottom: 0; width: 41px;
-    background:
-      repeating-linear-gradient(90deg,
-        #2b0810 0px, #4a0e1f 6px, #6b1530 12px, #4a0e1f 18px, #2b0810 24px);
-    box-shadow: inset 0 0 30px rgba(0,0,0,0.8);
-    pointer-events: none;
+    content: ""; position: absolute; top: 0; bottom: 0; width: 30px;
+    background: repeating-linear-gradient(90deg,
+      #2b0810 0px, #4a0e1f 4px, #6b1530 9px, #4a0e1f 13px, #2b0810 18px);
+    box-shadow: inset 0 0 24px rgba(0,0,0,0.8);
+    pointer-events: none; z-index: 1;
   }
   #window::before { left: 0; }
   #window::after  { right: 0; }
+  #topPanel, #chatPanel, #inputPanel, #toolbar, .sheet, #errorBar, #status { position: relative; z-index: 2; }
 
-  /* the counter display — a brass-rimmed window with the fate number */
+  /* ---- TOP PANEL: counter + stamp ---- */
+  #topPanel {
+    display: grid; grid-template-columns: 1fr 110px; gap: 10px;
+    margin: 0 32px 10px;
+  }
   #counterWrap {
-    position: relative; margin: 0 44px; padding: 10px 14px;
-    background:
-      radial-gradient(ellipse at center, #1f0d10 0%, #0a0306 100%);
+    padding: 6px 10px;
+    background: radial-gradient(ellipse at center, #1f0d10 0%, #0a0306 100%);
     border: 2px solid var(--gold-dim);
-    box-shadow:
-      inset 0 0 0 1px #000,
-      inset 0 0 20px rgba(255,138,60,0.10),
-      0 0 0 1px var(--gold) inset;
+    box-shadow: inset 0 0 0 1px var(--gold), inset 0 0 20px rgba(255,138,60,0.10);
+    display: flex; flex-direction: column; justify-content: center;
   }
   #counterLabel {
-    font-family: 'Merienda', serif; font-weight: 500; font-size: 20px;
-    letter-spacing: 4px; text-align: center; color: var(--gold);
-    margin-bottom: 4px;
+    font-family: 'Merienda', serif; font-weight: 500; font-size: 13px;
+    letter-spacing: 3px; text-align: center; color: var(--gold);
   }
   #counter {
-    font-family: 'Merienda', serif; font-weight: 700; font-size: 40px;
+    font-family: 'Merienda', serif; font-weight: 700; font-size: 32px;
     text-align: center; color: var(--ember); white-space: nowrap;
-    overflow: hidden; line-height: 1.1;
-    text-shadow:
-      0 0 8px rgba(255,138,60,0.55),
-      0 0 24px rgba(255,138,60,0.25),
-      0 1px 0 #000;
+    overflow: hidden; line-height: 1.05;
+    text-shadow: 0 0 8px rgba(255,138,60,0.55), 0 0 24px rgba(255,138,60,0.25), 0 1px 0 #000;
   }
 
-  /* the coin slot — the call to action */
-  #coinSlot {
-    margin: 18px 44px 6px; padding: 14px 16px; text-align: center;
-    background:
-      linear-gradient(180deg, #1a0a05 0%, #0a0403 100%);
-    border: 2px solid var(--gold-dim);
-    box-shadow:
-      inset 0 0 0 1px var(--gold),
-      inset 0 6px 12px rgba(0,0,0,0.7),
-      inset 0 -2px 0 rgba(214,165,72,0.18);
-    cursor: pointer; user-select: none;
-    transition: filter 200ms;
-  }
-  #coinSlot:hover { filter: brightness(1.18); }
-  #coinSlot.busy { cursor: progress; filter: brightness(0.7); }
-  #coinSlotLabel {
-    font-family: 'Merienda', serif; font-weight: 700; font-size: 14px;
-    letter-spacing: 3px; color: var(--gold-hi);
-  }
-  #coinSlotHint {
-    font-family: 'IM Fell English', serif; font-style: italic; font-size: 14px;
-    color: var(--ivory); opacity: 0.78; margin-top: 4px;
-  }
-  /* the slot mouth — a thin dark slit */
-  #slotMouth {
-    height: 6px; margin: 8px auto 0; width: 80px;
-    background: #000;
-    box-shadow:
-      inset 0 2px 4px rgba(0,0,0,0.9),
-      0 1px 0 var(--gold-dim);
-  }
-
-  /* the fortune card — appears when a number is drawn */
-  #card {
-    margin: 14px 32px 6px; padding: 16px;
-    background:
-      linear-gradient(180deg, #f4e4c1 0%, #ddc89a 100%);
-    color: #2b1b0a; display: none; position: relative;
-    border: 1px solid #6b4a1a;
-    box-shadow:
-      inset 0 0 0 4px #f4e4c1,
-      inset 0 0 0 5px var(--gold-dim),
-      0 8px 24px rgba(0,0,0,0.5);
-  }
-  #cardInner {
-    border: 1px solid var(--gold-dim);
-    padding: 12px;
-    background:
-      repeating-linear-gradient(45deg,
-        transparent 0 6px, rgba(214,165,72,0.04) 6px 7px);
-  }
-  #cardNum {
-    font-family: 'Merienda', serif; font-weight: 700; font-size: 26px;
-    letter-spacing: 2px; color: var(--burgundy);
-    text-align: center; margin-bottom: 6px;
-    text-shadow: 0 1px 0 rgba(255,255,255,0.4);
-  }
-  #cardDivider {
-    text-align: center; color: var(--gold-dim);
-    font-size: 14px; line-height: 1; margin: 4px 0 8px;
-    letter-spacing: 8px;
-  }
-  #fortune {
-    font-family: 'IM Fell English', serif; font-style: italic;
-    font-size: 16px; line-height: 1.55; min-height: 1.6em;
-    color: #2b1b0a; text-align: center; padding: 0 4px;
-  }
-  /* the tarot image area */
-  #sealWrap {
-    margin: 12px auto 4px; width: 200px; height: 280px;
+  /* the Stamp — the tarot card image. Re-roll refreshes this in place. */
+  #stampWrap {
+    position: relative; aspect-ratio: 5/7; min-height: 92px;
     background: var(--plum); border: 2px solid var(--gold-dim);
+    box-shadow: inset 0 0 0 1px var(--gold), inset 0 0 24px rgba(0,0,0,0.6);
     display: flex; align-items: center; justify-content: center;
-    position: relative; overflow: hidden;
-    box-shadow: inset 0 0 0 1px var(--gold), inset 0 0 30px rgba(0,0,0,0.6);
+    overflow: hidden; flex-direction: column; gap: 4px;
   }
-  #seal { width: 100%; height: 100%; object-fit: cover; display: none; }
-  #seal.ready { display: block; }
-  #sealFallback {
-    font-family: 'Merienda', serif; font-weight: 700; font-size: 38px;
-    color: var(--gold-hi); text-align: center;
+  #stampImg { width: 100%; height: 100%; object-fit: cover; display: none; }
+  #stampImg.ready { display: block; }
+  #stampFallback {
+    font-family: 'Merienda', serif; font-weight: 700; font-size: 16px;
+    color: var(--gold-hi); text-align: center; padding: 0 6px;
     text-shadow: 0 0 12px rgba(214,165,72,0.5);
-    display: none;
+    display: flex; flex-direction: column; gap: 2px;
   }
-
-  /* crystal-ball spinner — the image-gen loading state */
-  #spinner { display: none; flex-direction: column; align-items: center; gap: 10px; }
-  #spinner.active { display: flex; }
+  #stampFallback .num { font-size: 22px; line-height: 1; }
+  #stampFallback .lbl { font-family: 'IM Fell English', serif; font-style: italic; font-size: 10px; color: var(--gold); letter-spacing: 1px; }
+  #stampSpin { display: none; flex-direction: column; align-items: center; gap: 4px; }
+  #stampSpin.active { display: flex; position: absolute; inset: 0; align-items: center; justify-content: center; background: rgba(15,8,20,0.85); }
   .orb {
-    width: 76px; height: 76px; border-radius: 50%; position: relative;
-    background:
-      radial-gradient(circle at 35% 30%,
-        rgba(255,255,255,0.85) 0%,
-        rgba(182,108,255,0.65) 18%,
-        rgba(120,40,200,0.55) 45%,
-        rgba(30,8,60,0.95) 80%);
-    box-shadow:
-      0 0 16px rgba(182,108,255,0.55),
-      0 0 32px rgba(182,108,255,0.30),
-      inset -8px -10px 18px rgba(0,0,0,0.5),
-      inset 8px 10px 14px rgba(255,255,255,0.10);
+    width: 36px; height: 36px; border-radius: 50%; position: relative;
+    background: radial-gradient(circle at 35% 30%,
+      rgba(255,255,255,0.85) 0%, rgba(182,108,255,0.65) 18%,
+      rgba(120,40,200,0.55) 45%, rgba(30,8,60,0.95) 80%);
+    box-shadow: 0 0 12px rgba(182,108,255,0.55), 0 0 24px rgba(182,108,255,0.30),
+      inset -4px -5px 10px rgba(0,0,0,0.5), inset 4px 5px 8px rgba(255,255,255,0.10);
     animation: orb-pulse 2.4s ease-in-out infinite;
   }
   .orb::after {
-    content: ""; position: absolute; inset: -10px; border-radius: 50%;
+    content: ""; position: absolute; inset: -5px; border-radius: 50%;
     border: 1px dashed rgba(214,165,72,0.35);
     animation: orb-rot 12s linear infinite;
   }
   @keyframes orb-pulse {
-    0%,100% { box-shadow: 0 0 16px rgba(182,108,255,0.55), 0 0 32px rgba(182,108,255,0.30), inset -8px -10px 18px rgba(0,0,0,0.5), inset 8px 10px 14px rgba(255,255,255,0.10); }
-    50%     { box-shadow: 0 0 28px rgba(182,108,255,0.85), 0 0 56px rgba(182,108,255,0.45), inset -8px -10px 18px rgba(0,0,0,0.5), inset 8px 10px 14px rgba(255,255,255,0.18); }
+    0%,100% { box-shadow: 0 0 12px rgba(182,108,255,0.55), 0 0 24px rgba(182,108,255,0.30), inset -4px -5px 10px rgba(0,0,0,0.5), inset 4px 5px 8px rgba(255,255,255,0.10); }
+    50%     { box-shadow: 0 0 18px rgba(182,108,255,0.85), 0 0 36px rgba(182,108,255,0.45), inset -4px -5px 10px rgba(0,0,0,0.5), inset 4px 5px 8px rgba(255,255,255,0.18); }
   }
   @keyframes orb-rot { to { transform: rotate(360deg); } }
-  .spinnerLabel {
+
+  /* ---- CHAT PANEL ---- */
+  #chatPanel {
+    margin: 0 32px 8px; height: 380px;
+    background: linear-gradient(180deg, #15070d 0%, #0c0306 100%);
+    border: 2px solid var(--gold-dim);
+    box-shadow: inset 0 0 0 1px var(--gold), inset 0 0 24px rgba(0,0,0,0.55);
+    overflow-y: auto; padding: 10px 10px 6px;
+    scrollbar-width: thin; scrollbar-color: var(--gold-dim) transparent;
+  }
+  #chatPanel::-webkit-scrollbar { width: 8px; }
+  #chatPanel::-webkit-scrollbar-thumb { background: var(--gold-dim); }
+  #chatPanel::-webkit-scrollbar-track { background: transparent; }
+
+  #emptyState {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100%; gap: 12px; text-align: center; padding: 0 16px;
+  }
+  #emptyState .glyph { font-size: 36px; color: var(--gold-hi); opacity: 0.6; }
+  #emptyState .hint {
     font-family: 'IM Fell English', serif; font-style: italic;
-    color: var(--ivory); opacity: 0.78; font-size: 13px; letter-spacing: 1px;
+    color: var(--ivory); opacity: 0.75; font-size: 14px; line-height: 1.5;
   }
 
-  /* hidden / dev */
-  #hint {
-    font-family: 'IM Fell English', serif; font-style: italic;
-    text-align: center; color: var(--ivory); opacity: 0.7;
-    font-size: 13px; margin: 14px 8px 4px; padding: 0 8px;
-  }
-  #reset {
-    margin: 10px auto 0; padding: 6px 12px; display: none;
+  .msg { margin: 8px 0; max-width: 88%; clear: both; }
+  .msg.madame { float: left; }
+  .msg.user   { float: right; }
+  .msgWho {
     font-family: 'Merienda', serif; font-size: 11px; letter-spacing: 2px;
+    margin-bottom: 3px; opacity: 0.8;
+  }
+  .msg.madame .msgWho { color: var(--gold-hi); }
+  .msg.user   .msgWho { color: var(--ember); text-align: right; }
+  .bubble {
+    padding: 9px 12px; line-height: 1.55; font-size: 14.5px;
+    border: 1px solid var(--gold-dim);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .msg.madame .bubble {
+    background: linear-gradient(180deg, #f4e4c1 0%, #ddc89a 100%);
+    color: #2b1b0a;
+    font-family: 'IM Fell English', serif; font-style: italic;
+    box-shadow: inset 0 0 0 2px #f4e4c1, inset 0 0 0 3px var(--gold-dim),
+      0 4px 10px rgba(0,0,0,0.4);
+  }
+  .msg.user .bubble {
+    background: linear-gradient(180deg, #2a0e18 0%, #1a0710 100%);
+    color: var(--ivory);
+    font-family: 'IM Fell English', serif;
+    border-color: var(--gold-dim);
+  }
+  /* Practical error bubble: clearly distinct from in-character content */
+  .msg.error .bubble {
+    background: var(--err-bg);
+    color: var(--err);
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    font-style: normal; font-size: 12.5px;
+    border: 1px solid var(--err);
+    box-shadow: none;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .msg.error .msgWho { color: var(--err); }
+
+  .msg .caret {
+    display: inline-block; width: 7px; height: 1em; vertical-align: -2px;
+    margin-left: 1px; background: currentColor; opacity: 0.6;
+    animation: blink 1s steps(2) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+  .clear { clear: both; }
+
+  #typing {
+    display: none; clear: both; float: left;
+    font-family: 'IM Fell English', serif; font-style: italic;
+    color: var(--gold); opacity: 0.7; font-size: 13px;
+    padding: 6px 10px; margin: 4px 0;
+  }
+  #typing.active { display: inline-block; }
+  #typing .dots::after { content: ""; animation: dots 1.4s steps(4) infinite; }
+  @keyframes dots {
+    0%   { content: ""; }
+    25%  { content: "."; }
+    50%  { content: ".."; }
+    75%  { content: "..."; }
+  }
+
+  /* ---- ERROR BAR (practical, NOT in-character) ---- */
+  #errorBar {
+    display: none; margin: 0 32px 8px;
+    padding: 8px 32px 8px 10px; position: relative;
+    background: var(--err-bg);
+    border: 1px solid var(--err);
+    color: var(--err);
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    font-size: 12px; line-height: 1.4;
+    word-break: break-word; white-space: pre-wrap;
+  }
+  #errorBar.active { display: block; }
+  #errorBar .label {
+    font-weight: 700; letter-spacing: 1px; margin-right: 6px;
+  }
+  #errorBar .close {
+    position: absolute; top: 4px; right: 6px;
+    background: transparent; border: 0; color: var(--err);
+    font-family: inherit; font-size: 16px; line-height: 1;
+    cursor: pointer; padding: 2px 6px;
+  }
+  #errorBar .close:hover { color: #fff; }
+
+  /* ---- INPUT PANEL ---- */
+  #inputPanel {
+    margin: 0 32px 8px;
+    display: flex; gap: 6px; align-items: flex-end;
+  }
+  #input {
+    flex: 1; resize: none; min-height: 38px; max-height: 100px;
+    padding: 8px 10px; line-height: 1.4; font-size: 14px;
+    font-family: 'IM Fell English', serif; color: var(--ivory);
+    background: linear-gradient(180deg, #1a0a05 0%, #0a0403 100%);
+    border: 2px solid var(--gold-dim);
+    box-shadow: inset 0 0 0 1px rgba(214,165,72,0.4), inset 0 4px 8px rgba(0,0,0,0.7);
+    outline: none;
+  }
+  #input::placeholder { color: var(--ivory); opacity: 0.45; font-style: italic; }
+  #input:focus { box-shadow: inset 0 0 0 1px var(--gold), inset 0 4px 8px rgba(0,0,0,0.7),
+    0 0 12px rgba(255,138,60,0.2); }
+  #input:disabled { opacity: 0.55; cursor: not-allowed; }
+  #sendBtn {
+    font-family: 'Merienda', serif; font-weight: 700; font-size: 13px;
+    letter-spacing: 2px; color: var(--gold-hi);
+    padding: 8px 12px; cursor: pointer;
+    background: linear-gradient(180deg, #1a0a05 0%, #0a0403 100%);
+    border: 2px solid var(--gold-dim);
+    box-shadow: inset 0 0 0 1px var(--gold), inset 0 -2px 0 rgba(214,165,72,0.18);
+    transition: filter 200ms;
+  }
+  #sendBtn:hover:not(:disabled) { filter: brightness(1.25); }
+  #sendBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ---- TOOLBAR ---- */
+  #toolbar {
+    margin: 0 32px 6px;
+    display: grid; grid-template-columns: 1fr auto auto auto; gap: 6px;
+  }
+  .tbtn {
+    font-family: 'Merienda', serif; font-weight: 700; font-size: 12px;
+    letter-spacing: 2px; color: var(--gold-hi);
+    padding: 9px 8px; cursor: pointer; user-select: none;
+    background: linear-gradient(180deg, #1a0a05 0%, #0a0403 100%);
+    border: 2px solid var(--gold-dim);
+    box-shadow: inset 0 0 0 1px var(--gold), inset 0 -2px 0 rgba(214,165,72,0.18);
+    transition: filter 200ms;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    min-height: 40px;
+  }
+  .tbtn:hover:not(:disabled) { filter: brightness(1.2); }
+  .tbtn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .tbtn.primary {
+    background: linear-gradient(180deg, #3a1208 0%, #1a0a05 100%);
+    color: var(--ember); text-shadow: 0 0 8px rgba(255,138,60,0.45);
+  }
+  .tbtn.busy { cursor: progress; filter: brightness(0.7); }
+  .tbtn .icon { font-size: 16px; line-height: 1; }
+  .tbtn .lbl { font-size: 11px; }
+
+  /* ---- BOTTOM SHEETS ---- */
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(180deg, #1a0d0a 0%, #0c0605 100%);
+    border-top: 3px solid var(--gold);
+    box-shadow: 0 -16px 40px rgba(0,0,0,0.7), inset 0 1px 0 var(--gold-hi);
+    transform: translateY(100%); transition: transform 280ms ease-out;
+    max-height: 78%; display: flex; flex-direction: column;
+    z-index: 50;
+  }
+  .sheet.open { transform: translateY(0); }
+  .sheetHeader {
+    padding: 10px 14px; display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--burgundy-deep);
+    background: linear-gradient(180deg, #2a1612 0%, #1a0d0a 100%);
+  }
+  .sheetTitle {
+    font-family: 'Merienda', serif; font-weight: 700; font-size: 15px;
+    letter-spacing: 3px; color: var(--gold-hi);
+  }
+  .sheetClose {
+    background: transparent; border: 1px solid var(--gold-dim); color: var(--gold);
+    font-family: 'Merienda', serif; font-size: 11px; padding: 4px 10px;
+    cursor: pointer; letter-spacing: 2px;
+  }
+  .sheetClose:hover { filter: brightness(1.3); }
+  .sheetBody {
+    padding: 12px 14px; overflow-y: auto; flex: 1;
+    scrollbar-width: thin; scrollbar-color: var(--gold-dim) transparent;
+  }
+  .sheetBody::-webkit-scrollbar { width: 8px; }
+  .sheetBody::-webkit-scrollbar-thumb { background: var(--gold-dim); }
+  .sheetFooter {
+    padding: 10px 14px; border-top: 1px solid var(--burgundy-deep);
+    display: flex; gap: 6px; justify-content: flex-end;
+  }
+
+  .field { margin-bottom: 12px; }
+  .field label {
+    display: block; font-family: 'Merienda', serif; font-weight: 600; font-size: 11px;
+    letter-spacing: 2px; color: var(--gold); margin-bottom: 4px;
+  }
+  .field input, .field textarea {
+    width: 100%; padding: 8px 10px; font-family: 'IM Fell English', serif;
+    color: var(--ivory); font-size: 14px; line-height: 1.4;
+    background: linear-gradient(180deg, #1a0a05 0%, #0a0403 100%);
+    border: 1px solid var(--gold-dim); outline: none;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.6);
+  }
+  .field input:focus, .field textarea:focus { border-color: var(--gold); }
+  .field textarea { resize: vertical; min-height: 80px; }
+  .field .hint {
+    font-family: 'IM Fell English', serif; font-style: italic; font-size: 12px;
+    color: var(--ivory); opacity: 0.55; margin-top: 4px;
+  }
+
+  .memItem { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+  .memItem input { flex: 1; }
+  .memItem .del {
     background: var(--burgundy-deep); color: var(--ivory);
-    border: 1px solid var(--gold-dim); cursor: pointer;
+    border: 1px solid var(--gold-dim); padding: 6px 9px; cursor: pointer;
+    font-family: 'Merienda', serif; font-size: 11px;
+  }
+  .memItem .del:hover { background: var(--burgundy); }
+  #memAdd {
+    margin-top: 4px; padding: 6px 12px; cursor: pointer;
+    font-family: 'Merienda', serif; font-size: 11px; letter-spacing: 2px;
+    color: var(--gold-hi); background: transparent;
+    border: 1px dashed var(--gold-dim);
+  }
+  #memAdd:hover { border-color: var(--gold); }
+
+  #histList { display: flex; flex-direction: column; gap: 6px; }
+  .histRow {
+    padding: 10px; cursor: pointer; user-select: none;
+    background: linear-gradient(180deg, #1a0a05 0%, #0a0403 100%);
+    border: 1px solid var(--gold-dim);
+    transition: filter 150ms, border-color 150ms;
+    display: grid; grid-template-columns: 1fr auto; gap: 4px 8px;
+  }
+  .histRow:hover { filter: brightness(1.2); border-color: var(--gold); }
+  .histRow.current { border-color: var(--ember); box-shadow: 0 0 8px rgba(255,138,60,0.25); }
+  .histNum {
+    font-family: 'Merienda', serif; font-weight: 700; color: var(--ember);
+    font-size: 14px; letter-spacing: 1px;
+  }
+  .histCard {
+    font-family: 'IM Fell English', serif; font-style: italic;
+    color: var(--gold); font-size: 12px; text-align: right;
+  }
+  .histPreview {
+    grid-column: 1 / -1; font-family: 'IM Fell English', serif; font-size: 12px;
+    color: var(--ivory); opacity: 0.7; line-height: 1.4;
+    overflow: hidden; text-overflow: ellipsis;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  }
+  .histDate {
+    grid-column: 1 / -1; font-family: 'IM Fell English', serif; font-size: 10px;
+    color: var(--gold-dim); letter-spacing: 1px;
+  }
+  .histEmpty {
+    font-family: 'IM Fell English', serif; font-style: italic;
+    color: var(--ivory); opacity: 0.5; text-align: center; padding: 20px;
+  }
+
+  .saveBtn {
+    font-family: 'Merienda', serif; font-weight: 700; font-size: 12px;
+    letter-spacing: 2px; padding: 7px 14px; cursor: pointer;
+    color: var(--gold-hi);
+    background: linear-gradient(180deg, #3a1208 0%, #1a0a05 100%);
+    border: 1px solid var(--gold);
+  }
+  .saveBtn:hover { filter: brightness(1.2); }
+
+  /* dev / status (in-theme info, separate from errors) */
+  #status {
+    font-family: 'IM Fell English', serif; font-style: italic;
+    text-align: center; color: var(--ivory); opacity: 0.6;
+    font-size: 11px; margin: 6px 32px 8px; min-height: 1em;
   }
   #debug {
-    font-family: ui-monospace, monospace; font-size: 10px;
-    color: rgba(214,165,72,0.7); text-align: center;
-    margin-top: 8px; word-break: break-all; display: none;
+    font-family: ui-monospace, monospace; font-size: 9px;
+    color: rgba(214,165,72,0.6); text-align: center;
+    margin: 0 8px 4px; word-break: break-all; display: none;
   }
-
-  /* footer */
   .footer {
     font-family: 'IM Fell English', serif; font-style: italic;
     color: rgba(244,228,193,0.45); font-size: 11px; text-align: center;
@@ -248,77 +433,135 @@
 </style>
 
 <div id="booth">
-  <!-- carved gilt pediment over the booth -->
   <svg id="pediment" viewBox="0 0 400 95" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <!-- ornamental swag -->
     <path class="gilt" d="M 30 60 Q 200 -10 370 60 L 370 64 Q 200 -6 30 64 Z"/>
     <path class="gilt-hi" d="M 30 60 Q 200 -10 370 60 L 370 61 Q 200 -9 30 61 Z"/>
-    <!-- left fleuron -->
     <g transform="translate(24,64)">
       <circle class="gilt" cx="0" cy="0" r="6"/>
       <circle class="dim" cx="0" cy="0" r="3"/>
       <path class="gilt" d="M -10 0 Q -6 -8 0 -8 Q 6 -8 10 0 Q 6 8 0 8 Q -6 8 -10 0 Z" opacity="0.55"/>
     </g>
-    <!-- right fleuron -->
     <g transform="translate(376,64)">
       <circle class="gilt" cx="0" cy="0" r="6"/>
       <circle class="dim" cx="0" cy="0" r="3"/>
       <path class="gilt" d="M -10 0 Q -6 -8 0 -8 Q 6 -8 10 0 Q 6 8 0 8 Q -6 8 -10 0 Z" opacity="0.55"/>
     </g>
-    <!-- all-seeing eye crest -->
     <g transform="translate(200,27)">
       <path class="gilt-hi" d="M -22 0 Q 0 -14 22 0 Q 0 14 -22 0 Z"/>
       <circle class="dim" cx="0" cy="0" r="6"/>
       <circle fill="#0e0a16" cx="0" cy="0" r="3"/>
       <circle class="gilt-hi" cx="-1" cy="-1" r="1"/>
-      <!-- rays -->
       <g class="gilt" opacity="0.7">
-        <path d="M -32 0 L -40 0"/>
-        <path d="M 32 0 L 40 0"/>
-        <path d="M -22 -12 L -28 -18"/>
-        <path d="M 22 -12 L 28 -18"/>
-        <path d="M -22 12 L -28 18"/>
-        <path d="M 22 12 L 28 18"/>
+        <path d="M -32 0 L -40 0"/><path d="M 32 0 L 40 0"/>
+        <path d="M -22 -12 L -28 -18"/><path d="M 22 -12 L 28 -18"/>
+        <path d="M -22 12 L -28 18"/><path d="M 22 12 L 28 18"/>
       </g>
     </g>
-    <!-- name plaque -->
     <text class="name" x="200" y="70" text-anchor="middle" font-size="20">MADAME AURELIA</text>
     <text class="sub"  x="200" y="90" text-anchor="middle" font-size="15">— Fortunes &amp; Futures —</text>
   </svg>
 
   <div id="window">
-    <div id="counterWrap">
-      <div id="counterLabel">FATES READ</div>
-      <div id="counter">0</div>
-    </div>
-
-    <!-- the card slot where the fortune emerges -->
-    <div id="card">
-      <div id="cardInner">
-        <div id="cardNum">№ 0</div>
-        <div id="cardDivider">✦ ✦ ✦</div>
-        <div id="sealWrap">
-          <div id="spinner" role="status" aria-live="polite">
-            <div class="orb" aria-hidden="true"></div>
-            <div class="spinnerLabel">Image generating… (60s.)</div>
-          </div>
-          <img id="seal" alt="Your fortune card">
-          <div id="sealFallback">№ 0</div>
+    <div id="topPanel">
+      <div id="counterWrap">
+        <div id="counterLabel">FATES READ</div>
+        <div id="counter">0</div>
+      </div>
+      <div id="stampWrap" title="Tonight's card">
+        <img id="stampImg" alt="Your fortune card">
+        <div id="stampFallback"><span class="num">№ —</span><span class="lbl">awaiting a coin</span></div>
+        <div id="stampSpin" role="status" aria-live="polite">
+          <div class="orb" aria-hidden="true"></div>
         </div>
-        <div id="fortune"></div>
       </div>
     </div>
 
-    <!-- the coin slot — the only call to action -->
-    <div id="coinSlot" role="button" tabindex="0">
-      <div id="coinSlotLabel">INSERT A COIN</div>
-      <div id="coinSlotHint">to have your fortune read</div>
-      <div id="slotMouth"></div>
+    <div id="chatPanel" aria-live="polite">
+      <div id="emptyState">
+        <div class="glyph">✦</div>
+        <div class="hint">Madame Aurelia is between readings.<br>Insert a coin below to draw your first fortune.</div>
+      </div>
+      <div id="messages"></div>
+      <div id="typing"><span class="dots">Madame is reading the cards</span></div>
+      <div class="clear"></div>
     </div>
 
-    <div id="hint">Loading counter…</div>
-    <button id="reset">RESET</button>
+    <!-- Practical error banner — NOT in character. Shows real error messages. -->
+    <div id="errorBar" role="alert">
+      <button class="close" title="Dismiss" aria-label="Dismiss error">×</button>
+      <span class="label">ERROR:</span><span class="msg"></span>
+    </div>
+
+    <div id="inputPanel">
+      <textarea id="input" rows="1" placeholder="Speak softly to Madame… (Enter ↵ to send)" disabled></textarea>
+      <button id="sendBtn" disabled>SEND</button>
+    </div>
+
+    <div id="toolbar">
+      <button id="newBtn" class="tbtn primary" title="Draw a new fortune">
+        <span class="icon">🪙</span><span class="lbl">NEW FORTUNE</span>
+      </button>
+      <button id="charBtn" class="tbtn" title="Character editor"><span class="icon">👁</span></button>
+      <button id="memBtn"  class="tbtn" title="Memory editor"><span class="icon">📜</span></button>
+      <button id="histBtn" class="tbtn" title="Past readings"><span class="icon">📚</span></button>
+    </div>
+
+    <div id="status">Loading the booth…</div>
     <div id="debug"></div>
+
+    <div id="sheetChar" class="sheet" role="dialog" aria-label="Character editor">
+      <div class="sheetHeader">
+        <div class="sheetTitle">👁 THE FORTUNE TELLER</div>
+        <button class="sheetClose" data-close="sheetChar">CLOSE</button>
+      </div>
+      <div class="sheetBody">
+        <div class="field">
+          <label>Name</label>
+          <input id="charName" type="text" placeholder="Madame Aurelia" maxlength="60">
+        </div>
+        <div class="field">
+          <label>Persona &amp; voice</label>
+          <textarea id="charDesc" rows="6" placeholder="Describe the fortune teller's voice, manner, and quirks. Leave blank to keep Madame Aurelia exactly as she is."></textarea>
+          <div class="hint">Additional notes that override the default carnival-mystic voice. e.g. "Slips into French when surprised. Has a black cat named Vesper who lives in her lap. Mentions tea often."</div>
+        </div>
+      </div>
+      <div class="sheetFooter">
+        <button class="sheetClose" data-close="sheetChar">CANCEL</button>
+        <button id="charSave" class="saveBtn">SAVE</button>
+      </div>
+    </div>
+
+    <div id="sheetMem" class="sheet" role="dialog" aria-label="Memory editor">
+      <div class="sheetHeader">
+        <div class="sheetTitle">📜 WHAT MADAME REMEMBERS</div>
+        <button class="sheetClose" data-close="sheetMem">CLOSE</button>
+      </div>
+      <div class="sheetBody">
+        <div class="field">
+          <label>Quiet memories</label>
+          <div class="hint" style="margin-bottom:8px;">Facts about you that Madame will quietly hold in mind. She uses them, rarely names them aloud. e.g. "I am called Wren." · "I work nights." · "My partner's name is Mara."</div>
+          <div id="memList"></div>
+          <button id="memAdd">+ ADD A MEMORY</button>
+        </div>
+      </div>
+      <div class="sheetFooter">
+        <button class="sheetClose" data-close="sheetMem">CANCEL</button>
+        <button id="memSave" class="saveBtn">SAVE</button>
+      </div>
+    </div>
+
+    <div id="sheetHist" class="sheet" role="dialog" aria-label="Past readings">
+      <div class="sheetHeader">
+        <div class="sheetTitle">📚 PAST READINGS</div>
+        <button class="sheetClose" data-close="sheetHist">CLOSE</button>
+      </div>
+      <div class="sheetBody">
+        <div id="histList"></div>
+      </div>
+      <div class="sheetFooter">
+        <button id="histReset" class="sheetClose" style="border-color:#7d1f15;color:#ffb39c;">CLEAR ALL HISTORY</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -330,21 +573,17 @@
 
 <script>
 (async function () {
-  // --- inlined from src/number-facts.js (tested separately) ---
+  // --- inlined number-facts (tested separately) ----------------------
   function isPrime(n) {
     if (n < 2) return false;
     for (let i = 2; i * i <= n; i++) if (n % i === 0) return false;
     return true;
   }
-
   function isSequential(digits, step) {
     if (digits.length < 2) return false;
-    for (let i = 1; i < digits.length; i++) {
-      if (digits[i] - digits[i - 1] !== step) return false;
-    }
+    for (let i = 1; i < digits.length; i++) if (digits[i] - digits[i-1] !== step) return false;
     return true;
   }
-
   function numberFacts(n, ctx = {}) {
     const digits = String(n).split("").map(Number);
     const uniq = new Set(digits);
@@ -364,10 +603,6 @@
       priorCount: ctx.priorCount != null ? ctx.priorCount : n - 1,
     };
   }
-
-  // Returns 1-2 human-readable fact strings, most "interesting" first.
-  // Always returns at least one (the ordinal fallback) so the fortune
-  // prompt is never starved of raw material.
   function pickSalientFacts(f) {
     const ranked = [];
     if (f.allSameDigit) ranked.push(`every digit is the same — a tidy ${f.n}`);
@@ -380,50 +615,84 @@
     if (f.isFirstToday) ranked.push(`it is the first number drawn today`);
     if (f.hasRepeatedDigits && ranked.length === 0)
       ranked.push(`some of its digits keep repeating`);
-    // Fallback — always available:
     ranked.push(`its digits add up to ${f.digitSum}`);
     ranked.push(`${f.priorCount} people drew a number before this one`);
     return ranked.slice(0, 2);
   }
 
+  // --- Motif bank (lives here as plain JS — no Perchance list access) ---
+  // Each motif: { card: "...", image: "..." } — card name + a sensory
+  // image that gets woven into the AI prompt and the Stamp image.
+  const MOTIF_BANK = [
+    { card: "The Queen of Cups",       image: "tea leaves arranging themselves into the shape of a small bird" },
+    { card: "The Ace of Cups",         image: "a chalice brimming over, the water trembling at the rim" },
+    { card: "The Hermit",              image: "a lantern lit in a window at dusk, and no one passing" },
+    { card: "The Star",                image: "a still pool catching every star, as though the sky had bent down to drink" },
+    { card: "The Wheel of Fortune",    image: "the wheel of fortune, turning slowly and not against you" },
+    { card: "The Page of Wands",       image: "the page of wands, half-revealed beneath a velvet sleeve" },
+    { card: "The Ten of Cups",         image: "a hand of cards fanned wide, then closed with a quiet snap" },
+    { card: "The Moon",                image: "a black cat blinking once, deliberately, from the curtain's edge" },
+    { card: "The Six of Pentacles",    image: "a small brass key found in a coat pocket you had not worn in years" },
+    { card: "The Sun",                 image: "a candle that flickers twice, then steadies, brighter than it was" },
+    { card: "The Three of Cups",       image: "a coin spinning a few moments longer than it should" },
+    { card: "The High Priestess",      image: "the smell of incense lingering long after the smoke has gone" },
+    { card: "The Knight of Cups",      image: "a sealed envelope with no name written on it, still warm" },
+    { card: "The Empress",             image: "the smell of cinnamon drifting from a room you cannot find" },
+    { card: "The Eight of Cups",       image: "velvet curtains breathing in a draft you cannot quite feel" },
+    { card: "The World",               image: "a glass orb catching the last of the lamplight, holding it whole" },
+    { card: "The Magician",            image: "a moth circling the lamp without ever harming itself" },
+    { card: "The Two of Wands",        image: "a pendulum settling into a small, quiet circle" },
+    { card: "The Nine of Pentacles",   image: "a dream you remember only the shape of, but kindly" },
+    { card: "The Knight of Pentacles", image: "the soft chime of a tarot card being laid down on velvet" },
+    { card: "The Ace of Wands",        image: "a brass key warm from being held, though no one has held it" },
+    { card: "The Lovers",              image: "two candles leaning gently toward one another in still air" },
+  ];
+
+  // Pick a motif with simple rotation memory. Excludes recently-drawn
+  // cards (by `card` name). If filtering would leave fewer than 3
+  // candidates, falls back to the full bank — guarantees a result.
+  function pickMotif(excludeCards) {
+    const excludes = Array.isArray(excludeCards) ? excludeCards : [];
+    const available = MOTIF_BANK.filter(m => !excludes.includes(m.card));
+    const pool = available.length >= 3 ? available : MOTIF_BANK;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  // --- DOM helpers ---------------------------------------------------
   const $ = (id) => document.getElementById(id);
   const MAX_TICKET = 999999999999;
+  const ROTATION_CAP = 8;
 
-  async function ensureDexie() {
-    for (let i = 0; i < 30 && typeof Dexie === "undefined"; i++) {
-      await new Promise((r) => setTimeout(r, 100));
-    }
-    if (typeof Dexie === "undefined") {
-      await new Promise((resolve) => {
-        const s = document.createElement("script");
-        s.src = "https://cdn.jsdelivr.net/npm/dexie@4.0.11/dist/dexie.min.js";
-        s.onload = resolve;
-        s.onerror = resolve;
-        document.head.appendChild(s);
-      });
-    }
-  }
-
-  await ensureDexie();
-  if (typeof Dexie === "undefined") {
-    $("hint").textContent = "error loading Dexie db — please refresh";
-    return;
-  }
-  const db = new Dexie("the-dispenser-v1");
-  db.version(1).stores({ stubs: "number", misc: "key" });
-
-  let state = "LOADING";
-  let epoch = 0;
-  let currentNumber = 0;
-  let lastCounter = null;
-  let lastWrite = "—";
-  let drawId = 0; // monotonic — guards async results against being overwritten by a later draw
-
-  const setHint = (t) => { $("hint").textContent = t; };
   const fmt = (n) => Math.min(n, MAX_TICKET).toLocaleString();
   const fmtCard = (n) => "№ " + fmt(n);
+  const escapeHTML = (s) => String(s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const errMsg = (e) => {
+    if (!e) return "unknown error";
+    if (typeof e === "string") return e;
+    if (e.message) return e.message;
+    try { return JSON.stringify(e); } catch { return String(e); }
+  };
 
-  // Auto-fit the counter font — stretch small numbers, shrink huge ones.
+  // --- Practical error reporting (NOT in character) ------------------
+  // Shows the real error in a banner. Also logs to console with full
+  // context for debugging. Errors persist until dismissed or replaced.
+  function showError(where, err) {
+    const msg = errMsg(err);
+    console.error("[" + where + "]", err);
+    const bar = $("errorBar");
+    bar.querySelector(".label").textContent = where.toUpperCase() + ":";
+    bar.querySelector(".msg").textContent = " " + msg;
+    bar.classList.add("active");
+  }
+  function clearError() { $("errorBar").classList.remove("active"); }
+  $("errorBar").querySelector(".close").onclick = clearError;
+
+  // In-theme status (boot messages, hints — NOT errors)
+  const setStatus = (t) => { $("status").textContent = t || ""; };
+
   function fitText(text) {
     const el = $("counter");
     el.textContent = text;
@@ -434,9 +703,9 @@
     document.body.appendChild(probe);
     const w = probe.offsetWidth || 1;
     probe.remove();
-    const avail = (el.clientWidth || 240) - 6;
+    const avail = (el.clientWidth || 200) - 6;
     let size = 100 * (avail / w);
-    size = Math.max(15, Math.min(size, 88));
+    size = Math.max(12, Math.min(size, 32));
     el.style.fontSize = size + "px";
   }
 
@@ -452,159 +721,604 @@
     requestAnimationFrame(step);
   }
 
-  window.addEventListener("resize", () => fitText(fmt(currentNumber)));
+  // --- Dexie loader --------------------------------------------------
+  async function ensureDexie() {
+    for (let i = 0; i < 30 && typeof Dexie === "undefined"; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    if (typeof Dexie === "undefined") {
+      await new Promise((resolve) => {
+        const s = document.createElement("script");
+        s.src = "https://cdn.jsdelivr.net/npm/dexie@4.0.11/dist/dexie.min.js";
+        s.onload = resolve;
+        s.onerror = resolve;
+        document.head.appendChild(s);
+      });
+    }
+  }
+  await ensureDexie();
+  if (typeof Dexie === "undefined") {
+    showError("db", "Could not load Dexie. Refresh to retry.");
+    return;
+  }
 
-  async function getEpoch() {
-    const row = await db.misc.get("epoch");
-    return row ? row.value : 1;
-  }
-  async function getLocalMax() {
-    const row = await db.misc.get("localMax");
-    return row ? row.value : 0;
-  }
-  async function setLocalMax(v) {
-    const cur = await getLocalMax();
-    if (v > cur) await db.misc.put({ key: "localMax", value: v });
-    return Math.max(v, cur);
-  }
+  const db = new Dexie("the-dispenser-v1");
+  db.version(1).stores({ stubs: "number", misc: "key" });
+  db.version(2).stores({
+    stubs: "number",
+    misc: "key",
+    chats: "id, createdAt, lastMessageAt",
+    messages: "++id, chatId, createdAt",
+  });
+
+  // --- App state -----------------------------------------------------
+  let state = "LOADING";
+  let epoch = 0;
+  let lastCounter = null;
+  let displayedNumber = 0;
+  let currentChat = null;
+  let currentMessages = [];
+  let character = { name: "Madame Aurelia", description: "" };
+  let memory = [];
+  let recentMotifIds = [];
+  let drawId = 0; // monotonic — guards async results across re-rolls
+
   const counterKey = () => "tickets-e" + epoch;
 
-  async function updateDebug() {
-    const lm = await getLocalMax();
-    const c = lastCounter ? (lastCounter.ok ? lastCounter.value : "unreachable") : "?";
-    $("debug").textContent =
-      `e${epoch} · counter:${c} · local:${lm} · shown:${currentNumber.toLocaleString()} · tick:${lastWrite}`;
+  // --- Storage helpers ----------------------------------------------
+  async function getMisc(key, def) {
+    const row = await db.misc.get(key);
+    return row ? row.value : def;
+  }
+  async function setMisc(key, value) { await db.misc.put({ key, value }); }
+  async function getEpoch() { return await getMisc("epoch", 1); }
+  async function getLocalMax() { return await getMisc("localMax", 0); }
+  async function setLocalMax(v) {
+    const cur = await getLocalMax();
+    if (v > cur) await setMisc("localMax", v);
+    return Math.max(v, cur);
   }
 
-  // Reset the slot + card to a state where another draw can happen.
-  function armSlot() {
-    $("coinSlot").classList.remove("busy");
-    $("coinSlotLabel").textContent = "INSERT A COIN";
-    $("coinSlotHint").textContent = "Madame Aurelia awaits";
+  async function loadCharacter() {
+    character = await getMisc("character", { name: "Madame Aurelia", description: "" });
+    if (!character || typeof character !== "object") character = { name: "Madame Aurelia", description: "" };
   }
-  function setSlotBusy(msg) {
-    $("coinSlot").classList.add("busy");
-    $("coinSlotLabel").textContent = msg;
-    $("coinSlotHint").textContent = "";
+  async function saveCharacter() { await setMisc("character", character); }
+  async function loadMemory() {
+    memory = await getMisc("memory", []);
+    if (!Array.isArray(memory)) memory = [];
+  }
+  async function saveMemory() { await setMisc("memory", memory); }
+  async function loadRecentMotifs() {
+    recentMotifIds = await getMisc("recentMotifIds", []);
+    if (!Array.isArray(recentMotifIds)) recentMotifIds = [];
+  }
+  async function pushRecentMotif(cardName) {
+    if (!cardName) return;
+    recentMotifIds = recentMotifIds.filter(x => x !== cardName);
+    recentMotifIds.push(cardName);
+    while (recentMotifIds.length > ROTATION_CAP) recentMotifIds.shift();
+    await setMisc("recentMotifIds", recentMotifIds);
   }
 
-  // --- LOADING -> READY (or OFFLINE) ---
+  async function listChats() {
+    return await db.chats.orderBy("lastMessageAt").reverse().toArray();
+  }
+  async function loadChatById(id) {
+    const chat = await db.chats.get(id);
+    if (!chat) return null;
+    const msgs = await db.messages.where("chatId").equals(id).sortBy("createdAt");
+    return { chat, messages: msgs };
+  }
+  async function saveChat(chat) { await db.chats.put(chat); }
+  async function addMessage(chatId, role, content) {
+    const m = { chatId, role, content, createdAt: Date.now() };
+    const id = await db.messages.add(m);
+    m.id = id;
+    return m;
+  }
+  async function touchChat(chatId) {
+    await db.chats.update(chatId, { lastMessageAt: Date.now() });
+  }
+
+  // --- Stamp rendering ----------------------------------------------
+  function setStamp({ number, url, busy, label }) {
+    const img = $("stampImg"); const fb = $("stampFallback"); const sp = $("stampSpin");
+    sp.classList.toggle("active", !!busy);
+    if (url) {
+      img.src = url;
+      img.classList.add("ready");
+      fb.style.display = "none";
+    } else {
+      img.classList.remove("ready");
+      img.src = "";
+      fb.style.display = "flex";
+      fb.querySelector(".num").textContent = number != null ? fmtCard(number) : "№ —";
+      fb.querySelector(".lbl").textContent = label || (number != null ? "your card" : "awaiting a coin");
+    }
+  }
+
+  // --- Chat rendering ------------------------------------------------
+  function renderEmptyState(show) {
+    $("emptyState").style.display = show ? "flex" : "none";
+    $("messages").style.display = show ? "none" : "block";
+  }
+  function clearChatPanel() {
+    $("messages").innerHTML = "";
+    currentMessages = [];
+  }
+  function scrollChatToBottom() {
+    const c = $("chatPanel");
+    c.scrollTop = c.scrollHeight;
+  }
+  function renderBubble(role, text, opts = {}) {
+    const wrap = document.createElement("div");
+    wrap.className = "msg " + (role === "user" ? "user" : "madame");
+    if (opts.id) wrap.dataset.id = opts.id;
+    const who = role === "user" ? "YOU" : (character.name || "MADAME").toUpperCase();
+    wrap.innerHTML = `
+      <div class="msgWho">${escapeHTML(who)}</div>
+      <div class="bubble"><span class="content"></span><span class="caret" style="display:none;"></span></div>
+    `;
+    wrap.querySelector(".content").textContent = text || "";
+    const clr = document.createElement("div"); clr.className = "clear";
+    $("messages").appendChild(wrap); $("messages").appendChild(clr);
+    scrollChatToBottom();
+    return wrap;
+  }
+  function renderErrorBubble(where, errorText) {
+    const wrap = document.createElement("div");
+    wrap.className = "msg madame error";
+    wrap.innerHTML = `
+      <div class="msgWho">${escapeHTML(where.toUpperCase())}</div>
+      <div class="bubble"><span class="content"></span></div>
+    `;
+    wrap.querySelector(".content").textContent = errorText;
+    const clr = document.createElement("div"); clr.className = "clear";
+    $("messages").appendChild(wrap); $("messages").appendChild(clr);
+    scrollChatToBottom();
+    return wrap;
+  }
+  function setBubbleStreaming(el, streaming) {
+    if (!el) return;
+    const caret = el.querySelector(".caret");
+    if (caret) caret.style.display = streaming ? "inline-block" : "none";
+  }
+  function appendToBubble(el, chunk) {
+    if (!el) return;
+    el.querySelector(".content").textContent += chunk;
+    scrollChatToBottom();
+  }
+  function setBubbleText(el, text) {
+    if (!el) return;
+    el.querySelector(".content").textContent = text;
+    scrollChatToBottom();
+  }
+  function removeBubble(el) {
+    if (!el) return;
+    const next = el.nextElementSibling;
+    if (next && next.classList.contains("clear")) next.remove();
+    el.remove();
+  }
+
+  function showTyping(on) {
+    $("typing").classList.toggle("active", !!on);
+    if (on) scrollChatToBottom();
+  }
+
+  // --- Validation: confirm required DSL functions exist -------------
+  // Surfaces a real error if the top panel didn't load correctly,
+  // instead of letting calls fail with cryptic TypeErrors.
+  function assertRoot() {
+    const required = ["readCounter", "tickCounter", "getFortune", "chatReply", "generateSeal", "confirmAsync"];
+    const missing = required.filter(fn => typeof root[fn] !== "function");
+    if (missing.length) {
+      throw new Error("Top-panel functions not loaded: " + missing.join(", "));
+    }
+  }
+
+  // --- Boot ----------------------------------------------------------
   async function boot() {
+    try {
+      assertRoot();
+    } catch (e) {
+      showError("init", e);
+      setStatus("");
+      return;
+    }
+
     epoch = await getEpoch();
-    if (window.innerWidth < 500) setTimeout(() => root.aiTextPlugin({ preload: true }), 5000);
-    else root.aiTextPlugin({ preload: true });
+    await loadCharacter();
+    await loadMemory();
+    await loadRecentMotifs();
+
+    try {
+      if (window.innerWidth < 500) setTimeout(() => root.aiTextPlugin({ preload: true }), 5000);
+      else root.aiTextPlugin({ preload: true });
+    } catch (e) {
+      showError("preload", e); // non-fatal — continue boot
+    }
 
     const counter = await root.readCounter(counterKey());
     lastCounter = counter;
     const localMax = await getLocalMax();
-    currentNumber = counter.ok ? Math.max(counter.value, localMax) : localMax;
-    if (counter.ok && currentNumber > localMax) await setLocalMax(currentNumber);
-
-    countUp(0, currentNumber, 700);
-    await updateDebug();
+    displayedNumber = counter.ok ? Math.max(counter.value, localMax) : localMax;
+    if (counter.ok && displayedNumber > localMax) await setLocalMax(displayedNumber);
+    countUp(0, displayedNumber, 700);
 
     if (!counter.ok) {
       state = "OFFLINE";
-      setHint("The remote counter service is unreachable. App fallback to offline mode.");
+      showError("counter", counter.error || "remote counter unreachable; running offline");
     } else {
       state = "READY";
-      setHint(currentNumber === 0
-        ? "The booth has just opened. Be the first to have your fortune read."
-        : "Madame Aurelia awaits");
     }
-  }
 
-  // --- TEAR / READING SEQUENCE ---
-  async function draw() {
-    if (state !== "READY" && state !== "OFFLINE") return; // guard
-    state = "DRAWING";
-    const myDraw = ++drawId; // every later result must check this is still current
-    setSlotBusy("generating...");
-    // Hide any previous card cleanly before the new one arrives.
-    $("card").style.display = "none";
-    $("seal").classList.remove("ready");
-    $("seal").src = "";
-    $("sealFallback").style.display = "none";
-    $("fortune").textContent = "";
-
-    const localMax = await getLocalMax();
-    const tick = await root.tickCounter(counterKey());
-    let n, recorded;
-    if (tick.ok) {
-      n = Math.max(tick.value, localMax + 1);
-      recorded = true;
-      lastWrite = "ticked->shared";
+    const chats = await listChats();
+    if (chats.length > 0) {
+      await activateChat(chats[0].id);
+      setStatus("");
     } else {
-      n = Math.max(currentNumber, localMax) + 1;
-      recorded = false;
-      lastWrite = "tick failed";
+      renderEmptyState(true);
+      setStamp({ number: null, url: null, busy: false, label: "awaiting a coin" });
+      setStatus(displayedNumber === 0
+        ? "The booth has just opened. Be the first to have your fortune read."
+        : "Press 🪙 NEW FORTUNE to draw your first card.");
     }
-    n = Math.min(n, MAX_TICKET);
-
-    state = "REVEALING";
-    $("card").style.display = "block";
-    $("cardNum").textContent = fmtCard(n);
-    $("spinner").classList.add("active");           // crystal orb spins
-    $("sealFallback").textContent = fmtCard(n);
-
-    // Fortune (streamed)
-    $("fortune").textContent = "";
-    const facts = pickSalientFacts(numberFacts(n, { priorCount: n - 1 }));
-    const fortuneRes = await root.getFortune(n, facts, (chunk) => {
-      $("fortune").textContent += chunk;
-    });
-    $("fortune").textContent = fortuneRes.text;
-
-    // Tarot card image — the spinner waits for this (or its failure).
-    // Guard: a slow seal from an EARLIER draw must not overwrite the CURRENT
-    // card. Each .then closes over `myDraw` and bails if a newer draw started.
-    root.generateSeal(n).then((url) => {
-      if (myDraw !== drawId) return; // stale — drop on the floor
-      $("spinner").classList.remove("active");
-      if (url) {
-        $("seal").src = url;
-        $("seal").classList.add("ready");
-      } else {
-        $("sealFallback").style.display = "block";
-      }
-    });
-
-    const stub = { number: n, fortune: fortuneRes.text, sealUrl: "", recorded };
-    await db.stubs.put(stub);
-    await setLocalMax(n);
-
-    const prev = currentNumber;
-    currentNumber = n;
-    countUp(prev, n, 500);
-    await updateDebug();
-
-    state = "READY"; // re-arm immediately so user can draw again
-    armSlot();
-    setHint(recorded
-      ? "Your number was " + fmtCard(n) + " , keep it close."
-      : "General error: Remote service unreachable. App fall back to offline mode.");
   }
 
-  // --- RESET (testing) ---
-  $("reset").onclick = async () => {
+  async function activateChat(chatId) {
+    const loaded = await loadChatById(chatId);
+    if (!loaded) return;
+    currentChat = loaded.chat;
+    renderEmptyState(false);
+    clearChatPanel();
+    currentMessages = loaded.messages.map(m => ({ role: m.role, content: m.content }));
+    for (const m of loaded.messages) renderBubble(m.role, m.content);
+    setStamp({
+      number: currentChat.number,
+      url: currentChat.stampUrl || null,
+      busy: false,
+      label: currentChat.motif ? currentChat.motif.card : "your card",
+    });
+    enableInput(true);
+    scrollChatToBottom();
+    await setMisc("currentChatId", chatId);
+  }
+
+  function enableInput(on) {
+    $("input").disabled = !on;
+    $("sendBtn").disabled = !on || !$("input").value.trim();
+  }
+
+  // --- Draw a new fortune (re-roll) ---------------------------------
+  async function drawNewFortune() {
+    if (state === "DRAWING" || state === "THINKING") return;
+    clearError();
+    const previousState = state;
+    state = "DRAWING";
+    const myDraw = ++drawId;
+    $("newBtn").classList.add("busy");
+
+    try {
+      // 1. Tick the shared counter.
+      const localMax = await getLocalMax();
+      const tick = await root.tickCounter(counterKey());
+      let n, recorded;
+      if (tick.ok) {
+        n = Math.max(tick.value, localMax + 1);
+        recorded = true;
+      } else {
+        n = Math.max(displayedNumber, localMax) + 1;
+        recorded = false;
+        showError("counter", tick.error || "counter unreachable; using local-only number");
+      }
+      n = Math.min(n, MAX_TICKET);
+
+      // 2. Pick a motif locally (no Perchance list access needed).
+      const facts = numberFacts(n, { isFirstToday: false, priorCount: n - 1 });
+      const factStrings = pickSalientFacts(facts);
+      const motif = pickMotif(recentMotifIds);
+      if (motif && motif.card) {
+        await pushRecentMotif(motif.card);
+      }
+
+      // 3. Create the new chat thread.
+      const chatId = newId();
+      const newChat = {
+        id: chatId,
+        number: n,
+        motif: motif || null,
+        stampUrl: "",
+        title: motif && motif.card ? `${motif.card} · ${fmtCard(n)}` : fmtCard(n),
+        recorded,
+        createdAt: Date.now(),
+        lastMessageAt: Date.now(),
+      };
+      await saveChat(newChat);
+      currentChat = newChat;
+      currentMessages = [];
+
+      // 4. Reset the UI for the new chat. Refresh the Stamp.
+      renderEmptyState(false);
+      clearChatPanel();
+      setStamp({ number: n, url: null, busy: true, label: motif ? motif.card : "drawing…" });
+
+      const prev = displayedNumber;
+      displayedNumber = n;
+      countUp(prev, n, 500);
+
+      // 5. Stream the fortune as Madame's first message.
+      const bubble = renderBubble("assistant", "");
+      setBubbleStreaming(bubble, true);
+      const fortuneRes = await root.getFortune(n, factStrings, motif, character, (chunk) => {
+        if (myDraw !== drawId) return;
+        appendToBubble(bubble, chunk);
+      });
+      if (myDraw !== drawId) return;
+
+      // If AI failed, fortuneRes.text is the static fallback and .error is the cause.
+      // Show the practical error to the user; the fallback fortune still appears.
+      if (fortuneRes.error) {
+        showError("getFortune", fortuneRes.error);
+      }
+      setBubbleText(bubble, fortuneRes.text);
+      setBubbleStreaming(bubble, false);
+
+      const savedMsg = await addMessage(chatId, "assistant", fortuneRes.text);
+      currentMessages.push({ role: "assistant", content: fortuneRes.text });
+      bubble.dataset.id = savedMsg.id;
+      await touchChat(chatId);
+      await setLocalMax(n);
+      await setMisc("currentChatId", chatId);
+
+      // 6. Kick off the Stamp image (async — does not block re-arming input).
+      root.generateSeal(n, motif).then(async (sealRes) => {
+        if (myDraw !== drawId) return;
+        if (sealRes && sealRes.url) {
+          setStamp({ number: n, url: sealRes.url, busy: false, label: motif ? motif.card : "your card" });
+          await db.chats.update(chatId, { stampUrl: sealRes.url });
+          if (currentChat && currentChat.id === chatId) currentChat.stampUrl = sealRes.url;
+        } else {
+          setStamp({ number: n, url: null, busy: false, label: motif ? motif.card : "your card" });
+          if (sealRes && sealRes.error) showError("generateSeal", sealRes.error);
+        }
+      }).catch(e => {
+        if (myDraw !== drawId) return;
+        setStamp({ number: n, url: null, busy: false, label: motif ? motif.card : "your card" });
+        showError("generateSeal", e);
+      });
+
+      state = "READY";
+      enableInput(true);
+      setStatus("");
+    } catch (e) {
+      showError("drawNewFortune", e);
+      state = previousState === "OFFLINE" ? "OFFLINE" : "READY";
+    } finally {
+      $("newBtn").classList.remove("busy");
+    }
+  }
+
+  // --- Send a user message ------------------------------------------
+  async function sendUserMessage() {
+    if (!currentChat) return;
+    if (state === "DRAWING" || state === "THINKING") return;
+    const raw = $("input").value.trim();
+    if (!raw) return;
+
+    state = "THINKING";
+    enableInput(false);
+    $("input").value = "";
+    autoResizeInput();
+
+    renderBubble("user", raw);
+    currentMessages.push({ role: "user", content: raw });
+    try {
+      await addMessage(currentChat.id, "user", raw);
+      await touchChat(currentChat.id);
+    } catch (e) {
+      showError("db.addMessage", e); // persistence failed but conversation can continue
+    }
+
+    showTyping(true);
+    const bubble = renderBubble("assistant", "");
+    setBubbleStreaming(bubble, true);
+    showTyping(false);
+
+    try {
+      const reply = await root.chatReply(
+        currentMessages,
+        character,
+        memory,
+        currentChat.motif,
+        currentChat.number,
+        (chunk) => appendToBubble(bubble, chunk),
+      );
+      if (reply.error || !reply.text) {
+        // Replace the empty assistant bubble with a practical error bubble.
+        removeBubble(bubble);
+        renderErrorBubble("chatReply", reply.error || "empty reply from chatReply");
+        showError("chatReply", reply.error || "empty reply");
+        // Also pop the user message from the in-memory conversation so
+        // the next send doesn't re-feed it (it stays in DB for history).
+        // Actually keep it — user might want to retry. Just don't push
+        // a phantom assistant message.
+      } else {
+        setBubbleText(bubble, reply.text);
+        setBubbleStreaming(bubble, false);
+        currentMessages.push({ role: "assistant", content: reply.text });
+        try {
+          await addMessage(currentChat.id, "assistant", reply.text);
+          await touchChat(currentChat.id);
+        } catch (e) {
+          showError("db.addMessage", e);
+        }
+      }
+    } catch (e) {
+      removeBubble(bubble);
+      renderErrorBubble("chatReply", errMsg(e));
+      showError("chatReply", e);
+    } finally {
+      showTyping(false);
+      state = "READY";
+      enableInput(true);
+      $("input").focus();
+    }
+  }
+
+  // --- Input autoresize + Enter to send -----------------------------
+  function autoResizeInput() {
+    const el = $("input");
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 100) + "px";
+  }
+  $("input").addEventListener("input", () => {
+    autoResizeInput();
+    $("sendBtn").disabled = $("input").disabled || !$("input").value.trim();
+  });
+  $("input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (!$("sendBtn").disabled) sendUserMessage();
+    }
+  });
+  $("sendBtn").onclick = sendUserMessage;
+  $("newBtn").onclick = drawNewFortune;
+
+  // --- Sheet management ---------------------------------------------
+  function openSheet(id) {
+    document.querySelectorAll(".sheet.open").forEach(s => s.classList.remove("open"));
+    const sheet = document.getElementById(id);
+    if (sheet) sheet.classList.add("open");
+  }
+  function closeSheet(id) {
+    const sheet = document.getElementById(id);
+    if (sheet) sheet.classList.remove("open");
+  }
+  document.querySelectorAll("[data-close]").forEach(b => {
+    b.onclick = () => closeSheet(b.getAttribute("data-close"));
+  });
+
+  // --- Character editor ---------------------------------------------
+  $("charBtn").onclick = () => {
+    $("charName").value = character.name || "";
+    $("charDesc").value = character.description || "";
+    openSheet("sheetChar");
+  };
+  $("charSave").onclick = async () => {
+    try {
+      character = {
+        name: ($("charName").value || "").trim() || "Madame Aurelia",
+        description: ($("charDesc").value || "").trim(),
+      };
+      await saveCharacter();
+      closeSheet("sheetChar");
+      document.querySelectorAll(".msg.madame:not(.error) .msgWho").forEach(el => {
+        el.textContent = (character.name || "Madame").toUpperCase();
+      });
+    } catch (e) {
+      showError("saveCharacter", e);
+    }
+  };
+
+  // --- Memory editor ------------------------------------------------
+  function renderMemList() {
+    const list = $("memList");
+    list.innerHTML = "";
+    memory.forEach((m, i) => {
+      const row = document.createElement("div");
+      row.className = "memItem";
+      row.innerHTML = `<input type="text" value="" maxlength="240"><button class="del" data-i="${i}">✕</button>`;
+      row.querySelector("input").value = m;
+      row.querySelector(".del").onclick = () => {
+        memory.splice(i, 1); renderMemList();
+      };
+      row.querySelector("input").oninput = (e) => { memory[i] = e.target.value; };
+      list.appendChild(row);
+    });
+    if (memory.length === 0) {
+      const empty = document.createElement("div");
+      empty.style.cssText = "font-family:'IM Fell English',serif;font-style:italic;color:rgba(244,228,193,0.4);font-size:13px;text-align:center;padding:14px;";
+      empty.textContent = "Madame has nothing in mind. Add a memory below.";
+      list.appendChild(empty);
+    }
+  }
+  $("memBtn").onclick = () => { renderMemList(); openSheet("sheetMem"); };
+  $("memAdd").onclick = () => { memory.push(""); renderMemList(); };
+  $("memSave").onclick = async () => {
+    try {
+      memory = memory.map(m => String(m || "").trim()).filter(Boolean);
+      await saveMemory();
+      closeSheet("sheetMem");
+    } catch (e) {
+      showError("saveMemory", e);
+    }
+  };
+
+  // --- History ------------------------------------------------------
+  async function renderHistory() {
+    const chats = await listChats();
+    const list = $("histList");
+    list.innerHTML = "";
+    if (chats.length === 0) {
+      list.innerHTML = `<div class="histEmpty">No readings yet. Insert a coin to begin.</div>`;
+      return;
+    }
+    for (const c of chats) {
+      const row = document.createElement("div");
+      row.className = "histRow" + (currentChat && currentChat.id === c.id ? " current" : "");
+      const msgs = await db.messages.where("chatId").equals(c.id).sortBy("createdAt");
+      const preview = msgs.length > 0
+        ? msgs[0].content.slice(0, 160) + (msgs[0].content.length > 160 ? "…" : "")
+        : "(reading lost)";
+      const date = new Date(c.createdAt || c.lastMessageAt || Date.now());
+      const dateStr = date.toLocaleDateString(undefined, { month: "short", day: "numeric" })
+        + " · " + date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+      const cardName = c.motif?.card || "—";
+      row.innerHTML = `
+        <div class="histNum">${escapeHTML(fmtCard(c.number || 0))}</div>
+        <div class="histCard">${escapeHTML(cardName)}</div>
+        <div class="histPreview">${escapeHTML(preview)}</div>
+        <div class="histDate">${escapeHTML(dateStr)} · ${msgs.length} message${msgs.length === 1 ? "" : "s"}</div>
+      `;
+      row.onclick = async () => {
+        closeSheet("sheetHist");
+        await activateChat(c.id);
+      };
+      list.appendChild(row);
+    }
+  }
+  $("histBtn").onclick = async () => { await renderHistory(); openSheet("sheetHist"); };
+  $("histReset").onclick = async () => {
     const ok = await root.confirmAsync(
-      "Clears your local history.\n\n Remote counter is hard-coded and cannot be reset.\n\n Continue?"
+      "Clear ALL chat history?\n\nThis removes every past reading and conversation. The shared counter is unaffected and cannot be reset.\n\nContinue?"
     );
     if (!ok) return;
-    const e = await getEpoch();
-    await db.stubs.clear();
-    await db.misc.clear();
-    await db.misc.put({ key: "epoch", value: e + 1 });
-    location.reload();
+    try {
+      await db.chats.clear();
+      await db.messages.clear();
+      await setMisc("currentChatId", null);
+      await setMisc("recentMotifIds", []);
+      recentMotifIds = [];
+      currentChat = null;
+      currentMessages = [];
+      clearChatPanel();
+      renderEmptyState(true);
+      setStamp({ number: null, url: null, busy: false, label: "awaiting a coin" });
+      enableInput(false);
+      closeSheet("sheetHist");
+      setStatus("History cleared. Press 🪙 NEW FORTUNE when you are ready.");
+    } catch (e) {
+      showError("clearHistory", e);
+    }
   };
 
-  // coin slot is the only action — clickable + keyboard-activatable
-  $("coinSlot").onclick = draw;
-  $("coinSlot").onkeydown = (e) => {
-    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); draw(); }
-  };
+  // --- Resize + final wiring ----------------------------------------
+  window.addEventListener("resize", () => fitText(fmt(displayedNumber)));
+  if (navigator.storage && navigator.storage.persist) {
+    navigator.storage.persist().catch(() => {});
+  }
 
   await boot();
-  if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
 })();
 </script>

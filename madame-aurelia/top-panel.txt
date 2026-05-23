@@ -1,11 +1,11 @@
 $meta
   header
-  tags = fortune, luck, coin, machine, tarrot, teller, random, ticket, dispenser, counter, ai, generator, perchance, nummber go up, live, co-op, multiplayer
-    mode = minimal   // maximum room for the slideshow UI — no generator chrome
+  tags = fortune, luck, coin, machine, tarrot, teller, random, ticket, dispenser, counter, ai, generator, perchance, nummber go up, live, co-op, multiplayer, chat, character
+    mode = minimal
   async dynamic(inputs) =>
     return {
       title: "Madame Aurelia - An Ai Fortune Teller",
-      description: "Madame Aurelia prints you a unique fortune with stamp of your number. Live counter goes up for everyone.",
+      description: "Madame Aurelia draws you a fortune stamped with your number — then sits across the table and listens. Chat with her. Draw again whenever you wish.",
     };
 deps = {import:ai-character-chat-dependencies-v1}
 aiTextPlugin = {import:ai-text-plugin}
@@ -14,6 +14,7 @@ uploadPlugin = {import:upload-plugin}
 fullscreenButtonPlugin = {import:fullscreen-button-plugin}
 superFetch = {import:super-fetch-plugin}
 
+// Fallback fortunes if the AI fails entirely.
 randomFortune
   The cards whisper your number softly, then settle. Good things are turning.
   The veil parts a little for you tonight. Trust the next small choice.
@@ -21,27 +22,9 @@ randomFortune
   Cross my palm — the omens are kind. Walk into your week without flinching.
   The crystal clouds and clears. Whatever you have been waiting on is closer.
 
-fortuneMotifs
-  a candle flickering twice before steadying
-  the queen of cups, drawn upright
-  a moth circling the lamp without harm
-  a coin spinning longer than it should
-  the smell of incense long after the smoke is gone
-  velvet curtains breathing in an unfelt draft
-  tea leaves arranging themselves into a small bird
-  a brass key found in a coat pocket
-  the wheel of fortune, turning slowly
-  a black cat blinking once, deliberately
-  a lantern lit in a window at dusk
-  the page of wands, half-revealed
-  a pendulum settling into a quiet circle
-  a sealed envelope with no name on it
-  the soft chime of a tarot card laid down
-  a glass orb catching the last of the lamplight
-  a hand of cards fanned out, then closed
-  the smell of cinnamon from a room you cannot find
-  a dream you remember only the shape of
-  the ace of cups, brimming over
+// The tarot motif bank lives in the HTML panel as plain JS (see
+// MOTIF_BANK). Perchance lists of object literals don't expose .map()
+// reliably to the JS side, so we keep the data with the consumer.
 
 output
   text = [randomFortune]
@@ -50,8 +33,8 @@ output
 // MUST use explicit { } braces. Indentation-only blocks will not transpile.
 
 // --- Shared counter (Abacus — abacus.jasoncameron.dev) -----------------
-// Atomic counter: /hit/ increments by 1 and returns the new value; /get/
-// reads without incrementing. The ?t= param is a cache-buster.
+// On failure, the returned error string is the real network/parse error.
+// Callers should surface it, not paper over it.
 async readCounter(key) =>
   try {
     let url = `https://abacus.jasoncameron.dev/get/the-dispenser-app/${key}?t=${Date.now()}_${Math.random()}`;
@@ -64,10 +47,10 @@ async readCounter(key) =>
     if(data.error && /not found/i.test(data.error)) {
       return { ok: true, value: 0 };
     }
-    return { ok: false, value: 0 };
+    return { ok: false, value: 0, error: data.error || "counter read returned no value" };
   } catch(e) {
-    console.error("readCounter failed", e);
-    return { ok: false, value: 0 };
+    console.error("readCounter failed:", e);
+    return { ok: false, value: 0, error: (e && e.message) || String(e) };
   }
 
 async tickCounter(key) =>
@@ -76,58 +59,60 @@ async tickCounter(key) =>
     let res = await root.superFetch(url);
     let data = await res.json();
     let v = parseInt(data.value, 10);
-    if(isNaN(v)) return { ok: false, value: 0 };
+    if(isNaN(v)) return { ok: false, value: 0, error: "counter tick returned non-numeric value: " + JSON.stringify(data) };
     return { ok: true, value: v };
   } catch(e) {
-    console.error("tickCounter failed", e);
-    return { ok: false, value: 0 };
+    console.error("tickCounter failed:", e);
+    return { ok: false, value: 0, error: (e && e.message) || String(e) };
   }
 
-// --- Fortune generation ------------------------------------------------
-// Voice: Madame Aurelia — a velvet-curtained carnival mystic. Warm, theatrical,
-// kindly. Speaks AS the fortune-teller, not about her. Calls the number "fate
-// number" or "the number that fell to you".
-async getFortune(n, factStrings, onChunk) =>
+// --- Fortune generation (the OPENING message Madame speaks) -----------
+// Returns { text, fromAI, error? }
+//   On AI success: { text: aiText, fromAI: true }
+//   On AI failure: { text: fallbackText, fromAI: false, error: "..." }
+async getFortune(n, factStrings, motif, character, onChunk) =>
   let facts = (factStrings || []).join("; ");
-  let motif = root.fortuneMotifs + "";
   let token = Math.random().toString(36).slice(2, 8);
+  let card = motif && motif.card ? motif.card : "an unfamiliar card";
+  let img  = motif && motif.image ? motif.image : "a candle flickering twice before steadying";
+  let charDesc = (character && character.description) ? String(character.description).trim() : "";
+  let charName = (character && character.name) ? String(character.name).trim() : "Madame Aurelia";
 
-  // Priming opener — fed to the model as `startWith` so it begins in character
-  // mid-sentence and *continues*. `hideStartWith:true` means the user sees the
-  // priming text too (it's the real opening line), the model just doesn't
-  // re-echo it. This pulls Madame deeper into voice than instruction alone.
   let openers = [
     `Ah, my dear — ${n}, the cards wish to tell a tale for you tonight.`,
-    `Ah, ${n}. Please, sit, — the candle has steadied, and so shall I.`,
+    `Ah, ${n}. Please, sit — the candle has steadied, and so shall I.`,
     `The deck has turned up ${n}, and Madame is not surprised.`,
     `Closer, child. ${n} has come to rest in your palm, and that is no small thing.`,
-    `Hush now — ${n} has has been drawn for you, and the cards have something to say.`,
+    `Hush now — ${n} has been drawn for you, and the cards have something to say.`,
   ];
   let opener = openers[Math.floor(Math.random() * openers.length)];
 
   let instruction = [
-  "You are Madame Aurelia: a velvet-curtained carnival mystic in a ",
-  "tent filled with incense smoke, velvet curtains, and soft candlelight. Voice: warm, theatrical, playful, gently knowing, and comforting.",
-  "You speak directly to the seeker before you. You believe in bright",
-  "possibilities and quietly encourage them. You are a kind friend in",
-  "costume, with a gift for reading cards and finding meaning in small",
-  "moments, symbols, and fortunate turns.",
-  "",
-  `The fate number drawn for this seeker is ${n}.`,
-  facts ? `Truths the cards reveal about this number: ${facts}.` : "",
-  `An image flickers in the candlelight as you speak: ${motif}.`,
-  "Let that image colour the reading lightly — a small thread woven",
-  "through the vision rather than its whole shape.",
-  `(Internal variety token — ignore this completely: ${token}.)`,
-  "",
-  "You will continue this fortune from the opening sentence already begun for you.",
-  "Write a FULL READING — 4 to 6 sentences, a true small paragraph, around",
-  "50–90 words. Reflect on the number's meaning. Blend poetic imagery",
-  "with warmth, insight, encouragement, and gentle wisdom. Address the",
-  "seeker fondly. Offer observations that feel personal, thoughtful,",
-  "and hopeful. Close on a warm note that lingers pleasantly.",
-  "Write naturally in Madame Aurelia's theatrical carnival voice.",
-  "Continue smoothly from the opening already provided.",
+    `You are ${charName}: a velvet-curtained carnival mystic in a tent`,
+    "filled with incense smoke, velvet curtains, and soft candlelight.",
+    "Voice: warm, theatrical, playful, gently knowing, and comforting.",
+    "You speak directly to the seeker before you. You believe in bright",
+    "possibilities and quietly encourage them. You are a kind friend in",
+    "costume, with a gift for reading cards and finding meaning in small",
+    "moments, symbols, and fortunate turns.",
+    charDesc ? `Additional notes about your character (override the defaults where they conflict): ${charDesc}` : "",
+    "",
+    `The fate number drawn for this seeker is ${n}.`,
+    facts ? `Truths the cards reveal about this number: ${facts}.` : "",
+    `THE CARD you have drawn for them is ${card}. The image you see inside it: ${img}.`,
+    "Let that card's image colour the reading lightly — a small thread",
+    "woven through the vision rather than its whole shape.",
+    `(Internal variety token — ignore this completely: ${token}.)`,
+    "",
+    "Continue this fortune from the opening sentence already begun for you.",
+    "Write a FULL READING — 4 to 6 sentences, a small paragraph, around",
+    "60–110 words. Reflect on the number's meaning. Name the card aloud",
+    "once and weave its image in. Blend poetic imagery with warmth,",
+    "insight, encouragement, and gentle wisdom. Address the seeker fondly.",
+    "Close with one short, warm invitation — a single sentence inviting",
+    "them to ask whatever they wish; you are listening, and the candle is",
+    "patient. Write naturally in Madame's theatrical carnival voice.",
+    "Continue smoothly from the opening already provided.",
   ].filter(Boolean).join("\n");
 
   try {
@@ -135,40 +120,135 @@ async getFortune(n, factStrings, onChunk) =>
       instruction,
       startWith: opener + " ",
       hideStartWith: false,
-      stopSequences: ["\n\n", "[[", "\n>>>"],
+      stopSequences: ["\n\n[[", "\n[[", "\n>>>"],
       onChunk: (d) => {
         if(onChunk && d && d.textChunk) onChunk(d.textChunk);
       },
     });
     let data = await streamObj;
     if(data.stopReason === "error" || !data.generatedText || !data.generatedText.trim()) {
-      return { text: root.randomFortune+"", fromAI:false };
+      return {
+        text: root.randomFortune+"",
+        fromAI: false,
+        error: "aiTextPlugin returned stopReason=" + (data.stopReason || "(none)") + " with empty text",
+      };
     }
     let text = data.generatedText.trim().replace(/\s+/g, " ");
-    return { text, fromAI:true };
+    return { text, fromAI: true };
   } catch(e) {
-    console.error("getFortune failed", e);
-    return { text: root.randomFortune+"", fromAI:false };
+    console.error("getFortune failed:", e);
+    return {
+      text: root.randomFortune+"",
+      fromAI: false,
+      error: (e && e.message) || String(e),
+    };
   }
 
-// --- Tarot-style fortune card image ------------------------------------
-// Returns an image URL, or "" on failure (caller shows a printed fallback).
-async generateSeal(n) =>
+// --- Chat reply (continues a conversation as Madame) ------------------
+// Standard Perchance chat-completion pattern: [[Speaker]]: format, model
+// continues from `[[Character]]:`. Memory entries are seeker-provided
+// facts injected as quiet context — Madame uses them but rarely names them.
+//
+// Returns { text, error? }
+//   On success: { text: replyText }
+//   On failure: { text: "", error: "..." }
+async chatReply(messages, character, memory, motif, n, onChunk) =>
+  let charDesc = (character && character.description) ? String(character.description).trim() : "";
+  let charName = (character && character.name) ? String(character.name).trim() : "Madame Aurelia";
+  let memArr = Array.isArray(memory) ? memory.filter(m => m && String(m).trim()) : [];
+  let memText = memArr.map(m => "  • " + String(m).trim()).join("\n");
+  let card = motif && motif.card ? motif.card : "";
+  let img  = motif && motif.image ? motif.image : "";
+
+  let trimmed = (messages || []).slice(-14);
+  let convo = trimmed.map(m => {
+    let who = m.role === "user" ? "Seeker" : charName;
+    return `[[${who}]]: ${String(m.content).replace(/\s+/g, " ").trim()}`;
+  }).join("\n");
+
+  let token = Math.random().toString(36).slice(2, 8);
+
+  let instruction = [
+    `You are ${charName}: a velvet-curtained carnival mystic — warm,`,
+    "theatrical, playful, gently knowing, comforting. You read cards,",
+    "you read people, and you find small bright things to point them",
+    "toward. You believe in fortune, kindly.",
+    charDesc ? `Additional character notes (these override defaults): ${charDesc}` : "",
+    "",
+    n ? `The seeker's fate number this evening is ${n}.` : "",
+    card ? `The card you turned earlier for them: ${card} — ${img}. You may refer back to it when it serves the reply, but do not repeat the reading.` : "",
+    memText ? `\nThings you quietly remember about this seeker (use them naturally; rarely name them aloud):\n${memText}` : "",
+    "",
+    "Stay in voice. Reply length: usually 1–3 sentences (Madame is",
+    "unhurried but not long-winded); 4–5 sentences only if the seeker",
+    "asks for a fuller reading. Address them warmly — \"my dear\",",
+    "\"child\", \"little one\" sparingly. Small theatrical gestures (a",
+    "hand turned palm-up, the candle dipped low, a glance at the curtain)",
+    "are welcome but used like seasoning, not garnish. Do not break",
+    "character. Do not mention being an AI, a language model, or a",
+    "computer. Do not draw a new card unless the seeker explicitly asks",
+    "you to — there is only one card on the table tonight.",
+    `(Internal variety token — ignore: ${token}.)`,
+    "",
+    "<MESSAGES>",
+    convo,
+    "</MESSAGES>",
+    "",
+    `>>> TASK: Write ${charName}'s next single reply only, in character. Do not write the seeker's response. Stop at the end of your reply.`,
+  ].filter(Boolean).join("\n");
+
   try {
+    let streamObj = root.aiTextPlugin({
+      instruction,
+      startWith: `[[${charName}]]:`,
+      hideStartWith: true,
+      stopSequences: ["\n\n[[", "\n[[", "[[Seeker]]", "\n>>>"],
+      onChunk: (d) => {
+        if(onChunk && d && d.textChunk && !d.isFromStartWith) onChunk(d.textChunk);
+      },
+    });
+    let data = await streamObj;
+    if(data.stopReason === "error" || !data.generatedText || !data.generatedText.trim()) {
+      return {
+        text: "",
+        error: "aiTextPlugin returned stopReason=" + (data.stopReason || "(none)") + " with empty text",
+      };
+    }
+    let text = data.generatedText.trim()
+      .replace(/^\[\[[^\]]+\]\]:\s*/i, "")
+      .replace(/\s+/g, " ");
+    return { text };
+  } catch(e) {
+    console.error("chatReply failed:", e);
+    return { text: "", error: (e && e.message) || String(e) };
+  }
+
+// --- Tarot-style fortune card image (the "Stamp") ---------------------
+// Returns { url, error? }
+//   On success: { url: imageUrl }
+//   On failure: { url: "", error: "..." }
+async generateSeal(n, motif) =>
+  try {
+    let card = motif && motif.card ? motif.card : "";
+    let img  = motif && motif.image ? motif.image : "";
+    let extra = card ? `subtly featuring the symbolism of ${card} (${img}),` : "";
     let prompt = [
       "an antique tarot-style fortune card portrait, vertical composition,",
-      "gilt scrollwork border with ornate corner flourishes, deep midnight blue",
-      "and burgundy background, candle-lit warm gold accents, vintage typography,",
-      `a single large number ${n} at the center, framed by`,
-      "an ornamental cartouche, small celestial symbols (moon, stars, eye)",
-      "scattered around the edges, weathered parchment texture, single card flat-lay, mystical carnival fortune-teller",
-      "aesthetic, painted illustration style"
-    ].join(" ");
+      "gilt scrollwork border with ornate corner flourishes, deep midnight",
+      "blue and burgundy background, candle-lit warm gold accents, vintage",
+      "typography,",
+      `a single large number ${n} at the center, framed by an ornamental cartouche,`,
+      extra,
+      "small celestial symbols (moon, stars, eye) scattered around the",
+      "edges, weathered parchment texture, single card flat-lay, mystical",
+      "carnival fortune-teller aesthetic, painted illustration style",
+    ].filter(Boolean).join(" ");
     let url = await root.textToImagePlugin({ prompt });
-    return url || "";
+    if(!url) return { url: "", error: "textToImagePlugin returned empty url" };
+    return { url };
   } catch(e) {
-    console.error("generateSeal failed", e);
-    return "";
+    console.error("generateSeal failed:", e);
+    return { url: "", error: (e && e.message) || String(e) };
   }
 
 // --- confirmAsync (Promise-based confirm dialog) -----------------------
