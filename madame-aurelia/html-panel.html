@@ -184,6 +184,45 @@
     font-family: 'IM Fell English', serif;
     border-color: var(--gold-dim);
   }
+
+  /* Inline images conjured by <image>...</image> tags in Madame's replies */
+  .inlineFig {
+    display: block;
+    margin: 8px 0 4px;
+    padding: 4px;
+    background: #1a0d10;
+    border: 1px solid var(--gold-dim);
+    box-shadow: inset 0 0 0 1px rgba(214,165,72,0.3), 0 2px 6px rgba(0,0,0,0.4);
+    text-align: center;
+  }
+  .inlineFig img {
+    display: block; max-width: 100%; height: auto;
+    margin: 0 auto;
+  }
+  .inlineFig figcaption {
+    font-family: 'IM Fell English', serif; font-style: italic;
+    font-size: 11px; color: var(--gold);
+    margin-top: 4px; line-height: 1.3;
+    word-break: break-word;
+  }
+  .inlineImgSpin {
+    min-height: 80px; display: flex; align-items: center; justify-content: center;
+    background: var(--plum); padding: 14px;
+  }
+  .inlineImgSpin .orb { width: 28px; height: 28px; }
+  .inlineImgFail {
+    padding: 10px; font-family: ui-monospace, monospace; font-size: 11px;
+    color: var(--err); background: var(--err-bg);
+    word-break: break-word;
+  }
+  /* Marker for an in-flight <image> tag where the closing > hasn't arrived yet */
+  .inlineImgPending {
+    display: inline-block; padding: 1px 6px; margin: 0 2px;
+    font-family: ui-monospace, monospace; font-size: 10px;
+    color: var(--gold-dim); background: rgba(214,165,72,0.08);
+    border: 1px dashed var(--gold-dim);
+    vertical-align: middle;
+  }
   /* Practical error bubble: clearly distinct from in-character content */
   .msg.error .bubble {
     background: var(--err-bg);
@@ -203,6 +242,59 @@
   }
   @keyframes blink { 50% { opacity: 0; } }
   .clear { clear: both; }
+
+  /* Per-bubble action toolbar (edit / delete / regenerate). Subtle by
+     default, full opacity on hover or when the bubble is focused. */
+  .msgActions {
+    display: flex; gap: 4px; margin-top: 6px;
+    opacity: 0.35; transition: opacity 150ms;
+  }
+  .msg.user .msgActions { justify-content: flex-end; }
+  .msg.madame .msgActions { justify-content: flex-start; }
+  .msg:hover .msgActions, .msg:focus-within .msgActions { opacity: 1; }
+  .actBtn {
+    font-family: ui-monospace, monospace; font-size: 12px;
+    padding: 2px 8px; cursor: pointer; line-height: 1.4;
+    background: transparent; color: var(--gold);
+    border: 1px solid var(--gold-dim);
+    transition: background 120ms, color 120ms, border-color 120ms;
+  }
+  .actBtn:hover { background: rgba(214,165,72,0.12); color: var(--gold-hi); border-color: var(--gold); }
+  .actBtn.danger:hover { background: rgba(255,107,107,0.12); color: var(--err); border-color: var(--err); }
+  .actBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Inline edit form replaces the bubble's content when editing. */
+  .msg.editing .msgActions { display: none; }
+  .editForm { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+  .editForm textarea {
+    width: 100%; min-height: 60px; max-height: 240px; padding: 6px 8px;
+    font-family: 'IM Fell English', serif; font-size: 14px; line-height: 1.5;
+    color: var(--ivory); background: rgba(15,8,20,0.92);
+    border: 1px solid var(--gold); outline: none; resize: vertical;
+  }
+  .msg.madame.editing .bubble {
+    /* Keep parchment background but darken slightly for contrast with textarea */
+    background: linear-gradient(180deg, #ddc89a 0%, #c0a87a 100%);
+  }
+  .msg.madame .editForm textarea {
+    color: #2b1b0a; background: #f4e4c1;
+    border-color: #6b4a1a;
+    font-style: italic;
+  }
+  .editFormButtons { display: flex; gap: 6px; justify-content: flex-end; }
+  .editForm .editSave, .editForm .editCancel {
+    font-family: 'Merienda', serif; font-size: 11px; letter-spacing: 2px;
+    padding: 4px 10px; cursor: pointer;
+  }
+  .editForm .editSave {
+    color: var(--gold-hi); background: linear-gradient(180deg, #3a1208 0%, #1a0a05 100%);
+    border: 1px solid var(--gold);
+  }
+  .editForm .editCancel {
+    color: var(--gold); background: transparent;
+    border: 1px solid var(--gold-dim);
+  }
+  .editForm .editSave:hover, .editForm .editCancel:hover { filter: brightness(1.25); }
 
   #typing {
     display: none; clear: both; float: left;
@@ -275,7 +367,7 @@
   /* ---- TOOLBAR ---- */
   #toolbar {
     margin: 0 32px 6px;
-    display: grid; grid-template-columns: 1fr auto auto auto; gap: 6px;
+    display: grid; grid-template-columns: 1fr auto auto auto auto; gap: 6px;
   }
   .tbtn {
     font-family: 'Merienda', serif; font-weight: 700; font-size: 12px;
@@ -369,6 +461,51 @@
     border: 1px dashed var(--gold-dim);
   }
   #memAdd:hover { border-color: var(--gold); }
+
+  /* The ✦ "Have Madame help" button on the persona editor. Subdued
+     gold border, sparkle icon. Disabled state when Memory is empty. */
+  .assistRow {
+    margin-top: 6px; padding-top: 12px;
+    border-top: 1px dashed var(--gold-dim);
+  }
+  .assistBtn {
+    display: flex; gap: 8px; align-items: center; width: 100%;
+    padding: 9px 12px; cursor: pointer;
+    font-family: 'Merienda', serif; font-weight: 600; font-size: 12px;
+    letter-spacing: 2px; color: var(--gold-hi);
+    background: linear-gradient(180deg, #1a0d10 0%, #0a0306 100%);
+    border: 1px solid var(--gold-dim);
+    box-shadow: inset 0 0 0 1px rgba(214,165,72,0.18);
+    transition: filter 150ms, border-color 150ms, color 150ms;
+    text-align: left;
+  }
+  .assistBtn:hover:not(:disabled) {
+    filter: brightness(1.25); border-color: var(--gold);
+    color: var(--ember);
+  }
+  .assistBtn:disabled {
+    opacity: 0.45; cursor: not-allowed;
+    color: var(--gold-dim); border-color: var(--gold-dim);
+  }
+  .assistBtn .icon {
+    font-size: 18px; line-height: 1;
+    text-shadow: 0 0 8px rgba(255,138,60,0.45);
+  }
+  .assistBtn.busy {
+    cursor: progress; filter: brightness(0.7);
+  }
+  .assistBtn.busy .icon {
+    animation: orb-pulse 1.2s ease-in-out infinite;
+  }
+  .assistStatus {
+    margin-top: 6px; font-family: 'IM Fell English', serif; font-style: italic;
+    font-size: 12px; color: var(--ivory); opacity: 0.7;
+    min-height: 1em;
+  }
+  .assistStatus.err {
+    font-family: ui-monospace, monospace; font-style: normal;
+    color: var(--err); opacity: 1;
+  }
 
   #histList { display: flex; flex-direction: column; gap: 6px; }
   .histRow {
@@ -501,8 +638,9 @@
       <button id="newBtn" class="tbtn primary" title="Draw a new fortune">
         <span class="icon">🪙</span><span class="lbl">NEW FORTUNE</span>
       </button>
-      <button id="charBtn" class="tbtn" title="Character editor"><span class="icon">👁</span></button>
-      <button id="memBtn"  class="tbtn" title="Memory editor"><span class="icon">📜</span></button>
+      <button id="charBtn" class="tbtn" title="Madame (character)"><span class="icon">🔮</span></button>
+      <button id="youBtn"  class="tbtn" title="You (personality)"><span class="icon">🧍</span></button>
+      <button id="memBtn"  class="tbtn" title="Memory"><span class="icon">📜</span></button>
       <button id="histBtn" class="tbtn" title="Past readings"><span class="icon">📚</span></button>
     </div>
 
@@ -511,7 +649,7 @@
 
     <div id="sheetChar" class="sheet" role="dialog" aria-label="Character editor">
       <div class="sheetHeader">
-        <div class="sheetTitle">👁 THE FORTUNE TELLER</div>
+        <div class="sheetTitle">🔮 THE FORTUNE TELLER</div>
         <button class="sheetClose" data-close="sheetChar">CLOSE</button>
       </div>
       <div class="sheetBody">
@@ -520,14 +658,45 @@
           <input id="charName" type="text" placeholder="Madame Aurelia" maxlength="60">
         </div>
         <div class="field">
-          <label>Persona &amp; voice</label>
-          <textarea id="charDesc" rows="6" placeholder="Describe the fortune teller's voice, manner, and quirks. Leave blank to keep Madame Aurelia exactly as she is."></textarea>
-          <div class="hint">Additional notes that override the default carnival-mystic voice. e.g. "Slips into French when surprised. Has a black cat named Vesper who lives in her lap. Mentions tea often."</div>
+          <label>Voice &amp; manner</label>
+          <textarea id="charDesc" rows="12" placeholder="Describe who is reading your fortune — their voice, presence, and habits."></textarea>
+          <div class="hint">This IS the fortune teller. Edit freely to change everything about who reads your cards — a stern oracle, a cheerful tea-leaf reader, a sphinx who only speaks in riddles. The "Restore default" button below brings back Madame Aurelia as she was.</div>
         </div>
       </div>
       <div class="sheetFooter">
+        <button id="charRestore" class="sheetClose" style="margin-right:auto;">↺ RESTORE DEFAULT</button>
         <button class="sheetClose" data-close="sheetChar">CANCEL</button>
         <button id="charSave" class="saveBtn">SAVE</button>
+      </div>
+    </div>
+
+    <!-- Personality (the user roleplaying themselves) -->
+    <div id="sheetYou" class="sheet" role="dialog" aria-label="Your personality">
+      <div class="sheetHeader">
+        <div class="sheetTitle">🧍 YOUR PERSONA</div>
+        <button class="sheetClose" data-close="sheetYou">CLOSE</button>
+      </div>
+      <div class="sheetBody">
+        <div class="field">
+          <label>Your name (optional)</label>
+          <input id="youName" type="text" placeholder="leave blank to remain anonymous" maxlength="60">
+          <div class="hint">If you set a name, Madame will address you by it and the chat labels you with it instead of "YOU".</div>
+        </div>
+        <div class="field">
+          <label>Who you are tonight</label>
+          <textarea id="youDesc" rows="6" placeholder="Describe yourself as you'd like Madame to see you. Could be the real you, or a character you're playing."></textarea>
+          <div class="hint">Sit across from Madame as whoever you'd like to be. She'll tailor her reading to this person. e.g. "I am Wren — a quiet librarian, autistic, recently engaged, here for clarity about a job offer in Berlin." Leave blank for a generic reading.</div>
+        </div>
+        <div class="assistRow">
+          <button id="youAssist" class="assistBtn" type="button">
+            <span class="icon">✦</span><span>Have Madame draft this from your memories</span>
+          </button>
+          <div id="youAssistStatus" class="assistStatus"></div>
+        </div>
+      </div>
+      <div class="sheetFooter">
+        <button class="sheetClose" data-close="sheetYou">CANCEL</button>
+        <button id="youSave" class="saveBtn">SAVE</button>
       </div>
     </div>
 
@@ -619,6 +788,28 @@
     ranked.push(`${f.priorCount} people drew a number before this one`);
     return ranked.slice(0, 2);
   }
+
+  // --- Default character (lives here so users can edit it freely) ---
+  // The full Madame Aurelia persona, lifted out of the Perchance instruction
+  // blocks. The character editor shows this as the starting value; users
+  // can rewrite it however they like. Restore button puts this back.
+  const DEFAULT_CHARACTER_NAME = "Madame Aurelia";
+  const DEFAULT_CHARACTER_DESCRIPTION = [
+    "You are a velvet-curtained carnival mystic in a tent filled with",
+    "incense smoke, candlelight, and the soft chime of small bells.",
+    "",
+    "VOICE: warm, theatrical, playful, gently knowing, comforting. You",
+    "speak directly to the seeker before you. You believe in bright",
+    "possibilities and quietly encourage them. You are a kind friend in",
+    "costume, with a gift for reading cards and finding meaning in small",
+    "moments, symbols, and fortunate turns.",
+    "",
+    "MANNER: Address the seeker fondly — \"my dear\", \"child\", \"little",
+    "one\" sparingly, or by name if they have given one. Small theatrical",
+    "gestures (a hand turned palm-up, the candle dipped low, a glance at",
+    "the curtain) are welcome but used like seasoning, not garnish.",
+    "Unhurried but never long-winded. You believe in fortune, kindly.",
+  ].join("\n");
 
   // --- Motif bank (lives here as plain JS — no Perchance list access) ---
   // Each motif: { card: "...", image: "..." } — card name + a sensory
@@ -758,10 +949,174 @@
   let displayedNumber = 0;
   let currentChat = null;
   let currentMessages = [];
-  let character = { name: "Madame Aurelia", description: "" };
+  let character = { name: DEFAULT_CHARACTER_NAME, description: DEFAULT_CHARACTER_DESCRIPTION };
+  let personality = { name: "", description: "" }; // who the seeker presents as
   let memory = [];
   let recentMotifIds = [];
   let drawId = 0; // monotonic — guards async results across re-rolls
+  let currentStream = null; // active aiTextPlugin stream (for .stop())
+
+  // Cancel any in-flight aiTextPlugin stream. Safe to call when nothing
+  // is running. The associated bubble's stale chunks are filtered out by
+  // the drawId guard, so this stop just frees the model and prevents
+  // further chunks from arriving.
+  function cancelStream() {
+    if (currentStream && typeof currentStream.stop === "function") {
+      try { currentStream.stop(); } catch (e) { console.warn("stream.stop() threw:", e); }
+    }
+    currentStream = null;
+  }
+
+  // --- Bubble state (raw text + image-prompt → URL map) -------------
+  // Each Madame bubble owns:
+  //   rawText   — the streamed text WITH <image>...</image> tags
+  //   images    — Map<prompt, {url, status, error?, firing?}>
+  // The bubble is re-rendered from these whenever they change.
+  const bubbleStates = new WeakMap();
+  function bubbleState(bubble) {
+    let s = bubbleStates.get(bubble);
+    if (!s) {
+      s = { rawText: "", images: new Map() };
+      bubbleStates.set(bubble, s);
+    }
+    return s;
+  }
+
+  // Extract image prompts → URLs map for persistence to DB.
+  function extractImagesMap(bubble) {
+    const s = bubbleState(bubble);
+    const out = {};
+    for (const [prompt, entry] of s.images.entries()) {
+      if (entry.url) out[prompt] = entry.url;
+    }
+    return out;
+  }
+
+  // Restore a previously-saved {prompt: url} map into a bubble's state.
+  function seedImagesMap(bubble, savedMap) {
+    if (!savedMap) return;
+    const s = bubbleState(bubble);
+    for (const [prompt, url] of Object.entries(savedMap)) {
+      s.images.set(prompt, { url, status: "ready" });
+    }
+  }
+
+  // Walk the bubble's rawText, find any <image>...</image> tags whose
+  // prompts haven't yet been requested, and fire textToImagePlugin.
+  // Re-renders the bubble when each image resolves or fails.
+  const IMAGE_TAG_RE = /<image>([\s\S]*?)<\/image>/g;
+  function kickoffImages(bubble) {
+    const s = bubbleState(bubble);
+    IMAGE_TAG_RE.lastIndex = 0;
+    let match;
+    while ((match = IMAGE_TAG_RE.exec(s.rawText)) !== null) {
+      const prompt = match[1].trim();
+      if (!prompt) continue;
+      let entry = s.images.get(prompt);
+      if (!entry) {
+        entry = { url: null, status: "pending" };
+        s.images.set(prompt, entry);
+      }
+      if (entry.status === "pending" && !entry.firing) {
+        entry.firing = true;
+        Promise.resolve()
+          .then(() => root.textToImagePlugin({ prompt }))
+          .then((url) => {
+            if (url) {
+              entry.url = url;
+              entry.status = "ready";
+            } else {
+              entry.status = "failed";
+              entry.error = "textToImagePlugin returned empty url";
+              showError("textToImagePlugin", entry.error);
+            }
+            renderBubbleFromState(bubble);
+          })
+          .catch((e) => {
+            entry.status = "failed";
+            entry.error = errMsg(e);
+            showError("textToImagePlugin", e);
+            renderBubbleFromState(bubble);
+          });
+      }
+    }
+  }
+
+  // Render a bubble's content from its rawText + images map. Called
+  // every time rawText grows (streaming) or an image resolves.
+  function renderBubbleFromState(bubble) {
+    if (!bubble || !bubble.isConnected) return;
+    const s = bubbleState(bubble);
+    const content = bubble.querySelector(".content");
+    if (!content) return;
+    const streaming = bubble.dataset.streaming === "1";
+    content.innerHTML = "";
+
+    let lastIndex = 0;
+    let match;
+    IMAGE_TAG_RE.lastIndex = 0;
+    while ((match = IMAGE_TAG_RE.exec(s.rawText)) !== null) {
+      const textPart = s.rawText.slice(lastIndex, match.index);
+      if (textPart) content.appendChild(document.createTextNode(textPart));
+      const prompt = match[1].trim();
+      content.appendChild(buildImageEl(prompt, s.images.get(prompt)));
+      lastIndex = match.index + match[0].length;
+    }
+
+    // Whatever's after the last complete tag. If it contains an OPENING
+    // `<image>` without a matching `</image>` (mid-stream), hide the
+    // partial-tag fragment and show a small "(summoning…)" marker.
+    const tail = s.rawText.slice(lastIndex);
+    const partialIdx = tail.indexOf("<image>");
+    if (partialIdx !== -1 && tail.indexOf("</image>", partialIdx) === -1) {
+      const beforePartial = tail.slice(0, partialIdx);
+      if (beforePartial) content.appendChild(document.createTextNode(beforePartial));
+      const marker = document.createElement("span");
+      marker.className = "inlineImgPending";
+      marker.textContent = "summoning…";
+      content.appendChild(marker);
+    } else if (tail) {
+      content.appendChild(document.createTextNode(tail));
+    }
+
+    if (streaming) {
+      const caret = document.createElement("span");
+      caret.className = "caret";
+      content.appendChild(caret);
+    }
+    scrollChatToBottom();
+  }
+
+  function buildImageEl(prompt, entry) {
+    const fig = document.createElement("figure");
+    fig.className = "inlineFig";
+    if (!entry || entry.status === "pending") {
+      const spin = document.createElement("div");
+      spin.className = "inlineImgSpin";
+      const orb = document.createElement("div");
+      orb.className = "orb";
+      spin.appendChild(orb);
+      fig.appendChild(spin);
+      const cap = document.createElement("figcaption");
+      cap.textContent = prompt;
+      fig.appendChild(cap);
+    } else if (entry.status === "ready" && entry.url) {
+      const img = document.createElement("img");
+      img.src = entry.url;
+      img.alt = prompt;
+      img.loading = "lazy";
+      fig.appendChild(img);
+      const cap = document.createElement("figcaption");
+      cap.textContent = prompt;
+      fig.appendChild(cap);
+    } else {
+      const fail = document.createElement("div");
+      fail.className = "inlineImgFail";
+      fail.textContent = "[image failed: " + (entry.error || "unknown") + "] prompt: " + prompt;
+      fig.appendChild(fail);
+    }
+    return fig;
+  }
 
   const counterKey = () => "tickets-e" + epoch;
 
@@ -780,10 +1135,22 @@
   }
 
   async function loadCharacter() {
-    character = await getMisc("character", { name: "Madame Aurelia", description: "" });
-    if (!character || typeof character !== "object") character = { name: "Madame Aurelia", description: "" };
+    const stored = await getMisc("character", null);
+    if (!stored || typeof stored !== "object") {
+      character = { name: DEFAULT_CHARACTER_NAME, description: DEFAULT_CHARACTER_DESCRIPTION };
+    } else {
+      character = {
+        name: stored.name || DEFAULT_CHARACTER_NAME,
+        description: stored.description != null ? stored.description : DEFAULT_CHARACTER_DESCRIPTION,
+      };
+    }
   }
   async function saveCharacter() { await setMisc("character", character); }
+  async function loadPersonality() {
+    personality = await getMisc("personality", { name: "", description: "" });
+    if (!personality || typeof personality !== "object") personality = { name: "", description: "" };
+  }
+  async function savePersonality() { await setMisc("personality", personality); }
   async function loadMemory() {
     memory = await getMisc("memory", []);
     if (!Array.isArray(memory)) memory = [];
@@ -811,8 +1178,9 @@
     return { chat, messages: msgs };
   }
   async function saveChat(chat) { await db.chats.put(chat); }
-  async function addMessage(chatId, role, content) {
+  async function addMessage(chatId, role, content, images) {
     const m = { chatId, role, content, createdAt: Date.now() };
+    if (images && Object.keys(images).length) m.images = images;
     const id = await db.messages.add(m);
     m.id = id;
     return m;
@@ -855,16 +1223,330 @@
     const wrap = document.createElement("div");
     wrap.className = "msg " + (role === "user" ? "user" : "madame");
     if (opts.id) wrap.dataset.id = opts.id;
-    const who = role === "user" ? "YOU" : (character.name || "MADAME").toUpperCase();
+    const youName = (personality.name || "").trim();
+    const who = role === "user"
+      ? (youName ? youName.toUpperCase() : "YOU")
+      : (character.name || "MADAME").toUpperCase();
     wrap.innerHTML = `
       <div class="msgWho">${escapeHTML(who)}</div>
-      <div class="bubble"><span class="content"></span><span class="caret" style="display:none;"></span></div>
+      <div class="bubble"><span class="content"></span></div>
+      <div class="msgActions"></div>
     `;
-    wrap.querySelector(".content").textContent = text || "";
     const clr = document.createElement("div"); clr.className = "clear";
     $("messages").appendChild(wrap); $("messages").appendChild(clr);
+    // For user bubbles we treat content as plain text (no tag parsing).
+    if (role === "user") {
+      wrap.querySelector(".content").textContent = text || "";
+    } else {
+      // Madame bubbles: parse tags through state machine.
+      if (opts.savedImages) seedImagesMap(wrap, opts.savedImages);
+      bubbleState(wrap).rawText = text || "";
+      kickoffImages(wrap);
+      renderBubbleFromState(wrap);
+    }
+    buildBubbleActions(wrap);
     scrollChatToBottom();
     return wrap;
+  }
+
+  // --- Per-bubble actions (Edit / Delete / Regenerate) ---------------
+  // Built lazily so each bubble has its own handlers bound to its dataset.id.
+  // Regenerate is only shown on assistant messages that have at least one
+  // preceding user message — re-drawing the opening fortune is what
+  // NEW FORTUNE is for.
+  function buildBubbleActions(bubble) {
+    const slot = bubble.querySelector(".msgActions");
+    if (!slot) return;
+    slot.innerHTML = "";
+    if (bubble.classList.contains("error")) {
+      // error bubbles get a single dismiss
+      const del = mkActBtn("✕", "Dismiss", () => removeBubble(bubble), true);
+      slot.appendChild(del);
+      return;
+    }
+    const edit = mkActBtn("✎ edit", "Edit this message", () => beginEditBubble(bubble));
+    slot.appendChild(edit);
+    if (bubble.classList.contains("madame") && hasPrecedingUser(bubble)) {
+      const regen = mkActBtn("↻ regen", "Regenerate (drops following messages)", () => regenerateFromBubble(bubble));
+      slot.appendChild(regen);
+    }
+    const del = mkActBtn("✕ delete", "Delete this message", () => deleteBubble(bubble), true);
+    slot.appendChild(del);
+  }
+  function mkActBtn(label, title, onclick, danger) {
+    const b = document.createElement("button");
+    b.className = "actBtn" + (danger ? " danger" : "");
+    b.textContent = label;
+    b.title = title;
+    b.type = "button";
+    b.onclick = onclick;
+    return b;
+  }
+  function hasPrecedingUser(bubble) {
+    const id = parseInt(bubble.dataset.id, 10);
+    if (!id) return false;
+    const idx = currentMessages.findIndex(m => m.id === id);
+    if (idx <= 0) return false;
+    for (let i = idx - 1; i >= 0; i--) {
+      if (currentMessages[i].role === "user") return true;
+    }
+    return false;
+  }
+  // Re-run action visibility / regen-button presence on every bubble.
+  // Cheap; just rebuilds the small toolbar.
+  function refreshAllActionVisibility() {
+    $("messages").querySelectorAll(".msg").forEach(b => {
+      if (!b.classList.contains("editing")) buildBubbleActions(b);
+    });
+  }
+
+  // --- Edit ---------------------------------------------------------
+  function beginEditBubble(bubble) {
+    if (bubble.classList.contains("editing")) return;
+    // Cancel any other in-progress edit first.
+    $("messages").querySelectorAll(".msg.editing").forEach(b => cancelEditBubble(b));
+    bubble.classList.add("editing");
+    const id = parseInt(bubble.dataset.id, 10);
+    const msg = currentMessages.find(m => m.id === id);
+    const currentText = msg ? msg.content : "";
+    const bubbleEl = bubble.querySelector(".bubble");
+    // Stash the previous content node so we can restore on cancel.
+    bubble._editPrev = bubbleEl.innerHTML;
+    bubbleEl.innerHTML = `
+      <div class="editForm">
+        <textarea></textarea>
+        <div class="editFormButtons">
+          <button class="editCancel" type="button">CANCEL</button>
+          <button class="editSave" type="button">SAVE</button>
+        </div>
+      </div>
+    `;
+    const ta = bubbleEl.querySelector("textarea");
+    ta.value = currentText;
+    ta.focus();
+    // Place caret at the end
+    ta.setSelectionRange(currentText.length, currentText.length);
+    bubbleEl.querySelector(".editCancel").onclick = () => cancelEditBubble(bubble);
+    bubbleEl.querySelector(".editSave").onclick   = () => commitEditBubble(bubble);
+    ta.addEventListener("keydown", (e) => {
+      // Esc cancels, Ctrl/Cmd+Enter saves. Plain Enter inserts a newline.
+      if (e.key === "Escape") { e.preventDefault(); cancelEditBubble(bubble); }
+      else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); commitEditBubble(bubble); }
+    });
+  }
+  function cancelEditBubble(bubble) {
+    if (!bubble.classList.contains("editing")) return;
+    bubble.classList.remove("editing");
+    const bubbleEl = bubble.querySelector(".bubble");
+    if (bubble._editPrev != null) {
+      bubbleEl.innerHTML = bubble._editPrev;
+      delete bubble._editPrev;
+    }
+    // Re-render to ensure state matches DOM (for madame bubbles with images)
+    if (bubble.classList.contains("madame")) renderBubbleFromState(bubble);
+    // The actions toolbar lives outside the bubble — make sure it's restored
+    buildBubbleActions(bubble);
+  }
+  async function commitEditBubble(bubble) {
+    const id = parseInt(bubble.dataset.id, 10);
+    const msg = currentMessages.find(m => m.id === id);
+    if (!id || !msg) { cancelEditBubble(bubble); return; }
+    const ta = bubble.querySelector(".editForm textarea");
+    const newText = (ta?.value || "").trim();
+    if (newText === msg.content) { cancelEditBubble(bubble); return; }
+    bubble.classList.remove("editing");
+    delete bubble._editPrev;
+    msg.content = newText;
+    // Repaint bubble
+    const bubbleEl = bubble.querySelector(".bubble");
+    bubbleEl.innerHTML = `<span class="content"></span>`;
+    if (bubble.classList.contains("user")) {
+      bubble.querySelector(".content").textContent = newText;
+    } else {
+      const s = bubbleState(bubble);
+      s.rawText = newText;
+      // Drop any image entries whose prompts are no longer in the text
+      const stillReferenced = new Set();
+      IMAGE_TAG_RE.lastIndex = 0;
+      let mm; while ((mm = IMAGE_TAG_RE.exec(newText)) !== null) stillReferenced.add(mm[1].trim());
+      for (const k of [...s.images.keys()]) if (!stillReferenced.has(k)) s.images.delete(k);
+      kickoffImages(bubble);
+      renderBubbleFromState(bubble);
+    }
+    buildBubbleActions(bubble);
+    // Persist
+    try {
+      const update = { content: newText };
+      if (bubble.classList.contains("madame")) update.images = extractImagesMap(bubble);
+      await db.messages.update(id, update);
+      msg.images = update.images;
+      await touchChat(currentChat.id);
+    } catch (e) {
+      showError("editMessage", e);
+    }
+  }
+
+  // --- Delete -------------------------------------------------------
+  async function deleteBubble(bubble) {
+    const id = parseInt(bubble.dataset.id, 10);
+    if (!id) { removeBubble(bubble); return; }
+    const ok = await root.confirmAsync("Delete this message?\n\nThis cannot be undone.");
+    if (!ok) return;
+    try { await db.messages.delete(id); }
+    catch (e) { showError("deleteMessage", e); return; }
+    currentMessages = currentMessages.filter(m => m.id !== id);
+    removeBubble(bubble);
+    refreshAllActionVisibility();
+    await touchChat(currentChat.id);
+  }
+
+  // --- Regenerate ---------------------------------------------------
+  // Cancels any in-flight stream, drops this assistant message and
+  // every message after it (from DOM, in-memory list, and DB), then
+  // streams a fresh chatReply based on the history up to the last
+  // remaining user message.
+  async function regenerateFromBubble(bubble) {
+    if (state === "DRAWING" || state === "THINKING") return;
+    const id = parseInt(bubble.dataset.id, 10);
+    if (!id) return;
+    const idx = currentMessages.findIndex(m => m.id === id);
+    if (idx === -1) return;
+    if (!hasPrecedingUser(bubble)) {
+      showError("regenerate", "no user message precedes this — use NEW FORTUNE to redraw the opening");
+      return;
+    }
+    const after = currentMessages.slice(idx).map(m => m.id).filter(Boolean);
+    if (after.length > 1) {
+      const ok = await root.confirmAsync(
+        `Regenerating will also discard ${after.length - 1} message${after.length === 2 ? "" : "s"} that came after this one.\n\nContinue?`
+      );
+      if (!ok) return;
+    }
+    clearError();
+    cancelStream();
+
+    // Remove from DB
+    try {
+      await db.transaction("rw", db.messages, async () => {
+        for (const did of after) await db.messages.delete(did);
+      });
+    } catch (e) {
+      showError("regenerate.delete", e);
+      return;
+    }
+
+    // Remove from in-memory + DOM (from this bubble onward)
+    currentMessages = currentMessages.slice(0, idx);
+    removeFromBubbleOnward(bubble);
+
+    // Stream a new assistant reply.
+    await streamAssistantReply();
+  }
+
+  // Removes the given bubble and every subsequent .msg/.clear sibling
+  // from the messages container. Used by regenerate.
+  function removeFromBubbleOnward(bubble) {
+    const container = $("messages");
+    const all = [...container.children];
+    const start = all.indexOf(bubble);
+    if (start === -1) return;
+    for (let i = all.length - 1; i >= start; i--) {
+      if (all[i].classList.contains("msg")) bubbleStates.delete(all[i]);
+      all[i].remove();
+    }
+  }
+
+  // Reusable assistant streaming pass — called by sendUserMessage and
+  // regenerate. Assumes currentMessages already represents the desired
+  // history for the model. Saves the result to DB and currentMessages.
+  async function streamAssistantReply() {
+    if (state === "DRAWING" || state === "THINKING") return;
+    state = "THINKING";
+    const myTurn = ++drawId;
+    enableInput(false);
+
+    showTyping(true);
+    const bubble = renderBubble("assistant", "");
+    setBubbleStreaming(bubble, true);
+    showTyping(false);
+
+    try {
+      const inflight = await root.chatReply(
+        currentMessages,
+        character,
+        memory,
+        currentChat.motif,
+        currentChat.number,
+        personality,
+        (chunk) => {
+          if (myTurn !== drawId) return;
+          appendToBubble(bubble, chunk);
+        },
+      );
+      if (myTurn !== drawId) return;
+      if (inflight.error || !inflight.stream) {
+        removeBubble(bubble);
+        renderErrorBubble("chatReply", inflight.error || "stream did not start");
+        showError("chatReply", inflight.error || "stream did not start");
+        return;
+      }
+      currentStream = inflight.stream;
+      let finalText = "";
+      let aborted = false;
+      try {
+        const data = await inflight.stream;
+        if (myTurn !== drawId) return;
+        if (data.stopReason === "error" || !data.generatedText || !data.generatedText.trim()) {
+          const stopped = data.stopReason && /stop/i.test(data.stopReason);
+          if (stopped) { aborted = true; }
+          else {
+            removeBubble(bubble);
+            renderErrorBubble("chatReply", "stopReason=" + (data.stopReason || "(none)") + " with empty text");
+            showError("chatReply", "stopReason=" + (data.stopReason || "(none)") + " with empty text");
+          }
+        } else {
+          finalText = data.generatedText.trim()
+            .replace(/^\[\[[^\]]+\]\]:\s*/i, "")
+            .replace(/\s+/g, " ");
+        }
+      } catch (e) {
+        if (myTurn !== drawId) return;
+        removeBubble(bubble);
+        renderErrorBubble("chatReply", errMsg(e));
+        showError("chatReply", e);
+      } finally {
+        if (currentStream === inflight.stream) currentStream = null;
+      }
+
+      if (finalText && !aborted) {
+        setBubbleStreaming(bubble, false);
+        setBubbleText(bubble, finalText);
+        try {
+          const images = extractImagesMap(bubble);
+          const savedMsg = await addMessage(currentChat.id, "assistant", finalText, images);
+          bubble.dataset.id = savedMsg.id;
+          currentMessages.push({ id: savedMsg.id, role: "assistant", content: finalText, images });
+          refreshAllActionVisibility();
+          persistLateImages(bubble, savedMsg.id);
+          await touchChat(currentChat.id);
+        } catch (e) {
+          showError("db.addMessage", e);
+        }
+      } else if (aborted) {
+        removeBubble(bubble);
+        setStatus("Reply cancelled.");
+      }
+    } catch (e) {
+      if (myTurn !== drawId) return;
+      removeBubble(bubble);
+      renderErrorBubble("chatReply", errMsg(e));
+      showError("chatReply", e);
+    } finally {
+      showTyping(false);
+      if (state === "THINKING") state = "READY";
+      enableInput(true);
+      $("input").focus();
+    }
   }
   function renderErrorBubble(where, errorText) {
     const wrap = document.createElement("div");
@@ -872,30 +1554,41 @@
     wrap.innerHTML = `
       <div class="msgWho">${escapeHTML(where.toUpperCase())}</div>
       <div class="bubble"><span class="content"></span></div>
+      <div class="msgActions"></div>
     `;
     wrap.querySelector(".content").textContent = errorText;
     const clr = document.createElement("div"); clr.className = "clear";
     $("messages").appendChild(wrap); $("messages").appendChild(clr);
+    buildBubbleActions(wrap);
     scrollChatToBottom();
     return wrap;
   }
   function setBubbleStreaming(el, streaming) {
     if (!el) return;
-    const caret = el.querySelector(".caret");
-    if (caret) caret.style.display = streaming ? "inline-block" : "none";
+    el.dataset.streaming = streaming ? "1" : "0";
+    renderBubbleFromState(el);
   }
+  // Streaming chunk: append to rawText, re-parse, fire images, redraw.
   function appendToBubble(el, chunk) {
     if (!el) return;
-    el.querySelector(".content").textContent += chunk;
-    scrollChatToBottom();
+    const s = bubbleState(el);
+    s.rawText += chunk;
+    kickoffImages(el);
+    renderBubbleFromState(el);
   }
+  // Set the final text on a bubble (replacing streamed content).
+  // Used when the model returns a cleaned final string (e.g. chatReply
+  // strips the leading speaker tag).
   function setBubbleText(el, text) {
     if (!el) return;
-    el.querySelector(".content").textContent = text;
-    scrollChatToBottom();
+    const s = bubbleState(el);
+    s.rawText = text || "";
+    kickoffImages(el);
+    renderBubbleFromState(el);
   }
   function removeBubble(el) {
     if (!el) return;
+    bubbleStates.delete(el);
     const next = el.nextElementSibling;
     if (next && next.classList.contains("clear")) next.remove();
     el.remove();
@@ -910,7 +1603,7 @@
   // Surfaces a real error if the top panel didn't load correctly,
   // instead of letting calls fail with cryptic TypeErrors.
   function assertRoot() {
-    const required = ["readCounter", "tickCounter", "getFortune", "chatReply", "generateSeal", "confirmAsync"];
+    const required = ["readCounter", "tickCounter", "getFortune", "chatReply", "generateSeal", "synthesizePersona", "confirmAsync"];
     const missing = required.filter(fn => typeof root[fn] !== "function");
     if (missing.length) {
       throw new Error("Top-panel functions not loaded: " + missing.join(", "));
@@ -929,6 +1622,7 @@
 
     epoch = await getEpoch();
     await loadCharacter();
+    await loadPersonality();
     await loadMemory();
     await loadRecentMotifs();
 
@@ -972,8 +1666,12 @@
     currentChat = loaded.chat;
     renderEmptyState(false);
     clearChatPanel();
-    currentMessages = loaded.messages.map(m => ({ role: m.role, content: m.content }));
-    for (const m of loaded.messages) renderBubble(m.role, m.content);
+    currentMessages = loaded.messages.map(m => ({ id: m.id, role: m.role, content: m.content, images: m.images }));
+    for (const m of loaded.messages) {
+      const b = renderBubble(m.role, m.content, { savedImages: m.images, id: m.id });
+      b.dataset.id = m.id;
+    }
+    refreshAllActionVisibility();
     setStamp({
       number: currentChat.number,
       url: currentChat.stampUrl || null,
@@ -991,9 +1689,13 @@
   }
 
   // --- Draw a new fortune (re-roll) ---------------------------------
+  // A re-roll cancels any in-flight stream (chat reply or previous fortune)
+  // before starting a new one. The drawId guard prevents stale chunks
+  // from a stopped stream from updating the UI even if .stop() leaks.
   async function drawNewFortune() {
-    if (state === "DRAWING" || state === "THINKING") return;
+    if (state === "DRAWING") return; // already drawing — don't stack draws
     clearError();
+    cancelStream(); // stop any inflight reply/fortune cleanly
     const previousState = state;
     state = "DRAWING";
     const myDraw = ++drawId;
@@ -1014,13 +1716,11 @@
       }
       n = Math.min(n, MAX_TICKET);
 
-      // 2. Pick a motif locally (no Perchance list access needed).
+      // 2. Pick a motif locally.
       const facts = numberFacts(n, { isFirstToday: false, priorCount: n - 1 });
       const factStrings = pickSalientFacts(facts);
       const motif = pickMotif(recentMotifIds);
-      if (motif && motif.card) {
-        await pushRecentMotif(motif.card);
-      }
+      if (motif && motif.card) await pushRecentMotif(motif.card);
 
       // 3. Create the new chat thread.
       const chatId = newId();
@@ -1047,31 +1747,54 @@
       displayedNumber = n;
       countUp(prev, n, 500);
 
-      // 5. Stream the fortune as Madame's first message.
+      // 5. Start streaming the fortune.
       const bubble = renderBubble("assistant", "");
       setBubbleStreaming(bubble, true);
-      const fortuneRes = await root.getFortune(n, factStrings, motif, character, (chunk) => {
+
+      const inflight = await root.getFortune(n, factStrings, motif, character, personality, (chunk) => {
         if (myDraw !== drawId) return;
         appendToBubble(bubble, chunk);
       });
       if (myDraw !== drawId) return;
 
-      // If AI failed, fortuneRes.text is the static fallback and .error is the cause.
-      // Show the practical error to the user; the fallback fortune still appears.
-      if (fortuneRes.error) {
-        showError("getFortune", fortuneRes.error);
+      let finalText = "";
+      if (inflight.error || !inflight.stream) {
+        showError("getFortune", inflight.error || "stream did not start");
+        finalText = inflight.fallback || "";
+      } else {
+        currentStream = inflight.stream;
+        try {
+          const data = await inflight.stream;
+          if (myDraw !== drawId) return;
+          if (data.stopReason === "error" || !data.generatedText || !data.generatedText.trim()) {
+            showError("getFortune", "stopReason=" + (data.stopReason || "(none)") + " with empty text");
+            finalText = inflight.fallback || "";
+          } else {
+            finalText = data.generatedText.trim().replace(/\s+/g, " ");
+          }
+        } catch (e) {
+          if (myDraw !== drawId) return;
+          showError("getFortune", e);
+          finalText = inflight.fallback || "";
+        } finally {
+          if (currentStream === inflight.stream) currentStream = null;
+        }
       }
-      setBubbleText(bubble, fortuneRes.text);
-      setBubbleStreaming(bubble, false);
 
-      const savedMsg = await addMessage(chatId, "assistant", fortuneRes.text);
-      currentMessages.push({ role: "assistant", content: fortuneRes.text });
+      setBubbleStreaming(bubble, false);
+      setBubbleText(bubble, finalText);
+
+      // 6. Persist. Save any resolved image URLs alongside the text.
+      const images = extractImagesMap(bubble);
+      const savedMsg = await addMessage(chatId, "assistant", finalText, images);
+      currentMessages.push({ id: savedMsg.id, role: "assistant", content: finalText, images });
       bubble.dataset.id = savedMsg.id;
+      refreshAllActionVisibility();
       await touchChat(chatId);
       await setLocalMax(n);
       await setMisc("currentChatId", chatId);
 
-      // 6. Kick off the Stamp image (async — does not block re-arming input).
+      // 7. Kick off the Stamp image (separate from any inline images).
       root.generateSeal(n, motif).then(async (sealRes) => {
         if (myDraw !== drawId) return;
         if (sealRes && sealRes.url) {
@@ -1088,6 +1811,11 @@
         showError("generateSeal", e);
       });
 
+      // 8. Late image-URL persistence: any <image> tags whose generation
+      // outlives this function should still be saved to DB. Watch the
+      // bubble's state and update the saved message once they all resolve.
+      persistLateImages(bubble, savedMsg.id);
+
       state = "READY";
       enableInput(true);
       setStatus("");
@@ -1099,71 +1827,60 @@
     }
   }
 
+  // After streaming completes, any <image> tags whose textToImagePlugin
+  // calls are still pending need their URLs saved once they resolve.
+  // Poll the bubble's state until no pending entries remain, then
+  // update the message in the DB. Bounded to avoid leaking timers.
+  function persistLateImages(bubble, msgId) {
+    let elapsed = 0;
+    const tick = setInterval(async () => {
+      elapsed += 1500;
+      if (!bubble.isConnected) { clearInterval(tick); return; }
+      const s = bubbleState(bubble);
+      let anyPending = false;
+      for (const entry of s.images.values()) {
+        if (entry.status === "pending") { anyPending = true; break; }
+      }
+      if (!anyPending) {
+        clearInterval(tick);
+        const images = extractImagesMap(bubble);
+        if (Object.keys(images).length) {
+          try { await db.messages.update(msgId, { images }); }
+          catch (e) { console.warn("late-image save failed:", e); }
+        }
+      } else if (elapsed >= 120000) { // 2-minute cap
+        clearInterval(tick);
+      }
+    }, 1500);
+  }
+
   // --- Send a user message ------------------------------------------
+  // Persists the user's message, then delegates assistant streaming to
+  // streamAssistantReply (which is shared with regenerate).
   async function sendUserMessage() {
     if (!currentChat) return;
     if (state === "DRAWING" || state === "THINKING") return;
     const raw = $("input").value.trim();
     if (!raw) return;
 
-    state = "THINKING";
+    clearError();
     enableInput(false);
     $("input").value = "";
     autoResizeInput();
 
-    renderBubble("user", raw);
-    currentMessages.push({ role: "user", content: raw });
+    const userBubble = renderBubble("user", raw);
+    let savedUserMsg = null;
     try {
-      await addMessage(currentChat.id, "user", raw);
+      savedUserMsg = await addMessage(currentChat.id, "user", raw);
+      userBubble.dataset.id = savedUserMsg.id;
       await touchChat(currentChat.id);
     } catch (e) {
-      showError("db.addMessage", e); // persistence failed but conversation can continue
+      showError("db.addMessage", e);
     }
+    currentMessages.push({ id: savedUserMsg?.id, role: "user", content: raw });
+    refreshAllActionVisibility();
 
-    showTyping(true);
-    const bubble = renderBubble("assistant", "");
-    setBubbleStreaming(bubble, true);
-    showTyping(false);
-
-    try {
-      const reply = await root.chatReply(
-        currentMessages,
-        character,
-        memory,
-        currentChat.motif,
-        currentChat.number,
-        (chunk) => appendToBubble(bubble, chunk),
-      );
-      if (reply.error || !reply.text) {
-        // Replace the empty assistant bubble with a practical error bubble.
-        removeBubble(bubble);
-        renderErrorBubble("chatReply", reply.error || "empty reply from chatReply");
-        showError("chatReply", reply.error || "empty reply");
-        // Also pop the user message from the in-memory conversation so
-        // the next send doesn't re-feed it (it stays in DB for history).
-        // Actually keep it — user might want to retry. Just don't push
-        // a phantom assistant message.
-      } else {
-        setBubbleText(bubble, reply.text);
-        setBubbleStreaming(bubble, false);
-        currentMessages.push({ role: "assistant", content: reply.text });
-        try {
-          await addMessage(currentChat.id, "assistant", reply.text);
-          await touchChat(currentChat.id);
-        } catch (e) {
-          showError("db.addMessage", e);
-        }
-      }
-    } catch (e) {
-      removeBubble(bubble);
-      renderErrorBubble("chatReply", errMsg(e));
-      showError("chatReply", e);
-    } finally {
-      showTyping(false);
-      state = "READY";
-      enableInput(true);
-      $("input").focus();
-    }
+    await streamAssistantReply();
   }
 
   // --- Input autoresize + Enter to send -----------------------------
@@ -1205,19 +1922,109 @@
     $("charDesc").value = character.description || "";
     openSheet("sheetChar");
   };
+  $("charRestore").onclick = async () => {
+    const ok = await root.confirmAsync(
+      "Restore the default fortune teller (Madame Aurelia)?\n\nThis replaces whatever is currently in the editor. You can still cancel before saving."
+    );
+    if (!ok) return;
+    $("charName").value = DEFAULT_CHARACTER_NAME;
+    $("charDesc").value = DEFAULT_CHARACTER_DESCRIPTION;
+  };
   $("charSave").onclick = async () => {
     try {
       character = {
-        name: ($("charName").value || "").trim() || "Madame Aurelia",
-        description: ($("charDesc").value || "").trim(),
+        name: ($("charName").value || "").trim() || DEFAULT_CHARACTER_NAME,
+        description: ($("charDesc").value || "").trim() || DEFAULT_CHARACTER_DESCRIPTION,
       };
       await saveCharacter();
       closeSheet("sheetChar");
+      // Re-label all Madame bubbles in the active chat
       document.querySelectorAll(".msg.madame:not(.error) .msgWho").forEach(el => {
         el.textContent = (character.name || "Madame").toUpperCase();
       });
     } catch (e) {
       showError("saveCharacter", e);
+    }
+  };
+
+  // --- Personality editor (the YOU sheet) ---------------------------
+  // The ✦ assist button is enabled iff the seeker has at least one
+  // saved Memory entry (synthesis has nothing to mine otherwise).
+  function refreshYouAssistAvailability() {
+    const btn = $("youAssist");
+    const status = $("youAssistStatus");
+    const count = memory.filter(m => m && String(m).trim()).length;
+    if (count === 0) {
+      btn.disabled = true;
+      btn.querySelector("span:last-child").textContent = "Add memories first — then Madame can draft this";
+      status.classList.remove("err");
+      status.textContent = "";
+    } else {
+      btn.disabled = false;
+      btn.querySelector("span:last-child").textContent =
+        `Have Madame draft this from your ${count} memor${count === 1 ? "y" : "ies"}`;
+    }
+  }
+  $("youBtn").onclick = () => {
+    $("youName").value = personality.name || "";
+    $("youDesc").value = personality.description || "";
+    $("youAssistStatus").textContent = "";
+    $("youAssistStatus").classList.remove("err");
+    refreshYouAssistAvailability();
+    openSheet("sheetYou");
+  };
+  $("youAssist").onclick = async () => {
+    const btn = $("youAssist");
+    const status = $("youAssistStatus");
+    if (btn.disabled || btn.classList.contains("busy")) return;
+    status.classList.remove("err");
+    status.textContent = "Reading the cards of your memories…";
+    btn.classList.add("busy");
+    try {
+      // Pass the in-memory `memory` array, plus whatever is currently
+      // typed into the form so we don't clobber half-done work.
+      const result = await root.synthesizePersona(
+        memory,
+        ($("youName").value || "").trim(),
+        ($("youDesc").value || "").trim(),
+      );
+      if (result.error) {
+        status.classList.add("err");
+        status.textContent = result.error;
+        showError("synthesizePersona", result.error);
+      } else {
+        // Only overwrite name if we don't already have one (preserve user's typing)
+        if (result.name && !$("youName").value.trim()) {
+          $("youName").value = result.name;
+        }
+        if (result.description) {
+          $("youDesc").value = result.description;
+        }
+        status.textContent = "Draft complete. Edit it however you like, then SAVE.";
+      }
+    } catch (e) {
+      status.classList.add("err");
+      status.textContent = errMsg(e);
+      showError("synthesizePersona", e);
+    } finally {
+      btn.classList.remove("busy");
+    }
+  };
+  $("youSave").onclick = async () => {
+    try {
+      personality = {
+        name: ($("youName").value || "").trim(),
+        description: ($("youDesc").value || "").trim(),
+      };
+      await savePersonality();
+      closeSheet("sheetYou");
+      // Re-label all user bubbles in the active chat
+      const newLabel = (personality.name || "YOU").toUpperCase();
+      document.querySelectorAll(".msg.user .msgWho").forEach(el => {
+        el.textContent = newLabel;
+      });
+    } catch (e) {
+      showError("savePersonality", e);
     }
   };
 

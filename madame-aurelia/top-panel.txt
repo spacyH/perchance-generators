@@ -67,16 +67,37 @@ async tickCounter(key) =>
   }
 
 // --- Fortune generation (the OPENING message Madame speaks) -----------
-// Returns { text, fromAI, error? }
-//   On AI success: { text: aiText, fromAI: true }
-//   On AI failure: { text: fallbackText, fromAI: false, error: "..." }
-async getFortune(n, factStrings, motif, character, onChunk) =>
+// Returns { stream, fallback, error? } — caller awaits the stream and
+// can .stop() it at any time. Stream resolves to aiTextPlugin's data
+// object: { generatedText, stopReason, ... }.
+//
+//   On setup success: { stream: streamObj, fallback: fallbackText }
+//   On setup failure: { stream: null, fallback: fallbackText, error: "..." }
+//
+// The caller is responsible for: post-processing the text, detecting
+// empty results, deciding whether to use the fallback.
+async getFortune(n, factStrings, motif, character, personality, onChunk) =>
   let facts = (factStrings || []).join("; ");
   let token = Math.random().toString(36).slice(2, 8);
   let card = motif && motif.card ? motif.card : "an unfamiliar card";
   let img  = motif && motif.image ? motif.image : "a candle flickering twice before steadying";
   let charDesc = (character && character.description) ? String(character.description).trim() : "";
   let charName = (character && character.name) ? String(character.name).trim() : "Madame Aurelia";
+  let fallback = root.randomFortune + "";
+
+  // Optional seeker persona — who they want Madame to read FOR. Name and
+  // description both optional. Used to colour the reading and address them.
+  let pName = (personality && personality.name) ? String(personality.name).trim() : "";
+  let pDesc = (personality && personality.description) ? String(personality.description).trim() : "";
+  let personaBlock = (pName || pDesc) ? [
+    "",
+    "THE SEEKER ACROSS THE TABLE FROM YOU:",
+    pName ? `  Their name: ${pName}` : "",
+    pDesc ? `  Who they are: ${pDesc}` : "",
+    "  Address them by name if they have given one, and let their",
+    "  character colour your reading. They are a real person to you;",
+    "  meet them where they are.",
+  ].filter(Boolean).join("\n") : "";
 
   let openers = [
     `Ah, my dear — ${n}, the cards wish to tell a tale for you tonight.`,
@@ -88,14 +109,9 @@ async getFortune(n, factStrings, motif, character, onChunk) =>
   let opener = openers[Math.floor(Math.random() * openers.length)];
 
   let instruction = [
-    `You are ${charName}: a velvet-curtained carnival mystic in a tent`,
-    "filled with incense smoke, velvet curtains, and soft candlelight.",
-    "Voice: warm, theatrical, playful, gently knowing, and comforting.",
-    "You speak directly to the seeker before you. You believe in bright",
-    "possibilities and quietly encourage them. You are a kind friend in",
-    "costume, with a gift for reading cards and finding meaning in small",
-    "moments, symbols, and fortunate turns.",
-    charDesc ? `Additional notes about your character (override the defaults where they conflict): ${charDesc}` : "",
+    `You are ${charName}.`,
+    charDesc || "A warm, theatrical fortune teller in a carnival tent.",
+    personaBlock,
     "",
     `The fate number drawn for this seeker is ${n}.`,
     facts ? `Truths the cards reveal about this number: ${facts}.` : "",
@@ -111,12 +127,14 @@ async getFortune(n, factStrings, motif, character, onChunk) =>
     "insight, encouragement, and gentle wisdom. Address the seeker fondly.",
     "Close with one short, warm invitation — a single sentence inviting",
     "them to ask whatever they wish; you are listening, and the candle is",
-    "patient. Write naturally in Madame's theatrical carnival voice.",
+    "patient. Stay in the voice described above.",
     "Continue smoothly from the opening already provided.",
+    "Do not include any <image> tags in this opening reading — the Stamp",
+    "card image is being summoned separately.",
   ].filter(Boolean).join("\n");
 
   try {
-    let streamObj = root.aiTextPlugin({
+    let stream = root.aiTextPlugin({
       instruction,
       startWith: opener + " ",
       hideStartWith: false,
@@ -125,34 +143,26 @@ async getFortune(n, factStrings, motif, character, onChunk) =>
         if(onChunk && d && d.textChunk) onChunk(d.textChunk);
       },
     });
-    let data = await streamObj;
-    if(data.stopReason === "error" || !data.generatedText || !data.generatedText.trim()) {
-      return {
-        text: root.randomFortune+"",
-        fromAI: false,
-        error: "aiTextPlugin returned stopReason=" + (data.stopReason || "(none)") + " with empty text",
-      };
-    }
-    let text = data.generatedText.trim().replace(/\s+/g, " ");
-    return { text, fromAI: true };
+    return { stream, fallback, opener };
   } catch(e) {
-    console.error("getFortune failed:", e);
-    return {
-      text: root.randomFortune+"",
-      fromAI: false,
-      error: (e && e.message) || String(e),
-    };
+    console.error("getFortune setup failed:", e);
+    return { stream: null, fallback, error: (e && e.message) || String(e) };
   }
 
 // --- Chat reply (continues a conversation as Madame) ------------------
 // Standard Perchance chat-completion pattern: [[Speaker]]: format, model
 // continues from `[[Character]]:`. Memory entries are seeker-provided
-// facts injected as quiet context — Madame uses them but rarely names them.
+// facts injected as quiet context.
 //
-// Returns { text, error? }
-//   On success: { text: replyText }
-//   On failure: { text: "", error: "..." }
-async chatReply(messages, character, memory, motif, n, onChunk) =>
+// Returns { stream, charName, error? } — caller awaits the stream and
+// can .stop() it at any time. Caller is responsible for post-processing
+// (strip leading speaker tag, collapse whitespace, detect empty).
+//
+// If the seeker's latest message uses image-related keywords (show,
+// draw, paint, image, etc.), Madame is permitted to emit one
+// `<image>brief description</image>` tag in her reply. The HTML side
+// parses these tags, renders them as inline images, and persists them.
+async chatReply(messages, character, memory, motif, n, personality, onChunk) =>
   let charDesc = (character && character.description) ? String(character.description).trim() : "";
   let charName = (character && character.name) ? String(character.name).trim() : "Madame Aurelia";
   let memArr = Array.isArray(memory) ? memory.filter(m => m && String(m).trim()) : [];
@@ -160,34 +170,54 @@ async chatReply(messages, character, memory, motif, n, onChunk) =>
   let card = motif && motif.card ? motif.card : "";
   let img  = motif && motif.image ? motif.image : "";
 
+  // Optional seeker persona — name becomes their speaker tag, description
+  // is injected into the system context so Madame talks TO that person.
+  let pName = (personality && personality.name) ? String(personality.name).trim() : "";
+  let pDesc = (personality && personality.description) ? String(personality.description).trim() : "";
+  let seekerLabel = pName || "Seeker";
+  let personaBlock = (pName || pDesc) ? [
+    "",
+    "THE SEEKER ACROSS THE TABLE FROM YOU:",
+    pName ? `  Their name: ${pName}` : "",
+    pDesc ? `  Who they are: ${pDesc}` : "",
+    "  Address them as this person. Let their character colour your replies.",
+  ].filter(Boolean).join("\n") : "";
+
   let trimmed = (messages || []).slice(-14);
   let convo = trimmed.map(m => {
-    let who = m.role === "user" ? "Seeker" : charName;
+    let who = m.role === "user" ? seekerLabel : charName;
     return `[[${who}]]: ${String(m.content).replace(/\s+/g, " ").trim()}`;
   }).join("\n");
+
+  // Detect if seeker is asking to see/draw/conjure something visual.
+  let lastSeeker = "";
+  for(let i = trimmed.length - 1; i >= 0; i--) {
+    if(trimmed[i].role === "user") { lastSeeker = trimmed[i].content || ""; break; }
+  }
+  let imageKeywords = /\b(image|images|pic|pics|picture|photo|photos|selfie|draw|paint|painting|sketch|show me|let me see|conjure|summon|vision)\b/i;
+  let allowImages = imageKeywords.test(lastSeeker);
+
+  let imageNote = allowImages
+    ? "The seeker has asked to see something. You may summon ONE image in your reply by including a tag exactly like: <image>brief evocative description, no more than 12 words, in your voice</image>. The image will appear in the smoke between your words. Use no more than one such tag in the whole reply. Place the tag mid-sentence where it reads naturally."
+    : "Do not include any <image> tags in this reply. The seeker has not asked to see anything.";
 
   let token = Math.random().toString(36).slice(2, 8);
 
   let instruction = [
-    `You are ${charName}: a velvet-curtained carnival mystic — warm,`,
-    "theatrical, playful, gently knowing, comforting. You read cards,",
-    "you read people, and you find small bright things to point them",
-    "toward. You believe in fortune, kindly.",
-    charDesc ? `Additional character notes (these override defaults): ${charDesc}` : "",
+    `You are ${charName}.`,
+    charDesc || "A warm, theatrical fortune teller in a carnival tent.",
+    personaBlock,
     "",
     n ? `The seeker's fate number this evening is ${n}.` : "",
     card ? `The card you turned earlier for them: ${card} — ${img}. You may refer back to it when it serves the reply, but do not repeat the reading.` : "",
     memText ? `\nThings you quietly remember about this seeker (use them naturally; rarely name them aloud):\n${memText}` : "",
     "",
-    "Stay in voice. Reply length: usually 1–3 sentences (Madame is",
-    "unhurried but not long-winded); 4–5 sentences only if the seeker",
-    "asks for a fuller reading. Address them warmly — \"my dear\",",
-    "\"child\", \"little one\" sparingly. Small theatrical gestures (a",
-    "hand turned palm-up, the candle dipped low, a glance at the curtain)",
-    "are welcome but used like seasoning, not garnish. Do not break",
-    "character. Do not mention being an AI, a language model, or a",
-    "computer. Do not draw a new card unless the seeker explicitly asks",
-    "you to — there is only one card on the table tonight.",
+    "Reply length: usually 1–3 sentences; 4–5 only if the seeker asks for",
+    "more. Stay in the voice described above. Do not break character.",
+    "Do not mention being an AI, a language model, or a computer. Do not",
+    "draw a new card unless the seeker explicitly asks you to — there is",
+    "only one card on the table tonight.",
+    imageNote,
     `(Internal variety token — ignore: ${token}.)`,
     "",
     "<MESSAGES>",
@@ -198,29 +228,19 @@ async chatReply(messages, character, memory, motif, n, onChunk) =>
   ].filter(Boolean).join("\n");
 
   try {
-    let streamObj = root.aiTextPlugin({
+    let stream = root.aiTextPlugin({
       instruction,
       startWith: `[[${charName}]]:`,
       hideStartWith: true,
-      stopSequences: ["\n\n[[", "\n[[", "[[Seeker]]", "\n>>>"],
+      stopSequences: ["\n\n[[", "\n[[", "\n>>>"],
       onChunk: (d) => {
         if(onChunk && d && d.textChunk && !d.isFromStartWith) onChunk(d.textChunk);
       },
     });
-    let data = await streamObj;
-    if(data.stopReason === "error" || !data.generatedText || !data.generatedText.trim()) {
-      return {
-        text: "",
-        error: "aiTextPlugin returned stopReason=" + (data.stopReason || "(none)") + " with empty text",
-      };
-    }
-    let text = data.generatedText.trim()
-      .replace(/^\[\[[^\]]+\]\]:\s*/i, "")
-      .replace(/\s+/g, " ");
-    return { text };
+    return { stream, charName, allowImages };
   } catch(e) {
-    console.error("chatReply failed:", e);
-    return { text: "", error: (e && e.message) || String(e) };
+    console.error("chatReply setup failed:", e);
+    return { stream: null, charName, error: (e && e.message) || String(e) };
   }
 
 // --- Tarot-style fortune card image (the "Stamp") ---------------------
@@ -249,6 +269,93 @@ async generateSeal(n, motif) =>
   } catch(e) {
     console.error("generateSeal failed:", e);
     return { url: "", error: (e && e.message) || String(e) };
+  }
+
+// --- Persona synthesis from memory ------------------------------------
+// Reads through the seeker's Memory entries and writes a draft persona
+// description in the seeker's own voice ("I am ..."). Used by the YOU
+// editor's ✦ assist button when the user has Memory but no Personality.
+//
+// memoryEntries: array of strings, the user's saved memories.
+// existingName, existingDesc: any current values in the editor (so we
+// don't overwrite a half-filled form, we blend with it).
+//
+// Returns { name, description, error? }
+//   name        — suggested seeker name (empty string if none can be inferred)
+//   description — a 2–4 sentence persona description in first person
+//
+// On failure: { name: "", description: "", error: "..." }
+async synthesizePersona(memoryEntries, existingName, existingDesc) =>
+  let entries = Array.isArray(memoryEntries) ? memoryEntries.filter(m => m && String(m).trim()) : [];
+  if(entries.length === 0) {
+    return { name: "", description: "", error: "no memory entries to synthesize from" };
+  }
+  let bullets = entries.map(m => "  - " + String(m).trim()).join("\n");
+  let nameHint = existingName ? `The seeker has provided this name: "${existingName}". Keep it.` : "";
+  let descHint = existingDesc ? `The seeker has already started a description: "${existingDesc}". Blend it with the new draft if it fits; otherwise replace it.` : "";
+
+  let instruction = [
+    "You are helping a person fill out a SHORT self-description for a",
+    "fortune-teller app. They have saved some memories about themselves.",
+    "Read those memories and write a brief, warm persona description as",
+    "if the person themselves wrote it (FIRST PERSON: \"I am...\", \"I",
+    "work...\", etc.). The fortune teller will read this to know who is",
+    "sitting across the table from her.",
+    "",
+    "RULES:",
+    "- 2 to 4 sentences. Around 30–80 words.",
+    "- First-person voice (\"I am\", \"I have\", \"I'm here because\").",
+    "- Include factual details from the memories: name, occupation,",
+    "  relationships, current situation, what's on their mind.",
+    "- Do not invent facts not present in the memories. If something is",
+    "  not stated, leave it out.",
+    "- Plain prose. No lists, no bullets, no markdown, no quotes around",
+    "  the output.",
+    "- If a name is clearly stated (e.g. \"My name is Wren\", \"I am",
+    "  called X\", \"They call me X\"), extract it. Otherwise leave name",
+    "  empty.",
+    nameHint,
+    descHint,
+    "",
+    "The seeker's saved memories:",
+    bullets,
+    "",
+    "Reply with ONLY this exact format on two lines, nothing else:",
+    "NAME: <just the first name or empty>",
+    "DESCRIPTION: <the 2-4 sentence first-person description>",
+  ].filter(Boolean).join("\n");
+
+  try {
+    let streamObj = root.aiTextPlugin({
+      instruction,
+      startWith: "NAME: ",
+      hideStartWith: false,
+      stopSequences: ["\n\n", "\nNAME:"],
+    });
+    let data = await streamObj;
+    if(data.stopReason === "error" || !data.generatedText || !data.generatedText.trim()) {
+      return { name: "", description: "", error: "aiTextPlugin returned stopReason=" + (data.stopReason || "(none)") };
+    }
+    let raw = data.generatedText.trim();
+    // Parse "NAME: X\nDESCRIPTION: Y" — tolerate variants in case the model strays.
+    let nameMatch = raw.match(/^\s*NAME:\s*(.*?)\s*$/im);
+    let descMatch = raw.match(/^\s*DESCRIPTION:\s*([\s\S]*?)\s*$/im);
+    let name = nameMatch ? nameMatch[1].trim() : "";
+    let description = descMatch ? descMatch[1].trim() : "";
+    // Sanitize: strip wrapping quotes the model may add despite the rule
+    name = name.replace(/^["']|["']$/g, "").trim();
+    description = description.replace(/^["']|["']$/g, "").trim();
+    // If parsing failed, fall back to the whole raw text as description
+    if(!description && !name) {
+      description = raw.replace(/^NAME:.*\n?/im, "").replace(/^DESCRIPTION:\s*/im, "").trim();
+    }
+    if(!description) {
+      return { name, description: "", error: "could not parse a description from model output" };
+    }
+    return { name, description };
+  } catch(e) {
+    console.error("synthesizePersona failed:", e);
+    return { name: "", description: "", error: (e && e.message) || String(e) };
   }
 
 // --- confirmAsync (Promise-based confirm dialog) -----------------------
