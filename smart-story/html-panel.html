@@ -82,6 +82,24 @@
   .msg.char .suggestStrip { grid-column: 2; grid-row: 5; }
   .msg.char .avatar { grid-column: 1; grid-row: 1 / span 5; }
   .msg.error { display: block; }
+  /* System notes — centered italic line for events like "Lyle has joined
+     the scene." No avatar, no actions, just the text. Rendered as a
+     stored message with role "system" so it persists in the conversation
+     and the AI sees it in context. */
+  .msg.system {
+    display: block;
+    text-align: center;
+    margin: 18px auto;
+    max-width: 80%;
+    color: var(--ink-faint);
+    font-family: 'Lora', Georgia, serif;
+    font-style: italic;
+    font-size: 13px;
+    letter-spacing: 0.3px;
+    padding: 6px 12px;
+    border-top: 1px dashed var(--surface-3);
+    border-bottom: 1px dashed var(--surface-3);
+  }
   @media (max-width: 500px) {
     .msg.user, .msg.char { grid-template-columns: 1fr; max-width: 92%; }
     .msg .avatar { display: none; }
@@ -366,6 +384,44 @@
   #stopBtn { color: var(--err); background: var(--err-bg); border: 1px solid var(--err); }
   #stopBtn:hover { filter: brightness(1.15); }
   #toolbar { display: flex; gap: 6px; margin-bottom: 8px; }
+  /* Speaker picker row — appears between the toolbar and the input
+     in multi-character chats. */
+  #speakerRow {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 8px; padding: 6px 10px;
+    background: var(--surface-2); border: 1px solid var(--surface-3);
+    border-radius: 8px;
+    font-size: 12px;
+  }
+  #speakerRow[hidden] { display: none; }
+  #speakerRow label {
+    color: var(--ink-dim); font-weight: 600;
+    letter-spacing: 0.5px; text-transform: uppercase;
+    font-size: 10px;
+  }
+  #speakerSelect {
+    flex: 1; padding: 5px 8px; font-size: 13px; font-family: inherit;
+    color: var(--ink); background: var(--surface);
+    border: 1px solid var(--surface-3); border-radius: 6px;
+  }
+  #speakerSelect:focus { outline: 2px solid var(--accent-dim); }
+  /* +Add character button inside the speaker row. Same height as the
+     select so the row aligns. Tinted with accent so it's visually
+     distinct from the (non-action) label. */
+  .speakerRowBtn {
+    padding: 5px 10px; font-size: 12px; font-family: inherit;
+    color: var(--accent-hi);
+    background: var(--surface);
+    border: 1px solid var(--accent-dim); border-radius: 6px;
+    cursor: pointer;
+    transition: all 120ms;
+  }
+  .speakerRowBtn:hover { background: var(--surface-3); border-color: var(--accent); }
+  .speakerRowBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+  /* When the chat has only 1 character (no need for a "Reply as:"
+     dropdown), hide the label + select but keep the +Add button. */
+  #speakerRow.solo #speakerLabel,
+  #speakerRow.solo #speakerSelect { display: none; }
   .tbtn {
     flex: 1; font-family: inherit; font-weight: 600; font-size: 12px;
     letter-spacing: 0.5px; padding: 9px 12px; cursor: pointer; user-select: none;
@@ -514,6 +570,37 @@
     padding: 6px 10px; font-size: 16px; line-height: 1;
   }
   .charLibRow button:disabled { opacity: 0.4; cursor: not-allowed; }
+  /* Cast picker — checkboxes for "who's in this scene" when starting a
+     new scene with multiple library characters available. */
+  .castPickRow {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 12px; margin-bottom: 6px;
+    background: var(--surface-2); border: 1px solid var(--surface-3);
+    border-radius: 8px; cursor: pointer;
+    transition: all 120ms;
+  }
+  .castPickRow:hover { background: var(--surface-3); border-color: var(--accent-dim); }
+  .castPickRow input[type="checkbox"] {
+    margin-top: 2px; cursor: pointer; flex-shrink: 0;
+    width: 16px; height: 16px;
+  }
+  .castPickRow .castPickName {
+    font-weight: 600; color: var(--ink); font-size: 14px;
+  }
+  .castPickRow .castPickDesc {
+    font-size: 12px; color: var(--ink-dim); margin-top: 2px;
+    line-height: 1.4;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .castPickRow .castPickPrimary {
+    font-size: 10px; font-weight: 700; letter-spacing: 1px;
+    color: var(--accent-hi);
+    background: rgba(124,179,255,0.12);
+    padding: 2px 6px; border-radius: 3px;
+    display: inline-block; margin-left: 6px;
+    vertical-align: middle;
+  }
   .assistRow { margin-top: 6px; padding-top: 12px; border-top: 1px dashed var(--surface-3); }
   .assistBtn {
     display: flex; gap: 8px; align-items: center; width: 100%;
@@ -696,6 +783,18 @@
       <button id="newBtn" class="tbtn primary" title="Start a new scene">
         <span class="ico">📖</span><span>NEW SCENE</span>
       </button>
+    </div>
+    <!-- Speaker picker (multi-character chats only). Hidden by default;
+         shown when the chat's roster has 2+ characters. Lets the user
+         choose who replies to their next message. -->
+    <!-- Speaker / cast row. Shown whenever the chat has a non-empty
+         roster. Houses (a) the "Reply as:" dropdown when there are 2+
+         characters, and (b) the "+ Add character" button to bring a
+         new character into the scene mid-conversation. -->
+    <div id="speakerRow" hidden>
+      <label id="speakerLabel" for="speakerSelect">Reply as:</label>
+      <select id="speakerSelect" aria-label="Choose which character replies"></select>
+      <button id="addCharacterBtn" class="speakerRowBtn" title="Bring a new character into this scene">✚ Add</button>
     </div>
     <div id="inputRow">
       <textarea id="input" rows="1" placeholder="Write your reply… (Enter to send)" disabled></textarea>
@@ -977,14 +1076,16 @@
       <div id="importStatus" class="assistStatus"></div>
 
       <!-- Destination actions -->
-      <div class="panelActions" id="importActions" style="display:none;">
-        <button id="importAsSettings" class="secondaryBtn">USE CHARACTER ONLY</button>
+      <div class="panelActions" id="importActions" style="display:none; flex-wrap: wrap; gap: 6px;">
+        <button id="importAsLibrary" class="secondaryBtn">ADD TO LIBRARY</button>
+        <button id="importAsSettings" class="secondaryBtn">USE AS CURRENT</button>
         <div class="spacer"></div>
-        <button id="importAsNewChat" class="saveBtn">IMPORT & CONTINUE</button>
+        <button id="importAsNewChat" class="saveBtn">IMPORT &amp; CONTINUE</button>
       </div>
       <div class="hint" id="importActionsHint" style="display:none; margin-top: 4px;">
         <b>Import &amp; Continue</b>: full import into a new scene, including any message history.<br>
-        <b>Use Character Only</b>: load the character/persona/scenario into Settings as a template. Messages are discarded.
+        <b>Use as Current</b>: replace your currently-active character with this one (your library keeps it too). Messages are discarded.<br>
+        <b>Add to Library</b>: save the character into your library for use in future scenes. Doesn't touch your current character or chat. Use this to build a multi-character library by importing cards one at a time.
       </div>
     </div>
   </div>
@@ -1027,6 +1128,61 @@
         <button id="exportDownloadBtn" class="saveBtn">💾 DOWNLOAD</button>
       </div>
       <div id="exportStatus" class="assistStatus"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Cast picker — only shown when starting a new scene with 2+ library
+     characters available. Lets the user choose which characters are in
+     this scene's roster. -->
+<div id="castPickerModal" class="modal" role="dialog" aria-label="Choose cast for this scene">
+  <div class="modalCard">
+    <div class="modalHeader">
+      <div class="modalTitle">📖 Who's in this scene?</div>
+      <button class="modalClose" data-close="castPickerModal">CANCEL</button>
+    </div>
+    <div class="modalBody">
+      <div class="hint" style="margin-bottom: 12px;">
+        Pick which characters appear in this scene. The first one ticked is the
+        primary speaker (opens the scene). When 2 or more are picked, a
+        "Reply as:" dropdown will appear in the composer so you can switch
+        who answers your messages.
+      </div>
+      <div id="castPickerList"></div>
+      <div class="panelActions">
+        <button id="castPickerCancel" class="secondaryBtn">CANCEL</button>
+        <div class="spacer"></div>
+        <button id="castPickerConfirm" class="saveBtn">START SCENE</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add-character-to-scene modal — pick a library character to bring
+     into the current scene. Single-select (you can add multiple by
+     repeating the action). Excludes characters already in the roster. -->
+<div id="addCharModal" class="modal" role="dialog" aria-label="Add a character to this scene">
+  <div class="modalCard">
+    <div class="modalHeader">
+      <div class="modalTitle">✚ Bring in a character</div>
+      <button class="modalClose" data-close="addCharModal">CANCEL</button>
+    </div>
+    <div class="modalBody">
+      <div class="hint" style="margin-bottom: 12px;">
+        Pick a character from your library to enter this scene. A short system
+        note will be added to the conversation so the AI knows the new character
+        has arrived. To create a new character first, open <b>Settings → CHARACTER</b>.
+      </div>
+      <div id="addCharList"></div>
+      <div id="addCharEmpty" class="hint" hidden style="font-style: italic; text-align: center; padding: 20px;">
+        Every character in your library is already in this scene. Create a new
+        character in <b>Settings → CHARACTER</b> if you want to bring in someone fresh.
+      </div>
+      <div class="panelActions">
+        <button id="addCharCancel" class="secondaryBtn">CANCEL</button>
+        <div class="spacer"></div>
+        <button id="addCharConfirm" class="saveBtn" disabled>BRING IN</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1218,6 +1374,19 @@
   let state = "LOADING";
   let currentChat = null;
   let currentMessages = [];
+  // Per-chat roster cache: keyed by character id, value is the library
+  // record (name, description, appearance). Populated when activating a
+  // chat by looking up each id in currentChat.characterIds. Used by the
+  // bubble renderer (to label past messages with the right speaker) and
+  // by the composer (to populate the "Reply as" picker). Refreshed
+  // whenever the roster changes.
+  let chatRoster = new Map();   // id → character record
+  // Which roster character will speak when the user sends their next
+  // message. Defaults to the chat's primary (roster[0]). Tracked per
+  // chat — persisted on the chat row as `nextReplyCharacterId` so it
+  // survives reloads. null when there's no roster (legacy single-char
+  // chats: the global `character` is used as a fallback).
+  let nextReplyCharacterId = null;
   // firstMessage: when set (typically by import), the next "NEW SCENE" uses
   // this exact text as the character's opening line, then clears the field.
   // Acts as a single-use template — the next scene afterward goes back to
@@ -1245,6 +1414,12 @@
   let currentUserAvatarPending = false;
   let currentCharAvatarHash = "";
   let currentUserAvatarHash = "";
+  // Avatar generation deduplication. Multi-character chats can trigger
+  // multiple resolveAvatarForCharacter calls in quick succession (one
+  // per roster member on activate); without this guard we'd start a
+  // generation per call even when one's already pending for the same
+  // hash. Set of in-flight hash keys.
+  const inFlightAvatars = new Set();
 
   // =====================================================================
   // STORAGE HELPERS
@@ -1306,6 +1481,54 @@
     // for new scenes — the past stays as it was. Empty-roster fallback
     // logic in chat code handles refs to deleted ids.
     await db.characters.delete(id);
+  }
+
+  // Build a roster cache for the given chat. Returns a Map<id, record>
+  // covering every id in chat.characterIds that still resolves to a
+  // library entry. Deleted-from-library characters are silently skipped
+  // — past message labels for those are recovered from the message's
+  // own `speakerName` denormalized copy (stamped at write-time).
+  async function buildRosterFor(chat) {
+    const m = new Map();
+    if (!chat || !Array.isArray(chat.characterIds)) return m;
+    for (const id of chat.characterIds) {
+      const row = await getCharacterById(id);
+      if (row) m.set(id, row);
+    }
+    return m;
+  }
+
+  // Resolve the character object that should be sent to chatReply as
+  // "who is replying this turn." Falls through to the global `character`
+  // when the chat has no roster (legacy data) or when the picked id
+  // doesn't resolve. Returns { id, record } — id may be null.
+  function resolveReplyingCharacter() {
+    if (nextReplyCharacterId && chatRoster.has(nextReplyCharacterId)) {
+      return { id: nextReplyCharacterId, record: chatRoster.get(nextReplyCharacterId) };
+    }
+    // Fall back: prefer the chat's primary roster entry; if none, use
+    // the global character cache. Keeps single-character behavior identical.
+    if (currentChat && Array.isArray(currentChat.characterIds)) {
+      for (const id of currentChat.characterIds) {
+        if (chatRoster.has(id)) return { id, record: chatRoster.get(id) };
+      }
+    }
+    return { id: null, record: character };
+  }
+
+  // For multi-character chats, list every roster member that is NOT the
+  // current replier — used by chatReply to inject an "ALSO IN THE SCENE"
+  // context block. Returns an array of {name, description}, never null.
+  function otherCharactersForPrompt() {
+    const replier = resolveReplyingCharacter();
+    const out = [];
+    if (!currentChat || !Array.isArray(currentChat.characterIds)) return out;
+    for (const id of currentChat.characterIds) {
+      if (id === replier.id) continue;
+      const row = chatRoster.get(id);
+      if (row) out.push({ name: row.name || "", description: row.description || "" });
+    }
+    return out;
   }
 
   async function loadCharacter() {
@@ -1403,6 +1626,13 @@
     const m = { chatId, role, content, createdAt: Date.now() };
     if (extras && extras.cutsceneUrl) m.cutsceneUrl = extras.cutsceneUrl;
     if (extras && extras.cutscenePrompt) m.cutscenePrompt = extras.cutscenePrompt;
+    // Multi-character (schema v2): stamp assistant messages with the
+    // speaker's library id AND a denormalized speakerName. The id lets
+    // future code re-resolve the character's full record from the
+    // library; the name is preserved so past bubbles still label
+    // correctly if the library entry is later deleted.
+    if (extras && extras.characterId) m.characterId = extras.characterId;
+    if (extras && extras.speakerName) m.speakerName = extras.speakerName;
     const id = await db.messages.add(m);
     m.id = id;
     return m;
@@ -1494,6 +1724,59 @@
       }
     }
   }
+
+  // Synchronous lookup: returns the cached URL for the given character
+  // record, or "" if none cached. Doesn't trigger generation. Used by
+  // applyAvatar to paint per-bubble avatars at render time.
+  function avatarUrlForCharacter(charRecord) {
+    if (!charRecord) return "";
+    const h = personaHash(charRecord);
+    if (!h) return "";
+    return charAvatars[h] || "";
+  }
+
+  // Kick off generation for the given character record if no cached URL
+  // exists. Idempotent + dedup-guarded — concurrent calls for the same
+  // hash result in a single generation. When the generation lands, we
+  // refresh all char bubbles so any of them whose hash matches start
+  // showing the new image.
+  async function ensureAvatarForCharacter(charRecord) {
+    if (!charRecord) return;
+    const hash = personaHash(charRecord);
+    if (!hash) return;
+    if (charAvatars[hash]) return;             // already cached
+    if (inFlightAvatars.has(hash)) return;     // already generating
+    inFlightAvatars.add(hash);
+    try {
+      const res = await root.generateCharacterAvatar(charRecord);
+      if (res && res.url) {
+        charAvatars[hash] = res.url;
+        await setMisc("charAvatars", charAvatars);
+        refreshCharAvatars();
+      } else if (res && res.error) {
+        showError("char avatar", res.error);
+      }
+    } catch (e) {
+      showError("char avatar", e);
+    } finally {
+      inFlightAvatars.delete(hash);
+    }
+  }
+
+  // Kick off generation for every character in the current roster that
+  // doesn't have a cached avatar yet. Returns immediately — generation
+  // continues in the background, and refreshCharAvatars repaints bubbles
+  // as each finishes. Safe to call multiple times; ensureAvatarForCharacter
+  // dedups by hash.
+  function ensureRosterAvatars() {
+    if (!chatRoster || chatRoster.size === 0) return;
+    for (const record of chatRoster.values()) {
+      ensureAvatarForCharacter(record).catch(e => {
+        console.warn("[avatar] roster member failed:", e);
+      });
+    }
+  }
+
   function applyAvatar(wrap, role) {
     const av = wrap.querySelector(".avatar");
     if (!av) return;
@@ -1502,9 +1785,23 @@
     av.dataset.imgUrl = "";
     let url = "";
     if (role === "assistant") {
-      url = currentCharAvatarUrl || "";
+      // Multi-character: each bubble may have its own characterId
+      // (dataset.characterId, set when rendering). Look up that
+      // character's avatar from the roster cache. Falls back to the
+      // legacy global currentCharAvatarUrl for messages without an id
+      // (single-character chats, or legacy data before schema v2).
+      const cidRaw = wrap.dataset.characterId;
+      const cid = cidRaw ? parseInt(cidRaw, 10) : 0;
+      const record = cid && chatRoster.has(cid) ? chatRoster.get(cid) : null;
+      url = record ? avatarUrlForCharacter(record) : (currentCharAvatarUrl || "");
       if (!url) {
-        if (currentCharAvatarPending) av.classList.add("pending", "default-char");
+        // No cached avatar. If there's a record we know about, mark as
+        // pending — refreshCharAvatars will repaint when it lands.
+        // Otherwise we just show the default silhouette.
+        const isPending = record
+          ? (personaHash(record) && !charAvatars[personaHash(record)])
+          : currentCharAvatarPending;
+        if (isPending) av.classList.add("pending", "default-char");
         else av.classList.add("default-char");
         return;
       }
@@ -1595,10 +1892,28 @@
   function renderBubble(role, text, opts) {
     opts = opts || {};
     const wrap = document.createElement("div");
+    // System notes are an intentionally simple element: just centered
+    // italic text, no avatar, no actions. They're stored in the
+    // messages table with role "system" so the AI sees them in
+    // conversation history.
+    if (role === "system") {
+      wrap.className = "msg system";
+      if (opts.id) wrap.dataset.id = opts.id;
+      wrap.textContent = text || "";
+      $("messages").appendChild(wrap);
+      scrollChatToBottom();
+      return wrap;
+    }
     wrap.className = "msg " + (role === "user" ? "user" : "char");
     if (opts.id) wrap.dataset.id = opts.id;
+    if (opts.characterId) wrap.dataset.characterId = String(opts.characterId);
     const youLabel = (personality.name || "").trim();
-    const charLabel = (character.name || "").trim();
+    // For assistant bubbles in multi-character chats, prefer the
+    // per-message speaker name. Falls back to the global character name
+    // for single-character data and brand-new streaming bubbles (where
+    // the caller may not know the speaker yet — they pass it in once
+    // the message is saved).
+    const charLabel = (opts.speakerName || character.name || "").trim();
     const who = role === "user"
       ? (youLabel || "YOU")
       : (charLabel || "CHARACTER");
@@ -1893,8 +2208,27 @@
     renderCutscenePending(bubble, "Illustrating…");
     try {
       const recent = currentMessages.slice(Math.max(0, idx - 3), idx);
+      // Multi-character: the "active speaker" of this bubble is the
+      // character whose appearance the cutscene prompt should
+      // foreground. Look up from the message's characterId; fall back
+      // to the global character for legacy single-character messages.
+      const speakerRecord = (msg.characterId && chatRoster.has(msg.characterId))
+        ? chatRoster.get(msg.characterId)
+        : character;
+      // The other roster members (excluding the speaker) get their
+      // appearances passed too, so multi-character scenes preserve
+      // visual identity for everyone visible in the frame.
+      const otherRoster = [];
+      if (currentChat && Array.isArray(currentChat.characterIds)) {
+        for (const cid of currentChat.characterIds) {
+          if (cid === msg.characterId) continue;
+          const r = chatRoster.get(cid);
+          if (r) otherRoster.push({ name: r.name || "", appearance: r.appearance || "" });
+        }
+      }
       const res = await root.generateCutscene(
-        msg.content, recent, character, personality, chatScenario(), resolveArtStyle(),
+        msg.content, recent, speakerRecord, personality, chatScenario(),
+        resolveArtStyle(), otherRoster,
       );
       if (res.error || !res.url) {
         renderCutsceneFailed(bubble, res.error || "unknown");
@@ -1942,22 +2276,385 @@
     const loaded = await loadChatById(chatId);
     if (!loaded) return;
     currentChat = loaded.chat;
+    // Build the roster cache for this chat (used by bubble labels +
+    // composer picker + chatReply context).
+    chatRoster = await buildRosterFor(currentChat);
+    // Initialize "who speaks next" from the chat's saved choice if
+    // present, otherwise from the primary roster member. Falls to null
+    // for empty rosters (legacy single-character chats).
+    if (currentChat.nextReplyCharacterId && chatRoster.has(currentChat.nextReplyCharacterId)) {
+      nextReplyCharacterId = currentChat.nextReplyCharacterId;
+    } else if (Array.isArray(currentChat.characterIds) && currentChat.characterIds.length > 0) {
+      nextReplyCharacterId = currentChat.characterIds.find(id => chatRoster.has(id)) || null;
+    } else {
+      nextReplyCharacterId = null;
+    }
     renderEmptyState(false);
     clearChatPanel();
     currentMessages = loaded.messages.map(m => ({
       id: m.id, role: m.role, content: m.content,
+      // Multi-character (schema v2): assistant messages may carry a
+      // characterId + speakerName denormalized copy. The speakerName
+      // is preserved even if the library entry was deleted, so past
+      // bubbles can still be labeled correctly.
+      characterId: m.characterId || null,
+      speakerName: m.speakerName || "",
       cutsceneUrl: m.cutsceneUrl, cutscenePrompt: m.cutscenePrompt,
     }));
-    for (const m of loaded.messages) {
-      const b = renderBubble(m.role, m.content, { id: m.id, cutsceneUrl: m.cutsceneUrl });
+    for (const m of currentMessages) {
+      const b = renderBubble(m.role, m.content, {
+        id: m.id, cutsceneUrl: m.cutsceneUrl,
+        characterId: m.characterId || null,
+        speakerName: m.role === "assistant" ? speakerLabelFor(m) : null,
+      });
       b.dataset.id = m.id;
     }
     refreshAllActionVisibility();
     updateChatSubtitle();
+    refreshSpeakerPicker();   // show/hide + populate the composer's "Reply as" picker
+    // Kick off any avatar generations needed for this chat's roster.
+    // Backgrounds — bubbles repaint as each lands.
+    ensureRosterAvatars();
     enableInput(true);
     scrollChatToBottom();
     updateTrackedBtnState();
     await setMisc("currentChatId", chatId);
+  }
+
+  // Resolve the display name for an assistant message. Priority:
+  //   1. The denormalized speakerName stamped on the message at write time
+  //      (survives library deletion).
+  //   2. The library record for the message's characterId.
+  //   3. The chat's first-roster name (defaulting to whoever's primary).
+  //   4. The global character name (single-character fallback).
+  function speakerLabelFor(message) {
+    if (message && message.speakerName) return message.speakerName;
+    if (message && message.characterId) {
+      const r = chatRoster.get(message.characterId);
+      if (r && r.name) return r.name;
+    }
+    // Fall through: prefer first roster member name, else global character.
+    for (const id of (currentChat && currentChat.characterIds) || []) {
+      const r = chatRoster.get(id);
+      if (r && r.name) return r.name;
+    }
+    return character.name || "";
+  }
+
+  // Show/hide and populate the composer's "Reply as" picker. Only
+  // visible when the current chat's roster has 2+ characters — for
+  // single-character chats it stays hidden so the UI is identical to
+  // the pre-multichar experience. Always sync with `nextReplyCharacterId`.
+  function refreshSpeakerPicker() {
+    const row = $("speakerRow");
+    const sel = $("speakerSelect");
+    const addBtn = $("addCharacterBtn");
+    if (!row || !sel) return;
+    const ids = (currentChat && Array.isArray(currentChat.characterIds))
+      ? currentChat.characterIds.filter(id => chatRoster.has(id))
+      : [];
+    // Three states the row can be in:
+    //   - empty roster (legacy single-character chats with no library
+    //     entry): hide the row entirely.
+    //   - solo roster (1 character): show only the +Add button.
+    //   - multi roster (2+): show the "Reply as:" label + dropdown +
+    //     +Add button.
+    row.classList.toggle("solo", ids.length === 1);
+    if (ids.length === 0) {
+      row.hidden = true;
+      sel.innerHTML = "";
+      return;
+    }
+    row.hidden = false;
+    sel.innerHTML = "";
+    if (ids.length >= 2) {
+      for (const id of ids) {
+        const r = chatRoster.get(id);
+        if (!r) continue;
+        const o = document.createElement("option");
+        o.value = String(id);
+        o.textContent = r.name || `(untitled #${id})`;
+        if (id === nextReplyCharacterId) o.selected = true;
+        sel.appendChild(o);
+      }
+    }
+    // The +Add button is always reachable when the row is shown. We
+    // disable it if the library has no additional characters available.
+    // Async check kicked off — result lands later, button enables/disables.
+    if (addBtn) {
+      addBtn.disabled = false;
+      listCharacters().then(all => {
+        const inRoster = new Set(ids);
+        const candidates = all.filter(c => !inRoster.has(c.id));
+        addBtn.disabled = candidates.length === 0;
+        addBtn.title = candidates.length === 0
+          ? "Library has no additional characters. Create one in Settings → CHARACTER."
+          : "Bring a new character into this scene";
+      }).catch(() => {});
+    }
+  }
+
+  // User picked a different replier. Persist on the chat row so it
+  // survives reloads (each chat remembers its last "who speaks next").
+  if ($("speakerSelect")) {
+    $("speakerSelect").addEventListener("change", async () => {
+      const sel = $("speakerSelect");
+      const id = parseInt(sel.value, 10);
+      if (!id || !chatRoster.has(id)) return;
+      nextReplyCharacterId = id;
+      if (currentChat) {
+        currentChat.nextReplyCharacterId = id;
+        try { await db.chats.update(currentChat.id, { nextReplyCharacterId: id }); }
+        catch (e) { console.warn("[speaker] couldn't persist nextReplyCharacterId:", e); }
+      }
+    });
+  }
+
+  // +Add character: open the picker, then on confirm, bring the
+  // picked character into the current chat's roster.
+  if ($("addCharacterBtn")) {
+    $("addCharacterBtn").onclick = async () => {
+      if (!currentChat) return;
+      try {
+        const all = await listCharacters();
+        const inRoster = new Set(currentChat.characterIds || []);
+        const candidates = all.filter(c => !inRoster.has(c.id));
+        const picked = await pickCharacterToAddAsync(candidates);
+        if (!picked) return;
+        await bringCharacterIntoScene(picked);
+      } catch (e) {
+        showError("addChar", e);
+      }
+    };
+  }
+
+  // Show the cast picker modal. Resolves to:
+  //   - an array of character ids (in pick order) if confirmed
+  //   - null if cancelled
+  // Default-ticks the current primary. Each row is itself a click target
+  // (the whole row toggles the checkbox) for mobile-friendly tapping.
+  function pickCastAsync(allCast, defaultPrimaryId) {
+    return new Promise((resolve) => {
+      const list = $("castPickerList");
+      list.innerHTML = "";
+      // Order: default primary first, then the rest by creation order.
+      const ordered = [...allCast].sort((a, b) => {
+        if (a.id === defaultPrimaryId) return -1;
+        if (b.id === defaultPrimaryId) return 1;
+        return (a.createdAt || 0) - (b.createdAt || 0);
+      });
+      // Local state — we map id → checked. The first checked id is the
+      // primary, which we visually highlight as a "PRIMARY" badge.
+      const checked = new Map();
+      checked.set(defaultPrimaryId || ordered[0].id, true);
+
+      function render() {
+        list.innerHTML = "";
+        // Recompute the visual primary = first ticked in the rendered order.
+        let visualPrimary = null;
+        for (const c of ordered) {
+          if (checked.get(c.id)) { visualPrimary = c.id; break; }
+        }
+        for (const c of ordered) {
+          const row = document.createElement("label");
+          row.className = "castPickRow";
+          const cb = document.createElement("input");
+          cb.type = "checkbox";
+          cb.checked = !!checked.get(c.id);
+          cb.addEventListener("change", () => {
+            checked.set(c.id, cb.checked);
+            // Re-render so the PRIMARY badge updates.
+            render();
+          });
+          const txt = document.createElement("div");
+          txt.style.flex = "1";
+          const nameEl = document.createElement("div");
+          nameEl.className = "castPickName";
+          nameEl.textContent = c.name || `(untitled #${c.id})`;
+          if (c.id === visualPrimary) {
+            const badge = document.createElement("span");
+            badge.className = "castPickPrimary";
+            badge.textContent = "PRIMARY";
+            nameEl.appendChild(badge);
+          }
+          const descEl = document.createElement("div");
+          descEl.className = "castPickDesc";
+          descEl.textContent = c.description || "(no description)";
+          txt.appendChild(nameEl);
+          txt.appendChild(descEl);
+          row.appendChild(cb);
+          row.appendChild(txt);
+          list.appendChild(row);
+        }
+      }
+      render();
+
+      function cleanup(answer) {
+        closeModal("castPickerModal");
+        $("castPickerConfirm").onclick = null;
+        $("castPickerCancel").onclick = null;
+        const modalEl = $("castPickerModal");
+        // The named backdrop listener is captured below — remove it on
+        // any exit path so it doesn't fire for a future picker session.
+        if (modalEl && cleanup._backdropListener) {
+          modalEl.removeEventListener("click", cleanup._backdropListener, true);
+          cleanup._backdropListener = null;
+        }
+        resolve(answer);
+      }
+      $("castPickerConfirm").onclick = () => {
+        // Collect in render order (so visual order = roster order).
+        const picked = [];
+        for (const c of ordered) {
+          if (checked.get(c.id)) picked.push(c.id);
+        }
+        cleanup(picked);
+      };
+      $("castPickerCancel").onclick = () => cleanup(null);
+      // ✕ button (data-close) also closes — wire the same cancel resolution.
+      const closeBtn = document.querySelector('#castPickerModal [data-close="castPickerModal"]');
+      if (closeBtn) closeBtn.onclick = () => cleanup(null);
+      // Backdrop click: the generic modal-click handler calls closeModal
+      // (which only manipulates classes), but our promise wouldn't
+      // resolve. Watch for the modal losing .open and treat it as cancel.
+      // MutationObserver is overkill — we just install a one-shot
+      // backdrop click that resolves null. Use a capture-phase listener
+      // so it fires before/alongside the generic one.
+      const modalEl = $("castPickerModal");
+      function onBackdrop(ev) {
+        if (ev.target === modalEl) {
+          cleanup(null);
+        }
+      }
+      cleanup._backdropListener = onBackdrop;
+      modalEl.addEventListener("click", onBackdrop, true);
+      openModal("castPickerModal");
+    });
+  }
+
+  // Show the add-character modal. Resolves to a character id (the
+  // picked one) on confirm, or null on cancel. `candidates` is the
+  // already-filtered list of library characters NOT in the current
+  // roster. If empty, the modal shows an "empty" state and only the
+  // CANCEL button is functional.
+  function pickCharacterToAddAsync(candidates) {
+    return new Promise((resolve) => {
+      const list = $("addCharList");
+      const empty = $("addCharEmpty");
+      const confirmBtn = $("addCharConfirm");
+      const cancelBtn = $("addCharCancel");
+      list.innerHTML = "";
+      let pickedId = null;
+
+      if (!candidates.length) {
+        list.style.display = "none";
+        empty.hidden = false;
+        confirmBtn.disabled = true;
+      } else {
+        list.style.display = "";
+        empty.hidden = true;
+        // Order by creation time (oldest first) — feels stable.
+        const ordered = [...candidates].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+        for (const c of ordered) {
+          const row = document.createElement("label");
+          row.className = "castPickRow";
+          const radio = document.createElement("input");
+          radio.type = "radio";
+          radio.name = "addCharPick";
+          radio.value = String(c.id);
+          radio.addEventListener("change", () => {
+            if (radio.checked) {
+              pickedId = c.id;
+              confirmBtn.disabled = false;
+            }
+          });
+          const txt = document.createElement("div");
+          txt.style.flex = "1";
+          const nameEl = document.createElement("div");
+          nameEl.className = "castPickName";
+          nameEl.textContent = c.name || `(untitled #${c.id})`;
+          const descEl = document.createElement("div");
+          descEl.className = "castPickDesc";
+          descEl.textContent = c.description || "(no description)";
+          txt.appendChild(nameEl);
+          txt.appendChild(descEl);
+          row.appendChild(radio);
+          row.appendChild(txt);
+          list.appendChild(row);
+        }
+        confirmBtn.disabled = true;
+      }
+
+      const modalEl = $("addCharModal");
+      function cleanup(answer) {
+        closeModal("addCharModal");
+        confirmBtn.onclick = null;
+        cancelBtn.onclick = null;
+        if (cleanup._backdropListener) {
+          modalEl.removeEventListener("click", cleanup._backdropListener, true);
+          cleanup._backdropListener = null;
+        }
+        resolve(answer);
+      }
+      confirmBtn.onclick = () => cleanup(pickedId);
+      cancelBtn.onclick = () => cleanup(null);
+      const closeBtn = modalEl.querySelector('[data-close="addCharModal"]');
+      if (closeBtn) closeBtn.onclick = () => cleanup(null);
+      function onBackdrop(ev) {
+        if (ev.target === modalEl) cleanup(null);
+      }
+      cleanup._backdropListener = onBackdrop;
+      modalEl.addEventListener("click", onBackdrop, true);
+      openModal("addCharModal");
+    });
+  }
+
+  // Bring a new character into the current scene. Appends their id to
+  // the chat's roster, rebuilds the cache, inserts a system note into
+  // the conversation, and kicks off avatar generation. Idempotent on
+  // characters already in the roster.
+  async function bringCharacterIntoScene(charId) {
+    if (!currentChat) return;
+    if (!Array.isArray(currentChat.characterIds)) currentChat.characterIds = [];
+    if (currentChat.characterIds.includes(charId)) return; // already in scene
+    const record = await getCharacterById(charId);
+    if (!record) return;
+    // Append to roster + persist.
+    currentChat.characterIds = [...currentChat.characterIds, charId];
+    try {
+      await db.chats.update(currentChat.id, { characterIds: currentChat.characterIds });
+    } catch (e) { showError("addChar.persist", e); return; }
+    // Refresh roster cache + composer picker.
+    chatRoster.set(charId, record);
+    // Make the new arrival the next speaker by default — usually what
+    // the user wants when adding a character. They can switch in the
+    // dropdown if they'd rather have someone else respond first.
+    nextReplyCharacterId = charId;
+    currentChat.nextReplyCharacterId = charId;
+    try { await db.chats.update(currentChat.id, { nextReplyCharacterId: charId }); }
+    catch (e) { console.warn("[addChar] couldn't persist nextReplyCharacterId:", e); }
+    refreshSpeakerPicker();
+    // Kick avatar generation for the new arrival (no-op if cached).
+    ensureAvatarForCharacter(record).catch(e => console.warn("[addChar] avatar:", e));
+    // Insert a system-style note as a real stored message so the AI
+    // sees it in conversation history. Role "system" — see speakerLabelFor
+    // and chatReply handling.
+    const noteText = `[${record.name || "A new character"} has joined the scene.]`;
+    try {
+      const noteMsg = await addMessage(currentChat.id, "system", noteText, {
+        characterId: charId,
+        speakerName: record.name || "",
+      });
+      currentMessages.push({
+        id: noteMsg.id, role: "system", content: noteText,
+        characterId: charId, speakerName: record.name || "",
+      });
+      renderBubble("system", noteText, { id: noteMsg.id });
+      refreshAllActionVisibility();
+      await touchChat(currentChat.id);
+    } catch (e) {
+      showError("addChar.note", e);
+    }
   }
 
   async function startNewScene() {
@@ -1971,6 +2668,38 @@
         return;
       }
     }
+
+    // Decide the roster for this new scene.
+    //
+    // - Library size 0: roster is empty (legacy single-character fallback;
+    //   `character` cache is used directly).
+    // - Library size 1: roster is that one character. No picker.
+    // - Library size 2+: open the cast picker so the user can choose
+    //   which subset to include. Default-tick the current primary.
+    //
+    // pickCastAsync returns either an array of ids (confirmed) or null
+    // (cancelled — we abort the new scene).
+    let rosterIds;
+    const allCast = await listCharacters();
+    const primaryId = await getMisc("currentCharacterId", null);
+    if (allCast.length === 0) {
+      rosterIds = [];
+    } else if (allCast.length === 1) {
+      rosterIds = [allCast[0].id];
+    } else {
+      const picked = await pickCastAsync(allCast, primaryId);
+      if (!picked) return;          // cancelled
+      if (picked.length === 0) {
+        // User unticked everything. Treat like single-character fallback
+        // pointing at the current primary so the scene can still start.
+        rosterIds = primaryId ? [primaryId] : [];
+      } else {
+        rosterIds = picked;
+      }
+    }
+    // Whoever is FIRST in the picked array becomes the scene's primary.
+    const newPrimaryId = rosterIds[0] || null;
+
     clearError();
     cancelStream();
     state = "WRITING";
@@ -1979,31 +2708,41 @@
 
     try {
       const chatId = newId();
-      // The new chat's roster starts with whichever character is the
-      // current primary (cached in misc:currentCharacterId). The
-      // saveCharacter call above (during settings save) ensures that
-      // id exists if the user has any character at all. Empty roster
-      // is allowed — falls through to using `character` directly,
-      // matching the pre-library behavior.
-      const primaryId = await getMisc("currentCharacterId", null);
+      // The new chat carries the picked roster verbatim. The primary
+      // (first ticked) determines the title + opening speaker.
       const newChat = {
         id: chatId,
         scenario: scenarioDefault || "",
         trackedInfo: "",          // story state — see updateTrackedInfo
         title: character.name ? `with ${character.name}` : "A new scene",
-        characterIds: primaryId ? [primaryId] : [],   // roster (schema v2)
+        characterIds: rosterIds,                       // roster (schema v2)
+        nextReplyCharacterId: newPrimaryId,            // "who speaks next" pointer
         createdAt: Date.now(),
         lastMessageAt: Date.now(),
       };
       await saveChat(newChat);
       currentChat = newChat;
       currentMessages = [];
+      // Sync the roster cache + composer picker for the new chat. The
+      // primary becomes the default "reply as" pick. Picker stays hidden
+      // for single-character rosters; visible if multiple are added later.
+      chatRoster = await buildRosterFor(currentChat);
+      nextReplyCharacterId = newPrimaryId && chatRoster.has(newPrimaryId) ? newPrimaryId : null;
+      refreshSpeakerPicker();
+      ensureRosterAvatars();
 
       renderEmptyState(false);
       clearChatPanel();
       updateChatSubtitle();
 
-      const bubble = renderBubble("assistant", "");
+      // The opening bubble carries the primary character's name as its
+      // speaker label so multi-character chats render correctly from the
+      // first message.
+      const openingSpeakerName = (newPrimaryId && chatRoster.get(newPrimaryId) && chatRoster.get(newPrimaryId).name) || character.name || "";
+      const bubble = renderBubble("assistant", "", {
+        speakerName: openingSpeakerName,
+        characterId: newPrimaryId || null,
+      });
 
       // If the character has a stored first message (typically from an
       // import), use it verbatim as the opening and skip the openScene AI
@@ -2021,7 +2760,13 @@
         character.firstMessage = "";
         await saveCharacter();
       } else {
-        const inflight = await root.openScene(character, personality, chatScenario(), chatTrackedInfo(), (chunk) => {
+        // The opening character should be the scene's primary (first
+        // ticked in the cast picker), not necessarily the global
+        // `character` — they may differ when the user picks a non-primary
+        // member of their library. Falls back to global `character` only
+        // if the roster is empty.
+        const openingChar = (newPrimaryId && chatRoster.get(newPrimaryId)) || character;
+        const inflight = await root.openScene(openingChar, personality, chatScenario(), chatTrackedInfo(), (chunk) => {
           if (myDraw !== drawId) return;
           appendBubbleText(bubble, chunk, "char");
         });
@@ -2047,9 +2792,20 @@
         finalizeBubble(bubble, finalText, "char");
       }
 
-      const savedMsg = await addMessage(chatId, "assistant", finalText);
-      currentMessages.push({ id: savedMsg.id, role: "assistant", content: finalText });
+      // Stamp the opening message with the primary character's id +
+      // name so multi-character chats render the right speaker label
+      // on this opening turn (and on every reload thereafter).
+      const savedMsg = await addMessage(chatId, "assistant", finalText, {
+        characterId: newPrimaryId || undefined,
+        speakerName: openingSpeakerName || undefined,
+      });
+      currentMessages.push({
+        id: savedMsg.id, role: "assistant", content: finalText,
+        characterId: newPrimaryId || null,
+        speakerName: openingSpeakerName || "",
+      });
       bubble.dataset.id = savedMsg.id;
+      if (newPrimaryId) bubble.dataset.characterId = String(newPrimaryId);
       refreshAllActionVisibility();
       await touchChat(chatId);
       await setMisc("currentChatId", chatId);
@@ -2104,17 +2860,37 @@
     const myTurn = ++drawId;
     enableInput(false);
     showTyping(true);
-    const bubble = renderBubble("assistant", "");
+
+    // Resolve which character is replying THIS turn. For single-character
+    // chats this is the global `character` (no roster); for multi-character
+    // chats it's the user's pick from the speaker dropdown.
+    const replier = resolveReplyingCharacter();
+    const replyingChar = replier.record;       // the {name, description, appearance} object
+    const replyingId = replier.id;             // the library id (or null)
+    const speakerName = (replyingChar && replyingChar.name) || character.name || "";
+    // Other roster members for the prompt's "ALSO IN THE SCENE" block.
+    // Empty for single-character chats — chatReply skips the block.
+    const others = otherCharactersForPrompt();
+
+    // Render the bubble with the speaker label AND character id up
+    // front so streaming bubbles show the right avatar from the first
+    // chunk. The avatar resolves via applyAvatar → chatRoster lookup
+    // → cached or pending state.
+    const bubble = renderBubble("assistant", "", {
+      speakerName: speakerName,
+      characterId: replyingId || null,
+    });
     showTyping(false);
 
     try {
       const inflight = await root.chatReply(
         currentMessages,
-        character, personality, chatScenario(), chatTrackedInfo(),
+        replyingChar, personality, chatScenario(), chatTrackedInfo(),
         (chunk) => {
           if (myTurn !== drawId) return;
           appendBubbleText(bubble, chunk, "char");
         },
+        others,
       );
       if (myTurn !== drawId) return;
 
@@ -2144,9 +2920,20 @@
       if (finalText && !aborted) {
         finalizeBubble(bubble, finalText, "char");
         try {
-          const savedMsg = await addMessage(currentChat.id, "assistant", finalText);
+          // Stamp the message with the replying character's id + name
+          // so future loads label it correctly even if the library entry
+          // is later deleted.
+          const savedMsg = await addMessage(currentChat.id, "assistant", finalText, {
+            characterId: replyingId || undefined,
+            speakerName: speakerName || undefined,
+          });
           bubble.dataset.id = savedMsg.id;
-          currentMessages.push({ id: savedMsg.id, role: "assistant", content: finalText });
+          if (replyingId) bubble.dataset.characterId = String(replyingId);
+          currentMessages.push({
+            id: savedMsg.id, role: "assistant", content: finalText,
+            characterId: replyingId || null,
+            speakerName: speakerName || "",
+          });
           refreshAllActionVisibility();
           await touchChat(currentChat.id);
           maybeAutoIllustrate(bubble, finalText, illustrateFlag, false);
@@ -2805,15 +3592,40 @@
       // otherwise updates the existing one in place. Also mirrors to the
       // legacy misc:character cache.
       await saveCharacter();
+      const savedId = await getMisc("currentCharacterId", null);
       closeModal("settingsModal");
-      // Relabel all character bubbles
+      // Relabel bubbles. In multi-character chats only the bubbles
+      // belonging to THIS character should be relabeled — other roster
+      // members' bubbles are unrelated to this edit. Empty roster falls
+      // through to the legacy "relabel all" behavior (the global
+      // character IS the only speaker).
       const newLabel = (character.name || "CHARACTER").toUpperCase();
-      document.querySelectorAll(".msg.char:not(.error) .msgWho").forEach(el => {
-        el.textContent = newLabel;
-      });
+      if (savedId && chatRoster.size > 0) {
+        // Refresh the roster cache with the updated record so subsequent
+        // bubble renders use the new name + appearance.
+        const updated = await getCharacterById(savedId);
+        if (updated) chatRoster.set(savedId, updated);
+        document.querySelectorAll(`.msg.char:not(.error)[data-character-id="${savedId}"] .msgWho`).forEach(el => {
+          el.textContent = newLabel;
+        });
+      } else {
+        // Legacy / single-character path.
+        document.querySelectorAll(".msg.char:not(.error) .msgWho").forEach(el => {
+          el.textContent = newLabel;
+        });
+      }
       updateChatSubtitle();
-      // Re-resolve avatar (may trigger generation)
+      // Legacy avatar resolution (kept for the user's current global
+      // character cache — used as a fallback for bubbles with no
+      // characterId).
       resolveCharAvatar();
+      // Multi-character: ensure the updated character gets a fresh
+      // avatar if its appearance changed. If hash matches the old one
+      // (only name/description changed), cache is reused.
+      if (savedId) {
+        const updated = chatRoster.get(savedId);
+        if (updated) ensureAvatarForCharacter(updated).then(() => refreshCharAvatars());
+      }
     } catch (e) {
       showError("saveCharacter", e);
     }
@@ -3018,7 +3830,11 @@
       await setMisc("currentChatId", null);
       currentChat = null;
       currentMessages = [];
+      // Roster is per-chat; with no chat, there's no roster.
+      chatRoster = new Map();
+      nextReplyCharacterId = null;
       clearChatPanel();
+      refreshSpeakerPicker();
       renderEmptyState(true);
       enableInput(false);
       updateTrackedBtnState();
@@ -3154,17 +3970,22 @@
       $("importActions").style.display = "flex";
       $("importActionsHint").style.display = "block";
       status.textContent = "";
-      // Smart Story backups go through a different restore path — disable the
-      // settings-only button since they're whole-app restores.
+      // Smart Story backups go through a different restore path — disable
+      // the per-character action buttons since they're whole-app restores.
       const settingsBtn = $("importAsSettings");
       const newChatBtn = $("importAsNewChat");
+      const libraryBtn = $("importAsLibrary");
       if (parsed.format === "tableau-backup") {
         settingsBtn.disabled = true;
         settingsBtn.title = "Smart Story backups are full app restores; the settings-only mode doesn't apply.";
+        libraryBtn.disabled = true;
+        libraryBtn.title = "Smart Story backups are full app restores; restore replaces your library entirely.";
         newChatBtn.textContent = "RESTORE BACKUP";
       } else {
         settingsBtn.disabled = false;
         settingsBtn.title = "";
+        libraryBtn.disabled = false;
+        libraryBtn.title = "";
         newChatBtn.textContent = "IMPORT & CONTINUE";
       }
     } catch (e) {
@@ -3209,14 +4030,69 @@
       // Trigger a fresh avatar for the new character.
       resolveCharAvatar();
       if (p.personality && p.personality.name) resolveUserAvatar();
-      // Re-render the open chat's labels in case there was one going.
+      // Re-render labels for the just-imported character only — other
+      // roster members in the active chat (if any) keep their labels.
+      // Same scoped-relabel pattern as charSave (multi-character safe).
       if (currentChat) {
         const newCharLabel = (character.name || "CHARACTER").toUpperCase();
-        document.querySelectorAll(".msg.char:not(.error) .msgWho").forEach(el => { el.textContent = newCharLabel; });
+        const savedId = await getMisc("currentCharacterId", null);
+        if (savedId && chatRoster.size > 0) {
+          // Refresh roster cache: if the imported character is in this
+          // chat's roster, swap in the updated record.
+          if (chatRoster.has(savedId)) {
+            const updated = await getCharacterById(savedId);
+            if (updated) chatRoster.set(savedId, updated);
+          }
+          document.querySelectorAll(`.msg.char:not(.error)[data-character-id="${savedId}"] .msgWho`).forEach(el => {
+            el.textContent = newCharLabel;
+          });
+        } else {
+          // Legacy / single-character path.
+          document.querySelectorAll(".msg.char:not(.error) .msgWho").forEach(el => { el.textContent = newCharLabel; });
+        }
         updateChatSubtitle();
       }
     } catch (e) {
       showError("import.settings", e);
+    }
+  };
+
+  // Library-only import: adds the imported character to the library as
+  // a new entry. Does NOT touch the current global character, does NOT
+  // start a new chat. Useful for building up a multi-character library
+  // from existing TavernAI / FurAI / ACC cards — import each one in
+  // turn, then start a multi-character scene with the picker.
+  //
+  // Drops any chat messages from the import — only the character record
+  // itself is added. (Messages can't usefully be attached to a library
+  // entry; they belong to a chat.)
+  $("importAsLibrary").onclick = async () => {
+    if (!pendingImport) return;
+    try {
+      const p = pendingImport;
+      const name = (p.character && p.character.name) || "";
+      const description = (p.character && p.character.description) || "";
+      const appearance = (p.character && p.character.appearance) || "";
+      if (!name && !description && !appearance) {
+        showError("import.library", "Nothing to add — the import has no character fields.");
+        return;
+      }
+      // Add to the library directly. Carries the first message so a
+      // future "use as current + new scene" path can use it; library
+      // entries store firstMessage even when nothing currently consumes it.
+      const created = await addCharacterToLibrary({
+        name, description, appearance,
+        firstMessage: p.openingMessage || "",
+      });
+      // Update the dropdown if the Settings panel is currently visible.
+      try { await refreshCharLibSelect(); } catch (e) {}
+      // Refresh the +Add button's enabled state in case the user is
+      // mid-scene and the imported character is now a candidate to bring in.
+      refreshSpeakerPicker();
+      closeModal("importModal");
+      setStatus(`Added "${created.name || "character"}" to your library. Open Settings → CHARACTER to pick them, or press ✚ Add in a scene to bring them in.`);
+    } catch (e) {
+      showError("import.library", e);
     }
   };
 
@@ -3247,6 +4123,12 @@
         };
         await savePersonality();
       }
+      // The library now has the imported character (saveCharacter
+      // creates a fresh entry when no currentCharacterId exists). Look
+      // it up to stamp the new chat's roster.
+      const importedCharacterId = await getMisc("currentCharacterId", null);
+      const importedSpeakerName = (character.name || "").trim();
+
       // 2. Create a fresh chat carrying the imported scenario + trackedInfo.
       const chatId = newId();
       const newChat = {
@@ -3254,6 +4136,8 @@
         scenario: p.scenario || scenarioDefault || "",
         trackedInfo: p.trackedInfo || "",
         title: p.title || (character.name ? `with ${character.name}` : "Imported scene"),
+        characterIds: importedCharacterId ? [importedCharacterId] : [],
+        nextReplyCharacterId: importedCharacterId || null,
         createdAt: Date.now(),
         lastMessageAt: Date.now(),
       };
@@ -3261,6 +4145,9 @@
 
       // 3. Seed messages. If the parser surfaced an openingMessage but no
       // messages array, treat the opening as the first assistant message.
+      // Stamp assistant messages with the imported character's id + name
+      // so labels render correctly on reload (and survive library
+      // deletion via the denormalized speakerName).
       const seedMessages = [];
       if (p.openingMessage && (!p.messages || p.messages.length === 0)) {
         seedMessages.push({ role: "assistant", content: p.openingMessage, createdAt: Date.now() });
@@ -3278,9 +4165,16 @@
         });
       }
       for (const m of seedMessages) {
-        await db.messages.add({
+        const rec = {
           chatId, role: m.role, content: m.content, createdAt: m.createdAt,
-        });
+        };
+        // Stamp only assistant messages — user messages are spoken by
+        // the user persona, not a library character.
+        if (m.role === "assistant" && importedCharacterId) {
+          rec.characterId = importedCharacterId;
+          if (importedSpeakerName) rec.speakerName = importedSpeakerName;
+        }
+        await db.messages.add(rec);
       }
       await db.chats.update(chatId, { lastMessageAt: Date.now() });
 
@@ -3500,10 +4394,16 @@
   function buildAccChatLogs(messages, botName, userName) {
     const bot = (botName || "{{char}}").trim() || "{{char}}";
     const user = (userName || "{{user}}").trim() || "{{user}}";
-    return messages.map(m => {
-      const speaker = m.role === "user" ? user : bot;
-      return `${speaker}: ${m.content}`;
-    }).join("\n\n");
+    return messages
+      // ACC has no concept of system/narrator messages. Drop them rather
+      // than attributing them to the character (which would distort the
+      // conversation). They survive in Smart Story backups, just not in
+      // the cross-app ACC format.
+      .filter(m => m.role !== "system")
+      .map(m => {
+        const speaker = m.role === "user" ? user : bot;
+        return `${speaker}: ${m.content}`;
+      }).join("\n\n");
   }
 
   // Build an ai-character-chat character export from current state. Carries

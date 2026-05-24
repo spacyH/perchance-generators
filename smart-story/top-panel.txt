@@ -116,7 +116,21 @@ async openScene(character, personality, scenario, trackedInfo, onChunk) =>
 // 14 messages. Returns the same { stream, charName, error? } shape.
 //
 // `trackedInfo` is a freeform string of story state (see openScene docs).
-async chatReply(messages, character, personality, scenario, trackedInfo, onChunk) =>
+//
+// Multi-character support (schema v2): if any past assistant message
+// carries a `speakerName` field (set by the HTML side from
+// message.characterId → library lookup), it labels that message in the
+// conversation rendering instead of the current `charName`. The
+// `character` argument is always WHO IS REPLYING THIS TURN — the AI
+// plays this character, regardless of who spoke previously. Old
+// single-character chats have no speakerName on their messages and so
+// fall through to the legacy behavior automatically.
+//
+// `otherCharacters` (optional): array of {name, description} for OTHER
+// characters present in the scene besides the replying one. Used to
+// build a brief "also in the scene" context block so the AI knows who
+// these other speakers are. Pass an empty array (or omit) to skip.
+async chatReply(messages, character, personality, scenario, trackedInfo, onChunk, otherCharacters) =>
   let charDesc = (character && character.description) ? String(character.description).trim() : "";
   let charName = (character && character.name) ? String(character.name).trim() : "Character";
   let scenarioText = scenario ? String(scenario).trim() : "";
@@ -145,9 +159,35 @@ async chatReply(messages, character, personality, scenario, trackedInfo, onChunk
     tracked,
   ].join("\n") : "";
 
+  // OTHER CHARACTERS block — only built when there's a multi-character
+  // roster. Single-character chats skip this entirely so the prompt is
+  // identical to the pre-multichar behavior.
+  let othersBlock = "";
+  if(Array.isArray(otherCharacters) && otherCharacters.length > 0) {
+    let lines = ["", "ALSO IN THE SCENE (you are NOT these characters — they are separate people you might interact with):"];
+    for(let oc of otherCharacters) {
+      let n = (oc && oc.name) ? String(oc.name).trim() : "";
+      let d = (oc && oc.description) ? String(oc.description).trim() : "";
+      if(n || d) {
+        lines.push(`  • ${n || "(unnamed)"}${d ? ": " + d.replace(/\s+/g, " ").slice(0, 200) : ""}`);
+      }
+    }
+    if(lines.length > 2) othersBlock = lines.join("\n");
+  }
+
   let trimmed = (messages || []).slice(-14);
   let convo = trimmed.map(m => {
-    let who = m.role === "user" ? seekerLabel : charName;
+    // System messages are scene notes (e.g. "[Lyle has joined the
+    // scene.]"). Render them as their own line with no speaker prefix
+    // so the AI reads them as narrator-style context, not as something
+    // a character said.
+    if(m.role === "system") {
+      return String(m.content).replace(/\s+/g, " ").trim();
+    }
+    // Multi-character: assistant messages may carry an explicit
+    // speakerName. Fall back to the replying character's name for old
+    // single-character data.
+    let who = m.role === "user" ? seekerLabel : (m.speakerName || charName);
     return `[[${who}]]: ${String(m.content).replace(/\s+/g, " ").trim()}`;
   }).join("\n");
 
@@ -157,6 +197,7 @@ async chatReply(messages, character, personality, scenario, trackedInfo, onChunk
     `You are ${charName}.`,
     charDesc || "A character in a story.",
     personaBlock,
+    othersBlock,
     scenarioBlock,
     trackedBlock,
     "",
@@ -172,6 +213,7 @@ async chatReply(messages, character, personality, scenario, trackedInfo, onChunk
     "- Do not break character. Do not mention being an AI, a model, or",
     "  a computer.",
     "- Do not write the other person's response.",
+    othersBlock ? "- Do not write or speak for the OTHER characters listed above. They are separate people. You may notice them, react to them, address them — but their words and actions belong to them alone." : "",
     "",
     "VISUAL BEAT TAG: if your reply contains a significant visual moment",
     "worth illustrating — a new setting, a striking action or pose, a",
@@ -386,7 +428,12 @@ listArtStyles() =>
 // Director now writes ONLY content (subject, action, composition,
 // setting, lighting); the prefix supplies the medium/style and the
 // negative prompt supplies what to avoid.
-async generateCutscene(focusMessage, recentMessages, character, personality, scenario, artStyle) =>
+// Optional `otherCharacters`: array of {name, appearance} for OTHER
+// characters who might appear visually in the scene besides the
+// `character` argument (the active speaker). Used to build a fuller
+// [CAST] block so multi-character cutscenes preserve visual identity
+// for each roster member. Single-character chats omit it.
+async generateCutscene(focusMessage, recentMessages, character, personality, scenario, artStyle, otherCharacters) =>
   let charName = (character && character.name) ? String(character.name).trim() : "";
   let charAppr = (character && character.appearance) ? String(character.appearance).trim() : "";
   let pName    = (personality && personality.name) ? String(personality.name).trim() : "";
@@ -410,16 +457,46 @@ async generateCutscene(focusMessage, recentMessages, character, personality, sce
   if(!focus) return { url: "", prompt: "", error: "no focus message to illustrate" };
 
   // Build a compact context block from the last 3 messages (or fewer).
+  // Multi-character: respect each message's speakerName if present, so
+  // the AI sees who said what when scenes have multiple AI characters.
   let recent = Array.isArray(recentMessages) ? recentMessages.slice(-3) : [];
   let recentText = recent.map(m => {
-    let who = m.role === "user" ? (pName || "User") : (charName || "Character");
+    // System messages are narrator-style scene notes. Render without
+    // a speaker prefix so the director AI reads them as context.
+    if(m.role === "system") {
+      return String(m.content || "").replace(/\s+/g, " ").trim();
+    }
+    let who;
+    if(m.role === "user") {
+      who = pName || "User";
+    } else {
+      who = m.speakerName || charName || "Character";
+    }
     return `${who}: ${String(m.content || "").replace(/\s+/g, " ").trim()}`;
   }).join("\n");
 
-  let castBlock = [
-    charName ? `${charName} (the character): ${charAppr || "appearance not specified"}` : "",
-    (pName || pAppr) ? `${pName || "User"} (the person across from them): ${pAppr || "appearance not specified"}` : "",
-  ].filter(Boolean).join("\n");
+  // Cast block: the active character + the user + any OTHER roster
+  // members supplied by the caller. Each line lists name and appearance
+  // (or a placeholder). Multi-character scenes get every speaker's
+  // visual identity in the prompt — the director can then preserve
+  // appearance continuity if the scene shows more than one of them.
+  let castLines = [];
+  if(charName || charAppr) {
+    castLines.push(`${charName || "Character"} (the active speaker): ${charAppr || "appearance not specified"}`);
+  }
+  if(Array.isArray(otherCharacters)) {
+    for(let oc of otherCharacters) {
+      let ocName = (oc && oc.name) ? String(oc.name).trim() : "";
+      let ocAppr = (oc && oc.appearance) ? String(oc.appearance).trim() : "";
+      if(ocName || ocAppr) {
+        castLines.push(`${ocName || "(unnamed)"} (also in the scene): ${ocAppr || "appearance not specified"}`);
+      }
+    }
+  }
+  if(pName || pAppr) {
+    castLines.push(`${pName || "User"} (the person across from them): ${pAppr || "appearance not specified"}`);
+  }
+  let castBlock = castLines.join("\n");
 
   let instruction = [
     "You are a Cutscene Director writing image-prompt CONTENT for a",
