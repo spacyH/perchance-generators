@@ -42,6 +42,7 @@
     border: 1px solid var(--surface-3); border-radius: 8px;
     cursor: pointer; display: flex; align-items: center; justify-content: center;
     font-size: 18px; transition: all 150ms;
+    position: relative;
   }
   .titleBtn:hover { color: var(--accent-hi); border-color: var(--accent-dim); }
   /* Visual hint that there's saved tracked-info on this scene. The
@@ -50,6 +51,16 @@
     color: var(--accent-hi);
     border-color: var(--accent-dim);
     background: rgba(192, 168, 120, 0.08);
+  }
+  /* Tiny counter badge in the upper-right of a titleBtn — used by the
+     profile button to indicate unviewed achievement unlocks. */
+  .titleBtnBadge {
+    position: absolute; top: -4px; right: -4px;
+    min-width: 16px; height: 16px; padding: 0 4px;
+    background: var(--accent); color: var(--ink-on-accent, #0b1220);
+    font-size: 10px; font-weight: 700; line-height: 16px;
+    border-radius: 8px; text-align: center;
+    pointer-events: none;
   }
   #chatPanel {
     flex: 1; overflow-y: auto; padding: 16px 14px 8px;
@@ -194,6 +205,15 @@
   .actBtn:hover { background: var(--surface-2); color: var(--ink); border-color: var(--accent-dim); }
   .actBtn.danger:hover { background: rgba(212,115,107,0.12); color: var(--err); border-color: var(--err); }
   .actBtn:disabled { opacity: 0.45; cursor: not-allowed; }
+  /* Continue-as menu — overlays an invisible <select> on top of the
+     button so the native picker handles positioning + touch. */
+  .continueAsWrap {
+    position: relative; display: inline-block;
+  }
+  .continueAsSelect {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer;
+    font-family: inherit; font-size: inherit;
+  }
   .msg.editing .msgActions { display: none; }
   /* Suggestion strip — "what to do/say next" buttons under the latest reply. */
   .suggestStrip {
@@ -601,6 +621,81 @@
     display: inline-block; margin-left: 6px;
     vertical-align: middle;
   }
+  /* Profile modal — level banner, stats list, achievement grid. */
+  #profileSummary {
+    margin-bottom: 18px; padding: 16px;
+    background: var(--surface-2); border: 1px solid var(--surface-3); border-radius: 10px;
+  }
+  #profileLevel {
+    display: flex; align-items: center; gap: 14px;
+  }
+  #profileLevel .lvlBig {
+    font-family: 'Merienda', 'Lora', serif; font-size: 48px; font-weight: 700;
+    color: var(--accent-hi); line-height: 1; min-width: 64px; text-align: center;
+  }
+  #profileLevel .lvlMeta { flex: 1; }
+  #profileLevel .lvlLabel {
+    font-size: 10px; letter-spacing: 2px; color: var(--ink-dim);
+    text-transform: uppercase;
+  }
+  #profileLevel .lvlXp {
+    font-size: 16px; font-weight: 600; color: var(--ink); margin-top: 2px;
+  }
+  .lvlBar {
+    margin-top: 12px; height: 6px; background: var(--surface);
+    border: 1px solid var(--surface-3); border-radius: 4px; overflow: hidden;
+  }
+  .lvlBarFill {
+    height: 100%; background: linear-gradient(90deg, var(--accent-dim), var(--accent-hi));
+    transition: width 600ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  #profileStats {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+    margin-bottom: 18px;
+  }
+  .statTile {
+    padding: 10px 12px; background: var(--surface-2);
+    border: 1px solid var(--surface-3); border-radius: 8px;
+  }
+  .statTile .statValue {
+    font-size: 22px; font-weight: 700; color: var(--ink); line-height: 1.1;
+  }
+  .statTile .statLabel {
+    font-size: 11px; color: var(--ink-dim); letter-spacing: 0.5px;
+    text-transform: uppercase; margin-top: 4px;
+  }
+  .lvlSectionLabel {
+    font-size: 11px; letter-spacing: 2px; color: var(--ink-dim);
+    text-transform: uppercase; margin: 4px 0 10px;
+  }
+  #achievementGrid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+  }
+  .achCard {
+    padding: 10px 12px; background: var(--surface-2);
+    border: 1px solid var(--surface-3); border-radius: 8px;
+    position: relative; transition: all 150ms;
+  }
+  .achCard.locked { opacity: 0.42; }
+  .achCard.unlocked { border-color: var(--accent-dim); background: rgba(124,179,255,0.04); }
+  .achCard .achIcon {
+    font-size: 22px; line-height: 1;
+  }
+  .achCard .achTitle {
+    font-size: 12px; font-weight: 600; color: var(--ink); margin-top: 6px;
+  }
+  .achCard.locked .achTitle { color: var(--ink-faint); }
+  .achCard .achDesc {
+    font-size: 11px; color: var(--ink-dim); margin-top: 2px;
+    line-height: 1.35;
+  }
+  .achCard .achNew {
+    position: absolute; top: 6px; right: 6px;
+    font-size: 9px; font-weight: 700; letter-spacing: 1px;
+    color: var(--ink-on-accent, #0b1220); background: var(--accent);
+    padding: 2px 5px; border-radius: 3px;
+  }
   .assistRow { margin-top: 6px; padding-top: 12px; border-top: 1px dashed var(--surface-3); }
   .assistBtn {
     display: flex; gap: 8px; align-items: center; width: 100%;
@@ -761,6 +856,7 @@
     </div>
     <button id="trackedBtn" class="titleBtn" title="Tracked story state">📋</button>
     <button id="vnBtn" class="titleBtn" title="Visual Novel mode">🎭</button>
+    <button id="profileBtn" class="titleBtn" title="Profile &amp; achievements"><span>🏆</span><span class="titleBtnBadge" id="profileBadge" hidden>0</span></button>
     <button id="settingsBtn" class="titleBtn" title="Settings">⚙</button>
   </div>
 
@@ -1187,6 +1283,37 @@
   </div>
 </div>
 
+<!-- Profile / Achievements modal. Live-computed stats + a grid of
+     achievements, locked (greyed) until unlocked. Reached via the 🏆
+     button in the title bar. -->
+<div id="profileModal" class="modal" role="dialog" aria-label="Profile and achievements">
+  <div class="modalCard">
+    <div class="modalHeader">
+      <div class="modalTitle">🏆 Profile</div>
+      <button class="modalClose" data-close="profileModal">CLOSE</button>
+    </div>
+    <div class="modalBody">
+      <div id="profileSummary">
+        <div id="profileLevel">
+          <div class="lvlBig">—</div>
+          <div class="lvlMeta">
+            <div class="lvlLabel">LEVEL</div>
+            <div id="profileXp" class="lvlXp">0 XP</div>
+          </div>
+        </div>
+        <div class="lvlBar"><div id="profileLevelBar" class="lvlBarFill"></div></div>
+        <div id="profileNextLevel" class="hint" style="margin-top:6px; text-align:center; font-size: 11px;"></div>
+      </div>
+      <div id="profileStats"></div>
+      <div class="lvlSectionLabel">ACHIEVEMENTS</div>
+      <div id="achievementGrid"></div>
+      <div id="profileAcksHint" class="hint" style="margin-top: 12px; font-size: 11px; text-align: center;">
+        Achievements unlock as you use Smart Story. They're a lightweight reflection of your usage — no scores leak anywhere, this is just for you.
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="lightbox" role="dialog" aria-label="Image preview">
   <button id="lightboxClose">✕ CLOSE</button>
   <img id="lightboxImg" alt="">
@@ -1421,6 +1548,14 @@
   // hash. Set of in-flight hash keys.
   const inFlightAvatars = new Set();
 
+  // Profile/achievement state. Stats are computed live from the DB on
+  // demand (no separate counters); `seenAchievementIds` is the only
+  // persisted bit — tracks which unlocks the user has acknowledged so
+  // we can show a "NEW!" badge on the title-bar 🏆 button.
+  let seenAchievementIds = [];
+  let cachedStats = null;       // last computed stats (for the title badge)
+  let pendingAchievementCount = 0;  // unviewed unlocked achievements (updates the badge)
+
   // =====================================================================
   // STORAGE HELPERS
   // =====================================================================
@@ -1464,6 +1599,7 @@
       createdAt: Date.now(),
     };
     const id = await db.characters.add(row);
+    bumpAchievements();   // could unlock cast-of-one / troupe / ensemble
     return { id, ...row };
   }
   async function updateCharacterInLibrary(id, updates) {
@@ -1502,7 +1638,14 @@
   // "who is replying this turn." Falls through to the global `character`
   // when the chat has no roster (legacy data) or when the picked id
   // doesn't resolve. Returns { id, record } — id may be null.
-  function resolveReplyingCharacter() {
+  // Resolve which character is replying. When `overrideId` is provided
+  // and valid, that character speaks instead of the dropdown's pick.
+  // Used by "Continue as X" to swap speakers without mutating
+  // nextReplyCharacterId. Returns { id, record }.
+  function resolveReplyingCharacter(overrideId) {
+    if (overrideId && chatRoster.has(overrideId)) {
+      return { id: overrideId, record: chatRoster.get(overrideId) };
+    }
     if (nextReplyCharacterId && chatRoster.has(nextReplyCharacterId)) {
       return { id: nextReplyCharacterId, record: chatRoster.get(nextReplyCharacterId) };
     }
@@ -1519,8 +1662,9 @@
   // For multi-character chats, list every roster member that is NOT the
   // current replier — used by chatReply to inject an "ALSO IN THE SCENE"
   // context block. Returns an array of {name, description}, never null.
-  function otherCharactersForPrompt() {
-    const replier = resolveReplyingCharacter();
+  // `overrideId` mirrors resolveReplyingCharacter's argument.
+  function otherCharactersForPrompt(overrideId) {
+    const replier = resolveReplyingCharacter(overrideId);
     const out = [];
     if (!currentChat || !Array.isArray(currentChat.characterIds)) return out;
     for (const id of currentChat.characterIds) {
@@ -1621,7 +1765,10 @@
     const msgs = await db.messages.where("chatId").equals(id).sortBy("createdAt");
     return { chat, messages: msgs };
   }
-  async function saveChat(chat) { await db.chats.put(chat); }
+  async function saveChat(chat) {
+    await db.chats.put(chat);
+    bumpAchievements();   // could unlock ensemble-act, also affects level via chat count
+  }
   async function addMessage(chatId, role, content, extras) {
     const m = { chatId, role, content, createdAt: Date.now() };
     if (extras && extras.cutsceneUrl) m.cutsceneUrl = extras.cutsceneUrl;
@@ -1635,10 +1782,15 @@
     if (extras && extras.speakerName) m.speakerName = extras.speakerName;
     const id = await db.messages.add(m);
     m.id = id;
+    // Profile: stats might have crossed an achievement threshold.
+    // Fire-and-forget; the bump itself is cheap and the badge update
+    // is purely UI.
+    bumpAchievements();
     return m;
   }
   async function updateMessageCutscene(msgId, url, prompt) {
     await db.messages.update(msgId, { cutsceneUrl: url, cutscenePrompt: prompt });
+    bumpAchievements();   // could unlock first-light / gallery
   }
   async function touchChat(chatId) { await db.chats.update(chatId, { lastMessageAt: Date.now() }); }
   // Save the tracked info of the current chat to disk. The in-memory
@@ -2030,7 +2182,111 @@
     if (isChar && hasPrecedingUser(bubble)) {
       slot.appendChild(mkActBtn("↻ regen", "Regenerate (drops following messages)", () => regenerateFromBubble(bubble)));
     }
+    // "↻ Continue as X" — multi-character scenes only, on the LATEST
+    // assistant bubble only. Generates a fresh reply spoken by a
+    // different roster character without requiring a user message in
+    // between. Useful for character-to-character moments.
+    if (isChar && isLatestAssistantBubble(bubble)) {
+      const otherIds = continueAsCandidatesForBubble(bubble);
+      if (otherIds.length === 1) {
+        // Direct single button.
+        const r = chatRoster.get(otherIds[0]);
+        if (r) {
+          slot.appendChild(mkActBtn(
+            `↻ Continue as ${r.name || "(unnamed)"}`,
+            `Generate a reply from ${r.name || "the other character"} continuing this scene`,
+            () => continueAsCharacter(otherIds[0]),
+          ));
+        }
+      } else if (otherIds.length >= 2) {
+        // Dropdown for picking the speaker.
+        slot.appendChild(mkContinueAsMenu(otherIds));
+      }
+    }
     slot.appendChild(mkActBtn("✕ delete", "Delete this message", () => deleteBubble(bubble), true));
+  }
+
+  // The latest assistant bubble in the current chat. Used to gate
+  // "Continue as X" — it only makes sense on the most recent reply
+  // (anything earlier would insert in the middle, which conflicts with
+  // the existing chat structure).
+  function isLatestAssistantBubble(bubble) {
+    const id = parseInt(bubble.dataset.id, 10);
+    if (!id) return false;
+    // Find the last assistant message by walking from the end of
+    // currentMessages. (We skip system/user messages.)
+    for (let i = currentMessages.length - 1; i >= 0; i--) {
+      const m = currentMessages[i];
+      if (m.role === "assistant") return m.id === id;
+    }
+    return false;
+  }
+
+  // Returns the array of roster character ids who are NOT the speaker
+  // of this bubble (i.e. candidates for "continue as"). Empty if the
+  // chat has only one roster character.
+  function continueAsCandidatesForBubble(bubble) {
+    if (!currentChat || !Array.isArray(currentChat.characterIds)) return [];
+    const ids = currentChat.characterIds.filter(id => chatRoster.has(id));
+    if (ids.length < 2) return [];
+    const id = parseInt(bubble.dataset.id, 10);
+    const msg = currentMessages.find(m => m.id === id);
+    const speakerId = msg && msg.characterId;
+    return ids.filter(cid => cid !== speakerId);
+  }
+
+  // Build a small dropdown-style continue-as control. Renders as a
+  // button that opens a popover with one entry per candidate; picking
+  // an entry triggers the generation. Uses a native <select> for the
+  // popover — minimal, accessible, mobile-friendly.
+  function mkContinueAsMenu(candidateIds) {
+    const wrap = document.createElement("span");
+    wrap.className = "continueAsWrap";
+    const btn = document.createElement("button");
+    btn.className = "actBtn";
+    btn.type = "button";
+    btn.textContent = "↻ Continue as ▾";
+    btn.title = "Generate a reply from another character continuing this scene";
+    const sel = document.createElement("select");
+    sel.className = "continueAsSelect";
+    sel.setAttribute("aria-label", "Choose which character continues");
+    // First option is a placeholder so opening the picker doesn't
+    // accidentally trigger on the first item.
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "— choose —";
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    sel.appendChild(placeholder);
+    for (const cid of candidateIds) {
+      const r = chatRoster.get(cid);
+      if (!r) continue;
+      const o = document.createElement("option");
+      o.value = String(cid);
+      o.textContent = r.name || `(untitled #${cid})`;
+      sel.appendChild(o);
+    }
+    sel.addEventListener("change", () => {
+      const id = parseInt(sel.value, 10);
+      if (id) continueAsCharacter(id);
+    });
+    // Stack the button + select: the button is visual, the select is
+    // overlaid invisibly to catch clicks. Native picker handles
+    // positioning + touch on mobile.
+    wrap.appendChild(btn);
+    wrap.appendChild(sel);
+    return wrap;
+  }
+
+  // Generate a new assistant reply spoken by the given character. The
+  // current conversation is preserved; the new reply is appended.
+  // Implemented as a thin wrapper around streamAssistantReply with a
+  // speaker override — doesn't touch the dropdown's `nextReplyCharacterId`
+  // so the user's choice for their NEXT message is unaffected.
+  function continueAsCharacter(charId) {
+    if (state === "WRITING") return;
+    if (!charId || !chatRoster.has(charId)) return;
+    streamAssistantReply(charId);
   }
   function mkActBtn(label, title, onclick, danger) {
     const b = document.createElement("button");
@@ -2854,7 +3110,12 @@
     await streamAssistantReply();
   }
 
-  async function streamAssistantReply() {
+  // Stream an assistant reply. When `speakerOverrideId` is provided,
+  // that roster character speaks instead of whoever the dropdown is
+  // currently pointing at (used by "Continue as X" — see
+  // continueAsCharacter). The override is local to this call; the
+  // dropdown's nextReplyCharacterId is not modified.
+  async function streamAssistantReply(speakerOverrideId) {
     if (state === "WRITING") return;
     state = "WRITING";
     const myTurn = ++drawId;
@@ -2863,14 +3124,15 @@
 
     // Resolve which character is replying THIS turn. For single-character
     // chats this is the global `character` (no roster); for multi-character
-    // chats it's the user's pick from the speaker dropdown.
-    const replier = resolveReplyingCharacter();
+    // chats it's the user's pick from the speaker dropdown, OR an explicit
+    // override passed by "Continue as X".
+    const replier = resolveReplyingCharacter(speakerOverrideId);
     const replyingChar = replier.record;       // the {name, description, appearance} object
     const replyingId = replier.id;             // the library id (or null)
     const speakerName = (replyingChar && replyingChar.name) || character.name || "";
     // Other roster members for the prompt's "ALSO IN THE SCENE" block.
     // Empty for single-character chats — chatReply skips the block.
-    const others = otherCharactersForPrompt();
+    const others = otherCharactersForPrompt(speakerOverrideId);
 
     // Render the bubble with the speaker label AND character id up
     // front so streaming bubbles show the right avatar from the first
@@ -4903,6 +5165,181 @@
   window.__startTutorial = startTutorial;
 
   // =====================================================================
+  // PROFILE / ACHIEVEMENTS
+  // =====================================================================
+  // Lightweight progression layer over the existing data. Stats are
+  // derived live from the DB on demand (no separate counters); the only
+  // persisted bit is `seenAchievementIds` — which unlocks the user has
+  // acknowledged, so we can show a "NEW!" badge for the rest.
+  //
+  // Level + XP curve: level = floor(sqrt(xp/100)) + 1, so
+  //   level 2 needs 100 xp, level 3 needs 400, level 4 needs 900, etc.
+  //   Smooth and forgiving; long-term users approach but don't hit a cap.
+  // XP weights are deliberately small for high-frequency actions
+  // (messages) and larger for rarer ones (characters, scenes).
+
+  const ACHIEVEMENTS = [
+    { id: "first-spark",   icon: "✨", title: "First Spark",   desc: "Send your first message.",          check: s => s.userMessages >= 1 },
+    { id: "scribe",        icon: "🖋", title: "Scribe",        desc: "Send 50 messages.",                  check: s => s.userMessages >= 50 },
+    { id: "novelist",      icon: "📚", title: "Novelist",      desc: "Send 500 messages.",                 check: s => s.userMessages >= 500 },
+    { id: "cast-of-one",   icon: "🎭", title: "Cast of One",   desc: "Create your first character.",       check: s => s.libraryCount >= 1 },
+    { id: "troupe",        icon: "🎪", title: "Troupe",        desc: "Three characters in your library.",  check: s => s.libraryCount >= 3 },
+    { id: "ensemble",      icon: "🎶", title: "Ensemble",      desc: "Five characters in your library.",   check: s => s.libraryCount >= 5 },
+    { id: "ensemble-act",  icon: "🎬", title: "Ensemble Act",  desc: "Start a multi-character scene.",     check: s => s.multiCharScenes >= 1 },
+    { id: "first-light",   icon: "🖼", title: "First Light",   desc: "Generate your first illustration.",  check: s => s.cutscenes >= 1 },
+    { id: "gallery",       icon: "🌅", title: "Gallery",       desc: "Generate 25 illustrations.",         check: s => s.cutscenes >= 25 },
+    { id: "regular",       icon: "📅", title: "Regular",       desc: "Use Smart Story on 7 different days.", check: s => s.activeDays >= 7 },
+  ];
+
+  // Compute the user's stats by scanning the DB. Cheap — these are
+  // count queries over a few thousand rows max in normal use.
+  async function computeStats() {
+    const [userMsgs, asstMsgs, chats, allMsgs, libCount] = await Promise.all([
+      db.messages.where("role").equals("user").count(),
+      db.messages.where("role").equals("assistant").count(),
+      db.chats.toArray(),
+      db.messages.toArray(),  // for cutscene count + active-days span
+      db.characters.count(),
+    ]);
+    const cutscenes = allMsgs.reduce((n, m) => n + (m.cutsceneUrl ? 1 : 0), 0);
+    const multiCharScenes = chats.reduce(
+      (n, c) => n + (Array.isArray(c.characterIds) && c.characterIds.length >= 2 ? 1 : 0),
+      0,
+    );
+    // Active days: distinct YYYY-MM-DD strings in chat.createdAt +
+    // chat.lastMessageAt. Stops short of computing per-message because
+    // chats already span the relevant range cheaply.
+    const days = new Set();
+    for (const c of chats) {
+      if (c.createdAt) days.add(new Date(c.createdAt).toISOString().slice(0, 10));
+      if (c.lastMessageAt) days.add(new Date(c.lastMessageAt).toISOString().slice(0, 10));
+    }
+    return {
+      userMessages: userMsgs,
+      assistantMessages: asstMsgs,
+      chats: chats.length,
+      cutscenes,
+      libraryCount: libCount,
+      multiCharScenes,
+      activeDays: days.size,
+    };
+  }
+
+  function xpFromStats(s) {
+    return (s.userMessages * 5) + (s.cutscenes * 15) + (s.libraryCount * 30) + (s.chats * 20);
+  }
+  function levelForXp(xp) {
+    return Math.floor(Math.sqrt(Math.max(0, xp) / 100)) + 1;
+  }
+  function xpForLevel(level) {
+    if (level <= 1) return 0;
+    return (level - 1) * (level - 1) * 100;
+  }
+
+  // Recompute stats + which achievements are now unlocked. Updates the
+  // title-bar badge (number of unviewed unlocks). Cheap — call this
+  // after any state-changing operation that might affect stats.
+  async function bumpAchievements() {
+    try {
+      cachedStats = await computeStats();
+      const seen = new Set(seenAchievementIds);
+      let pending = 0;
+      for (const a of ACHIEVEMENTS) {
+        if (a.check(cachedStats) && !seen.has(a.id)) pending++;
+      }
+      pendingAchievementCount = pending;
+      updateProfileBadge();
+    } catch (e) {
+      console.warn("[profile] bumpAchievements failed:", e);
+    }
+  }
+
+  function updateProfileBadge() {
+    const badge = $("profileBadge");
+    if (!badge) return;
+    if (pendingAchievementCount > 0) {
+      badge.hidden = false;
+      badge.textContent = String(pendingAchievementCount);
+    } else {
+      badge.hidden = true;
+    }
+  }
+
+  // Render the profile modal: level summary + stats tiles + achievement
+  // grid. Marks all currently-unlocked achievements as seen on open
+  // (clears the title badge).
+  async function openProfileModal() {
+    const stats = await computeStats();
+    cachedStats = stats;
+    const xp = xpFromStats(stats);
+    const level = levelForXp(xp);
+    const xpThisLevel = xp - xpForLevel(level);
+    const xpToNext = xpForLevel(level + 1) - xpForLevel(level);
+    const pct = xpToNext > 0 ? Math.min(100, Math.max(0, (xpThisLevel / xpToNext) * 100)) : 0;
+
+    $("profileLevel").querySelector(".lvlBig").textContent = String(level);
+    $("profileXp").textContent = xp.toLocaleString() + " XP";
+    $("profileLevelBar").style.width = pct + "%";
+    $("profileNextLevel").textContent =
+      `${xpThisLevel.toLocaleString()} / ${xpToNext.toLocaleString()} XP to level ${level + 1}`;
+
+    // Stats tiles.
+    const tiles = [
+      { label: "Messages sent",      value: stats.userMessages },
+      { label: "AI replies received", value: stats.assistantMessages },
+      { label: "Scenes started",      value: stats.chats },
+      { label: "Illustrations",       value: stats.cutscenes },
+      { label: "Characters",          value: stats.libraryCount },
+      { label: "Multi-cast scenes",   value: stats.multiCharScenes },
+      { label: "Active days",         value: stats.activeDays },
+    ];
+    const statHost = $("profileStats");
+    statHost.innerHTML = "";
+    for (const t of tiles) {
+      const el = document.createElement("div");
+      el.className = "statTile";
+      el.innerHTML = `<div class="statValue">${t.value.toLocaleString()}</div><div class="statLabel">${escapeHTML(t.label)}</div>`;
+      statHost.appendChild(el);
+    }
+
+    // Achievement grid.
+    const seen = new Set(seenAchievementIds);
+    const newlyUnlocked = [];
+    const grid = $("achievementGrid");
+    grid.innerHTML = "";
+    for (const a of ACHIEVEMENTS) {
+      const unlocked = a.check(stats);
+      const isNew = unlocked && !seen.has(a.id);
+      if (isNew) newlyUnlocked.push(a.id);
+      const card = document.createElement("div");
+      card.className = "achCard " + (unlocked ? "unlocked" : "locked");
+      card.innerHTML = `
+        <div class="achIcon">${unlocked ? a.icon : "🔒"}</div>
+        <div class="achTitle">${escapeHTML(a.title)}</div>
+        <div class="achDesc">${escapeHTML(a.desc)}</div>
+        ${isNew ? `<div class="achNew">NEW</div>` : ""}
+      `;
+      grid.appendChild(card);
+    }
+
+    // Acknowledge any new unlocks: persist + clear the title badge.
+    if (newlyUnlocked.length) {
+      seenAchievementIds = [...new Set([...seenAchievementIds, ...newlyUnlocked])];
+      try { await setMisc("seenAchievementIds", seenAchievementIds); } catch (e) {}
+      pendingAchievementCount = 0;
+      updateProfileBadge();
+    }
+
+    openModal("profileModal");
+  }
+
+  if ($("profileBtn")) {
+    $("profileBtn").onclick = () => {
+      openProfileModal().catch(e => showError("profile", e));
+    };
+  }
+
+  // =====================================================================
   // BOOT
   // =====================================================================
   function assertRoot() {
@@ -4923,6 +5360,13 @@
     await loadMemory();
     await loadSettings();
     await loadAvatarCaches();
+    // Load the persisted set of acknowledged achievements + compute the
+    // initial badge count.
+    try {
+      const stored = await getMisc("seenAchievementIds", []);
+      seenAchievementIds = Array.isArray(stored) ? stored : [];
+    } catch (e) { seenAchievementIds = []; }
+    bumpAchievements();   // fire-and-forget; updates the title badge
     const ch = personaHash(character);
     if (ch && charAvatars[ch]) { currentCharAvatarUrl = charAvatars[ch]; currentCharAvatarHash = ch; }
     const ph = personaHash(personality);
