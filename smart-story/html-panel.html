@@ -73,12 +73,14 @@
   .msg.user .bubble { grid-column: 1; grid-row: 2; }
   .msg.user .cutscene { grid-column: 1; grid-row: 3; }
   .msg.user .msgActions { grid-column: 1; grid-row: 4; justify-content: flex-end; }
-  .msg.user .avatar { grid-column: 2; grid-row: 1 / span 4; }
+  .msg.user .suggestStrip { grid-column: 1; grid-row: 5; }
+  .msg.user .avatar { grid-column: 2; grid-row: 1 / span 5; }
   .msg.char .msgWho { grid-column: 2; grid-row: 1; }
   .msg.char .bubble { grid-column: 2; grid-row: 2; }
   .msg.char .cutscene { grid-column: 2; grid-row: 3; }
   .msg.char .msgActions { grid-column: 2; grid-row: 4; }
-  .msg.char .avatar { grid-column: 1; grid-row: 1 / span 4; }
+  .msg.char .suggestStrip { grid-column: 2; grid-row: 5; }
+  .msg.char .avatar { grid-column: 1; grid-row: 1 / span 5; }
   .msg.error { display: block; }
   @media (max-width: 500px) {
     .msg.user, .msg.char { grid-template-columns: 1fr; max-width: 92%; }
@@ -175,6 +177,130 @@
   .actBtn.danger:hover { background: rgba(212,115,107,0.12); color: var(--err); border-color: var(--err); }
   .actBtn:disabled { opacity: 0.45; cursor: not-allowed; }
   .msg.editing .msgActions { display: none; }
+  /* Suggestion strip — "what to do/say next" buttons under the latest reply. */
+  .suggestStrip {
+    display: flex; flex-direction: column; gap: 6px;
+    margin-top: 10px; max-width: 100%;
+  }
+  .suggestStrip .suggestLabel {
+    font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--ink-faint); margin-bottom: 2px;
+  }
+  .suggestBtn {
+    display: block; width: 100%; text-align: left;
+    padding: 8px 12px; font-size: 13px; line-height: 1.4;
+    background: var(--surface); color: var(--ink);
+    border: 1px solid var(--surface-3); border-radius: 8px;
+    cursor: pointer; transition: all 120ms; font-family: inherit;
+    word-wrap: break-word; white-space: normal;
+  }
+  .suggestBtn:hover { background: var(--surface-2); border-color: var(--accent-dim); color: var(--ink); }
+  .suggestBtn:active { background: var(--surface-3); }
+  .suggestStrip.loading { opacity: 0.6; font-style: italic; font-size: 12px; color: var(--ink-faint); padding-top: 6px; }
+  .suggestStrip.failed {
+    font-size: 11px; color: var(--ink-faint); font-style: italic;
+    padding-top: 6px;
+  }
+  /* ───────────────────────────────────────────────────────────────────
+     Onboarding tutorial — first-startup walkthrough.
+     Dim the screen, "spotlight" the target element (a transparent
+     rectangle cut out of the dim layer), show a tooltip pointing at it
+     with NEXT / SKIP controls. The user can still interact with the
+     spotlighted element — pointer-events are blocked everywhere EXCEPT
+     the spotlight hole. Some steps require an actual user gesture (e.g.
+     "open settings"), in which case the tutorial advances when the gesture
+     happens.
+     ─────────────────────────────────────────────────────────────────── */
+  #tutorialOverlay {
+    position: fixed; inset: 0;
+    /* Must be ABOVE .modal (99999990) so the spotlight and tooltip stay
+       visible when Settings (or any other modal) is open. The dim panels
+       are interactive-blocking, but the spotlight cutout passes clicks
+       through to the highlighted element underneath — which itself can
+       live inside a modal. */
+    z-index: 99999995;
+    pointer-events: none;
+    display: none;
+  }
+  #tutorialOverlay.active { display: block; }
+  /* The dim layer: 4 rectangles around the spotlight hole. We use
+     individual divs (not box-shadow tricks) because they can have
+     pointer-events:auto to block clicks outside the spotlight. */
+  .tutDim {
+    position: absolute; background: rgba(8, 12, 24, 0.78);
+    pointer-events: auto;
+    transition: all 200ms ease-out;
+  }
+  /* When a step has no target element, use a single fullscreen dim. */
+  .tutDimFull {
+    position: absolute; inset: 0;
+    background: rgba(8, 12, 24, 0.78);
+    pointer-events: auto;
+  }
+  /* The "spotlight" — just a transparent area that lets clicks through
+     to the target. The dim divs surround it. A glowing border helps
+     the user spot the target. */
+  #tutSpotlight {
+    position: absolute;
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    box-shadow: 0 0 0 4px rgba(124, 179, 255, 0.18), 0 0 20px rgba(124, 179, 255, 0.45);
+    pointer-events: none;
+    transition: all 200ms ease-out;
+    animation: tutPulse 1.8s ease-in-out infinite;
+  }
+  @keyframes tutPulse {
+    0%, 100% { box-shadow: 0 0 0 4px rgba(124, 179, 255, 0.18), 0 0 20px rgba(124, 179, 255, 0.45); }
+    50%      { box-shadow: 0 0 0 6px rgba(124, 179, 255, 0.30), 0 0 30px rgba(124, 179, 255, 0.65); }
+  }
+  /* The tooltip card — positioned next to the spotlight. */
+  #tutTooltip {
+    position: absolute;
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--surface-3);
+    border-radius: 10px;
+    padding: 14px 16px;
+    max-width: 320px; min-width: 240px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+    pointer-events: auto;
+    font-size: 14px; line-height: 1.5;
+    transition: all 200ms ease-out;
+  }
+  #tutTooltip .tutTitle {
+    font-weight: 700; font-size: 13px; letter-spacing: 0.5px;
+    text-transform: uppercase; color: var(--accent);
+    margin-bottom: 6px;
+  }
+  #tutTooltip .tutBody { color: var(--ink); margin-bottom: 12px; }
+  #tutTooltip .tutBody b { color: var(--ink-hi, var(--ink)); }
+  #tutTooltip .tutActions {
+    display: flex; gap: 8px; align-items: center;
+  }
+  #tutTooltip .tutSkip {
+    font-size: 12px; padding: 4px 8px; cursor: pointer;
+    background: transparent; color: var(--ink-faint);
+    border: 1px solid var(--surface-3); border-radius: 5px;
+    font-family: inherit;
+  }
+  #tutTooltip .tutSkip:hover { color: var(--ink); border-color: var(--ink-faint); }
+  #tutTooltip .tutNext {
+    font-size: 13px; padding: 6px 14px; cursor: pointer; font-weight: 600;
+    background: var(--accent); color: var(--ink-on-accent, #0b1220);
+    border: 0; border-radius: 5px;
+    font-family: inherit;
+    margin-left: auto;
+  }
+  #tutTooltip .tutNext:hover { background: var(--accent-hi); }
+  #tutTooltip .tutNext:disabled { opacity: 0.5; cursor: not-allowed; }
+  #tutTooltip .tutProgress {
+    font-size: 10px; letter-spacing: 1px; color: var(--ink-faint);
+    text-transform: uppercase;
+  }
+  #tutTooltip .tutWaiting {
+    font-size: 12px; font-style: italic; color: var(--ink-faint);
+    margin-top: 6px;
+  }
   .editForm { display: flex; flex-direction: column; gap: 6px; width: 100%; }
   .editForm textarea {
     width: 100%; min-height: 70px; max-height: 240px; padding: 8px 10px;
@@ -370,6 +496,24 @@
     color: #c08850; background: rgba(192,136,80,0.08);
     border: 1px solid rgba(192,136,80,0.35); border-radius: 4px;
   }
+  /* Character-library selector at the top of the CHARACTER tab. */
+  .charLibField {
+    margin-bottom: 18px; padding-bottom: 14px;
+    border-bottom: 1px solid var(--surface-3);
+  }
+  .charLibRow {
+    display: flex; gap: 6px; align-items: stretch;
+  }
+  .charLibRow select {
+    flex: 1; padding: 8px 10px; font-size: 14px; font-family: inherit;
+    color: var(--ink); background: var(--surface);
+    border: 1px solid var(--surface-3); border-radius: 6px;
+  }
+  .charLibRow select:focus { outline: 2px solid var(--accent-dim); }
+  .charLibRow button {
+    padding: 6px 10px; font-size: 16px; line-height: 1;
+  }
+  .charLibRow button:disabled { opacity: 0.4; cursor: not-allowed; }
   .assistRow { margin-top: 6px; padding-top: 12px; border-top: 1px dashed var(--surface-3); }
   .assistBtn {
     display: flex; gap: 8px; align-items: center; width: 100%;
@@ -525,7 +669,7 @@
 <div id="app">
   <div id="titleBar">
     <div id="titleHeader">
-      <div id="appTitle">Tableau</div>
+      <div id="appTitle">Smart Story</div>
       <div id="chatSubtitle">Illustrated AI Chat</div>
     </div>
     <button id="trackedBtn" class="titleBtn" title="Tracked story state">📋</button>
@@ -587,6 +731,19 @@
     </div>
     <div class="modalBody">
       <div id="panelChar" class="settingsPanel active" role="tabpanel">
+        <!-- Character library selector (schema v2). For now: pick from
+             your defined characters, or start a new one. Editing below
+             modifies whichever character is selected; SAVE persists. -->
+        <div class="field charLibField">
+          <label>Cast — who lives in your library</label>
+          <div class="charLibRow">
+            <select id="charLibSelect" aria-label="Choose a character">
+              <option value="__new__">— Start a new character —</option>
+            </select>
+            <button id="charLibDelete" class="secondaryBtn" type="button" title="Delete this character from the library">🗑</button>
+          </div>
+          <div class="hint">Pick a character to edit, or start a fresh one. Smart Story keeps every character you build so you can switch between them. The character used in your current scene is locked to that scene — editing here only changes future scenes.</div>
+        </div>
         <div class="field">
           <label>Character name</label>
           <input id="charName" type="text" placeholder="e.g. Mira, Theron, the Detective" maxlength="60">
@@ -685,6 +842,11 @@
             </div>
             <div class="hint">Higher = fewer illustrations. Manual 🎬 button always works regardless.</div>
           </div>
+          <label class="toggleRow" style="margin-top: 18px;">
+            <input id="suggestActions" type="checkbox">
+            <span class="toggleLabel">Suggest actions after each reply</span>
+          </label>
+          <div class="hint" style="margin-top: 4px;">When on, three short "what to do/say next" buttons appear under the most recent reply. Clicking one fills your input — you can still edit it before sending.</div>
         </div>
         <div class="panelActions">
           <div class="spacer"></div>
@@ -714,8 +876,12 @@
           <button id="histReset" class="secondaryBtn" style="color: var(--err); border-color: var(--err);">CLEAR ALL HISTORY</button>
         </div>
         <div class="hint" style="margin-top: 10px;">
-          Import from FurAI, ai-character-chat, TavernAI character cards, or a Tableau backup file.
+          Import from FurAI, ai-character-chat, TavernAI character cards, or a Smart Story backup file.
           Export the whole app state (all chats + character + settings) as a backup file you can re-import later.
+        </div>
+        <div class="panelActions" style="margin-top:18px; border-top:1px solid var(--surface-3); padding-top:14px;">
+          <button id="replayTutorialBtn" class="secondaryBtn">🎓 REPLAY TUTORIAL</button>
+          <div class="hint" style="margin: 0 0 0 10px; align-self: center;">Walks through Settings step by step. Useful if you skipped it on first launch.</div>
         </div>
       </div>
     </div>
@@ -750,7 +916,7 @@
   </div>
 </div>
 
-<!-- Import modal — factory-style importer for FurAI / ai-character-chat / TavernAI / Tableau -->
+<!-- Import modal — factory-style importer for FurAI / ai-character-chat / TavernAI / Smart Story -->
 <div id="importModal" class="modal" role="dialog" aria-label="Import">
   <div class="modalCard">
     <div class="modalHeader">
@@ -759,7 +925,7 @@
     </div>
     <div class="modalBody">
       <div class="hint" style="margin-bottom: 12px;">
-        Paste, upload, or link to a character / chat from FurAI, ai-character-chat, TavernAI, or a Tableau backup.
+        Paste, upload, or link to a character / chat from FurAI, ai-character-chat, TavernAI, or a Smart Story backup.
         The format is detected automatically.
       </div>
 
@@ -833,13 +999,13 @@
     </div>
     <div class="modalBody">
       <div class="hint" style="margin-bottom: 14px;">
-        Choose a format. Tableau backups are best for moving between devices. TavernAI cards are character-only — they work in SillyTavern, RisuAI, Janitor, and most other AI chat apps. ai-character-chat exports keep chat history along with the character.
+        Choose a format. Smart Story backups are best for moving between devices. TavernAI cards are character-only — they work in SillyTavern, RisuAI, Janitor, and most other AI chat apps. ai-character-chat exports keep chat history along with the character.
       </div>
 
       <div class="field">
         <label>Format</label>
         <select id="exportFormat">
-          <option value="tableau-backup">Tableau backup (full app — round-trips perfectly)</option>
+          <option value="tableau-backup">Smart Story backup (full app — round-trips perfectly)</option>
           <option value="tavern-v2">TavernAI v2 character card (character only)</option>
           <option value="ai-character-chat">ai-character-chat (character + current chat history)</option>
         </select>
@@ -886,6 +1052,10 @@
   </div>
   <div id="vnEmpty" hidden>No cutscenes in this scene yet. Generate one with the 🎬 button on a message, or enable auto-illustrate.</div>
 </div>
+
+<!-- Onboarding tutorial overlay. JS builds the dim/spotlight/tooltip
+     children on demand and removes them when the tutorial ends. -->
+<div id="tutorialOverlay" aria-hidden="true"></div>
 
 <footer class="footer">
   <span>© 2026 therealwestninja.</span> ·
@@ -968,12 +1138,78 @@
     return;
   }
 
-  // Fresh DB name — clean break from the fortune-teller's "the-dispenser-v1".
+  // DB name is "tableau-v1", preserved from the app's earlier name.
+  // Renaming would orphan all existing users' data — the DB name is what
+  // IndexedDB keys on. Leave it. The app is "Smart Story" everywhere else.
   const db = new Dexie("tableau-v1");
   db.version(1).stores({
     chats: "id, createdAt, lastMessageAt",
     messages: "++id, chatId, createdAt",
     misc: "key",
+  });
+  // Schema v2: introduces the `characters` table (the cast library, plural).
+  //
+  // Each chat gets a `characterIds: number[]` roster (added to existing
+  // chat records at migration time — single-character chats become a
+  // 1-element roster). The first id is the "primary" speaker — used as
+  // the default for the existing single-character UX.
+  //
+  // Each assistant message can optionally carry a `characterId` field
+  // indicating which roster member spoke. Messages without it default to
+  // the chat's primary character.
+  //
+  // The global `character` misc key remains as the "library default":
+  // when you start a new scene without explicitly setting a roster, we
+  // copy the global character into the new chat's roster. Editing the
+  // global character in Settings only affects future scenes — existing
+  // chats' rosters are independent (so old conversations don't suddenly
+  // get a renamed speaker).
+  db.version(2).stores({
+    chats: "id, createdAt, lastMessageAt",
+    messages: "++id, chatId, createdAt",
+    characters: "++id, createdAt",   // NEW: character library
+    misc: "key",
+  }).upgrade(async (tx) => {
+    // One-time migration: synthesize a character library record from the
+    // existing global `character`, and stamp it onto every existing chat
+    // as the sole roster member. Messages stay un-stamped — they're
+    // assistant-or-user by `role`, and a missing characterId means "use
+    // the chat's primary", which preserves their current behavior.
+    const miscTbl = tx.table("misc");
+    const chatsTbl = tx.table("chats");
+    const charactersTbl = tx.table("characters");
+
+    const charRow = await miscTbl.get("character");
+    const persRow = await miscTbl.get("personality");  // user's persona, NOT a character — see migration note below
+    const globalChar = (charRow && charRow.value) || null;
+
+    let primaryId = null;
+    if (globalChar && (globalChar.name || globalChar.description || globalChar.appearance)) {
+      // The global character has content — promote it to a library entry.
+      const record = {
+        name: globalChar.name || "",
+        description: globalChar.description || "",
+        appearance: globalChar.appearance || "",
+        firstMessage: globalChar.firstMessage || "",
+        createdAt: Date.now(),
+      };
+      primaryId = await charactersTbl.add(record);
+    }
+    // (We do NOT add the user's persona to the characters table. Persona
+    //  is the user's avatar in the story — they're not an assistant
+    //  character. The persona remains in misc:personality, separately.)
+
+    // Stamp every existing chat with a 1-element roster pointing at the
+    // primary. Chats from users who never set a global character end up
+    // with an empty roster — that's fine; new scenes there will fall
+    // back to creating a placeholder library entry on demand.
+    const existingChats = await chatsTbl.toArray();
+    for (const c of existingChats) {
+      if (!c.characterIds) {
+        c.characterIds = primaryId ? [primaryId] : [];
+        await chatsTbl.put(c);
+      }
+    }
   });
 
   // =====================================================================
@@ -996,6 +1232,7 @@
     artStyleKey: "default",      // which preset is selected
     customStylePrefix: "",       // used when artStyleKey === "custom"
     customStyleNegative: "",     // used when artStyleKey === "custom"
+    suggestActions: false,       // show 3 "what to do next" buttons after each reply
   };
   let drawId = 0;
   let currentStream = null;
@@ -1018,8 +1255,76 @@
   }
   async function setMisc(key, value) { await db.misc.put({ key, value }); }
 
+  // =====================================================================
+  // CHARACTER LIBRARY (multi-character roster, schema v2)
+  // =====================================================================
+  // The `characters` table is the cast library — every character the
+  // user has ever defined lives here. The global `character` misc key
+  // and `currentCharacterId` together form a "currently-selected
+  // primary" cache that existing single-character code paths keep
+  // using untouched: they read `character.name` etc as before.
+  //
+  // When the user creates/edits/picks a character, both the library
+  // entry AND the misc cache are updated. When the schema v2 migration
+  // ran above, it backfilled the library from misc:character.
+  //
+  // Multi-character UI (speaker picker, "continue as X") is built on
+  // top of this in subsequent milestones. For now, the rest of the
+  // app is unaware of the library — it only sees the cached single
+  // `character` object.
+
+  async function listCharacters() {
+    return await db.characters.orderBy("createdAt").toArray();
+  }
+  async function getCharacterById(id) {
+    if (!id) return null;
+    return await db.characters.get(id);
+  }
+  async function addCharacterToLibrary(record) {
+    const row = {
+      name: record.name || "",
+      description: record.description || "",
+      appearance: record.appearance || "",
+      firstMessage: record.firstMessage || "",
+      createdAt: Date.now(),
+    };
+    const id = await db.characters.add(row);
+    return { id, ...row };
+  }
+  async function updateCharacterInLibrary(id, updates) {
+    const safe = {};
+    for (const k of ["name", "description", "appearance", "firstMessage"]) {
+      if (k in updates) safe[k] = updates[k] || "";
+    }
+    await db.characters.update(id, safe);
+    return await db.characters.get(id);
+  }
+  async function deleteCharacterFromLibrary(id) {
+    // Note: we don't scrub characterId references on existing chats /
+    // messages because those rosters represent history. Deleting a
+    // character "from the library" just means it's no longer available
+    // for new scenes — the past stays as it was. Empty-roster fallback
+    // logic in chat code handles refs to deleted ids.
+    await db.characters.delete(id);
+  }
+
   async function loadCharacter() {
-    const stored = await getMisc("character", null);
+    // The misc:character key is a denormalized cache of "the currently
+    // selected primary character" — what the legacy single-character
+    // code paths read. Reload from the library entry if we have an id.
+    let stored = await getMisc("character", null);
+    const currentId = await getMisc("currentCharacterId", null);
+    if (currentId) {
+      const fromLib = await getCharacterById(currentId);
+      if (fromLib) {
+        stored = {
+          name: fromLib.name || "",
+          description: fromLib.description || "",
+          appearance: fromLib.appearance || "",
+          firstMessage: fromLib.firstMessage || "",
+        };
+      }
+    }
     character = (!stored || typeof stored !== "object")
       ? { name: "", description: "", appearance: "", firstMessage: "" }
       : {
@@ -1029,7 +1334,25 @@
           firstMessage: stored.firstMessage || "",
         };
   }
-  async function saveCharacter() { await setMisc("character", character); }
+
+  // Save the current `character` global. Keeps the library entry and
+  // the misc cache in sync. If no library entry is selected yet, create
+  // one — covers a fresh install where loadCharacter saw nothing.
+  async function saveCharacter() {
+    let currentId = await getMisc("currentCharacterId", null);
+    const hasContent = !!(character.name || character.description || character.appearance);
+    if (!currentId && hasContent) {
+      const created = await addCharacterToLibrary(character);
+      currentId = created.id;
+      await setMisc("currentCharacterId", currentId);
+    } else if (currentId) {
+      await updateCharacterInLibrary(currentId, character);
+    }
+    // Mirror the cache for legacy reads. Done last so a failure above
+    // doesn't leave the cache pointing at stale library data.
+    await setMisc("character", character);
+  }
+
   async function loadPersonality() {
     const stored = await getMisc("personality", null);
     personality = (!stored || typeof stored !== "object")
@@ -1050,13 +1373,14 @@
   async function loadSettings() {
     const s = await getMisc("settings", null);
     settings = (!s || typeof s !== "object")
-      ? { autoIllustrate: true, suppressionWindow: 2, artStyleKey: "default", customStylePrefix: "", customStyleNegative: "" }
+      ? { autoIllustrate: true, suppressionWindow: 2, artStyleKey: "default", customStylePrefix: "", customStyleNegative: "", suggestActions: false }
       : {
           autoIllustrate: s.autoIllustrate !== false,
           suppressionWindow: Math.max(1, Math.min(5, parseInt(s.suppressionWindow) || 2)),
           artStyleKey: s.artStyleKey || "default",
           customStylePrefix: s.customStylePrefix || "",
           customStyleNegative: s.customStyleNegative || "",
+          suggestActions: !!s.suggestActions,
         };
   }
   async function saveSettings() { await setMisc("settings", settings); }
@@ -1223,6 +1547,34 @@
     if (!stop || !send) return;
     stop.hidden = !streaming;
     send.hidden = streaming;
+  }
+
+  // Drain an inflight {stream, fallback, error} into a normalized result.
+  // Returns one of:
+  //   { kind: "startFailed", message }   — couldn't begin streaming
+  //   { kind: "aborted" }                 — user clicked STOP
+  //   { kind: "emptyOrError", message }   — stream finished but produced nothing useful
+  //   { kind: "ok", text }                — full generated text (untrimmed)
+  // Handles currentStream tracking + setStreamingUI for the duration of the await.
+  async function awaitInflight(inflight) {
+    if (!inflight || inflight.error || !inflight.stream) {
+      return { kind: "startFailed", message: (inflight && inflight.error) || "stream did not start" };
+    }
+    currentStream = inflight.stream;
+    setStreamingUI(true);
+    try {
+      const data = await inflight.stream;
+      if (!data || !data.generatedText || !data.generatedText.trim() || data.stopReason === "error") {
+        const stopped = data && data.stopReason && /stop/i.test(data.stopReason);
+        if (stopped) return { kind: "aborted" };
+        return { kind: "emptyOrError", message: "stopReason=" + ((data && data.stopReason) || "(none)") + " with empty text" };
+      }
+      return { kind: "ok", text: data.generatedText };
+    } catch (e) {
+      return { kind: "emptyOrError", message: errMsg(e) };
+    } finally {
+      if (currentStream === inflight.stream) { currentStream = null; setStreamingUI(false); }
+    }
   }
 
   // =====================================================================
@@ -1457,6 +1809,9 @@
     catch (e) { showError("deleteMessage", e); return; }
     currentMessages = currentMessages.filter(m => m.id !== id);
     removeBubble(bubble);
+    // The strip on the previous latest reply is now stale — its suggestions
+    // were generated against a conversation that no longer exists.
+    clearAllSuggestionStrips();
     refreshAllActionVisibility();
     await touchChat(currentChat.id);
   }
@@ -1479,6 +1834,7 @@
       if (!ok) return;
     }
     clearError();
+    clearAllSuggestionStrips();
     cancelStream();
     try {
       await db.transaction("rw", db.messages, async () => {
@@ -1623,11 +1979,19 @@
 
     try {
       const chatId = newId();
+      // The new chat's roster starts with whichever character is the
+      // current primary (cached in misc:currentCharacterId). The
+      // saveCharacter call above (during settings save) ensures that
+      // id exists if the user has any character at all. Empty roster
+      // is allowed — falls through to using `character` directly,
+      // matching the pre-library behavior.
+      const primaryId = await getMisc("currentCharacterId", null);
       const newChat = {
         id: chatId,
         scenario: scenarioDefault || "",
         trackedInfo: "",          // story state — see updateTrackedInfo
         title: character.name ? `with ${character.name}` : "A new scene",
+        characterIds: primaryId ? [primaryId] : [],   // roster (schema v2)
         createdAt: Date.now(),
         lastMessageAt: Date.now(),
       };
@@ -1663,30 +2027,22 @@
         });
         if (myDraw !== drawId) return;
 
-        if (inflight.error || !inflight.stream) {
-          showError("openScene", inflight.error || "stream did not start");
-          finalText = "*The character is quiet — the chat AI couldn't start the scene. Check the error banner and try again, or adjust your character settings.*";
+        const result = await awaitInflight(inflight);
+        if (myDraw !== drawId) return;
+        if (result.kind === "ok") {
+          const parsed = parseAndStripIllustrateTag(result.text);
+          finalText = parsed.text;
+          illustrateFlag = parsed.illustrate;
+        } else if (result.kind === "aborted") {
+          // openScene doesn't expect mid-stream aborts as a normal flow, but if
+          // it happens (e.g. user hits NEW SCENE twice fast), just open in silence.
+          finalText = "*(the scene opened in silence)*";
         } else {
-          currentStream = inflight.stream;
-          setStreamingUI(true);
-          try {
-            const data = await inflight.stream;
-            if (myDraw !== drawId) return;
-            if (data.stopReason === "error" || !data.generatedText || !data.generatedText.trim()) {
-              showError("openScene", "stopReason=" + (data.stopReason || "(none)") + " with empty text");
-              finalText = "*(the scene opened in silence)*";
-            } else {
-              const parsed = parseAndStripIllustrateTag(data.generatedText);
-              finalText = parsed.text;
-              illustrateFlag = parsed.illustrate;
-            }
-          } catch (e) {
-            if (myDraw !== drawId) return;
-            showError("openScene", e);
-            finalText = "*(the scene opened in silence)*";
-          } finally {
-            if (currentStream === inflight.stream) { currentStream = null; setStreamingUI(false); }
-          }
+          // startFailed or emptyOrError — both surface the same fallback to the user.
+          showError("openScene", result.message);
+          finalText = result.kind === "startFailed"
+            ? "*The character is quiet — the chat AI couldn't start the scene. Check the error banner and try again, or adjust your character settings.*"
+            : "*(the scene opened in silence)*";
         }
         finalizeBubble(bubble, finalText, "char");
       }
@@ -1699,6 +2055,8 @@
       await setMisc("currentChatId", chatId);
 
       maybeAutoIllustrate(bubble, finalText, illustrateFlag, true);
+      // Fire-and-forget — suggestions render when ready, don't block the UI.
+      maybeShowSuggestions(bubble);
 
       state = "READY";
       enableInput(true);
@@ -1718,6 +2076,9 @@
     if (!raw) return;
 
     clearError();
+    // The previous reply's suggestions are about THIS decision point —
+    // once we move past it, they're moot.
+    clearAllSuggestionStrips();
     enableInput(false);
     $("input").value = "";
     autoResizeInput();
@@ -1756,41 +2117,28 @@
         },
       );
       if (myTurn !== drawId) return;
-      if (inflight.error || !inflight.stream) {
-        removeBubble(bubble);
-        renderErrorBubble("chatReply", inflight.error || "stream did not start");
-        showError("chatReply", inflight.error || "stream did not start");
-        return;
-      }
-      currentStream = inflight.stream;
-      setStreamingUI(true);
+
+      const result = await awaitInflight(inflight);
+      if (myTurn !== drawId) return;
+
       let finalText = "";
       let aborted = false;
       let illustrateFlag = false;
-      try {
-        const data = await inflight.stream;
-        if (myTurn !== drawId) return;
-        if (data.stopReason === "error" || !data.generatedText || !data.generatedText.trim()) {
-          const stopped = data.stopReason && /stop/i.test(data.stopReason);
-          if (stopped) { aborted = true; }
-          else {
-            removeBubble(bubble);
-            renderErrorBubble("chatReply", "stopReason=" + (data.stopReason || "(none)") + " with empty text");
-            showError("chatReply", "stopReason=" + (data.stopReason || "(none)") + " with empty text");
-          }
-        } else {
-          const cleaned = data.generatedText.trim().replace(/^\[\[[^\]]+\]\]:\s*/i, "").trim();
-          const parsed = parseAndStripIllustrateTag(cleaned);
-          finalText = parsed.text;
-          illustrateFlag = parsed.illustrate;
-        }
-      } catch (e) {
-        if (myTurn !== drawId) return;
+      if (result.kind === "ok") {
+        // Strip a stray leading [[Speaker]]: that the model sometimes emits.
+        const cleaned = result.text.trim().replace(/^\[\[[^\]]+\]\]:\s*/i, "").trim();
+        const parsed = parseAndStripIllustrateTag(cleaned);
+        finalText = parsed.text;
+        illustrateFlag = parsed.illustrate;
+      } else if (result.kind === "aborted") {
+        // User clicked STOP — the trailing `if (aborted)` block below handles
+        // bubble cleanup and the status message.
+        aborted = true;
+      } else {
+        // startFailed or emptyOrError — discard the empty bubble, render an error.
         removeBubble(bubble);
-        renderErrorBubble("chatReply", errMsg(e));
-        showError("chatReply", e);
-      } finally {
-        if (currentStream === inflight.stream) { currentStream = null; setStreamingUI(false); }
+        renderErrorBubble("chatReply", result.message);
+        showError("chatReply", result.message);
       }
 
       if (finalText && !aborted) {
@@ -1802,6 +2150,8 @@
           refreshAllActionVisibility();
           await touchChat(currentChat.id);
           maybeAutoIllustrate(bubble, finalText, illustrateFlag, false);
+          // Fire-and-forget suggestion generation.
+          maybeShowSuggestions(bubble);
         } catch (e) {
           showError("db.addMessage", e);
         }
@@ -1859,6 +2209,102 @@
       }
     }
     illustrateBubble(bubble);
+  }
+
+  // =====================================================================
+  // SUGGESTED ACTIONS — optional 3 buttons under the latest reply
+  // =====================================================================
+  // Only ever one strip in the UI at a time, on the latest assistant
+  // bubble. Clicking a button fills the chat input — we never auto-send,
+  // so the user can edit before committing. Sending, regenerating, or
+  // deleting any message clears all strips (the suggestions are tied to
+  // a specific point in the conversation; once we move on, they're moot).
+
+  // Remove every suggestion strip from the DOM. Called whenever the
+  // conversation state changes — new message sent, reply regenerated, etc.
+  function clearAllSuggestionStrips() {
+    document.querySelectorAll(".suggestStrip").forEach(el => el.remove());
+  }
+
+  // Generate suggestions for the most recent reply and attach buttons to
+  // its bubble. No-op if the toggle is off, no chat is active, or the
+  // bubble isn't actually the latest. Failure mode is silent — the
+  // feature is optional, so a transient AI hiccup shouldn't surface as
+  // an error banner. We do log to console for debugging.
+  async function maybeShowSuggestions(bubble) {
+    if (!settings.suggestActions) return;
+    if (!bubble || !bubble.isConnected) return;
+    if (!currentChat || !currentMessages.length) return;
+    // Don't suggest after an aborted/empty reply — the bubble might be in
+    // a half-state. Only attach to bubbles tied to a saved message.
+    if (!bubble.dataset.id) return;
+
+    // Clear any existing strip — there should be at most one.
+    clearAllSuggestionStrips();
+
+    // Render a quiet loading hint while we wait. The strip is removed
+    // either when results arrive (replaced) or if the conversation moves
+    // on before they do (clearAllSuggestionStrips on next send).
+    const strip = document.createElement("div");
+    strip.className = "suggestStrip loading";
+    strip.textContent = "Drafting suggestions…";
+    bubble.appendChild(strip);
+
+    // Capture the drawId at call time. If the user starts a new
+    // scene or otherwise rolls drawId before we get back, drop the result.
+    const myDraw = drawId;
+
+    let result;
+    try {
+      result = await root.suggestActions(
+        currentMessages, character, personality, chatScenario(), chatTrackedInfo()
+      );
+    } catch (e) {
+      console.warn("[suggestActions] threw:", e);
+      result = { actions: [], error: errMsg(e) };
+    }
+
+    // Check the strip is still in the DOM (it may have been cleared by a
+    // user action) and the draw is still current.
+    if (!strip.isConnected) return;
+    if (myDraw !== drawId) { strip.remove(); return; }
+
+    if (!result || !result.actions || result.actions.length === 0) {
+      // Quietly remove on failure — no error banner. Console log is enough.
+      console.warn("[suggestActions] no actions:", result && result.error);
+      strip.remove();
+      return;
+    }
+
+    // Replace the loading hint with the real buttons.
+    strip.classList.remove("loading");
+    strip.innerHTML = "";
+    const label = document.createElement("div");
+    label.className = "suggestLabel";
+    label.textContent = "What you could do or say next";
+    strip.appendChild(label);
+    for (const action of result.actions) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "suggestBtn";
+      btn.textContent = action;
+      btn.onclick = () => {
+        const input = $("input");
+        if (!input) return;
+        input.value = action;
+        input.focus();
+        // Move cursor to the end so the user can keep typing/editing.
+        try { input.setSelectionRange(input.value.length, input.value.length); } catch (e) {}
+        autoResizeInput();
+        // Enable the send button now that there's text.
+        $("sendBtn").disabled = input.disabled || !input.value.trim();
+        // Strip is now consumed — remove it. If the user changes their
+        // mind and types something else, we don't want a stale set of
+        // buttons hanging around. The next reply will get fresh ones.
+        strip.remove();
+      };
+      strip.appendChild(btn);
+    }
   }
 
   // =====================================================================
@@ -1989,14 +2435,20 @@
   function closeModal(id) {
     const m = document.getElementById(id);
     if (m) m.classList.remove("open");
+    // Notify the onboarding tutorial. No-op when no tutorial is running.
+    if (id === "settingsModal") tutEmit("settings-closed");
   }
   document.querySelectorAll("[data-close]").forEach(b => {
     b.onclick = () => closeModal(b.getAttribute("data-close"));
   });
   // Also close when clicking the dark backdrop (outside the modalCard).
+  // EXCEPTION: while the onboarding tutorial is running, backdrop clicks
+  // are ignored — otherwise the user can accidentally dismiss settings
+  // mid-walkthrough (the tutorial steps walk through tabs and rely on
+  // the modal staying open until the explicit "Close Settings" step).
   document.querySelectorAll(".modal").forEach(m => {
     m.addEventListener("click", (e) => {
-      if (e.target === m) closeModal(m.id);
+      if (e.target === m && !tutorial) closeModal(m.id);
     });
   });
 
@@ -2010,6 +2462,8 @@
       p.classList.toggle("active", p.id === panelId);
       p.hidden = (p.id !== panelId);
     });
+    // Notify the onboarding tutorial. No-op when no tutorial is running.
+    tutEmit("panel-" + panelId);
     if (panelId === "panelChar") {
       $("charName").value = character.name || "";
       $("charDesc").value = character.description || "";
@@ -2017,6 +2471,10 @@
       $("charAssistStatus").textContent = "";
       $("charAssistStatus").classList.remove("err");
       updateLengthNotice("charDesc", "charLengthNotice");
+      // Refresh the library dropdown — async, but the field-population
+      // above is correct immediately, so the dropdown is just a "switch
+      // away from current" affordance.
+      refreshCharLibSelect().catch(e => console.warn("[charLib] refresh failed:", e));
     } else if (panelId === "panelYou") {
       $("youName").value = personality.name || "";
       $("youDesc").value = personality.description || "";
@@ -2030,6 +2488,7 @@
       $("autoIllustrate").checked = !!settings.autoIllustrate;
       $("suppressionWindow").value = settings.suppressionWindow;
       $("suppressionVal").textContent = settings.suppressionWindow;
+      $("suggestActions").checked = !!settings.suggestActions;
       populateArtStyleSelect();
       $("artStyleSelect").value = settings.artStyleKey || "default";
       $("customStylePrefix").value = settings.customStylePrefix || "";
@@ -2048,8 +2507,13 @@
     tab.onclick = () => activatePanel(tab.dataset.panel);
   });
   function openSettings(initialPanel) {
-    activatePanel(initialPanel || lastPanel);
     openModal("settingsModal");
+    // Notify the onboarding tutorial BEFORE we activate the panel, so the
+    // implicit "panel-X" gesture that follows is observed in the correct
+    // order (settings-opened → panel-X). Otherwise the tutorial step for
+    // CHARACTER would already be satisfied before settings-opened arrived.
+    tutEmit("settings-opened");
+    activatePanel(initialPanel || lastPanel);
   }
   $("settingsBtn").onclick = () => openSettings();
 
@@ -2164,6 +2628,40 @@
   $("youDesc").addEventListener("input", () => updateLengthNotice("youDesc", "youLengthNotice"));
   $("scenarioText").addEventListener("input", () => updateLengthNotice("scenarioText", "scenarioLengthNotice"));
 
+  // ---- Assist-handler factory ----
+  // Every assist button has the same shape: lock button → set "thinking"
+  // status → call a top-panel synthesize fn → if error, show in status +
+  // banner; if success, apply the result to inputs → restore button.
+  // `call` is a thunk that returns the promise (so the caller decides how
+  // to read DOM at invocation time). `apply` receives the result object.
+  function runAssist({ btnId, statusId, where, busyMsg, doneMsg, call, apply }) {
+    const btn = $(btnId);
+    const status = $(statusId);
+    if (btn.disabled || btn.classList.contains("busy")) return Promise.resolve();
+    status.classList.remove("err");
+    status.textContent = busyMsg;
+    btn.classList.add("busy");
+    return (async () => {
+      try {
+        const result = await call();
+        if (result && result.error) {
+          status.classList.add("err");
+          status.textContent = result.error;
+          showError(where, result.error);
+          return;
+        }
+        apply(result || {});
+        status.textContent = doneMsg;
+      } catch (e) {
+        status.classList.add("err");
+        status.textContent = errMsg(e);
+        showError(where, e);
+      } finally {
+        btn.classList.remove("busy");
+      }
+    })();
+  }
+
   // ---- CHARACTER panel handlers ----
   $("charClear").onclick = async () => {
     const ok = await root.confirmAsync("Clear all character fields?\n\nYou can still cancel before saving.");
@@ -2173,42 +2671,128 @@
     $("charAppearance").value = "";
     updateLengthNotice("charDesc", "charLengthNotice");
   };
-  $("charAssist").onclick = async () => {
-    const btn = $("charAssist");
-    const status = $("charAssistStatus");
-    if (btn.classList.contains("busy")) return;
-    status.classList.remove("err");
-    status.textContent = "Drafting the character…";
-    btn.classList.add("busy");
-    try {
-      const result = await root.synthesizeCharacter(
-        ($("charName").value || "").trim(),
-        ($("charDesc").value || "").trim(),
-        ($("charAppearance").value || "").trim(),
-      );
-      if (result.error) {
-        status.classList.add("err");
-        status.textContent = result.error;
-        showError("synthesizeCharacter", result.error);
-      } else {
-        if (result.name && !$("charName").value.trim()) $("charName").value = result.name;
-        if (result.description) {
-          $("charDesc").value = result.description;
-          updateLengthNotice("charDesc", "charLengthNotice");
-        }
-        if (result.appearance) $("charAppearance").value = result.appearance;
-        status.textContent = "Draft complete. Edit it however you like, then SAVE.";
+  $("charAssist").onclick = () => runAssist({
+    btnId: "charAssist",
+    statusId: "charAssistStatus",
+    where: "synthesizeCharacter",
+    busyMsg: "Drafting the character…",
+    doneMsg: "Draft complete. Edit it however you like, then SAVE.",
+    call: () => root.synthesizeCharacter(
+      ($("charName").value || "").trim(),
+      ($("charDesc").value || "").trim(),
+      ($("charAppearance").value || "").trim(),
+    ),
+    apply: (r) => {
+      // Don't overwrite a name the user already typed.
+      if (r.name && !$("charName").value.trim()) $("charName").value = r.name;
+      if (r.description) {
+        $("charDesc").value = r.description;
+        updateLengthNotice("charDesc", "charLengthNotice");
       }
-    } catch (e) {
-      status.classList.add("err");
-      status.textContent = errMsg(e);
-      showError("synthesizeCharacter", e);
-    } finally {
-      btn.classList.remove("busy");
+      if (r.appearance) $("charAppearance").value = r.appearance;
+    },
+  });
+  // ---- Character library handlers ----
+  // Reload the dropdown from the library. Selects the currently active
+  // character (from misc:currentCharacterId), or "__new__" if none.
+  async function refreshCharLibSelect() {
+    const sel = $("charLibSelect");
+    const delBtn = $("charLibDelete");
+    if (!sel) return;
+    const cast = await listCharacters();
+    const activeId = await getMisc("currentCharacterId", null);
+    // Rebuild options.
+    sel.innerHTML = "";
+    const newOpt = document.createElement("option");
+    newOpt.value = "__new__";
+    newOpt.textContent = "— Start a new character —";
+    sel.appendChild(newOpt);
+    for (const c of cast) {
+      const o = document.createElement("option");
+      o.value = String(c.id);
+      o.textContent = c.name || `(untitled #${c.id})`;
+      if (c.id === activeId) o.selected = true;
+      sel.appendChild(o);
     }
+    if (!activeId) sel.value = "__new__";
+    // Disable delete when nothing real is selected.
+    delBtn.disabled = (sel.value === "__new__");
+  }
+
+  // User picked a different character (or "new"). This is a PREVIEW —
+  // we load that character's fields into the editable form, but we do
+  // NOT yet update misc:currentCharacterId or misc:character. The
+  // global `character` global also doesn't change. The selection only
+  // commits when the user clicks SAVE.
+  //
+  // Rationale: switching without saving used to corrupt the misc cache
+  // — the user could pick a different character to peek at, close the
+  // modal, and find that their chat subtitle / status had changed even
+  // though they never agreed to a switch. Now: peek freely, commit
+  // when ready.
+  $("charLibSelect").addEventListener("change", async () => {
+    const sel = $("charLibSelect");
+    const value = sel.value;
+    if (value === "__new__") {
+      $("charName").value = "";
+      $("charDesc").value = "";
+      $("charAppearance").value = "";
+    } else {
+      const id = parseInt(value, 10);
+      const row = await getCharacterById(id);
+      if (row) {
+        $("charName").value = row.name || "";
+        $("charDesc").value = row.description || "";
+        $("charAppearance").value = row.appearance || "";
+      }
+    }
+    updateLengthNotice("charDesc", "charLengthNotice");
+    $("charLibDelete").disabled = (sel.value === "__new__");
+  });
+
+  $("charLibDelete").onclick = async () => {
+    const sel = $("charLibSelect");
+    if (sel.value === "__new__") return;
+    const id = parseInt(sel.value, 10);
+    const row = await getCharacterById(id);
+    if (!row) return;
+    const ok = await root.confirmAsync(
+      `Delete "${row.name || "this character"}" from your library?\n\n` +
+      `Past scenes using this character keep working — their data is on the scene itself, not the library.\n\n` +
+      `This only affects future scene-starts and the dropdown above.`
+    );
+    if (!ok) return;
+    await deleteCharacterFromLibrary(id);
+    // If we just deleted the active one, the SAVE button below would
+    // try to update a now-missing id. Drop the active link.
+    const active = await getMisc("currentCharacterId", null);
+    if (active === id) {
+      await setMisc("currentCharacterId", null);
+      character = { name: "", description: "", appearance: "", firstMessage: "" };
+      await setMisc("character", character);
+      $("charName").value = ""; $("charDesc").value = ""; $("charAppearance").value = "";
+      updateLengthNotice("charDesc", "charLengthNotice");
+    }
+    await refreshCharLibSelect();
   };
+
   $("charSave").onclick = async () => {
     try {
+      // First: which library entry should we commit to? The dropdown
+      // selection wins (the user may have switched preview before
+      // saving). "__new__" means "create a fresh entry from these
+      // fields"; a numeric id means "update that entry in place".
+      const sel = $("charLibSelect");
+      const selValue = sel ? sel.value : null;
+      if (selValue && selValue !== "__new__") {
+        const id = parseInt(selValue, 10);
+        // Point the misc cache at the picked entry. saveCharacter below
+        // will update that library row with the form's current values.
+        await setMisc("currentCharacterId", id);
+      } else if (selValue === "__new__") {
+        // Clear current id so saveCharacter creates a fresh entry.
+        await setMisc("currentCharacterId", null);
+      }
       character = {
         name: ($("charName").value || "").trim(),
         description: ($("charDesc").value || "").trim(),
@@ -2217,6 +2801,9 @@
         // the character shouldn't accidentally drop it.
         firstMessage: character.firstMessage || "",
       };
+      // saveCharacter creates a library entry if there isn't one yet,
+      // otherwise updates the existing one in place. Also mirrors to the
+      // legacy misc:character cache.
       await saveCharacter();
       closeModal("settingsModal");
       // Relabel all character bubbles
@@ -2245,38 +2832,24 @@
         `Draft this from your ${count} memor${count === 1 ? "y" : "ies"}`;
     }
   }
-  $("youAssist").onclick = async () => {
-    const btn = $("youAssist");
-    const status = $("youAssistStatus");
-    if (btn.disabled || btn.classList.contains("busy")) return;
-    status.classList.remove("err");
-    status.textContent = "Drafting your persona from memories…";
-    btn.classList.add("busy");
-    try {
-      const result = await root.synthesizePersona(
-        memory,
-        ($("youName").value || "").trim(),
-        ($("youDesc").value || "").trim(),
-        ($("youAppearance").value || "").trim(),
-      );
-      if (result.error) {
-        status.classList.add("err");
-        status.textContent = result.error;
-        showError("synthesizePersona", result.error);
-      } else {
-        if (result.name && !$("youName").value.trim()) $("youName").value = result.name;
-        if (result.description) $("youDesc").value = result.description;
-        if (result.appearance) $("youAppearance").value = result.appearance;
-        status.textContent = "Draft complete. Edit it however you like, then SAVE.";
-      }
-    } catch (e) {
-      status.classList.add("err");
-      status.textContent = errMsg(e);
-      showError("synthesizePersona", e);
-    } finally {
-      btn.classList.remove("busy");
-    }
-  };
+  $("youAssist").onclick = () => runAssist({
+    btnId: "youAssist",
+    statusId: "youAssistStatus",
+    where: "synthesizePersona",
+    busyMsg: "Drafting your persona from memories…",
+    doneMsg: "Draft complete. Edit it however you like, then SAVE.",
+    call: () => root.synthesizePersona(
+      memory,
+      ($("youName").value || "").trim(),
+      ($("youDesc").value || "").trim(),
+      ($("youAppearance").value || "").trim(),
+    ),
+    apply: (r) => {
+      if (r.name && !$("youName").value.trim()) $("youName").value = r.name;
+      if (r.description) $("youDesc").value = r.description;
+      if (r.appearance) $("youAppearance").value = r.appearance;
+    },
+  });
   $("youSave").onclick = async () => {
     try {
       personality = {
@@ -2297,35 +2870,23 @@
   };
 
   // ---- SCENE panel handlers ----
-  $("scenarioAssist").onclick = async () => {
-    const btn = $("scenarioAssist");
-    const status = $("scenarioAssistStatus");
-    if (btn.classList.contains("busy")) return;
-    status.classList.remove("err");
-    status.textContent = "Inventing a scenario…";
-    btn.classList.add("busy");
-    try {
-      const result = await root.synthesizeScenario(
-        ($("scenarioText").value || "").trim(),
-        (character.description || character.name || "").trim(),
-      );
-      if (result.error) {
-        status.classList.add("err");
-        status.textContent = result.error;
-        showError("synthesizeScenario", result.error);
-      } else if (result.scenario) {
-        $("scenarioText").value = result.scenario;
+  $("scenarioAssist").onclick = () => runAssist({
+    btnId: "scenarioAssist",
+    statusId: "scenarioAssistStatus",
+    where: "synthesizeScenario",
+    busyMsg: "Inventing a scenario…",
+    doneMsg: "Scenario drafted. Edit it however you like, then SAVE.",
+    call: () => root.synthesizeScenario(
+      ($("scenarioText").value || "").trim(),
+      (character.description || character.name || "").trim(),
+    ),
+    apply: (r) => {
+      if (r.scenario) {
+        $("scenarioText").value = r.scenario;
         updateLengthNotice("scenarioText", "scenarioLengthNotice");
-        status.textContent = "Scenario drafted. Edit it however you like, then SAVE.";
       }
-    } catch (e) {
-      status.classList.add("err");
-      status.textContent = errMsg(e);
-      showError("synthesizeScenario", e);
-    } finally {
-      btn.classList.remove("busy");
-    }
-  };
+    },
+  });
   $("suppressionWindow").addEventListener("input", (e) => {
     $("suppressionVal").textContent = e.target.value;
   });
@@ -2369,7 +2930,10 @@
       settings.artStyleKey = $("artStyleSelect").value || "default";
       settings.customStylePrefix = ($("customStylePrefix").value || "").trim();
       settings.customStyleNegative = ($("customStyleNegative").value || "").trim();
+      settings.suggestActions = !!$("suggestActions").checked;
       await saveSettings();
+      // If the toggle was turned off, remove any existing suggestion strip.
+      if (!settings.suggestActions) clearAllSuggestionStrips();
       closeModal("settingsModal");
     } catch (e) {
       showError("saveScene", e);
@@ -2469,7 +3033,7 @@
   // IMPORT / EXPORT
   // =====================================================================
   // Factory-style importer for FurAI, ai-character-chat, TavernAI cards,
-  // and Tableau's own backup format. The detection logic lives on the top
+  // and Smart Story's own backup format. The detection logic lives on the top
   // panel (detectAndParseImport, fetchImportFromUrl). This UI is just the
   // user-facing wrapping.
 
@@ -2546,7 +3110,7 @@
       "ai-character-chat":"ai-character-chat character",
       "tavern-v2":        "TavernAI v2 character card",
       "tavern-v1":        "TavernAI v1 / generic character card",
-      "tableau-backup":   "Tableau backup (full app state)",
+      "tableau-backup":   "Smart Story backup (full app state)",
     };
     return labels[key] || key;
   }
@@ -2590,13 +3154,13 @@
       $("importActions").style.display = "flex";
       $("importActionsHint").style.display = "block";
       status.textContent = "";
-      // Tableau backups go through a different restore path — disable the
+      // Smart Story backups go through a different restore path — disable the
       // settings-only button since they're whole-app restores.
       const settingsBtn = $("importAsSettings");
       const newChatBtn = $("importAsNewChat");
       if (parsed.format === "tableau-backup") {
         settingsBtn.disabled = true;
-        settingsBtn.title = "Tableau backups are full app restores; the settings-only mode doesn't apply.";
+        settingsBtn.title = "Smart Story backups are full app restores; the settings-only mode doesn't apply.";
         newChatBtn.textContent = "RESTORE BACKUP";
       } else {
         settingsBtn.disabled = false;
@@ -2663,7 +3227,7 @@
     if (!pendingImport) return;
     const p = pendingImport;
     try {
-      // Special path for Tableau backups: restore the whole DB.
+      // Special path for Smart Story backups: restore the whole DB.
       if (p.format === "tableau-backup") {
         await restoreTableauBackup(p.extras.raw);
         return;
@@ -2733,18 +3297,25 @@
   };
 
   // ---------------------------------------------------------------
-  // Tableau backup: export + restore
+  // Smart Story backup: export + restore
   // ---------------------------------------------------------------
 
   // Gathers everything in the DB into a single JSON object. This is the
   // canonical "round-trip" format — what you export here can be re-imported
-  // into a fresh Tableau instance with zero loss.
+  // into a fresh Smart Story instance with zero loss.
+  //
+  // Note: the function is named buildTableauBackup (and the on-disk format
+  // string is "tableau") because of the app's earlier name. Both are kept
+  // for backwards compatibility — renaming would break detection of any
+  // backup file already in the wild.
   async function buildTableauBackup() {
     const chats = await db.chats.toArray();
     const messages = await db.messages.toArray();
+    const characters = await db.characters.toArray();
+    const currentCharacterId = await getMisc("currentCharacterId", null);
     return {
       app: "tableau",
-      version: 1,
+      version: 2,                   // v2: adds `characters` table + per-chat characterIds + currentCharacterId
       exportedAt: Date.now(),
       // Misc keys we surface explicitly so the format is self-documenting.
       character,
@@ -2754,9 +3325,11 @@
       settings,
       charAvatars,
       userAvatars,
-      // Chats and messages tables, verbatim.
-      chats,
-      messages,
+      currentCharacterId,           // misc:currentCharacterId → which library entry is the active primary
+      // Tables.
+      chats,                        // chats now have characterIds: number[]
+      messages,                     // messages may have characterId: number (assistant-side only)
+      characters,                   // the library
     };
   }
 
@@ -2764,11 +3337,11 @@
   // Confirmation gate is up to the caller.
   async function restoreTableauBackup(raw) {
     if (!raw || raw.app !== "tableau") {
-      showError("restore", "Not a Tableau backup.");
+      showError("restore", "Not a Smart Story backup.");
       return;
     }
     const ok = await root.confirmAsync(
-      `Restore this Tableau backup?\n\n` +
+      `Restore this Smart Story backup?\n\n` +
       `This will REPLACE ALL existing chats and character data with the backup's contents.\n\n` +
       `Backup has ${(raw.chats || []).length} chats and ${(raw.messages || []).length} messages.\n\n` +
       `This cannot be undone. Continue?`
@@ -2778,6 +3351,8 @@
       cancelStream();
       await db.chats.clear();
       await db.messages.clear();
+      await db.characters.clear();
+      const backupVersion = parseInt(raw.version, 10) || 1;
       // Misc keys.
       if (raw.character) {
         // Backwards compat: older backups don't have firstMessage. Default it.
@@ -2787,6 +3362,10 @@
           appearance: raw.character.appearance || "",
           firstMessage: raw.character.firstMessage || "",
         };
+        // Clear the currentCharacterId so saveCharacter creates a fresh
+        // library entry instead of trying to update a now-deleted id.
+        // For v2 backups we re-link below.
+        await setMisc("currentCharacterId", null);
         await saveCharacter();
       }
       if (raw.personality) { personality = raw.personality; await savePersonality(); }
@@ -2799,14 +3378,36 @@
           artStyleKey: raw.settings.artStyleKey || "default",
           customStylePrefix: raw.settings.customStylePrefix || "",
           customStyleNegative: raw.settings.customStyleNegative || "",
+          suggestActions: !!raw.settings.suggestActions,
         };
         await saveSettings();
       }
       if (raw.charAvatars && typeof raw.charAvatars === "object") { charAvatars = raw.charAvatars; await setMisc("charAvatars", charAvatars); }
       if (raw.userAvatars && typeof raw.userAvatars === "object") { userAvatars = raw.userAvatars; await setMisc("userAvatars", userAvatars); }
+      // Characters library — v2 carries it explicitly; v1 needs synthesis.
+      if (backupVersion >= 2 && Array.isArray(raw.characters)) {
+        for (const c of raw.characters) await db.characters.add(c);
+        // Re-link the misc cache to the same id the backup considered primary.
+        if (raw.currentCharacterId) {
+          await setMisc("currentCharacterId", raw.currentCharacterId);
+        }
+      } else if (raw.character && (raw.character.name || raw.character.description)) {
+        // v1 upgrade path: the saveCharacter call above already created
+        // a fresh library entry from the global character. Nothing else
+        // to do — `currentCharacterId` now points at it.
+      }
       // Chats and messages.
       if (Array.isArray(raw.chats)) {
-        for (const c of raw.chats) await db.chats.add(c);
+        for (const c of raw.chats) {
+          // v1 upgrade: chats lack characterIds. Synthesize a 1-element
+          // roster pointing at the currently-selected primary (which the
+          // v1 path just synthesized above).
+          if (!c.characterIds) {
+            const primaryId = await getMisc("currentCharacterId", null);
+            c.characterIds = primaryId ? [primaryId] : [];
+          }
+          await db.chats.add(c);
+        }
       }
       if (Array.isArray(raw.messages)) {
         // We drop the original IDs and let Dexie auto-increment, but we
@@ -2836,12 +3437,12 @@
     }
   }
 
-  // Triggers a download of the current app state as a Tableau backup JSON.
+  // Triggers a download of the current app state as a Smart Story backup JSON.
   // Used by both the direct (legacy) call and the export modal.
   async function exportTableauBackup() {
     try {
       const data = await buildTableauBackup();
-      downloadJson(data, `tableau-backup-${new Date().toISOString().slice(0, 10)}.json`);
+      downloadJson(data, `smart-story-backup-${new Date().toISOString().slice(0, 10)}.json`);
       setStatus(`Backup downloaded (${data.chats.length} chats, ${data.messages.length} messages).`);
     } catch (e) {
       showError("export", e);
@@ -2875,7 +3476,7 @@
         scenario: scenarioDefault || (currentChat && currentChat.scenario) || "",
         first_mes: character.firstMessage || "",
         mes_example: "",
-        creator_notes: "Exported from Tableau",
+        creator_notes: "Exported from Smart Story",
         system_prompt: "",
         post_history_instructions: "",
         alternate_greetings: [],
@@ -2893,7 +3494,7 @@
     };
   }
 
-  // Serialize Tableau's messages to ai-character-chat's chatLogs string.
+  // Serialize Smart Story's messages to ai-character-chat's chatLogs string.
   // Format: "BotName: ...\n\nUserName: ...\n\nBotName: ..."
   // Empty bot/user names fall back to "{{char}}" / "{{user}}".
   function buildAccChatLogs(messages, botName, userName) {
@@ -2919,7 +3520,9 @@
       userAvatarUrl: currentUserAvatarUrl || "",
       scenario: (currentChat && currentChat.scenario) || scenarioDefault || "",
       chatLogs: includeMessages ? buildAccChatLogs(currentMessages, character.name, personality.name) : "",
-      // Tableau-specific extras so round-trips don't lose data:
+      // Smart Story extras (kept under "_tableau" key for backwards
+      // compatibility — the key name is from the app's earlier name and
+      // must not change, or round-trip imports from older builds break).
       _tableau: {
         appearance: character.appearance || "",
         personaAppearance: personality.appearance || "",
@@ -2945,15 +3548,15 @@
   async function buildExportPayload() {
     const fmt = $("exportFormat").value;
     const scope = $("exportScope").value;
-    const safeName = (character.name || "tableau").replace(/[^a-z0-9]+/gi, "-").toLowerCase().slice(0, 40) || "tableau";
+    const safeName = (character.name || "smart-story").replace(/[^a-z0-9]+/gi, "-").toLowerCase().slice(0, 40) || "smart-story";
     const stamp = new Date().toISOString().slice(0, 10);
     try {
       if (fmt === "tableau-backup") {
         const data = await buildTableauBackup();
         return {
           data,
-          filename: `tableau-backup-${stamp}.json`,
-          summary: `Tableau backup: ${data.chats.length} chats, ${data.messages.length} messages.`,
+          filename: `smart-story-backup-${stamp}.json`,
+          summary: `Smart Story backup: ${data.chats.length} chats, ${data.messages.length} messages.`,
         };
       }
       if (fmt === "tavern-v2") {
@@ -3022,6 +3625,20 @@
   }
   $("histExport").onclick = openExportModal;
 
+  // Replay the onboarding tutorial. Closes Settings first (so the
+  // tutorial starts from a clean state — the first step is "open
+  // Settings", which assumes it's currently closed).
+  $("replayTutorialBtn").onclick = () => {
+    closeModal("settingsModal");
+    // Slight delay so the close animation settles and the modal is
+    // actually offscreen by the time the tutorial spotlights elements
+    // behind it.
+    setTimeout(() => {
+      try { startTutorial(); }
+      catch (e) { showError("tutorial", e); }
+    }, 200);
+  };
+
   $("exportDownloadBtn").onclick = async () => {
     const status = $("exportStatus");
     status.classList.remove("err");
@@ -3054,6 +3671,336 @@
       status.textContent = "Could not access clipboard: " + errMsg(e);
     }
   };
+
+  // =====================================================================
+  // ONBOARDING TUTORIAL
+  // =====================================================================
+  // Walks first-time users through Settings: each tab in turn, then ends
+  // by pointing at IMPORT and inviting them to close the modal.
+  //
+  // State stored in misc:onboardingComplete (boolean). Once true, the
+  // tutorial never auto-runs again (manual rerun TBD if asked for).
+  //
+  // Architecture: a small pure state machine (validated by test-tutorial-
+  // machine.js) drives a DOM renderer. Each step is either:
+  //   - mode "click": user advances via NEXT button
+  //   - mode "wait":  tutorial waits for a named gesture (e.g. opening
+  //                   settings, switching tabs, closing the modal). Other
+  //                   gestures are ignored — user can't accidentally skip.
+  // The renderer dims the screen with 4 panels around a transparent
+  // spotlight "hole" so the target element remains clickable.
+
+  // Bound to false on every panel switch / modal open / modal close so
+  // the tutorial gesture observers can see them without us threading a
+  // reference through every callsite. JS callers fire `tutEmit(name)`.
+  let tutorial = null;  // active tutorial controller (or null)
+
+  // Fire a tutorial gesture event. No-op when no tutorial is running.
+  // Call sites are added in the modal/tab handlers below.
+  function tutEmit(gesture) {
+    if (tutorial) tutorial.observe(gesture);
+  }
+
+  // Step definitions. Targets are CSS selectors resolved at render time
+  // (so dynamically-mounted children work). `position` controls which
+  // side of the spotlight the tooltip sits on; "auto" picks the side
+  // with the most room.
+  const TUTORIAL_STEPS = [
+    {
+      id: "welcome",
+      mode: "click",
+      target: null,  // no spotlight — centered welcome card
+      title: "Welcome to Smart Story",
+      body: "Smart Story is an illustrated AI chat: you design a character, talk with them, and the scenes get illustrated as the story unfolds. Quick tour? About a minute.",
+      nextLabel: "Take the tour",
+    },
+    {
+      id: "openSettings",
+      mode: "wait",
+      waitFor: "settings-opened",
+      target: "#settingsBtn",
+      position: "bottom",
+      title: "Open Settings",
+      body: "Tap the <b>⚙ gear</b> in the top right. That's where you build the world.",
+      waiting: "Waiting for you to open Settings…",
+    },
+    {
+      id: "tabChar",
+      mode: "wait",
+      waitFor: "panel-panelChar",
+      target: '.settingsTab[data-panel="panelChar"]',
+      position: "bottom",
+      title: "1. CHARACTER",
+      body: "This is who you'll be talking to — name, voice, manner, appearance. You can write it yourself or tap <b>✨ ASSIST</b> to have the AI draft a character for you. Tap the CHARACTER tab now.",
+      waiting: "Waiting for the CHARACTER tab…",
+    },
+    {
+      id: "tabYou",
+      mode: "wait",
+      waitFor: "panel-panelYou",
+      target: '.settingsTab[data-panel="panelYou"]',
+      position: "bottom",
+      title: "2. YOU",
+      body: "Your persona — how the character sees you. Optional. Defaults to a generic <i>you</i>. Tap the YOU tab to see it.",
+      waiting: "Waiting for the YOU tab…",
+    },
+    {
+      id: "tabScene",
+      mode: "wait",
+      waitFor: "panel-panelScene",
+      target: '.settingsTab[data-panel="panelScene"]',
+      position: "bottom",
+      title: "3. SCENE",
+      body: "Sets the stage — where and when. Also the art style for cutscenes (10 presets plus custom), auto-illustrate, and suggested actions. Tap SCENE.",
+      waiting: "Waiting for the SCENE tab…",
+    },
+    {
+      id: "tabMem",
+      mode: "wait",
+      waitFor: "panel-panelMem",
+      target: '.settingsTab[data-panel="panelMem"]',
+      position: "bottom",
+      title: "4. MEMORY",
+      body: "Long-lived facts the character should always know — your name, shared history, what year it is. Different from <i>tracked story state</i>, which lives on a single scene. Tap MEMORY.",
+      waiting: "Waiting for the MEMORY tab…",
+    },
+    {
+      id: "tabHist",
+      mode: "wait",
+      waitFor: "panel-panelHist",
+      target: '.settingsTab[data-panel="panelHist"]',
+      position: "bottom",
+      title: "5. HISTORY",
+      body: "All your saved scenes live here. From this tab you can also <b>import</b> a character from FurAI, TavernAI, or ai-character-chat — or <b>export</b> a backup. Tap HISTORY.",
+      waiting: "Waiting for the HISTORY tab…",
+    },
+    {
+      id: "importHint",
+      mode: "click",
+      target: "#histImport",
+      position: "top",
+      title: "Import a character",
+      body: "If you already have a character from another AI chat app, <b>📥 IMPORT</b> brings them in — character card, chat history, or both. You can also start from scratch. Either works.",
+      nextLabel: "Got it",
+    },
+    {
+      id: "closeSettings",
+      mode: "wait",
+      waitFor: "settings-closed",
+      target: '#settingsModal .modalClose',
+      position: "bottom",
+      title: "Close Settings to begin",
+      body: "Save your work, close Settings, then press <b>📖 NEW SCENE</b> in the toolbar to start chatting. Welcome aboard.",
+      waiting: "Waiting for you to close Settings…",
+    },
+  ];
+
+  // The pure state-machine factory (mirrors /tmp/test-tutorial-machine.js).
+  function makeTutorialMachine(steps) {
+    let index = 0, done = false, skipped = false;
+    const snap = () => ({ index, step: steps[index] || null, done, skipped });
+    return {
+      get state() { return snap(); },
+      next() {
+        if (done || skipped) return snap();
+        const step = steps[index];
+        if (!step) { done = true; return snap(); }
+        if (step.mode === "wait") return snap();
+        index++;
+        if (index >= steps.length) done = true;
+        return snap();
+      },
+      skip() {
+        if (done || skipped) return snap();
+        skipped = true;
+        return snap();
+      },
+      observe(gesture) {
+        if (done || skipped) return snap();
+        const step = steps[index];
+        if (!step) return snap();
+        if (step.mode !== "wait") return snap();
+        if (step.waitFor !== gesture) return snap();
+        index++;
+        if (index >= steps.length) done = true;
+        return snap();
+      },
+    };
+  }
+
+  // Position the spotlight + tooltip for the current step.
+  // Returns nothing — pure side-effects on the overlay DOM.
+  function renderTutorialStep(step, machineState, controller) {
+    const overlay = $("tutorialOverlay");
+    overlay.innerHTML = "";  // clear last step's elements
+
+    // ── Spotlight + dim panels ──────────────────────────────────
+    let rect = null;
+    if (step.target) {
+      const el = document.querySelector(step.target);
+      if (el) {
+        // Scroll into view if needed (e.g. a tab off-screen on mobile).
+        el.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+        const r = el.getBoundingClientRect();
+        // Pad the spotlight so it doesn't crowd the element.
+        const pad = 6;
+        rect = {
+          x: Math.max(0, r.left - pad),
+          y: Math.max(0, r.top - pad),
+          w: Math.min(window.innerWidth, r.width + pad * 2),
+          h: Math.min(window.innerHeight, r.height + pad * 2),
+        };
+      }
+    }
+
+    if (rect) {
+      // Build 4 dim panels around the spotlight hole.
+      const W = window.innerWidth, H = window.innerHeight;
+      const mk = (left, top, width, height) => {
+        const d = document.createElement("div");
+        d.className = "tutDim";
+        Object.assign(d.style, { left: left+"px", top: top+"px", width: width+"px", height: height+"px" });
+        // Clicking the dim area = SKIP-equivalent (NOT — it dismisses tooltip
+        // confusion). Actually it should be a no-op so users don't lose
+        // progress by missing the spotlight. Leave click as a no-op.
+        overlay.appendChild(d);
+      };
+      mk(0, 0, W, rect.y);                              // top strip
+      mk(0, rect.y + rect.h, W, H - (rect.y + rect.h)); // bottom strip
+      mk(0, rect.y, rect.x, rect.h);                    // left strip
+      mk(rect.x + rect.w, rect.y, W - (rect.x + rect.w), rect.h); // right strip
+
+      const spot = document.createElement("div");
+      spot.id = "tutSpotlight";
+      Object.assign(spot.style, { left: rect.x+"px", top: rect.y+"px", width: rect.w+"px", height: rect.h+"px" });
+      overlay.appendChild(spot);
+    } else {
+      // No target → full-screen dim.
+      const full = document.createElement("div");
+      full.className = "tutDimFull";
+      overlay.appendChild(full);
+    }
+
+    // ── Tooltip ──────────────────────────────────────────────────
+    const tip = document.createElement("div");
+    tip.id = "tutTooltip";
+    tip.innerHTML = `
+      <div class="tutTitle">${escapeHtml(step.title || "")}</div>
+      <div class="tutBody">${step.body || ""}</div>
+      ${step.mode === "wait" ? `<div class="tutWaiting">${escapeHtml(step.waiting || "Waiting for you…")}</div>` : ""}
+      <div class="tutActions">
+        <button class="tutSkip" type="button">Skip tour</button>
+        <div class="tutProgress">${machineState.index + 1} / ${TUTORIAL_STEPS.length}</div>
+        ${step.mode === "click" ? `<button class="tutNext" type="button">${escapeHtml(step.nextLabel || "Next")}</button>` : ""}
+      </div>
+    `;
+    overlay.appendChild(tip);
+
+    // Position the tooltip relative to the spotlight (or center it if none).
+    positionTutTooltip(tip, rect, step.position || "auto");
+
+    // Wire actions.
+    tip.querySelector(".tutSkip").onclick = () => controller.skip();
+    const nextBtn = tip.querySelector(".tutNext");
+    if (nextBtn) nextBtn.onclick = () => controller.advance();
+  }
+
+  // Position tooltip near the spotlight rect. `pref` is "top", "bottom",
+  // "left", "right", or "auto" (most space). Falls back to centered if
+  // there's no rect.
+  function positionTutTooltip(tip, rect, pref) {
+    const tipW = 320, tipH = 180; // rough — actual is measured after attach
+    const W = window.innerWidth, H = window.innerHeight;
+    if (!rect) {
+      // Center.
+      tip.style.left = Math.max(16, (W - tipW) / 2) + "px";
+      tip.style.top  = Math.max(16, (H - tipH) / 2) + "px";
+      return;
+    }
+    // Measure after attach.
+    const tr = tip.getBoundingClientRect();
+    const tw = tr.width, th = tr.height;
+    const gap = 14;
+
+    function placeBelow()  { return { x: clamp(rect.x + rect.w/2 - tw/2, 8, W - tw - 8), y: Math.min(H - th - 8, rect.y + rect.h + gap) }; }
+    function placeAbove()  { return { x: clamp(rect.x + rect.w/2 - tw/2, 8, W - tw - 8), y: Math.max(8, rect.y - th - gap) }; }
+    function placeRight()  { return { x: Math.min(W - tw - 8, rect.x + rect.w + gap), y: clamp(rect.y + rect.h/2 - th/2, 8, H - th - 8) }; }
+    function placeLeft()   { return { x: Math.max(8, rect.x - tw - gap), y: clamp(rect.y + rect.h/2 - th/2, 8, H - th - 8) }; }
+
+    let pos;
+    if (pref === "bottom") pos = placeBelow();
+    else if (pref === "top") pos = placeAbove();
+    else if (pref === "right") pos = placeRight();
+    else if (pref === "left") pos = placeLeft();
+    else {
+      // Auto: pick the side with the most room.
+      const room = {
+        bottom: H - (rect.y + rect.h),
+        top:    rect.y,
+        right:  W - (rect.x + rect.w),
+        left:   rect.x,
+      };
+      const best = Object.entries(room).sort((a, b) => b[1] - a[1])[0][0];
+      pos = best === "bottom" ? placeBelow() : best === "top" ? placeAbove() : best === "right" ? placeRight() : placeLeft();
+    }
+    tip.style.left = pos.x + "px";
+    tip.style.top  = pos.y + "px";
+  }
+
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  // Start the tutorial. Returns the controller so callers can drive it.
+  function startTutorial() {
+    const machine = makeTutorialMachine(TUTORIAL_STEPS);
+    const overlay = $("tutorialOverlay");
+    overlay.classList.add("active");
+    overlay.setAttribute("aria-hidden", "false");
+
+    let resizeRaf = null;
+    function rerender() {
+      const s = machine.state;
+      if (s.done || s.skipped) { finish(); return; }
+      if (s.step) renderTutorialStep(s.step, s, controller);
+    }
+    function onResize() {
+      if (resizeRaf) cancelAnimationFrame(resizeRaf);
+      resizeRaf = requestAnimationFrame(rerender);
+    }
+    async function finish() {
+      overlay.classList.remove("active");
+      overlay.innerHTML = "";
+      overlay.setAttribute("aria-hidden", "true");
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("scroll", onResize, true);
+      tutorial = null;
+      try { await setMisc("onboardingComplete", true); }
+      catch (e) { console.warn("[tutorial] couldn't save completion:", e); }
+    }
+
+    const controller = {
+      advance() { machine.next(); rerender(); },
+      skip()    { machine.skip(); rerender(); },
+      observe(gesture) {
+        machine.observe(gesture);
+        rerender();
+      },
+    };
+
+    window.addEventListener("resize", onResize);
+    // Scroll capture so we re-place the tooltip when target moves.
+    window.addEventListener("scroll", onResize, true);
+
+    tutorial = controller;
+    rerender();
+    return controller;
+  }
+
+  // Manual rerun (exposed for future "Replay tour" button — not wired
+  // anywhere yet, but reachable from devtools as `window.__startTutorial`).
+  window.__startTutorial = startTutorial;
 
   // =====================================================================
   // BOOT
@@ -3098,6 +4045,22 @@
     resolveCharAvatar();
     resolveUserAvatar();
     state = "READY";
+
+    // First-run onboarding. We gate on misc:onboardingComplete, AND on
+    // whether the user actually looks new (no chats, no character set) —
+    // someone restoring from a backup before we've seen them shouldn't
+    // get the tutorial despite having a fresh onboarding flag.
+    try {
+      const seen = await getMisc("onboardingComplete", false);
+      const looksNew = chats.length === 0 && !character.name && !character.description;
+      if (!seen && looksNew) {
+        // Small delay so the user sees the rendered UI before the dim
+        // overlay appears — gives a sense of "what is this app" first.
+        setTimeout(() => { try { startTutorial(); } catch (e) { console.warn("[tutorial] failed to start:", e); } }, 400);
+      }
+    } catch (e) {
+      console.warn("[boot] onboarding check failed:", e);
+    }
   }
 
   if (navigator.storage && navigator.storage.persist) {
