@@ -5,7 +5,7 @@ $meta
   async dynamic(inputs) =>
     return {
       title: "Smart Story — Illustrated AI Chat",
-      description: "Chat with a character of your own design. The story is illustrated as it unfolds — AI writes the scene, AI paints it.",
+      description: "Chat with a character of your own design, the story is illustrated as it unfolds. Import your history from Fur-Ai, SillyTavern, Ai-Character-Chat, and more!",
     };
 deps = {import:ai-character-chat-dependencies-v1}
 aiTextPlugin = {import:ai-text-plugin}
@@ -184,6 +184,12 @@ async chatReply(messages, character, personality, scenario, trackedInfo, onChunk
     if(m.role === "system") {
       return String(m.content).replace(/\s+/g, " ").trim();
     }
+    // Narrator messages are scene description prose. Render with a
+    // bracketed [scene] label so the AI sees them as continuity
+    // narration — context to react to, not lines to mimic.
+    if(m.role === "narrator") {
+      return `*[scene]: ${String(m.content).replace(/\s+/g, " ").trim()}*`;
+    }
     // Multi-character: assistant messages may carry an explicit
     // speakerName. Fall back to the replying character's name for old
     // single-character data.
@@ -245,6 +251,120 @@ async chatReply(messages, character, personality, scenario, trackedInfo, onChunk
   } catch(e) {
     console.error("chatReply setup failed:", e);
     return { stream: null, charName, error: (e && e.message) || String(e) };
+  }
+
+// =====================================================================
+// NARRATOR — a non-character voice that describes scene context
+// =====================================================================
+// Generates a short narrative beat (2-4 sentences) that DOES NOT speak
+// for any character. It describes setting, mood, passage of time, an
+// environmental change, a sensory detail, a small action no character
+// "owns" — anything that pushes the scene forward without putting
+// words in someone's mouth.
+//
+// Returns {stream, error?} matching chatReply's shape so the HTML side
+// can drain it through the existing awaitInflight helper.
+//
+// Why a dedicated function vs. chatReply with a "narrator character"?
+// Because the narrator is structurally different: no name, no dialogue,
+// no [[Speaker]]: prefix, no first-person voice. The prompt is shaped
+// for prose description rather than character roleplay. Trying to bend
+// chatReply into this role would distort its prompts for everyone else.
+async narrate(messages, character, personality, scenario, trackedInfo, otherCharacters, onChunk) =>
+  let scenarioText = scenario ? String(scenario).trim() : "";
+  let tracked = trackedInfo ? String(trackedInfo).trim() : "";
+
+  // The cast block lists every character in the scene WITH their name
+  // and appearance — the narrator may reference them by name and
+  // describe what they look like, but should never voice them.
+  let castLines = [];
+  let primaryName = (character && character.name) ? String(character.name).trim() : "";
+  let primaryAppr = (character && character.appearance) ? String(character.appearance).trim() : "";
+  if(primaryName || primaryAppr) {
+    castLines.push(`${primaryName || "(unnamed)"}: ${primaryAppr || "no appearance set"}`);
+  }
+  if(Array.isArray(otherCharacters)) {
+    for(let oc of otherCharacters) {
+      let n = (oc && oc.name) ? String(oc.name).trim() : "";
+      let a = (oc && oc.appearance) ? String(oc.appearance).trim() : "";
+      if(n || a) castLines.push(`${n || "(unnamed)"}: ${a || "no appearance set"}`);
+    }
+  }
+  let pName = (personality && personality.name) ? String(personality.name).trim() : "";
+  let pAppr = (personality && personality.appearance) ? String(personality.appearance).trim() : "";
+  if(pName || pAppr) castLines.push(`${pName || "the user"} (the seeker): ${pAppr || "no appearance set"}`);
+
+  // Conversation context. Same trimming/labeling as chatReply, with the
+  // important difference that NARRATOR lines (role=narrator) get a bare
+  // italic-bracketed label so the model sees prior narration as
+  // continuity, not as something a character said.
+  let seekerLabel = pName || "User";
+  let trimmed = (messages || []).slice(-14);
+  let convo = trimmed.map(m => {
+    if(m.role === "narrator") {
+      return `*[scene]: ${String(m.content).replace(/\s+/g, " ").trim()}*`;
+    }
+    if(m.role === "system") {
+      return String(m.content).replace(/\s+/g, " ").trim();
+    }
+    let who = m.role === "user" ? seekerLabel : (m.speakerName || primaryName || "Character");
+    return `[[${who}]]: ${String(m.content).replace(/\s+/g, " ").trim()}`;
+  }).join("\n");
+
+  let scenarioBlock = scenarioText ? ["", "THE SCENE:", scenarioText].join("\n") : "";
+  let trackedBlock = tracked ? ["", "TRACKED STATE (canonical facts you must respect):", tracked].join("\n") : "";
+  let castBlock = castLines.length ? ["", "WHO IS IN THE SCENE:", ...castLines].join("\n") : "";
+  let token = Math.random().toString(36).slice(2, 8);
+
+  let instruction = [
+    "You are the NARRATOR of an unfolding scene. You are not a character.",
+    "You do not speak. You do not have a name. Your role is to describe —",
+    "to set the stage, mark passage of time, fill in sensory detail, note",
+    "a shift in mood, a small environmental change, a sound from somewhere",
+    "off-page. You give the scene depth and breath between dialogue.",
+    castBlock,
+    scenarioBlock,
+    trackedBlock,
+    "",
+    "Continue the scene with a NARRATIVE BEAT — 2 to 4 sentences, prose,",
+    "no dialogue, no internal monologue from any character. Describe what",
+    "is happening AROUND the characters, or to the moment they're in:",
+    "the light shifting, a sound in the distance, the weight of a pause,",
+    "the air growing colder, what the room smells like, what time of day",
+    "it has become. You may briefly reference what a character is",
+    "physically doing if it's incidental (\"his hand drifted toward the",
+    "lamp\"), but you must NOT have them speak, think, or take a deliberate",
+    "action that drives the plot.",
+    "",
+    "Style:",
+    "- Specific, sensory, grounded. No purple prose.",
+    "- Stay in present-tense prose, third-person omniscient.",
+    "- Do not address the reader. Do not use second person (\"you\").",
+    "- No character voice. No quoted dialogue. No first-person.",
+    "- Do not start with a character's name as if they're speaking.",
+    "- Do not end with a question.",
+    `(Internal variety token — ignore: ${token}.)`,
+    "",
+    "<MESSAGES>",
+    convo,
+    "</MESSAGES>",
+    "",
+    ">>> TASK: Write a single short narrative beat continuing the scene. Just the prose, no preamble, no asterisks, no quotes.",
+  ].filter(Boolean).join("\n");
+
+  try {
+    let stream = root.aiTextPlugin({
+      instruction,
+      startWith: "",
+      stopSequences: ["\n\n[[", "\n[[", "\n>>>"],
+      onChunk: (d) => {
+        if(onChunk && d && d.textChunk) onChunk(d.textChunk);
+      },
+    });
+    return { stream };
+  } catch(e) {
+    console.error("narrate setup failed:", e);
+    return { stream: null, error: (e && e.message) || String(e) };
   }
 
 // =====================================================================
@@ -465,6 +585,11 @@ async generateCutscene(focusMessage, recentMessages, character, personality, sce
     // a speaker prefix so the director AI reads them as context.
     if(m.role === "system") {
       return String(m.content || "").replace(/\s+/g, " ").trim();
+    }
+    // Narrator beats are scene description prose. Tag them so the
+    // director can pull mood/setting from them without misattributing.
+    if(m.role === "narrator") {
+      return `[scene] ${String(m.content || "").replace(/\s+/g, " ").trim()}`;
     }
     let who;
     if(m.role === "user") {

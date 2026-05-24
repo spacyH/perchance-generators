@@ -11,6 +11,67 @@
     --err: #d4736b; --err-bg: #2d1a1a;
     --shadow: 0 6px 20px rgba(0,0,0,0.35); --shadow-sm: 0 2px 6px rgba(0,0,0,0.25);
   }
+  /* Alternate themes — applied via a class on <html>. Each block
+     overrides only the variables that change; paper/err/shadow are
+     intentionally consistent across themes so character bubbles +
+     errors look identical regardless of palette. */
+  html.theme-twilight {
+    --bg: #16121e; --surface: #211a2c; --surface-2: #2b2238; --surface-3: #3b3148;
+    --ink: #ece6f2; --ink-dim: #b0a4c2; --ink-faint: #6e6580;
+    --accent: #b48cf5; --accent-hi: #c9a8ff; --accent-dim: #7a5fa8;
+  }
+  html.theme-ember {
+    --bg: #1c1410; --surface: #2a1d17; --surface-2: #34251e; --surface-3: #463127;
+    --ink: #f0e6dc; --ink-dim: #c4a896; --ink-faint: #7a6258;
+    --accent: #e07a3c; --accent-hi: #f0975a; --accent-dim: #9b5326;
+  }
+  html.theme-forest {
+    --bg: #161e18; --surface: #1f2a22; --surface-2: #28362b; --surface-3: #354536;
+    --ink: #e4ebdc; --ink-dim: #a4b09a; --ink-faint: #687060;
+    --accent: #8aab6e; --accent-hi: #a4c488; --accent-dim: #5b7c47;
+  }
+  html.theme-slate {
+    --bg: #161a1f; --surface: #1f242b; --surface-2: #282e37; --surface-3: #353c47;
+    --ink: #e4e8ed; --ink-dim: #a8aeb8; --ink-faint: #6c7280;
+    --accent: #6ec3d4; --accent-hi: #8fd6e4; --accent-dim: #4a8a98;
+  }
+  /* Theme swatch picker — small round color samples in Settings → SCENE. */
+  .themeSwatchRow {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+  .themeSwatch {
+    width: 36px; height: 36px; padding: 0; cursor: pointer;
+    border-radius: 50%; border: 2px solid var(--surface-3);
+    transition: all 150ms; position: relative;
+    background: transparent;  /* the gradient lives on the inner span */
+  }
+  .themeSwatch:hover { transform: scale(1.08); border-color: var(--ink-dim); }
+  .themeSwatch.active { border-color: var(--ink); border-width: 3px; }
+  .themeSwatch .swatchDot {
+    position: absolute; inset: 2px;
+    border-radius: 50%; display: block;
+    /* Two-stop gradient: accent into surface. Gives a clear sense of
+       "what dominates the look" per theme. */
+    background: linear-gradient(135deg, var(--sw-accent) 0% 50%, var(--sw-surface) 50% 100%);
+  }
+  .themeSwatch[data-theme="default"]   { --sw-accent: #d4be93; --sw-surface: #232831; }
+  .themeSwatch[data-theme="twilight"]  { --sw-accent: #c9a8ff; --sw-surface: #211a2c; }
+  .themeSwatch[data-theme="ember"]     { --sw-accent: #f0975a; --sw-surface: #2a1d17; }
+  .themeSwatch[data-theme="forest"]    { --sw-accent: #a4c488; --sw-surface: #1f2a22; }
+  .themeSwatch[data-theme="slate"]     { --sw-accent: #8fd6e4; --sw-surface: #1f242b; }
+  .themeSwatch .swatchLabel {
+    position: absolute; left: 50%; bottom: -18px;
+    transform: translateX(-50%);
+    font-size: 9px; letter-spacing: 0.5px;
+    color: var(--ink-faint); text-transform: uppercase;
+    white-space: nowrap; opacity: 0;
+    transition: opacity 150ms;
+    pointer-events: none;
+  }
+  .themeSwatch:hover .swatchLabel,
+  .themeSwatch.active .swatchLabel { opacity: 1; }
+  .themeSwatchRow { padding-bottom: 22px; }  /* room for hover label */
   * { box-sizing: border-box; }
   html, body { background: var(--bg); }
   body {
@@ -111,6 +172,42 @@
     border-top: 1px dashed var(--surface-3);
     border-bottom: 1px dashed var(--surface-3);
   }
+  /* Narrator beats — substantive prose describing scene context. Wider
+     than system notes, full italic paragraph, with a NARRATOR label
+     above. Has edit/regen/delete actions like assistant messages but
+     no avatar. */
+  .msg.narrator {
+    display: grid;
+    grid-template-columns: 1fr;
+    margin: 18px auto;
+    max-width: 92%;
+    padding: 0 6%;
+  }
+  .msg.narrator .msgWho {
+    font-weight: 600; font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--accent-dim); margin-bottom: 6px; text-align: center;
+  }
+  .msg.narrator .bubble {
+    background: transparent;
+    color: var(--ink-dim);
+    font-family: 'Lora', Georgia, serif;
+    font-style: italic;
+    font-size: 14px;
+    line-height: 1.65;
+    text-align: center;
+    padding: 4px 12px;
+    border-left: 2px solid var(--accent-dim);
+    border-right: 2px solid var(--accent-dim);
+    border-radius: 0;
+    box-shadow: none;
+    background-image: none;
+  }
+  .msg.narrator .cutscene { margin-top: 8px; }
+  .msg.narrator .msgActions {
+    justify-content: center;
+    opacity: 0.4; transition: opacity 150ms;
+  }
+  .msg.narrator:hover .msgActions, .msg.narrator:focus-within .msgActions { opacity: 1; }
   @media (max-width: 500px) {
     .msg.user, .msg.char { grid-template-columns: 1fr; max-width: 92%; }
     .msg .avatar { display: none; }
@@ -439,9 +536,13 @@
   .speakerRowBtn:hover { background: var(--surface-3); border-color: var(--accent); }
   .speakerRowBtn:disabled { opacity: 0.4; cursor: not-allowed; }
   /* When the chat has only 1 character (no need for a "Reply as:"
-     dropdown), hide the label + select but keep the +Add button. */
+     dropdown), hide the label + select but keep the action buttons. */
   #speakerRow.solo #speakerLabel,
-  #speakerRow.solo #speakerSelect { display: none; }
+  #speakerRow.solo #speakerSelect,
+  #speakerRow.no-roster #speakerLabel,
+  #speakerRow.no-roster #speakerSelect { display: none; }
+  /* Empty-roster legacy chats: hide the ✕ Remove button entirely. */
+  #speakerRow.no-roster #removeCharacterBtn { display: none; }
   .tbtn {
     flex: 1; font-family: inherit; font-weight: 600; font-size: 12px;
     letter-spacing: 0.5px; padding: 9px 12px; cursor: pointer; user-select: none;
@@ -884,13 +985,15 @@
          shown when the chat's roster has 2+ characters. Lets the user
          choose who replies to their next message. -->
     <!-- Speaker / cast row. Shown whenever the chat has a non-empty
-         roster. Houses (a) the "Reply as:" dropdown when there are 2+
-         characters, and (b) the "+ Add character" button to bring a
-         new character into the scene mid-conversation. -->
+         roster. Houses the "Reply as:" dropdown (2+ characters only),
+         and roster-management + narrator buttons that are always
+         reachable. -->
     <div id="speakerRow" hidden>
       <label id="speakerLabel" for="speakerSelect">Reply as:</label>
       <select id="speakerSelect" aria-label="Choose which character replies"></select>
+      <button id="narrateBtn" class="speakerRowBtn" title="Generate a narrative beat — scene description without character dialogue">📜 Narrate</button>
       <button id="addCharacterBtn" class="speakerRowBtn" title="Bring a new character into this scene">✚ Add</button>
+      <button id="removeCharacterBtn" class="speakerRowBtn" title="Remove a character from this scene">✕ Remove</button>
     </div>
     <div id="inputRow">
       <textarea id="input" rows="1" placeholder="Write your reply… (Enter to send)" disabled></textarea>
@@ -1008,6 +1111,11 @@
             <span class="ico">✨</span><span>Invent a scenario (uses character if set)</span>
           </button>
           <div id="scenarioAssistStatus" class="assistStatus"></div>
+        </div>
+        <div style="margin-top: 24px;">
+          <label style="display:block; font-weight:600; font-size:11px; letter-spacing:0.5px; color:var(--ink); text-transform:uppercase; margin-bottom:8px;">Theme</label>
+          <div id="themeSwatchRow" class="themeSwatchRow"></div>
+          <div class="hint">Pick a color palette for the app. Changes apply immediately and persist across sessions.</div>
         </div>
         <div style="margin-top: 24px;">
           <label style="display:block; font-weight:600; font-size:11px; letter-spacing:0.5px; color:var(--ink); text-transform:uppercase; margin-bottom:8px;">Illustration settings</label>
@@ -1278,6 +1386,32 @@
         <button id="addCharCancel" class="secondaryBtn">CANCEL</button>
         <div class="spacer"></div>
         <button id="addCharConfirm" class="saveBtn" disabled>BRING IN</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Remove-character-from-scene modal — pick a roster member to leave
+     the scene. Single-select. The character isn't deleted from the
+     library; they just exit this scene. Past messages from them stay
+     intact. -->
+<div id="removeCharModal" class="modal" role="dialog" aria-label="Remove a character from this scene">
+  <div class="modalCard">
+    <div class="modalHeader">
+      <div class="modalTitle">✕ Send a character off</div>
+      <button class="modalClose" data-close="removeCharModal">CANCEL</button>
+    </div>
+    <div class="modalBody">
+      <div class="hint" style="margin-bottom: 12px;">
+        Pick a character to leave the scene. Their past messages stay; they just
+        won't be in the scene anymore. A short system note will be added so the
+        AI knows. They can be brought back later with <b>✚ Add</b>.
+      </div>
+      <div id="removeCharList"></div>
+      <div class="panelActions">
+        <button id="removeCharCancel" class="secondaryBtn">CANCEL</button>
+        <div class="spacer"></div>
+        <button id="removeCharConfirm" class="saveBtn" disabled>SEND OFF</button>
       </div>
     </div>
   </div>
@@ -1740,7 +1874,7 @@
   async function loadSettings() {
     const s = await getMisc("settings", null);
     settings = (!s || typeof s !== "object")
-      ? { autoIllustrate: true, suppressionWindow: 2, artStyleKey: "default", customStylePrefix: "", customStyleNegative: "", suggestActions: false }
+      ? { autoIllustrate: true, suppressionWindow: 2, artStyleKey: "default", customStylePrefix: "", customStyleNegative: "", suggestActions: false, themeKey: "default" }
       : {
           autoIllustrate: s.autoIllustrate !== false,
           suppressionWindow: Math.max(1, Math.min(5, parseInt(s.suppressionWindow) || 2)),
@@ -1748,6 +1882,7 @@
           customStylePrefix: s.customStylePrefix || "",
           customStyleNegative: s.customStyleNegative || "",
           suggestActions: !!s.suggestActions,
+          themeKey: s.themeKey || "default",
         };
   }
   async function saveSettings() { await setMisc("settings", settings); }
@@ -2056,6 +2191,26 @@
       scrollChatToBottom();
       return wrap;
     }
+    // Narrator beats are substantive scene-description prose. Get a
+    // bubble + actions like assistant messages (edit, regen, delete,
+    // illustrate) but no avatar, and a "NARRATOR" label instead of a
+    // character name.
+    if (role === "narrator") {
+      wrap.className = "msg narrator";
+      if (opts.id) wrap.dataset.id = opts.id;
+      wrap.innerHTML = `
+        <div class="msgWho">NARRATOR</div>
+        <div class="bubble"></div>
+        <div class="cutscene" hidden></div>
+        <div class="msgActions"></div>
+      `;
+      setBubbleText(wrap, text || "", "char"); // reuse "char" rendering path (prose, not user input)
+      if (opts.cutsceneUrl) renderCutsceneImage(wrap, opts.cutsceneUrl);
+      buildBubbleActions(wrap);
+      $("messages").appendChild(wrap);
+      scrollChatToBottom();
+      return wrap;
+    }
     wrap.className = "msg " + (role === "user" ? "user" : "char");
     if (opts.id) wrap.dataset.id = opts.id;
     if (opts.characterId) wrap.dataset.characterId = String(opts.characterId);
@@ -2168,7 +2323,10 @@
       return;
     }
     const isChar = bubble.classList.contains("char");
-    if (isChar) {
+    const isNarrator = bubble.classList.contains("narrator");
+    // Illustrate is available on character bubbles AND narrator beats —
+    // both are substantive scene content worth illustrating.
+    if (isChar || isNarrator) {
       const id = parseInt(bubble.dataset.id, 10);
       const msg = currentMessages.find(m => m.id === id);
       const hasCutscene = msg && msg.cutsceneUrl;
@@ -2179,13 +2337,15 @@
       ));
     }
     slot.appendChild(mkActBtn("✎ edit", "Edit this message", () => beginEditBubble(bubble)));
-    if (isChar && hasPrecedingUser(bubble)) {
+    // Regen is available on char + narrator bubbles, both of which are
+    // AI-generated content with a preceding user (or scene) context.
+    if ((isChar || isNarrator) && hasPrecedingUser(bubble)) {
       slot.appendChild(mkActBtn("↻ regen", "Regenerate (drops following messages)", () => regenerateFromBubble(bubble)));
     }
     // "↻ Continue as X" — multi-character scenes only, on the LATEST
-    // assistant bubble only. Generates a fresh reply spoken by a
-    // different roster character without requiring a user message in
-    // between. Useful for character-to-character moments.
+    // assistant (character) bubble only. NOT on narrator beats — a
+    // narrator beat doesn't have a "speaker" so "continue as other" is
+    // meaningless there.
     if (isChar && isLatestAssistantBubble(bubble)) {
       const otherIds = continueAsCandidatesForBubble(bubble);
       if (otherIds.length === 1) {
@@ -2605,18 +2765,22 @@
     const row = $("speakerRow");
     const sel = $("speakerSelect");
     const addBtn = $("addCharacterBtn");
+    const removeBtn = $("removeCharacterBtn");
+    const narrateBtn = $("narrateBtn");
     if (!row || !sel) return;
     const ids = (currentChat && Array.isArray(currentChat.characterIds))
       ? currentChat.characterIds.filter(id => chatRoster.has(id))
       : [];
-    // Three states the row can be in:
-    //   - empty roster (legacy single-character chats with no library
-    //     entry): hide the row entirely.
-    //   - solo roster (1 character): show only the +Add button.
-    //   - multi roster (2+): show the "Reply as:" label + dropdown +
-    //     +Add button.
+    // Show the row whenever there's an active chat. Use modifier
+    // classes to control which child controls are visible:
+    //   .no-roster — empty roster (legacy single-character chats):
+    //                hide dropdown + ✕ Remove. Narrate + ✚ Add still work.
+    //   .solo      — 1 character in roster: hide dropdown + ✕ Remove
+    //                (can't remove the last one). Narrate + ✚ Add work.
+    //   (default)  — 2+ characters: show everything.
+    row.classList.toggle("no-roster", ids.length === 0);
     row.classList.toggle("solo", ids.length === 1);
-    if (ids.length === 0) {
+    if (!currentChat) {
       row.hidden = true;
       sel.innerHTML = "";
       return;
@@ -2636,7 +2800,7 @@
     }
     // The +Add button is always reachable when the row is shown. We
     // disable it if the library has no additional characters available.
-    // Async check kicked off — result lands later, button enables/disables.
+    // Async check — result lands later, button enables/disables.
     if (addBtn) {
       addBtn.disabled = false;
       listCharacters().then(all => {
@@ -2648,6 +2812,17 @@
           : "Bring a new character into this scene";
       }).catch(() => {});
     }
+    // Remove button: only enabled when roster has 2+ characters (the
+    // last one cannot be removed — would leave the scene with no speaker).
+    if (removeBtn) {
+      removeBtn.disabled = ids.length < 2;
+      removeBtn.title = ids.length < 2
+        ? "Scenes need at least one character. Add another before removing one."
+        : "Remove a character from this scene";
+    }
+    // Narrate button: always usable on an active chat. (Legacy chats
+    // with no roster still get a narrator from the global character.)
+    if (narrateBtn) narrateBtn.disabled = false;
   }
 
   // User picked a different replier. Persist on the chat row so it
@@ -2680,6 +2855,34 @@
         await bringCharacterIntoScene(picked);
       } catch (e) {
         showError("addChar", e);
+      }
+    };
+  }
+
+  // Narrate: generate a narrator beat (scene description prose) that
+  // continues the conversation without putting words in a character's
+  // mouth. Streams in like a normal reply but uses role:"narrator".
+  if ($("narrateBtn")) {
+    $("narrateBtn").onclick = () => {
+      if (!currentChat) return;
+      streamNarratorBeat().catch(e => showError("narrate", e));
+    };
+  }
+
+  // Remove a character from the scene. Open the modal with the current
+  // roster as candidates; the user picks one.
+  if ($("removeCharacterBtn")) {
+    $("removeCharacterBtn").onclick = async () => {
+      if (!currentChat) return;
+      const rosterIds = (currentChat.characterIds || []).filter(id => chatRoster.has(id));
+      if (rosterIds.length < 2) return;  // guard duplicate of refreshSpeakerPicker's disable
+      try {
+        const candidates = rosterIds.map(id => chatRoster.get(id)).filter(Boolean);
+        const picked = await pickCharacterToRemoveAsync(candidates);
+        if (!picked) return;
+        await sendCharacterOutOfScene(picked);
+      } catch (e) {
+        showError("removeChar", e);
       }
     };
   }
@@ -2910,6 +3113,121 @@
       await touchChat(currentChat.id);
     } catch (e) {
       showError("addChar.note", e);
+    }
+  }
+
+  // Show the remove-character modal. Resolves to a character id (the
+  // picked one) on confirm, or null on cancel. `candidates` is the
+  // roster (current chat's characters) since you can only remove what's
+  // currently in the scene.
+  function pickCharacterToRemoveAsync(candidates) {
+    return new Promise((resolve) => {
+      const list = $("removeCharList");
+      const confirmBtn = $("removeCharConfirm");
+      const cancelBtn = $("removeCharCancel");
+      list.innerHTML = "";
+      let pickedId = null;
+
+      const ordered = [...candidates].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      for (const c of ordered) {
+        const row = document.createElement("label");
+        row.className = "castPickRow";
+        const radio = document.createElement("input");
+        radio.type = "radio";
+        radio.name = "removeCharPick";
+        radio.value = String(c.id);
+        radio.addEventListener("change", () => {
+          if (radio.checked) {
+            pickedId = c.id;
+            confirmBtn.disabled = false;
+          }
+        });
+        const txt = document.createElement("div");
+        txt.style.flex = "1";
+        const nameEl = document.createElement("div");
+        nameEl.className = "castPickName";
+        nameEl.textContent = c.name || `(untitled #${c.id})`;
+        const descEl = document.createElement("div");
+        descEl.className = "castPickDesc";
+        descEl.textContent = c.description || "(no description)";
+        txt.appendChild(nameEl);
+        txt.appendChild(descEl);
+        row.appendChild(radio);
+        row.appendChild(txt);
+        list.appendChild(row);
+      }
+      confirmBtn.disabled = true;
+
+      const modalEl = $("removeCharModal");
+      function cleanup(answer) {
+        closeModal("removeCharModal");
+        confirmBtn.onclick = null;
+        cancelBtn.onclick = null;
+        if (cleanup._backdropListener) {
+          modalEl.removeEventListener("click", cleanup._backdropListener, true);
+          cleanup._backdropListener = null;
+        }
+        resolve(answer);
+      }
+      confirmBtn.onclick = () => cleanup(pickedId);
+      cancelBtn.onclick = () => cleanup(null);
+      const closeBtn = modalEl.querySelector('[data-close="removeCharModal"]');
+      if (closeBtn) closeBtn.onclick = () => cleanup(null);
+      function onBackdrop(ev) {
+        if (ev.target === modalEl) cleanup(null);
+      }
+      cleanup._backdropListener = onBackdrop;
+      modalEl.addEventListener("click", onBackdrop, true);
+      openModal("removeCharModal");
+    });
+  }
+
+  // Remove a character from the current scene. The library entry is
+  // NOT touched — only the chat's roster. Inserts a system note so the
+  // AI sees they've left. Past messages from this character stay
+  // visible and properly labeled (the per-message speakerName was
+  // denormalized at write time).
+  async function sendCharacterOutOfScene(charId) {
+    if (!currentChat) return;
+    if (!Array.isArray(currentChat.characterIds)) return;
+    if (!currentChat.characterIds.includes(charId)) return;
+    if (currentChat.characterIds.length <= 1) return;  // guard: can't remove the last one
+    const record = chatRoster.get(charId);
+    const name = (record && record.name) || "A character";
+    // Update roster + persist.
+    currentChat.characterIds = currentChat.characterIds.filter(id => id !== charId);
+    try {
+      await db.chats.update(currentChat.id, { characterIds: currentChat.characterIds });
+    } catch (e) { showError("removeChar.persist", e); return; }
+    // Update next-reply pointer if we just removed the active speaker.
+    if (nextReplyCharacterId === charId) {
+      nextReplyCharacterId = currentChat.characterIds[0] || null;
+      currentChat.nextReplyCharacterId = nextReplyCharacterId;
+      try { await db.chats.update(currentChat.id, { nextReplyCharacterId }); }
+      catch (e) { console.warn("[removeChar] nextReply persist:", e); }
+    }
+    // Drop from roster cache. Past messages still render correctly
+    // because their speakerName was stamped at write time.
+    chatRoster.delete(charId);
+    refreshSpeakerPicker();
+    // Insert the leave note. Same pattern as bringCharacterIntoScene's
+    // arrival note — stored as role:"system" so it shows up in chatReply
+    // history as bare context.
+    const noteText = `[${name} has left the scene.]`;
+    try {
+      const noteMsg = await addMessage(currentChat.id, "system", noteText, {
+        characterId: charId,
+        speakerName: name,
+      });
+      currentMessages.push({
+        id: noteMsg.id, role: "system", content: noteText,
+        characterId: charId, speakerName: name,
+      });
+      renderBubble("system", noteText, { id: noteMsg.id });
+      refreshAllActionVisibility();
+      await touchChat(currentChat.id);
+    } catch (e) {
+      showError("removeChar.note", e);
     }
   }
 
@@ -3218,6 +3536,91 @@
       if (state === "WRITING") state = "READY";
       enableInput(true);
       $("input").focus();
+    }
+  }
+
+  // Stream a narrator beat — short prose describing scene context, no
+  // character dialogue. Appends to the current conversation as a new
+  // message with role "narrator". Mirrors streamAssistantReply's flow
+  // (state guard, draw token, error paths, suggestions) but simpler:
+  // no speaker, no avatar, no Continue-As eligibility.
+  async function streamNarratorBeat() {
+    if (state === "WRITING") return;
+    if (!currentChat) return;
+    state = "WRITING";
+    const myTurn = ++drawId;
+    enableInput(false);
+    showTyping(true);
+
+    // Resolve the "primary" character context the narrator sees. For
+    // multi-character scenes we pass the active speaker as primary and
+    // the rest as otherCharacters, so the cast block has appearance data
+    // for everyone the narrator might reference.
+    const replier = resolveReplyingCharacter();
+    const primary = replier.record;
+    const others = otherCharactersForPrompt();
+
+    const bubble = renderBubble("narrator", "");
+    showTyping(false);
+
+    try {
+      const inflight = await root.narrate(
+        currentMessages, primary, personality, chatScenario(), chatTrackedInfo(),
+        others,
+        (chunk) => {
+          if (myTurn !== drawId) return;
+          appendBubbleText(bubble, chunk, "char");  // reuse "char" rendering — prose, not user text
+        },
+      );
+      if (myTurn !== drawId) return;
+      const result = await awaitInflight(inflight);
+      if (myTurn !== drawId) return;
+
+      let finalText = "";
+      let aborted = false;
+      let illustrateFlag = false;
+      if (result.kind === "ok") {
+        // Strip any stray quoted dialogue or [[Speaker]]: prefix that the
+        // model sometimes adds despite the instructions.
+        const cleaned = result.text.trim().replace(/^\[\[[^\]]+\]\]:\s*/i, "").trim();
+        const parsed = parseAndStripIllustrateTag(cleaned);
+        finalText = parsed.text;
+        illustrateFlag = parsed.illustrate;
+      } else if (result.kind === "aborted") {
+        aborted = true;
+      } else {
+        removeBubble(bubble);
+        renderErrorBubble("narrate", result.message);
+        showError("narrate", result.message);
+      }
+
+      if (finalText && !aborted) {
+        finalizeBubble(bubble, finalText, "char");
+        try {
+          const savedMsg = await addMessage(currentChat.id, "narrator", finalText, {});
+          bubble.dataset.id = savedMsg.id;
+          currentMessages.push({
+            id: savedMsg.id, role: "narrator", content: finalText,
+          });
+          refreshAllActionVisibility();
+          await touchChat(currentChat.id);
+          maybeAutoIllustrate(bubble, finalText, illustrateFlag, false);
+        } catch (e) {
+          showError("db.addMessage", e);
+        }
+      } else if (aborted) {
+        removeBubble(bubble);
+        setStatus("Narration cancelled.");
+      }
+    } catch (e) {
+      if (myTurn !== drawId) return;
+      removeBubble(bubble);
+      renderErrorBubble("narrate", errMsg(e));
+      showError("narrate", e);
+    } finally {
+      showTyping(false);
+      if (state === "WRITING") state = "READY";
+      enableInput(true);
     }
   }
 
@@ -4657,12 +5060,18 @@
     const bot = (botName || "{{char}}").trim() || "{{char}}";
     const user = (userName || "{{user}}").trim() || "{{user}}";
     return messages
-      // ACC has no concept of system/narrator messages. Drop them rather
-      // than attributing them to the character (which would distort the
-      // conversation). They survive in Smart Story backups, just not in
-      // the cross-app ACC format.
+      // ACC has no concept of system or narrator messages. System notes
+      // are dropped (they're tiny scene markers like "[X has joined]"
+      // that don't read well as character lines). Narrator beats are
+      // kept but rendered as bracketed scene-direction lines — they're
+      // substantive prose that adds story value, but they shouldn't be
+      // attributed to a character. Anyone re-importing into ACC sees a
+      // single "*scene*" line they can treat as flavor or strip.
       .filter(m => m.role !== "system")
       .map(m => {
+        if (m.role === "narrator") {
+          return `*${(m.content || "").trim()}*`;
+        }
         const speaker = m.role === "user" ? user : bot;
         return `${speaker}: ${m.content}`;
       }).join("\n\n");
@@ -5165,6 +5574,55 @@
   window.__startTutorial = startTutorial;
 
   // =====================================================================
+  // THEME
+  // =====================================================================
+  // Class-based theming: each named theme is a CSS class on <html>
+  // that overrides the design tokens. The "default" theme uses :root's
+  // baseline values (no class). User pick persists in settings.themeKey.
+
+  const THEMES = [
+    { key: "default",  label: "Default"  },
+    { key: "twilight", label: "Twilight" },
+    { key: "ember",    label: "Ember"    },
+    { key: "forest",   label: "Forest"   },
+    { key: "slate",    label: "Slate"    },
+  ];
+
+  // Apply the theme to the document. Removes any prior theme-* class
+  // and adds the new one. "default" means: no class (use :root vars).
+  function applyTheme(key) {
+    const html = document.documentElement;
+    for (const t of THEMES) html.classList.remove("theme-" + t.key);
+    if (key && key !== "default") html.classList.add("theme-" + key);
+  }
+
+  // Populate the swatch row in Settings → SCENE. Builds one button per
+  // theme; clicking picks + persists + applies immediately.
+  function renderThemeSwatches() {
+    const host = $("themeSwatchRow");
+    if (!host) return;
+    host.innerHTML = "";
+    const current = (settings && settings.themeKey) || "default";
+    for (const t of THEMES) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "themeSwatch" + (t.key === current ? " active" : "");
+      btn.dataset.theme = t.key;
+      btn.title = t.label;
+      btn.setAttribute("aria-label", `${t.label} theme`);
+      btn.innerHTML = `<span class="swatchDot"></span><span class="swatchLabel">${escapeHTML(t.label)}</span>`;
+      btn.onclick = async () => {
+        settings.themeKey = t.key;
+        try { await saveSettings(); } catch (e) { showError("theme.save", e); }
+        applyTheme(t.key);
+        // Update active state on all swatches without re-rendering.
+        host.querySelectorAll(".themeSwatch").forEach(el => el.classList.toggle("active", el.dataset.theme === t.key));
+      };
+      host.appendChild(btn);
+    }
+  }
+
+  // =====================================================================
   // PROFILE / ACHIEVEMENTS
   // =====================================================================
   // Lightweight progression layer over the existing data. Stats are
@@ -5343,7 +5801,7 @@
   // BOOT
   // =====================================================================
   function assertRoot() {
-    const required = ["openScene", "chatReply", "generateCutscene", "generateCharacterAvatar", "generateUserAvatar", "synthesizeCharacter", "synthesizePersona", "synthesizeScenario", "confirmAsync", "artStyleByKey", "listArtStyles", "updateTrackedInfo", "detectAndParseImport", "fetchImportFromUrl"];
+    const required = ["openScene", "chatReply", "narrate", "generateCutscene", "generateCharacterAvatar", "generateUserAvatar", "synthesizeCharacter", "synthesizePersona", "synthesizeScenario", "confirmAsync", "artStyleByKey", "listArtStyles", "updateTrackedInfo", "detectAndParseImport", "fetchImportFromUrl"];
     const missing = required.filter(fn => typeof root[fn] !== "function");
     if (missing.length) {
       throw new Error("Top-panel functions not loaded: " + missing.join(", "));
@@ -5360,6 +5818,11 @@
     await loadMemory();
     await loadSettings();
     await loadAvatarCaches();
+    // Apply persisted theme before anything renders so users don't see
+    // a brief flash of the default palette. (loadSettings already
+    // populated settings.themeKey.)
+    applyTheme(settings.themeKey || "default");
+    renderThemeSwatches();
     // Load the persisted set of acknowledged achievements + compute the
     // initial badge count.
     try {
