@@ -1,0 +1,801 @@
+$meta
+  header
+  tags = chat, ai, character, story, illustration, image generation, visual novel, perchance
+    mode = minimal
+  async dynamic(inputs) =>
+    return {
+      title: "Tableau — Illustrated AI Chat",
+      description: "Chat with a character of your own design. The story is illustrated as it unfolds — AI writes the scene, AI paints it.",
+    };
+deps = {import:ai-character-chat-dependencies-v1}
+aiTextPlugin = {import:ai-text-plugin}
+textToImagePlugin = {import:text-to-image-plugin}
+uploadPlugin = {import:upload-plugin}
+fullscreenButtonPlugin = {import:fullscreen-button-plugin}
+
+// Fallback replies if the chat AI completely fails.
+fallbackReply
+  *pauses, gathering thought* Give me a moment — the words slipped away.
+  *looks up* Try that again? Something didn't come through clearly.
+  *quiet, then* The page is blank. Ask again.
+
+output
+  text = [fallbackReply]
+
+// NOTE: list functions are auto-dedented — every nested block (if/while/try)
+// MUST use explicit { } braces. Indentation-only blocks will not transpile.
+
+// =====================================================================
+// CHAT AI — the storyteller voice that writes the narrative
+// =====================================================================
+// Each call returns { stream, charName, error? } so the caller can
+// .stop() the stream and decide post-processing. Streams emit chunks
+// via onChunk(textChunk). Final text comes from `await stream`.
+
+// --- Opening message ---------------------------------------------------
+// When the user starts a new chat, this writes the character's opening
+// turn — establishing the scene and inviting the user in. Mirrors the
+// chatReply structure but with no prior message history.
+//
+// `trackedInfo` is a freeform string of story state the user maintains
+// (locations, items, knowledge, relationships, time of day, etc.). It's
+// injected into the prompt so the character "knows" the state.
+async openScene(character, personality, scenario, trackedInfo, onChunk) =>
+  let charDesc = (character && character.description) ? String(character.description).trim() : "";
+  let charName = (character && character.name) ? String(character.name).trim() : "Character";
+  let scenarioText = scenario ? String(scenario).trim() : "";
+  let tracked = trackedInfo ? String(trackedInfo).trim() : "";
+
+  let pName = (personality && personality.name) ? String(personality.name).trim() : "";
+  let pDesc = (personality && personality.description) ? String(personality.description).trim() : "";
+  let personaBlock = (pName || pDesc) ? [
+    "",
+    "THE PERSON ACROSS FROM YOU:",
+    pName ? `  Their name: ${pName}` : "",
+    pDesc ? `  Who they are: ${pDesc}` : "",
+  ].filter(Boolean).join("\n") : "";
+
+  let scenarioBlock = scenarioText ? [
+    "",
+    "THE SCENE:",
+    scenarioText,
+  ].join("\n") : "";
+
+  let trackedBlock = tracked ? [
+    "",
+    "TRACKED STATE (treat this as ground truth — facts you know):",
+    tracked,
+  ].join("\n") : "";
+
+  let token = Math.random().toString(36).slice(2, 8);
+
+  let instruction = [
+    `You are ${charName}.`,
+    charDesc || "A character in a story.",
+    personaBlock,
+    scenarioBlock,
+    trackedBlock,
+    "",
+    "Open this scene. Write your character's first turn — the moment the",
+    "story begins. Establish the setting and your character's state of mind",
+    "through small concrete details. Then either speak, act, or react to",
+    "the person across from you. Leave room for them to respond.",
+    "",
+    "Style notes:",
+    "- 3 to 6 sentences. Around 50–120 words.",
+    "- Mix narration and dialogue. Use *asterisks* for actions/expressions,",
+    "  \"quotes\" for spoken words.",
+    "- Vivid, specific, sensory. No purple prose.",
+    "- Stay in character. Do not break the fourth wall.",
+    "- Do not mention being an AI, a model, or a computer.",
+    "",
+    "VISUAL BEAT TAG: if this opening contains a significant visual moment",
+    "worth illustrating — a striking setting, an entrance, a character",
+    "reveal — end your reply with the exact marker <<illustrate>> on its",
+    "own line. Use sparingly: not every opening warrants an illustration.",
+    `(Internal variety token — ignore: ${token}.)`,
+  ].filter(Boolean).join("\n");
+
+  try {
+    let stream = root.aiTextPlugin({
+      instruction,
+      startWith: "",
+      stopSequences: ["\n\n[[", "\n[[", "\n>>>"],
+      onChunk: (d) => {
+        if(onChunk && d && d.textChunk) onChunk(d.textChunk);
+      },
+    });
+    return { stream, charName };
+  } catch(e) {
+    console.error("openScene setup failed:", e);
+    return { stream: null, charName, error: (e && e.message) || String(e) };
+  }
+
+// --- Chat reply (continues a conversation) ----------------------------
+// Standard [[Speaker]]: format. Builds the conversation from the last
+// 14 messages. Returns the same { stream, charName, error? } shape.
+//
+// `trackedInfo` is a freeform string of story state (see openScene docs).
+async chatReply(messages, character, personality, scenario, trackedInfo, onChunk) =>
+  let charDesc = (character && character.description) ? String(character.description).trim() : "";
+  let charName = (character && character.name) ? String(character.name).trim() : "Character";
+  let scenarioText = scenario ? String(scenario).trim() : "";
+  let tracked = trackedInfo ? String(trackedInfo).trim() : "";
+
+  let pName = (personality && personality.name) ? String(personality.name).trim() : "";
+  let pDesc = (personality && personality.description) ? String(personality.description).trim() : "";
+  let seekerLabel = pName || "User";
+
+  let personaBlock = (pName || pDesc) ? [
+    "",
+    "THE PERSON ACROSS FROM YOU:",
+    pName ? `  Their name: ${pName}` : "",
+    pDesc ? `  Who they are: ${pDesc}` : "",
+  ].filter(Boolean).join("\n") : "";
+
+  let scenarioBlock = scenarioText ? [
+    "",
+    "THE SCENE:",
+    scenarioText,
+  ].join("\n") : "";
+
+  let trackedBlock = tracked ? [
+    "",
+    "TRACKED STATE (treat this as ground truth — facts you know, situations you're in, items you have):",
+    tracked,
+  ].join("\n") : "";
+
+  let trimmed = (messages || []).slice(-14);
+  let convo = trimmed.map(m => {
+    let who = m.role === "user" ? seekerLabel : charName;
+    return `[[${who}]]: ${String(m.content).replace(/\s+/g, " ").trim()}`;
+  }).join("\n");
+
+  let token = Math.random().toString(36).slice(2, 8);
+
+  let instruction = [
+    `You are ${charName}.`,
+    charDesc || "A character in a story.",
+    personaBlock,
+    scenarioBlock,
+    trackedBlock,
+    "",
+    "Continue the conversation. Stay in character throughout. The TRACKED",
+    "STATE above (if present) is canonical — facts you should not",
+    "contradict.",
+    "",
+    "Style notes:",
+    "- 2 to 5 sentences usually. Up to 6–8 only for major beats.",
+    "- Mix narration and dialogue. Use *asterisks* for actions/expressions,",
+    "  \"quotes\" for spoken words.",
+    "- Vivid, specific, sensory. No purple prose.",
+    "- Do not break character. Do not mention being an AI, a model, or",
+    "  a computer.",
+    "- Do not write the other person's response.",
+    "",
+    "VISUAL BEAT TAG: if your reply contains a significant visual moment",
+    "worth illustrating — a new setting, a striking action or pose, a",
+    "reveal, a vivid character expression — end your reply with the",
+    "exact marker <<illustrate>> on its own line. Use sparingly: NOT for",
+    "pure dialogue exchanges, brief reactions, or internal thoughts. The",
+    "story should average one illustration every few replies, not every",
+    "reply.",
+    `(Internal variety token — ignore: ${token}.)`,
+    "",
+    "<MESSAGES>",
+    convo,
+    "</MESSAGES>",
+    "",
+    `>>> TASK: Write ${charName}'s next single reply only, in character. Stop at the end of your reply.`,
+  ].filter(Boolean).join("\n");
+
+  try {
+    let stream = root.aiTextPlugin({
+      instruction,
+      startWith: `[[${charName}]]:`,
+      hideStartWith: true,
+      stopSequences: ["\n\n[[", "\n[[", "\n>>>"],
+      onChunk: (d) => {
+        if(onChunk && d && d.textChunk && !d.isFromStartWith) onChunk(d.textChunk);
+      },
+    });
+    return { stream, charName };
+  } catch(e) {
+    console.error("chatReply setup failed:", e);
+    return { stream: null, charName, error: (e && e.message) || String(e) };
+  }
+
+// =====================================================================
+// ART STYLE PRESETS — curated styles for cutscene rendering
+// =====================================================================
+// Each style is { name, promptPrefix, negativePrompt }. The Director
+// writes a content-only prompt (subject, action, composition); the
+// chosen style wraps it with the visual treatment. promptPrefix is
+// prepended to the Director's output; negativePrompt goes to the image
+// plugin separately.
+//
+// Users select one in the SCENE settings panel. "custom" lets users
+// write their own prefix + negative.
+//
+// To add a new style: add a row here following the same format. The UI
+// reads this list at boot to populate the dropdown.
+artStyles
+  default
+    name = Painted illustration (default)
+    promptPrefix = painted illustration, warm cinematic lighting, painterly brushwork, rich colors, detailed,
+    negativePrompt = blurry, low quality, deformed, watermark, signature, text, ugly
+  watercolor
+    name = Watercolor
+    promptPrefix = soft watercolor painting, delicate washes of color, paper texture, gentle brushstrokes, pastel palette, dreamy atmosphere,
+    negativePrompt = harsh lines, vivid saturation, photorealistic, 3d render, low quality, deformed, watermark
+  oilpainting
+    name = Oil painting
+    promptPrefix = classical oil painting, rich impasto texture, dramatic chiaroscuro lighting, deep colors, masterful brushwork, baroque feel,
+    negativePrompt = digital art, anime, cartoon, low quality, deformed, watermark, blurry
+  anime
+    name = Anime / manga
+    promptPrefix = anime illustration, clean lineart, cel-shaded, expressive eyes, dynamic composition, vibrant colors, studio-quality animation key art,
+    negativePrompt = photorealistic, 3d render, western cartoon, low quality, deformed, watermark, blurry, sketchy
+  comicbook
+    name = Comic book
+    promptPrefix = comic book illustration, bold ink outlines, halftone shading, vivid saturated colors, dynamic action panel composition, graphic novel style,
+    negativePrompt = photorealistic, blurry, low quality, deformed, watermark, sketchy
+  noir
+    name = Noir comic
+    promptPrefix = high-contrast black and white noir comic art, deep shadows, dramatic chiaroscuro, selective spot color, brush ink illustration, 1940s detective aesthetic,
+    negativePrompt = colorful, bright, cheerful, anime, 3d render, low quality, deformed, watermark
+  photograph
+    name = Photograph
+    promptPrefix = cinematic photograph, professional photography, natural realistic lighting, sharp focus, photorealistic, shallow depth of field, 35mm film aesthetic,
+    negativePrompt = illustration, painting, drawing, cartoon, anime, low quality, deformed, watermark, blurry
+  pencilsketch
+    name = Pencil sketch
+    promptPrefix = detailed pencil drawing, graphite shading, expressive linework, soft hatching, sketchbook texture, monochrome,
+    negativePrompt = color, photorealistic, 3d render, anime, low quality, deformed, watermark
+  storybook
+    name = Storybook illustration
+    promptPrefix = whimsical storybook illustration, gentle warm palette, soft textures, hand-drawn feel, children's book aesthetic, cozy and inviting,
+    negativePrompt = dark, gritty, horror, photorealistic, low quality, deformed, watermark, blurry
+  pixelart
+    name = Pixel art
+    promptPrefix = pixel art, 16-bit retro game aesthetic, limited color palette, crisp pixel edges, isometric or side-scroller composition,
+    negativePrompt = blurry, smooth gradients, photorealistic, anti-aliased, low quality, deformed, watermark
+  custom
+    name = Custom (define your own)
+    promptPrefix =
+    negativePrompt =
+
+// JS helper: resolve a style by its key. Returns the style object or
+// the default if the key is unknown. The "custom" style is special-cased
+// by the caller, which substitutes the user's saved custom values.
+artStyleByKey(key) =>
+  if(!key) key = "default";
+  if(artStyles[key]) return artStyles[key];
+  return artStyles.default;
+
+// JS helper: list all available styles as [{key, name}] for the UI dropdown.
+listArtStyles() =>
+  let out = [];
+  // Iterate in declaration order — Perchance preserves it.
+  for(let key in artStyles) {
+    out.push({ key, name: artStyles[key].name });
+  }
+  return out;
+
+// =====================================================================
+// CUTSCENE DIRECTOR — separate AI pass that writes image prompts
+// =====================================================================
+// This is the heart of the illustration system. Inspired by fur-ai's
+// approach: a dedicated AI call that reads recent chat + character
+// appearances + scenario, and outputs ONE focused image prompt. Then
+// the prompt is rendered by textToImagePlugin.
+//
+// Returns { url, prompt, error? }
+//   On success: { url: imageUrl, prompt: theFinalPromptUsed }
+//   On failure: { url: "", prompt: "", error: "..." }
+//
+// The two-step design (LLM-prompt then image-render) means the chat AI
+// never writes image prompts directly — it just narrates, and the
+// Director extracts the visual beat. This separation is what makes the
+// illustrations consistent with the story rather than generic.
+//
+// artStyle is { promptPrefix, negativePrompt } resolved by the caller
+// from the user's selected style preset (or their custom values). The
+// Director now writes ONLY content (subject, action, composition,
+// setting, lighting); the prefix supplies the medium/style and the
+// negative prompt supplies what to avoid.
+async generateCutscene(focusMessage, recentMessages, character, personality, scenario, artStyle) =>
+  let charName = (character && character.name) ? String(character.name).trim() : "";
+  let charAppr = (character && character.appearance) ? String(character.appearance).trim() : "";
+  let pName    = (personality && personality.name) ? String(personality.name).trim() : "";
+  let pAppr    = (personality && personality.appearance) ? String(personality.appearance).trim() : "";
+  let scen     = scenario ? String(scenario).trim() : "";
+  let focus    = focusMessage ? String(focusMessage).trim() : "";
+
+  // Resolve art style; fall back to default if caller didn't supply.
+  let stylePrefix = "";
+  let styleNegative = "";
+  if(artStyle && typeof artStyle === "object") {
+    stylePrefix = (artStyle.promptPrefix || "").trim();
+    styleNegative = (artStyle.negativePrompt || "").trim();
+  }
+  if(!stylePrefix) {
+    let def = artStyles.default;
+    stylePrefix = (def.promptPrefix + "").trim();
+    styleNegative = (def.negativePrompt + "").trim();
+  }
+
+  if(!focus) return { url: "", prompt: "", error: "no focus message to illustrate" };
+
+  // Build a compact context block from the last 3 messages (or fewer).
+  let recent = Array.isArray(recentMessages) ? recentMessages.slice(-3) : [];
+  let recentText = recent.map(m => {
+    let who = m.role === "user" ? (pName || "User") : (charName || "Character");
+    return `${who}: ${String(m.content || "").replace(/\s+/g, " ").trim()}`;
+  }).join("\n");
+
+  let castBlock = [
+    charName ? `${charName} (the character): ${charAppr || "appearance not specified"}` : "",
+    (pName || pAppr) ? `${pName || "User"} (the person across from them): ${pAppr || "appearance not specified"}` : "",
+  ].filter(Boolean).join("\n");
+
+  let instruction = [
+    "You are a Cutscene Director writing image-prompt CONTENT for a",
+    "story-illustration tool. Your output describes WHAT is in the scene",
+    "(subject, action, composition, setting, lighting) — but NOT how it",
+    "is rendered. A separate step adds medium/style cues (oil painting,",
+    "anime, watercolor, etc.). Do NOT include words like 'oil painting',",
+    "'watercolor', 'anime style', 'pencil sketch', 'photograph', 'comic",
+    "book', '3d render', 'digital art', or any phrase describing the",
+    "rendering medium. Stick to scene content only.",
+    "",
+    "[VISUAL PRIORITY]",
+    "Read the FOCUS MESSAGE below — this is what should be illustrated.",
+    "Use the recent chat context to understand action, location, mood, and",
+    "who is visually present. Use the cast data to preserve appearance,",
+    "outfit, body type, and visual continuity. Use the scene/setting for",
+    "atmosphere and location.",
+    "",
+    "Choose the strongest visual beat from the focus message — an action,",
+    "pose, expression, reveal, setting detail, or character moment.",
+    "",
+    "[CAST]",
+    castBlock || "(no cast data)",
+    "",
+    "[SCENE / SETTING]",
+    scen || "(no scenario set)",
+    "",
+    "[RECENT CHAT CONTEXT]",
+    recentText || "(no prior messages)",
+    "",
+    "[FOCUS MESSAGE — illustrate this moment]",
+    focus,
+    "",
+    "[COMPOSITION RULES]",
+    "Build a natural commission brief: subject and action first, then",
+    "scene scale, character appearance, composition, setting, lighting,",
+    "mood, shot distance, camera angle, color palette, textures. For",
+    "multiple characters, make each figure visually distinct. Skip medium",
+    "cues — those will be added separately.",
+    "",
+    "[RESOLUTION]",
+    "Choose ONE resolution based on the scene:",
+    "- 512x768 for portraits, single standing characters, vertical subjects",
+    "- 768x512 for environments, multi-character scenes, wide cinematic",
+    "  staging",
+    "- 768x768 for close-ups, character busts, balanced square framing",
+    "",
+    "[OUTPUT FORMAT]",
+    "Output ONLY the final image prompt — no preamble, no explanation, no",
+    "quotes. The prompt should end with the resolution command in this",
+    "exact form: (resolution:::WIDTHxHEIGHT)",
+    "Example ending: ...soft window light, intimate framing (resolution:::512x768)",
+  ].filter(Boolean).join("\n");
+
+  // Step 1: ask the AI to write the prompt content
+  let directorPrompt = "";
+  try {
+    let streamObj = root.aiTextPlugin({
+      instruction,
+      startWith: "",
+      stopSequences: ["\n\n[", "\n>>>"],
+    });
+    let data = await streamObj;
+    if(data.stopReason === "error" || !data.generatedText || !data.generatedText.trim()) {
+      return { url: "", prompt: "", error: "Director AI returned empty prompt" };
+    }
+    directorPrompt = data.generatedText.trim();
+    directorPrompt = directorPrompt.replace(/^```[a-z]*\s*/i, "").replace(/```\s*$/i, "").trim();
+    directorPrompt = directorPrompt.replace(/^["']|["']$/g, "").trim();
+  } catch(e) {
+    console.error("Cutscene Director prompt-gen failed:", e);
+    return { url: "", prompt: "", error: "Director: " + ((e && e.message) || String(e)) };
+  }
+
+  if(!directorPrompt) return { url: "", prompt: "", error: "empty prompt after parsing" };
+
+  // Step 2: wrap with the chosen art style. The Director output may
+  // already include a (resolution:::WxH) suffix — keep that at the end.
+  // We splice the style prefix *before* the content but *after* any
+  // leading commands.
+  let finalPrompt = stylePrefix + " " + directorPrompt;
+  finalPrompt = finalPrompt.replace(/\s+/g, " ").trim();
+
+  // Step 3: render the image
+  try {
+    let imageOpts = { prompt: finalPrompt };
+    if(styleNegative) imageOpts.negativePrompt = styleNegative;
+    let url = await root.textToImagePlugin(imageOpts);
+    if(!url) return { url: "", prompt: finalPrompt, error: "textToImagePlugin returned empty url" };
+    return { url, prompt: finalPrompt };
+  } catch(e) {
+    console.error("Cutscene image render failed:", e);
+    return { url: "", prompt: finalPrompt, error: "Render: " + ((e && e.message) || String(e)) };
+  }
+
+// =====================================================================
+// CHARACTER / PERSONALITY SYNTHESIS — AI-assisted profile filling
+// =====================================================================
+
+// Build out a character (the AI roleplayer) from a seed or from scratch.
+// Returns { name, description, appearance, error? }
+async synthesizeCharacter(existingName, existingDesc, existingAppearance) =>
+  let nameHint = existingName ? `The user has provided this name: "${existingName}". Keep it.` : "";
+  let descHint = existingDesc ? `The user has written this seed for VOICE/PERSONALITY: "${existingDesc}". Expand and refine it. Preserve their intent.` : "";
+  let apprHint = existingAppearance ? `The user has written this seed for APPEARANCE: "${existingAppearance}". Expand and refine it.` : "";
+  let blankCanvas = (!existingDesc && !existingAppearance);
+
+  let instruction = [
+    "You are helping a user design a CHARACTER for an AI chat & story",
+    "app. The character has THREE descriptive fields you must write.",
+    "These are kept apart on purpose: each is fed to a different AI",
+    "downstream and must not overlap.",
+    "",
+    "  1. NAME — the character's name.",
+    "  2. DESCRIPTION — voice, personality, manner. Fed to the CHAT AI.",
+    "  3. APPEARANCE — visual portrait brief. Fed to the IMAGE AI.",
+    "",
+    "DESCRIPTION rules:",
+    "- Written in SECOND PERSON (\"You are...\", \"You speak...\").",
+    "- 4 to 8 sentences, around 80–180 words.",
+    "- Cover: who they are (the angle), voice/tone/speech patterns,",
+    "  manner toward others, internal life, defining habits.",
+    "- NO physical/visual details. Those go in APPEARANCE.",
+    "- Vivid and specific. Names of things over abstractions.",
+    "- No dialogue examples. No lists or markdown.",
+    "",
+    "APPEARANCE rules:",
+    "- Third-person commission brief for an artist.",
+    "- 2 to 4 short sentences, around 30–80 words.",
+    "- Concrete visual details ONLY: age range, build, hair, eyes,",
+    "  skin, clothing, accessories, posture, lighting cues.",
+    "- Match the personality but stay strictly visual.",
+    "- No personality traits. No backstory. No internal life.",
+    "",
+    "NAME: if a name fits the concept and one wasn't given, suggest one.",
+    blankCanvas ? "The user has provided nothing — invent an interesting, original character from scratch. Surprise them." : "",
+    nameHint,
+    descHint,
+    apprHint,
+    "",
+    "Reply with ONLY this exact format on three lines, nothing else:",
+    "NAME: <character name>",
+    "DESCRIPTION: <4-8 sentence voice & personality, second person>",
+    "APPEARANCE: <2-4 sentence visual portrait brief, third person>",
+  ].filter(Boolean).join("\n");
+
+  try {
+    let streamObj = root.aiTextPlugin({
+      instruction,
+      startWith: "NAME: ",
+      hideStartWith: false,
+      stopSequences: ["\n\n", "\nNAME:"],
+    });
+    let data = await streamObj;
+    if(data.stopReason === "error" || !data.generatedText || !data.generatedText.trim()) {
+      return { name: "", description: "", appearance: "", error: "AI returned stopReason=" + (data.stopReason || "(none)") };
+    }
+    let raw = data.generatedText.trim();
+    let nameMatch = raw.match(/^\s*NAME:\s*(.*?)\s*$/im);
+    let descMatch = raw.match(/^\s*DESCRIPTION:\s*([\s\S]*?)(?=\n\s*APPEARANCE:|$)/im);
+    let apprMatch = raw.match(/^\s*APPEARANCE:\s*([\s\S]*?)$/im);
+    let name = nameMatch ? nameMatch[1].trim().replace(/^["']|["']$/g, "") : "";
+    let description = descMatch ? descMatch[1].trim().replace(/^["']|["']$/g, "") : "";
+    let appearance = apprMatch ? apprMatch[1].trim().replace(/^["']|["']$/g, "") : "";
+    if(!description && !name && !appearance) {
+      description = raw.replace(/^NAME:.*\n?/im, "").replace(/^DESCRIPTION:\s*/im, "").trim();
+    }
+    if(!description && !appearance) {
+      return { name, description: "", appearance: "", error: "could not parse fields from model output" };
+    }
+    return { name, description, appearance };
+  } catch(e) {
+    console.error("synthesizeCharacter failed:", e);
+    return { name: "", description: "", appearance: "", error: (e && e.message) || String(e) };
+  }
+
+// Build out the user's persona from saved memories + any seed input.
+// Returns { name, description, appearance, error? }
+async synthesizePersona(memoryEntries, existingName, existingDesc, existingAppearance) =>
+  let entries = Array.isArray(memoryEntries) ? memoryEntries.filter(m => m && String(m).trim()) : [];
+  if(entries.length === 0) {
+    return { name: "", description: "", appearance: "", error: "no memory entries to synthesize from" };
+  }
+  let bullets = entries.map(m => "  - " + String(m).trim()).join("\n");
+  let nameHint = existingName ? `The user has provided this name: "${existingName}". Keep it.` : "";
+  let descHint = existingDesc ? `The user has already started a description: "${existingDesc}". Blend it with the new draft if it fits; otherwise replace it.` : "";
+  let apprHint = existingAppearance ? `The user has already sketched an appearance: "${existingAppearance}". Blend it in or refine it.` : "";
+
+  let instruction = [
+    "You are helping someone fill out their persona for a story-chat app.",
+    "They have saved some memories about themselves. From those memories",
+    "write TWO separate things:",
+    "  1. DESCRIPTION — who they are, in their own voice (first person).",
+    "                   Read by the chat AI.",
+    "  2. APPEARANCE  — a short portrait sketch for an artist to draw.",
+    "                   Read by the image AI.",
+    "These are different. The chat AI doesn't need to know what they look",
+    "like. The image AI doesn't need their inner life.",
+    "",
+    "DESCRIPTION rules:",
+    "- 2 to 4 sentences. Around 30–80 words.",
+    "- First-person voice (\"I am\", \"I have\", \"I work\").",
+    "- Focus on identity, occupation, situation, what they care about.",
+    "- Do not include physical appearance.",
+    "",
+    "APPEARANCE rules:",
+    "- 1 to 2 short sentences. Around 15–40 words.",
+    "- Third-person, concrete visual details: age range, build, hair,",
+    "  clothing style, distinguishing features.",
+    "- If the memories don't mention how they look, infer a reasonable",
+    "  default from age, profession, or interests — but only gentle hints,",
+    "  no invented specifics. Better brief than fabricated.",
+    "",
+    "NAME: extract a first name only if clearly stated in memory.",
+    "Otherwise leave empty.",
+    nameHint,
+    descHint,
+    apprHint,
+    "",
+    "The user's saved memories:",
+    bullets,
+    "",
+    "Reply with ONLY this exact format, nothing else:",
+    "NAME: <first name or empty>",
+    "DESCRIPTION: <2-4 sentence first-person description>",
+    "APPEARANCE: <1-2 sentence visual sketch>",
+  ].filter(Boolean).join("\n");
+
+  try {
+    let streamObj = root.aiTextPlugin({
+      instruction,
+      startWith: "NAME: ",
+      hideStartWith: false,
+      stopSequences: ["\n\n", "\nNAME:"],
+    });
+    let data = await streamObj;
+    if(data.stopReason === "error" || !data.generatedText || !data.generatedText.trim()) {
+      return { name: "", description: "", appearance: "", error: "AI returned stopReason=" + (data.stopReason || "(none)") };
+    }
+    let raw = data.generatedText.trim();
+    let nameMatch = raw.match(/^\s*NAME:\s*(.*?)\s*$/im);
+    let descMatch = raw.match(/^\s*DESCRIPTION:\s*([\s\S]*?)(?=\n\s*APPEARANCE:|$)/im);
+    let apprMatch = raw.match(/^\s*APPEARANCE:\s*([\s\S]*?)$/im);
+    let name = nameMatch ? nameMatch[1].trim().replace(/^["']|["']$/g, "") : "";
+    let description = descMatch ? descMatch[1].trim().replace(/^["']|["']$/g, "") : "";
+    let appearance = apprMatch ? apprMatch[1].trim().replace(/^["']|["']$/g, "") : "";
+    if(!description && !name && !appearance) {
+      description = raw.replace(/^NAME:.*\n?/im, "").replace(/^DESCRIPTION:\s*/im, "").trim();
+    }
+    if(!description && !appearance) {
+      return { name, description: "", appearance: "", error: "could not parse fields from model output" };
+    }
+    return { name, description, appearance };
+  } catch(e) {
+    console.error("synthesizePersona failed:", e);
+    return { name: "", description: "", appearance: "", error: (e && e.message) || String(e) };
+  }
+
+// Generate a scenario / opening setting from a seed.
+// Returns { scenario, error? }
+async synthesizeScenario(existingScenario, characterHint) =>
+  let scenHint = existingScenario ? `The user has written this seed: "${existingScenario}". Expand and refine it.` : "The user has provided nothing — invent a compelling scenario from scratch. Choose a striking time, place, and situation.";
+  let charContext = characterHint ? `The character involved: "${characterHint}". Build a scenario that fits them.` : "";
+
+  let instruction = [
+    "You are helping a user write a SCENARIO for a story-chat app.",
+    "The scenario sets the stage: when and where the story takes place,",
+    "the mood of the world, and the situation the character is in. It is",
+    "read by both the chat AI (for narrative grounding) and the image AI",
+    "(for setting/atmosphere in illustrations).",
+    "",
+    "RULES:",
+    "- 3 to 5 sentences. Around 60–140 words.",
+    "- Third-person, present-tense ('The marketplace at dusk...', 'The",
+    "  cold stone of the cathedral...').",
+    "- Include: where, when, atmosphere/weather/lighting, the current",
+    "  situation or tension that gives the story a starting point.",
+    "- Vivid and specific. Sensory details. No purple prose.",
+    "- Plain prose. No lists or markdown.",
+    scenHint,
+    charContext,
+    "",
+    "Output ONLY the scenario text, nothing else.",
+  ].filter(Boolean).join("\n");
+
+  try {
+    let streamObj = root.aiTextPlugin({
+      instruction,
+      startWith: "",
+      stopSequences: ["\n\n\n", "\n>>>"],
+    });
+    let data = await streamObj;
+    if(data.stopReason === "error" || !data.generatedText || !data.generatedText.trim()) {
+      return { scenario: "", error: "AI returned empty scenario" };
+    }
+    let text = data.generatedText.trim().replace(/^["']|["']$/g, "").trim();
+    return { scenario: text };
+  } catch(e) {
+    console.error("synthesizeScenario failed:", e);
+    return { scenario: "", error: (e && e.message) || String(e) };
+  }
+
+// =====================================================================
+// TRACKED INFO — AI-assisted state update
+// =====================================================================
+// Reads the recent chat history + current tracked-info, and outputs an
+// updated version that reflects what's changed (locations, items,
+// time passage, new facts, relationships). The user owns the field —
+// this is an opt-in convenience, not automatic.
+//
+// Inspired by ai-rpg's tracked-info auto-update pattern.
+//
+// Returns { trackedInfo, error? }
+async updateTrackedInfo(currentTrackedInfo, recentMessages, character, personality, scenario) =>
+  let messages = Array.isArray(recentMessages) ? recentMessages.slice(-12) : [];
+  if(messages.length === 0) {
+    return { trackedInfo: currentTrackedInfo || "", error: "no chat history to read from" };
+  }
+
+  let charName = (character && character.name) ? String(character.name).trim() : "Character";
+  let pName    = (personality && personality.name) ? String(personality.name).trim() : "User";
+  let scen     = scenario ? String(scenario).trim() : "";
+  let current  = currentTrackedInfo ? String(currentTrackedInfo).trim() : "";
+
+  let convo = messages.map(m => {
+    let who = m.role === "user" ? pName : charName;
+    return `${who}: ${String(m.content || "").replace(/\s+/g, " ").trim()}`;
+  }).join("\n\n");
+
+  let scenarioBlock = scen ? `\n[SCENARIO]\n${scen}\n` : "";
+  let currentBlock = current
+    ? `[CURRENT TRACKED STATE]\n${current}`
+    : "[CURRENT TRACKED STATE]\n(empty — this is the first update; create the initial state based on what's happened so far)";
+
+  let instruction = [
+    "You are maintaining a STORY STATE TRACKER for a chat-based story.",
+    "This tracker is a freeform plaintext document the AI sees in every",
+    "reply, so it can remember facts across long sessions.",
+    "",
+    "TASK: Given the CURRENT TRACKED STATE and the RECENT CHAT below,",
+    "output an UPDATED version of the tracker that reflects any new",
+    "facts, location changes, items acquired/lost, knowledge gained,",
+    "time passage, relationship shifts, or new characters introduced.",
+    "",
+    "RULES:",
+    "- Preserve sections that haven't changed.",
+    "- Add new facts under appropriate headers.",
+    "- Use markdown-style headers (# Character, # World, # Events,",
+    "  etc.) — but the exact structure is up to you.",
+    "- Keep entries concise: short bullet points, key-value pairs, or",
+    "  one-line statements.",
+    "- Do NOT include anything that isn't established by the chat.",
+    "- Do NOT speculate or invent facts not present in the chat.",
+    "- If the current state is empty, create the initial tracker from",
+    "  what's been established so far.",
+    "- Aim for under 600 words total. Tighten or remove stale entries.",
+    "",
+    scenarioBlock,
+    currentBlock,
+    "",
+    "[RECENT CHAT]",
+    convo,
+    "",
+    "[OUTPUT FORMAT]",
+    "Output ONLY the new tracked state — the complete document, ready",
+    "to replace the old one. No preamble, no commentary, no markdown",
+    "code fences. Just the plaintext content.",
+  ].filter(Boolean).join("\n");
+
+  try {
+    let streamObj = root.aiTextPlugin({
+      instruction,
+      startWith: "",
+      stopSequences: ["\n\n\n---", "\n>>>"],
+    });
+    let data = await streamObj;
+    if(data.stopReason === "error" || !data.generatedText || !data.generatedText.trim()) {
+      return { trackedInfo: current, error: "AI returned empty update" };
+    }
+    let text = data.generatedText.trim();
+    text = text.replace(/^```[a-z]*\s*/i, "").replace(/```\s*$/i, "").trim();
+    text = text.replace(/^["']|["']$/g, "").trim();
+    if(!text) {
+      return { trackedInfo: current, error: "empty output after parsing" };
+    }
+    return { trackedInfo: text };
+  } catch(e) {
+    console.error("updateTrackedInfo failed:", e);
+    return { trackedInfo: current, error: (e && e.message) || String(e) };
+  }
+
+// =====================================================================
+// AVATARS — quick portrait images for the speaker icons
+// =====================================================================
+// One-shot calls (not streams). Returns { url, error? }.
+
+async generateCharacterAvatar(character) =>
+  try {
+    let appearance = (character && character.appearance) ? String(character.appearance).trim() : "";
+    let desc = (character && character.description) ? String(character.description).trim() : "";
+    let name = (character && character.name) ? String(character.name).trim() : "";
+    if(!appearance && !desc && !name) return { url: "", error: "no character data to draw from" };
+    let subject = appearance || desc || `a person named ${name}`;
+    let prompt = [
+      "portrait of",
+      subject,
+      ", head-and-shoulders, centered, vertical composition,",
+      "painted illustration, soft natural lighting,",
+      "single subject, neutral expression, painterly brushwork,",
+      "(resolution:::512x768)",
+    ].join(" ");
+    let url = await root.textToImagePlugin({ prompt });
+    if(!url) return { url: "", error: "textToImagePlugin returned empty url" };
+    return { url };
+  } catch(e) {
+    console.error("generateCharacterAvatar failed:", e);
+    return { url: "", error: (e && e.message) || String(e) };
+  }
+
+async generateUserAvatar(personality) =>
+  try {
+    let appearance = (personality && personality.appearance) ? String(personality.appearance).trim() : "";
+    let desc = (personality && personality.description) ? String(personality.description).trim() : "";
+    let name = (personality && personality.name) ? String(personality.name).trim() : "";
+    if(!appearance && !desc && !name) return { url: "", error: "no persona to draw from" };
+    let subject = appearance || desc || `a person named ${name}`;
+    let prompt = [
+      "portrait of",
+      subject,
+      ", head-and-shoulders, centered, vertical composition,",
+      "painted illustration, soft natural lighting,",
+      "single subject, neutral expression, painterly brushwork,",
+      "(resolution:::512x768)",
+    ].join(" ");
+    let url = await root.textToImagePlugin({ prompt });
+    if(!url) return { url: "", error: "textToImagePlugin returned empty url" };
+    return { url };
+  } catch(e) {
+    console.error("generateUserAvatar failed:", e);
+    return { url: "", error: (e && e.message) || String(e) };
+  }
+
+// =====================================================================
+// confirmAsync — Promise-based confirm dialog
+// =====================================================================
+async confirmAsync(message) =>
+  return new Promise(resolve => {
+    let overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;z-index:99999999;display:grid;place-items:center;background:rgba(0,0,0,.65);font:16px system-ui;";
+    overlay.innerHTML = `<div style="max-width:420px;padding:16px;background:#fff;color:#000;border:2px solid #000;border-radius:8px;">
+      <p style="margin:0 0 16px;white-space:pre-wrap;"></p>
+      <div style="display:flex;justify-content:flex-end;gap:8px;">
+        <button data-x style="padding:6px 14px;">Cancel</button>
+        <button data-o style="padding:6px 14px;background:#3a4a5a;color:#fff;border:0;border-radius:4px;">Okay</button>
+      </div></div>`;
+    overlay.querySelector("p").textContent = message;
+    let done = v => { overlay.remove(); resolve(v); };
+    overlay.querySelector("[data-x]").onclick = () => done(false);
+    overlay.querySelector("[data-o]").onclick = () => done(true);
+    document.body.appendChild(overlay);
+  });

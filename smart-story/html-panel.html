@@ -1,0 +1,2355 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg: #1a1d24; --surface: #232831; --surface-2: #2d333d; --surface-3: #383f4b;
+    --ink: #e8e6e0; --ink-dim: #a8a5a0; --ink-faint: #6e6c68;
+    --accent: #c0a878; --accent-hi: #d4be93; --accent-dim: #7a6d52;
+    --paper: #f0ece2; --paper-ink: #2a2a28; --paper-dim: #6e6a62;
+    --err: #d4736b; --err-bg: #2d1a1a;
+    --shadow: 0 6px 20px rgba(0,0,0,0.35); --shadow-sm: 0 2px 6px rgba(0,0,0,0.25);
+  }
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg); }
+  body {
+    margin: 0; min-height: 100vh; color: var(--ink);
+    font-family: 'Inter', system-ui, sans-serif; font-size: 14px; line-height: 1.5;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  #app {
+    width: min(560px, 100vw); position: relative;
+    background: var(--surface);
+    border-left: 1px solid var(--surface-3); border-right: 1px solid var(--surface-3);
+    min-height: 100vh; display: flex; flex-direction: column;
+  }
+  #titleBar {
+    padding: 14px 18px;
+    background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 100%);
+    border-bottom: 1px solid var(--surface-3);
+    display: flex; align-items: center; gap: 10px;
+  }
+  #titleHeader { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  #appTitle { font-family: 'Lora', serif; font-weight: 600; font-size: 18px; color: var(--ink); }
+  #chatSubtitle {
+    font-size: 11px; color: var(--ink-dim); letter-spacing: 0.5px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .titleBtn {
+    width: 36px; height: 36px; padding: 0;
+    background: transparent; color: var(--ink-dim);
+    border: 1px solid var(--surface-3); border-radius: 8px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; transition: all 150ms;
+  }
+  .titleBtn:hover { color: var(--accent-hi); border-color: var(--accent-dim); }
+  /* Visual hint that there's saved tracked-info on this scene. The
+     accent-tinted background draws the eye without being loud. */
+  .titleBtn.has-content {
+    color: var(--accent-hi);
+    border-color: var(--accent-dim);
+    background: rgba(192, 168, 120, 0.08);
+  }
+  #chatPanel {
+    flex: 1; overflow-y: auto; padding: 16px 14px 8px;
+    scrollbar-width: thin; scrollbar-color: var(--surface-3) transparent;
+  }
+  #chatPanel::-webkit-scrollbar { width: 8px; }
+  #chatPanel::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 4px; }
+  #emptyState {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 50vh; gap: 16px; text-align: center; padding: 24px;
+  }
+  #emptyState .glyph { font-size: 42px; opacity: 0.6; }
+  #emptyState .hint {
+    font-family: 'Lora', serif; font-style: italic;
+    color: var(--ink-dim); font-size: 16px; line-height: 1.6; max-width: 380px;
+  }
+  .msg { margin: 14px 0; max-width: 94%; clear: both; display: grid; column-gap: 10px; align-items: flex-start; }
+  .msg.user { grid-template-columns: 1fr 40px; }
+  .msg.char { grid-template-columns: 40px 1fr; }
+  .msg.user .msgWho { grid-column: 1; grid-row: 1; text-align: right; }
+  .msg.user .bubble { grid-column: 1; grid-row: 2; }
+  .msg.user .cutscene { grid-column: 1; grid-row: 3; }
+  .msg.user .msgActions { grid-column: 1; grid-row: 4; justify-content: flex-end; }
+  .msg.user .avatar { grid-column: 2; grid-row: 1 / span 4; }
+  .msg.char .msgWho { grid-column: 2; grid-row: 1; }
+  .msg.char .bubble { grid-column: 2; grid-row: 2; }
+  .msg.char .cutscene { grid-column: 2; grid-row: 3; }
+  .msg.char .msgActions { grid-column: 2; grid-row: 4; }
+  .msg.char .avatar { grid-column: 1; grid-row: 1 / span 4; }
+  .msg.error { display: block; }
+  @media (max-width: 500px) {
+    .msg.user, .msg.char { grid-template-columns: 1fr; max-width: 92%; }
+    .msg .avatar { display: none; }
+  }
+  .msgWho {
+    font-weight: 600; font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+    margin-bottom: 4px; color: var(--ink-faint);
+  }
+  .bubble { padding: 12px 14px; border-radius: 12px; line-height: 1.5; font-size: 14px; word-wrap: break-word; }
+  .msg.char .bubble {
+    background: var(--paper); color: var(--paper-ink);
+    font-family: 'Lora', Georgia, serif; font-size: 14.5px;
+    border-bottom-left-radius: 3px; box-shadow: var(--shadow-sm);
+    background-image:
+      linear-gradient(180deg, var(--paper) 0%, #ebe6da 100%),
+      repeating-linear-gradient(45deg, transparent 0 6px, rgba(0,0,0,0.012) 6px 7px);
+  }
+  .msg.user .bubble {
+    background: var(--surface-2); color: var(--ink);
+    border: 1px solid var(--surface-3); border-bottom-right-radius: 3px;
+  }
+  .msg.char .bubble em { font-style: italic; color: var(--paper-dim); }
+  .msg.char .bubble q { color: #2a3a5a; font-style: normal; }
+  .msg.char .bubble q::before { content: "\201C"; }
+  .msg.char .bubble q::after { content: "\201D"; }
+  .msg.error .bubble {
+    background: var(--err-bg); color: var(--err);
+    font-family: ui-monospace, monospace; font-size: 12.5px;
+    border: 1px solid var(--err); border-radius: 6px;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .msg.error .msgWho { color: var(--err); }
+  .msg .caret {
+    display: inline-block; width: 7px; height: 1em; vertical-align: -2px;
+    margin-left: 2px; background: currentColor; opacity: 0.5;
+    animation: blink 1s steps(2) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+  .avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--surface-3) center/cover no-repeat;
+    border: 1px solid var(--surface-3); margin-top: 22px;
+    cursor: pointer; flex-shrink: 0;
+    position: relative; overflow: hidden; transition: filter 150ms;
+  }
+  .avatar:hover { filter: brightness(1.1); }
+  .avatar.pending::after {
+    content: ""; position: absolute; inset: 4px; border-radius: 50%;
+    border: 1px dashed var(--accent-dim); animation: rot 6s linear infinite;
+  }
+  @keyframes rot { to { transform: rotate(360deg); } }
+  .avatar.default-char {
+    background: linear-gradient(135deg, #3a4a5a 0%, #2a3a4a 100%);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--ink-dim); font-size: 18px;
+  }
+  .avatar.default-char::before { content: "👤"; filter: grayscale(0.3); }
+  .avatar.default-user {
+    background: linear-gradient(135deg, var(--surface-3) 0%, var(--surface-2) 100%);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--ink-dim); font-size: 18px;
+  }
+  .avatar.default-user::before { content: "👤"; filter: grayscale(0.5); }
+  .cutscene {
+    margin-top: 10px; border-radius: 8px; overflow: hidden;
+    border: 1px solid var(--surface-3); background: var(--surface);
+    box-shadow: var(--shadow); position: relative; max-width: 100%;
+  }
+  .cutscene img { display: block; width: 100%; height: auto; cursor: zoom-in; }
+  .cutscene .cutsceneStatus {
+    padding: 16px; min-height: 80px;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    color: var(--ink-dim); font-style: italic; font-size: 13px;
+  }
+  .cutscene .cutsceneStatus .spinner {
+    width: 16px; height: 16px; border-radius: 50%;
+    border: 2px solid var(--surface-3); border-top-color: var(--accent);
+    animation: rot 0.9s linear infinite;
+  }
+  .cutscene.failed .cutsceneStatus { color: var(--err); }
+  .msgActions {
+    display: flex; gap: 4px; margin-top: 6px;
+    opacity: 0.4; transition: opacity 150ms;
+  }
+  .msg:hover .msgActions, .msg:focus-within .msgActions { opacity: 1; }
+  .actBtn {
+    font-size: 11px; font-weight: 500; padding: 3px 8px; cursor: pointer; line-height: 1.4;
+    background: var(--surface); color: var(--ink-dim);
+    border: 1px solid var(--surface-3); border-radius: 4px;
+    transition: all 120ms; font-family: inherit;
+  }
+  .actBtn:hover { background: var(--surface-2); color: var(--ink); border-color: var(--accent-dim); }
+  .actBtn.danger:hover { background: rgba(212,115,107,0.12); color: var(--err); border-color: var(--err); }
+  .actBtn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .msg.editing .msgActions { display: none; }
+  .editForm { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+  .editForm textarea {
+    width: 100%; min-height: 70px; max-height: 240px; padding: 8px 10px;
+    font-size: 14px; line-height: 1.5;
+    color: var(--ink); background: var(--surface-2);
+    border: 1px solid var(--accent-dim); border-radius: 8px;
+    outline: none; resize: vertical; font-family: inherit;
+  }
+  .msg.char.editing .editForm textarea {
+    background: var(--paper); color: var(--paper-ink);
+    font-family: 'Lora', serif;
+  }
+  .editFormButtons { display: flex; gap: 6px; justify-content: flex-end; }
+  .editForm button { font-size: 11px; padding: 4px 10px; cursor: pointer; border-radius: 4px; font-family: inherit; font-weight: 500; }
+  .editForm .editSave { color: var(--bg); background: var(--accent); border: 1px solid var(--accent); }
+  .editForm .editCancel { color: var(--ink-dim); background: transparent; border: 1px solid var(--surface-3); }
+  #typing {
+    display: none; padding: 8px 14px; margin: 6px 0;
+    font-style: italic; color: var(--ink-dim); font-size: 13px; font-family: 'Lora', serif;
+  }
+  #typing.active { display: inline-block; }
+  #typing .dots::after { content: ""; animation: dots 1.4s steps(4) infinite; }
+  @keyframes dots {
+    0%, 25% { content: ""; } 50% { content: "."; } 75% { content: ".."; } 100% { content: "..."; }
+  }
+  #errorBar {
+    display: none; margin: 0 14px 8px;
+    padding: 10px 36px 10px 12px; position: relative;
+    background: var(--err-bg); border: 1px solid var(--err); border-radius: 6px;
+    color: var(--err); font-family: ui-monospace, monospace; font-size: 12px;
+    word-break: break-word; white-space: pre-wrap;
+  }
+  #errorBar.active { display: block; }
+  #errorBar .label { font-weight: 700; margin-right: 6px; letter-spacing: 0.5px; }
+  #errorBar .close {
+    position: absolute; top: 4px; right: 6px;
+    background: transparent; border: 0; color: var(--err);
+    font-size: 16px; cursor: pointer; padding: 2px 6px;
+  }
+  #composer {
+    padding: 10px 14px 12px;
+    background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%);
+    border-top: 1px solid var(--surface-3);
+  }
+  #inputRow { display: flex; gap: 6px; align-items: flex-end; }
+  #input {
+    flex: 1; resize: none; min-height: 40px; max-height: 140px;
+    padding: 10px 12px; line-height: 1.5; font-size: 14px;
+    font-family: inherit; color: var(--ink);
+    background: var(--surface-2); border: 1px solid var(--surface-3);
+    border-radius: 8px; outline: none;
+  }
+  #input::placeholder { color: var(--ink-faint); }
+  #input:focus { border-color: var(--accent-dim); }
+  #input:disabled { opacity: 0.55; cursor: not-allowed; }
+  #sendBtn, #stopBtn {
+    font-family: inherit; font-weight: 600; font-size: 13px;
+    padding: 10px 16px; cursor: pointer; border-radius: 8px; transition: all 150ms;
+  }
+  #sendBtn { color: var(--bg); background: var(--accent); border: 1px solid var(--accent); }
+  #sendBtn:hover:not(:disabled) { background: var(--accent-hi); }
+  #sendBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+  #stopBtn { color: var(--err); background: var(--err-bg); border: 1px solid var(--err); }
+  #stopBtn:hover { filter: brightness(1.15); }
+  #toolbar { display: flex; gap: 6px; margin-bottom: 8px; }
+  .tbtn {
+    flex: 1; font-family: inherit; font-weight: 600; font-size: 12px;
+    letter-spacing: 0.5px; padding: 9px 12px; cursor: pointer; user-select: none;
+    background: var(--surface); color: var(--ink);
+    border: 1px solid var(--surface-3); border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    transition: all 150ms;
+  }
+  .tbtn:hover:not(:disabled) { background: var(--surface-2); border-color: var(--accent-dim); }
+  .tbtn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .tbtn.primary {
+    background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dim) 100%);
+    color: var(--bg); border-color: var(--accent);
+  }
+  .tbtn.primary:hover { filter: brightness(1.1); }
+  .tbtn.busy { cursor: progress; filter: brightness(0.7); }
+  .tbtn .ico { font-size: 14px; line-height: 1; }
+  #status {
+    font-family: 'Lora', serif; font-style: italic;
+    text-align: center; color: var(--ink-faint);
+    font-size: 11px; padding: 4px 14px 0; min-height: 1em;
+  }
+
+  .modal {
+    position: fixed; inset: 0; z-index: 99999990;
+    background: rgba(0,0,0,0.55);
+    display: none; align-items: center; justify-content: center; padding: 16px;
+  }
+  .modal.open { display: flex; }
+  .modalCard {
+    width: min(620px, 100%); max-height: 92vh;
+    background: var(--surface); border: 1px solid var(--surface-3);
+    border-radius: 12px; box-shadow: var(--shadow);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .modalHeader {
+    padding: 12px 18px;
+    background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 100%);
+    border-bottom: 1px solid var(--surface-3);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .modalTitle { font-family: 'Lora', serif; font-weight: 600; font-size: 16px; color: var(--ink); }
+  .modalClose {
+    background: transparent; border: 1px solid var(--surface-3);
+    color: var(--ink-dim); padding: 4px 10px; cursor: pointer;
+    border-radius: 6px; font-size: 11px; font-weight: 500; font-family: inherit;
+  }
+  .modalClose:hover { color: var(--ink); border-color: var(--accent-dim); }
+  .settingsTabs {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 0;
+    border-bottom: 1px solid var(--surface-3); background: var(--surface);
+  }
+  .settingsTab {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 10px 4px;
+    background: transparent; color: var(--ink-faint);
+    border: 0; border-bottom: 2px solid transparent;
+    cursor: pointer; font-family: inherit; font-weight: 500; font-size: 10px;
+    letter-spacing: 0.5px; transition: all 150ms;
+  }
+  .settingsTab .ico { font-size: 18px; line-height: 1; }
+  .settingsTab .lbl { font-size: 10px; }
+  .settingsTab:hover:not([aria-selected="true"]) { color: var(--ink-dim); background: var(--surface-2); }
+  .settingsTab[aria-selected="true"] {
+    color: var(--accent-hi); border-bottom-color: var(--accent);
+    background: var(--surface-2);
+  }
+  .settingsPanel { display: none; }
+  .settingsPanel.active { display: block; }
+  .modalBody {
+    padding: 16px 18px; overflow-y: auto; flex: 1;
+    scrollbar-width: thin; scrollbar-color: var(--surface-3) transparent;
+  }
+  .modalBody::-webkit-scrollbar { width: 8px; }
+  .modalBody::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 4px; }
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block; font-weight: 600; font-size: 11px;
+    letter-spacing: 0.5px; color: var(--ink); margin-bottom: 4px; text-transform: uppercase;
+  }
+  .field label .fieldKind {
+    font-weight: 400; font-style: italic; font-size: 11px;
+    color: var(--ink-faint); margin-left: 6px; text-transform: none; letter-spacing: 0;
+  }
+  .field input, .field textarea, .field select {
+    width: 100%; padding: 8px 10px; font-size: 13px;
+    color: var(--ink); background: var(--surface-2);
+    border: 1px solid var(--surface-3); border-radius: 6px;
+    outline: none; font-family: inherit;
+  }
+  .field input:focus, .field textarea:focus, .field select:focus { border-color: var(--accent-dim); }
+  .field textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
+  .field .hint { font-style: italic; font-size: 12px; color: var(--ink-dim); margin-top: 4px; line-height: 1.45; }
+  .panelActions {
+    display: flex; align-items: center; gap: 6px;
+    margin-top: 18px; padding-top: 14px;
+    border-top: 1px solid var(--surface-3);
+  }
+  .panelActions .spacer { flex: 1; }
+  .saveBtn {
+    font-family: inherit; font-weight: 600; font-size: 12px;
+    padding: 7px 14px; cursor: pointer;
+    color: var(--bg); background: var(--accent);
+    border: 1px solid var(--accent); border-radius: 6px;
+  }
+  .saveBtn:hover { background: var(--accent-hi); }
+  .secondaryBtn {
+    font-family: inherit; font-size: 12px; padding: 7px 12px; cursor: pointer;
+    color: var(--ink-dim); background: transparent;
+    border: 1px solid var(--surface-3); border-radius: 6px;
+  }
+  .secondaryBtn:hover { color: var(--ink); border-color: var(--accent-dim); }
+  .lengthNotice {
+    margin-top: 6px; padding: 4px 8px; font-size: 11px;
+    color: #c08850; background: rgba(192,136,80,0.08);
+    border: 1px solid rgba(192,136,80,0.35); border-radius: 4px;
+  }
+  .assistRow { margin-top: 6px; padding-top: 12px; border-top: 1px dashed var(--surface-3); }
+  .assistBtn {
+    display: flex; gap: 8px; align-items: center; width: 100%;
+    padding: 9px 12px; cursor: pointer;
+    font-family: inherit; font-weight: 500; font-size: 12px;
+    color: var(--accent-hi); background: var(--surface-2);
+    border: 1px solid var(--accent-dim); border-radius: 6px;
+    transition: all 150ms; text-align: left;
+  }
+  .assistBtn:hover:not(:disabled) { background: var(--surface-3); }
+  .assistBtn:disabled { opacity: 0.5; cursor: not-allowed; color: var(--ink-faint); border-color: var(--surface-3); }
+  .assistBtn .ico { font-size: 16px; }
+  .assistBtn.busy { cursor: progress; filter: brightness(0.7); }
+  .assistStatus { margin-top: 6px; font-style: italic; font-size: 12px; color: var(--ink-dim); min-height: 1em; }
+  .assistStatus.err { font-family: ui-monospace, monospace; font-style: normal; color: var(--err); }
+  .memItem { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+  .memItem input { flex: 1; }
+  .memItem .del {
+    background: var(--surface-2); color: var(--ink-dim);
+    border: 1px solid var(--surface-3); padding: 6px 9px; cursor: pointer;
+    border-radius: 4px; font-size: 11px; font-family: inherit;
+  }
+  .memItem .del:hover { color: var(--err); border-color: var(--err); }
+  #memAdd {
+    margin-top: 4px; padding: 6px 12px; cursor: pointer;
+    font-family: inherit; font-size: 11px;
+    color: var(--accent-hi); background: transparent;
+    border: 1px dashed var(--surface-3); border-radius: 4px;
+  }
+  #memAdd:hover { border-color: var(--accent-dim); }
+  #histList { display: flex; flex-direction: column; gap: 6px; }
+  .histRow {
+    padding: 10px 12px; cursor: pointer; user-select: none;
+    background: var(--surface-2); border: 1px solid var(--surface-3);
+    border-radius: 6px; transition: all 150ms;
+    display: grid; grid-template-columns: 1fr auto; gap: 4px 8px;
+  }
+  .histRow:hover { background: var(--surface-3); border-color: var(--accent-dim); }
+  .histRow.current { border-color: var(--accent); }
+  .histTitle {
+    font-weight: 600; font-size: 13px; color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .histCount { font-size: 11px; color: var(--ink-faint); }
+  .histPreview {
+    grid-column: 1 / -1; font-family: 'Lora', serif; font-style: italic;
+    color: var(--ink-dim); font-size: 12px; line-height: 1.4;
+    overflow: hidden; text-overflow: ellipsis;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  }
+  .histDate { grid-column: 1 / -1; font-size: 10px; color: var(--ink-faint); }
+  .histEmpty { font-style: italic; color: var(--ink-faint); text-align: center; padding: 20px; }
+  .sliderRow { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+  .sliderRow input[type=range] { flex: 1; accent-color: var(--accent); }
+  .sliderRow .sliderVal { width: 50px; text-align: center; font-weight: 600; color: var(--accent-hi); }
+  .toggleRow { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; padding: 8px 0; }
+  .toggleRow input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--accent); }
+  .toggleRow .toggleLabel { font-weight: 500; color: var(--ink); }
+
+  #lightbox {
+    position: fixed; inset: 0; z-index: 99999998;
+    background: rgba(0,0,0,0.92);
+    display: none; align-items: center; justify-content: center;
+    padding: 24px; cursor: zoom-out;
+  }
+  #lightbox.open { display: flex; }
+  #lightboxImg {
+    max-width: 94vw; max-height: 90vh; object-fit: contain;
+    box-shadow: 0 0 0 1px var(--accent-dim), 0 0 40px rgba(192,168,120,0.18);
+    border-radius: 4px;
+  }
+  #lightboxClose {
+    position: absolute; top: 16px; right: 20px;
+    background: rgba(0,0,0,0.5); color: var(--ink);
+    border: 1px solid var(--surface-3); padding: 6px 12px; cursor: pointer;
+    font-size: 12px; font-weight: 500; border-radius: 6px; font-family: inherit;
+  }
+  #lightboxClose:hover { color: var(--accent-hi); border-color: var(--accent-dim); }
+
+  #vnLayer {
+    position: fixed; inset: 0; z-index: 99999997;
+    background: #000; display: none; flex-direction: column; overflow: hidden;
+  }
+  #vnLayer.open { display: flex; }
+  #vnBg {
+    position: absolute; inset: 0;
+    background: #000 center/contain no-repeat;
+    transition: opacity 600ms ease-in-out;
+  }
+  #vnBg.fading { opacity: 0; }
+  #vnPanel {
+    position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%);
+    width: min(880px, 92vw); max-height: 36vh;
+    padding: 20px 24px;
+    background: rgba(20, 24, 32, 0.78);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(192, 168, 120, 0.35);
+    border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    color: var(--ink); overflow-y: auto;
+    scrollbar-width: thin; scrollbar-color: var(--surface-3) transparent;
+  }
+  #vnSpeaker {
+    font-weight: 700; font-size: 12px;
+    letter-spacing: 1px; text-transform: uppercase;
+    color: var(--accent-hi); margin-bottom: 6px;
+  }
+  #vnText { font-family: 'Lora', serif; font-size: 16px; line-height: 1.6; color: var(--ink); }
+  #vnText em { font-style: italic; color: var(--ink-dim); }
+  #vnText q { color: var(--accent-hi); font-style: normal; }
+  #vnText q::before { content: "\201C"; }
+  #vnText q::after { content: "\201D"; }
+  #vnTopBar {
+    position: absolute; top: 16px; left: 0; right: 0;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0 20px; z-index: 2;
+  }
+  .vnBtn {
+    background: rgba(20, 24, 32, 0.7);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    color: var(--ink); border: 1px solid var(--surface-3); border-radius: 8px;
+    padding: 8px 14px; cursor: pointer;
+    font-family: inherit; font-size: 12px; font-weight: 500; transition: all 150ms;
+  }
+  .vnBtn:hover { color: var(--accent-hi); border-color: var(--accent-dim); }
+  .vnBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+  #vnCounter {
+    font-size: 11px; color: var(--ink-dim); letter-spacing: 1px;
+    background: rgba(20, 24, 32, 0.5); padding: 6px 10px; border-radius: 6px;
+  }
+  #vnNav {
+    position: absolute; left: 0; right: 0; bottom: 28px;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0 16px; pointer-events: none; z-index: 1;
+  }
+  #vnNav .vnBtn { pointer-events: auto; min-width: 44px; }
+  #vnEmpty {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--ink-dim); font-style: italic;
+    font-family: 'Lora', serif; font-size: 16px;
+    text-align: center; padding: 24px;
+  }
+
+  .footer {
+    font-style: italic; font-size: 11px;
+    color: var(--ink-faint); text-align: center;
+    margin: 16px 8px 28px; letter-spacing: 0.5px;
+  }
+  .footer a { color: var(--accent); text-decoration: none; }
+  .footer a:hover { color: var(--accent-hi); }
+</style>
+
+<div id="app">
+  <div id="titleBar">
+    <div id="titleHeader">
+      <div id="appTitle">Tableau</div>
+      <div id="chatSubtitle">Illustrated AI Chat</div>
+    </div>
+    <button id="trackedBtn" class="titleBtn" title="Tracked story state">📋</button>
+    <button id="vnBtn" class="titleBtn" title="Visual Novel mode">🎭</button>
+    <button id="settingsBtn" class="titleBtn" title="Settings">⚙</button>
+  </div>
+
+  <div id="chatPanel" aria-live="polite">
+    <div id="emptyState">
+      <div class="glyph">📖</div>
+      <div class="hint">No story yet. Open Settings to create a character and scenario, then press <b>New Scene</b> below to begin.</div>
+    </div>
+    <div id="messages"></div>
+    <div id="typing"><span class="dots">Writing</span></div>
+  </div>
+
+  <div id="errorBar" role="alert">
+    <button class="close" title="Dismiss" aria-label="Dismiss error">×</button>
+    <span class="label">ERROR:</span><span class="msg"></span>
+  </div>
+
+  <div id="composer">
+    <div id="toolbar">
+      <button id="newBtn" class="tbtn primary" title="Start a new scene">
+        <span class="ico">📖</span><span>NEW SCENE</span>
+      </button>
+    </div>
+    <div id="inputRow">
+      <textarea id="input" rows="1" placeholder="Write your reply… (Enter to send)" disabled></textarea>
+      <button id="stopBtn" title="Stop generation" hidden>STOP</button>
+      <button id="sendBtn" disabled>SEND</button>
+    </div>
+    <div id="status">Loading…</div>
+  </div>
+</div>
+
+<div id="settingsModal" class="modal" role="dialog" aria-label="Settings">
+  <div class="modalCard">
+    <div class="modalHeader">
+      <div class="modalTitle">Settings</div>
+      <button class="modalClose" data-close="settingsModal">CLOSE</button>
+    </div>
+    <div class="settingsTabs" role="tablist">
+      <button class="settingsTab" role="tab" data-panel="panelChar" aria-selected="true">
+        <span class="ico">👤</span><span class="lbl">CHARACTER</span>
+      </button>
+      <button class="settingsTab" role="tab" data-panel="panelYou" aria-selected="false">
+        <span class="ico">🧍</span><span class="lbl">YOU</span>
+      </button>
+      <button class="settingsTab" role="tab" data-panel="panelScene" aria-selected="false">
+        <span class="ico">🌅</span><span class="lbl">SCENE</span>
+      </button>
+      <button class="settingsTab" role="tab" data-panel="panelMem" aria-selected="false">
+        <span class="ico">📜</span><span class="lbl">MEMORY</span>
+      </button>
+      <button class="settingsTab" role="tab" data-panel="panelHist" aria-selected="false">
+        <span class="ico">📚</span><span class="lbl">HISTORY</span>
+      </button>
+    </div>
+    <div class="modalBody">
+      <div id="panelChar" class="settingsPanel active" role="tabpanel">
+        <div class="field">
+          <label>Character name</label>
+          <input id="charName" type="text" placeholder="e.g. Mira, Theron, the Detective" maxlength="60">
+        </div>
+        <div class="field">
+          <label>Voice &amp; personality <span class="fieldKind">(words — chat AI)</span></label>
+          <textarea id="charDesc" rows="8" placeholder="Describe who this character is — their voice, manner, internal life."></textarea>
+          <div class="hint">Read by the chat AI. Cover voice, personality, manner, habits. NOT looks — visuals go below.</div>
+          <div id="charLengthNotice" class="lengthNotice" hidden></div>
+        </div>
+        <div class="field">
+          <label>Appearance <span class="fieldKind">(image — picture AI)</span></label>
+          <textarea id="charAppearance" rows="4" placeholder="A vivid portrait brief: age, build, hair, clothing, accessories."></textarea>
+          <div class="hint">Read by the image AI for avatars and illustrations. Concrete visual details only.</div>
+        </div>
+        <div class="assistRow">
+          <button id="charAssist" class="assistBtn" type="button">
+            <span class="ico">✨</span><span>Build this character from a seed (or from scratch)</span>
+          </button>
+          <div id="charAssistStatus" class="assistStatus"></div>
+        </div>
+        <div class="panelActions">
+          <button id="charClear" class="secondaryBtn">CLEAR</button>
+          <div class="spacer"></div>
+          <button id="charSave" class="saveBtn">SAVE</button>
+        </div>
+      </div>
+
+      <div id="panelYou" class="settingsPanel" role="tabpanel" hidden>
+        <div class="field">
+          <label>Your name (optional)</label>
+          <input id="youName" type="text" placeholder="leave blank to remain anonymous" maxlength="60">
+          <div class="hint">If set, the character will address you by it.</div>
+        </div>
+        <div class="field">
+          <label>Who you are <span class="fieldKind">(words — chat AI)</span></label>
+          <textarea id="youDesc" rows="5" placeholder="Describe the character you are in this story."></textarea>
+          <div class="hint">Read by the chat AI. e.g. "I am a quiet librarian, here to investigate the disappearance of my brother."</div>
+          <div id="youLengthNotice" class="lengthNotice" hidden></div>
+        </div>
+        <div class="field">
+          <label>How you look <span class="fieldKind">(image — picture AI)</span></label>
+          <textarea id="youAppearance" rows="3" placeholder="Short visual sketch — age, build, hair, clothing. Optional."></textarea>
+          <div class="hint">Optional. Read by the image AI for your avatar.</div>
+        </div>
+        <div class="assistRow">
+          <button id="youAssist" class="assistBtn" type="button">
+            <span class="ico">✦</span><span>Draft this from your memories</span>
+          </button>
+          <div id="youAssistStatus" class="assistStatus"></div>
+        </div>
+        <div class="panelActions">
+          <div class="spacer"></div>
+          <button id="youSave" class="saveBtn">SAVE</button>
+        </div>
+      </div>
+
+      <div id="panelScene" class="settingsPanel" role="tabpanel" hidden>
+        <div class="field">
+          <label>Scenario <span class="fieldKind">(both AIs)</span></label>
+          <textarea id="scenarioText" rows="6" placeholder="Where and when this story takes place."></textarea>
+          <div class="hint">Read by both AIs. Sets the world, time, place, atmosphere. Leave blank for an undefined setting.</div>
+          <div id="scenarioLengthNotice" class="lengthNotice" hidden></div>
+        </div>
+        <div class="assistRow">
+          <button id="scenarioAssist" class="assistBtn" type="button">
+            <span class="ico">✨</span><span>Invent a scenario (uses character if set)</span>
+          </button>
+          <div id="scenarioAssistStatus" class="assistStatus"></div>
+        </div>
+        <div style="margin-top: 24px;">
+          <label style="display:block; font-weight:600; font-size:11px; letter-spacing:0.5px; color:var(--ink); text-transform:uppercase; margin-bottom:8px;">Illustration settings</label>
+          <div class="field">
+            <label>Art style</label>
+            <select id="artStyleSelect"></select>
+            <div class="hint">All cutscenes in this story will be rendered in this style. Lock the look so illustrations feel like a single project, not a grab-bag.</div>
+          </div>
+          <div class="field" id="customStyleFields" hidden>
+            <label>Custom — style prompt prefix</label>
+            <textarea id="customStylePrefix" rows="2" placeholder="e.g. 'art nouveau illustration, ornate floral border, gold leaf accents, Mucha-inspired'"></textarea>
+            <div class="hint">Free-form text added to the start of every cutscene prompt. Describes the medium/style/aesthetic only.</div>
+            <label style="margin-top: 10px;">Custom — negative prompt</label>
+            <textarea id="customStyleNegative" rows="2" placeholder="e.g. 'photorealistic, 3d render, low quality, deformed'"></textarea>
+            <div class="hint">What to keep OUT of the image. Sent separately to the image model.</div>
+          </div>
+          <label class="toggleRow">
+            <input id="autoIllustrate" type="checkbox" checked>
+            <span class="toggleLabel">Auto-illustrate scenes</span>
+          </label>
+          <div class="hint" style="margin-top: 4px;">When on, the chat AI marks vivid moments and the system illustrates them automatically.</div>
+          <div class="field" style="margin-top: 16px;">
+            <label>Suppression window — messages between auto-illustrations</label>
+            <div class="sliderRow">
+              <input id="suppressionWindow" type="range" min="1" max="5" step="1" value="2">
+              <span class="sliderVal" id="suppressionVal">2</span>
+            </div>
+            <div class="hint">Higher = fewer illustrations. Manual 🎬 button always works regardless.</div>
+          </div>
+        </div>
+        <div class="panelActions">
+          <div class="spacer"></div>
+          <button id="sceneSave" class="saveBtn">SAVE</button>
+        </div>
+      </div>
+
+      <div id="panelMem" class="settingsPanel" role="tabpanel" hidden>
+        <div class="field">
+          <label>What the character quietly knows about you</label>
+          <div class="hint" style="margin-bottom:8px;">Facts the character keeps in mind without naming them aloud.</div>
+          <div id="memList"></div>
+          <button id="memAdd">+ ADD A MEMORY</button>
+        </div>
+        <div class="panelActions">
+          <div class="spacer"></div>
+          <button id="memSave" class="saveBtn">SAVE</button>
+        </div>
+      </div>
+
+      <div id="panelHist" class="settingsPanel" role="tabpanel" hidden>
+        <div id="histList"></div>
+        <div class="panelActions" style="margin-top:14px;">
+          <button id="histReset" class="secondaryBtn" style="color: var(--err); border-color: var(--err);">CLEAR ALL HISTORY</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tracked Info modal — per-chat story state -->
+<div id="trackedModal" class="modal" role="dialog" aria-label="Tracked story state">
+  <div class="modalCard">
+    <div class="modalHeader">
+      <div class="modalTitle">📋 Tracked story state</div>
+      <button class="modalClose" data-close="trackedModal">CLOSE</button>
+    </div>
+    <div class="modalBody">
+      <div class="field">
+        <div class="hint" style="margin-bottom:8px;">A freeform note attached to <i>this scene only</i>. The character sees it in every reply and treats it as fact. Use it for things you want remembered across many turns: locations, items, time of day, who knows what, relationships, the ticking clock.</div>
+        <textarea id="trackedInfoText" rows="14" placeholder="# Character&#10;Items: brass key, water-stained letter&#10;Knows: the warehouse was rented under a fake name&#10;&#10;# World&#10;Location: rooming house on Pier Street&#10;Time: 2am, third night of rain&#10;&#10;# Events&#10;Day 4 of an unofficial 7-day deadline"></textarea>
+        <div id="trackedLengthNotice" class="lengthNotice" hidden></div>
+      </div>
+      <div class="assistRow">
+        <button id="trackedUpdate" class="assistBtn" type="button">
+          <span class="ico">↻</span><span>Auto-update from recent chat</span>
+        </button>
+        <div id="trackedUpdateStatus" class="assistStatus"></div>
+      </div>
+      <div class="panelActions">
+        <button id="trackedClear" class="secondaryBtn">CLEAR</button>
+        <div class="spacer"></div>
+        <button id="trackedSave" class="saveBtn">SAVE</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="lightbox" role="dialog" aria-label="Image preview">
+  <button id="lightboxClose">✕ CLOSE</button>
+  <img id="lightboxImg" alt="">
+</div>
+
+<div id="vnLayer" role="dialog" aria-label="Visual Novel mode">
+  <div id="vnBg"></div>
+  <div id="vnTopBar">
+    <button class="vnBtn" id="vnExit">✕ EXIT</button>
+    <div id="vnCounter">— / —</div>
+  </div>
+  <div id="vnNav">
+    <button class="vnBtn" id="vnPrev">◀ PREV</button>
+    <button class="vnBtn" id="vnNext">NEXT ▶</button>
+  </div>
+  <div id="vnPanel">
+    <div id="vnSpeaker"></div>
+    <div id="vnText"></div>
+  </div>
+  <div id="vnEmpty" hidden>No cutscenes in this scene yet. Generate one with the 🎬 button on a message, or enable auto-illustrate.</div>
+</div>
+
+<footer class="footer">
+  <span>© 2026 therealwestninja.</span> ·
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> ·
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>
+
+<script>
+(async function () {
+  // =====================================================================
+  // CONSTANTS
+  // =====================================================================
+  const ILLUSTRATE_TAG = "<<illustrate>>";
+  const MIN_ILLUSTRATE_WORDS = 25;
+  const MAX_DIALOGUE_FRACTION = 0.6;
+
+  // =====================================================================
+  // UTILITIES
+  // =====================================================================
+  const $ = (id) => document.getElementById(id);
+  const escapeHTML = (s) => String(s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const errMsg = (e) => {
+    if (!e) return "unknown error";
+    if (typeof e === "string") return e;
+    if (e.message) return e.message;
+    try { return JSON.stringify(e); } catch { return String(e); }
+  };
+
+  // Render *italic* and "quote" markup for AI bubbles. Returns DOM nodes.
+  // User messages are rendered as plain text.
+  function renderCharText(text) {
+    if (!text) return [];
+    const escaped = escapeHTML(text);
+    const html = escaped
+      .replace(/(?:&quot;|&#x22;|\u201C)([^"\u201C\u201D]+?)(?:&quot;|&#x22;|\u201D)/g, "<q>$1</q>")
+      .replace(/\u201C([^\u201D]+?)\u201D/g, "<q>$1</q>")
+      .replace(/\*([^*]+?)\*/g, "<em>$1</em>");
+    const tmpl = document.createElement("template");
+    tmpl.innerHTML = html;
+    return Array.from(tmpl.content.childNodes);
+  }
+
+  // =====================================================================
+  // ERROR BANNER
+  // =====================================================================
+  function showError(where, err) {
+    const msg = errMsg(err);
+    console.error("[" + where + "]", err);
+    const bar = $("errorBar");
+    bar.querySelector(".label").textContent = where.toUpperCase() + ":";
+    bar.querySelector(".msg").textContent = " " + msg;
+    bar.classList.add("active");
+  }
+  function clearError() { $("errorBar").classList.remove("active"); }
+  $("errorBar").querySelector(".close").onclick = clearError;
+  const setStatus = (t) => { $("status").textContent = t || ""; };
+
+  // =====================================================================
+  // DEXIE LOADER + DB
+  // =====================================================================
+  async function ensureDexie() {
+    for (let i = 0; i < 30 && typeof Dexie === "undefined"; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    if (typeof Dexie === "undefined") {
+      await new Promise((resolve) => {
+        const s = document.createElement("script");
+        s.src = "https://cdn.jsdelivr.net/npm/dexie@4.0.11/dist/dexie.min.js";
+        s.onload = resolve; s.onerror = resolve;
+        document.head.appendChild(s);
+      });
+    }
+  }
+  await ensureDexie();
+  if (typeof Dexie === "undefined") {
+    showError("db", "Could not load Dexie. Refresh to retry.");
+    return;
+  }
+
+  // Fresh DB name — clean break from the fortune-teller's "the-dispenser-v1".
+  const db = new Dexie("tableau-v1");
+  db.version(1).stores({
+    chats: "id, createdAt, lastMessageAt",
+    messages: "++id, chatId, createdAt",
+    misc: "key",
+  });
+
+  // =====================================================================
+  // STATE
+  // =====================================================================
+  let state = "LOADING";
+  let currentChat = null;
+  let currentMessages = [];
+  let character = { name: "", description: "", appearance: "" };
+  let personality = { name: "", description: "", appearance: "" };
+  let scenarioDefault = "";
+  let memory = [];
+  let settings = {
+    autoIllustrate: true,
+    suppressionWindow: 2,
+    artStyleKey: "default",      // which preset is selected
+    customStylePrefix: "",       // used when artStyleKey === "custom"
+    customStyleNegative: "",     // used when artStyleKey === "custom"
+  };
+  let drawId = 0;
+  let currentStream = null;
+
+  let charAvatars = {};
+  let userAvatars = {};
+  let currentCharAvatarUrl = "";
+  let currentUserAvatarUrl = "";
+  let currentCharAvatarPending = false;
+  let currentUserAvatarPending = false;
+  let currentCharAvatarHash = "";
+  let currentUserAvatarHash = "";
+
+  // =====================================================================
+  // STORAGE HELPERS
+  // =====================================================================
+  async function getMisc(key, def) {
+    const row = await db.misc.get(key);
+    return row ? row.value : def;
+  }
+  async function setMisc(key, value) { await db.misc.put({ key, value }); }
+
+  async function loadCharacter() {
+    const stored = await getMisc("character", null);
+    character = (!stored || typeof stored !== "object")
+      ? { name: "", description: "", appearance: "" }
+      : { name: stored.name || "", description: stored.description || "", appearance: stored.appearance || "" };
+  }
+  async function saveCharacter() { await setMisc("character", character); }
+  async function loadPersonality() {
+    const stored = await getMisc("personality", null);
+    personality = (!stored || typeof stored !== "object")
+      ? { name: "", description: "", appearance: "" }
+      : { name: stored.name || "", description: stored.description || "", appearance: stored.appearance || "" };
+  }
+  async function savePersonality() { await setMisc("personality", personality); }
+  async function loadScenarioDefault() {
+    scenarioDefault = await getMisc("scenarioDefault", "");
+    if (typeof scenarioDefault !== "string") scenarioDefault = "";
+  }
+  async function saveScenarioDefault() { await setMisc("scenarioDefault", scenarioDefault); }
+  async function loadMemory() {
+    memory = await getMisc("memory", []);
+    if (!Array.isArray(memory)) memory = [];
+  }
+  async function saveMemory() { await setMisc("memory", memory); }
+  async function loadSettings() {
+    const s = await getMisc("settings", null);
+    settings = (!s || typeof s !== "object")
+      ? { autoIllustrate: true, suppressionWindow: 2, artStyleKey: "default", customStylePrefix: "", customStyleNegative: "" }
+      : {
+          autoIllustrate: s.autoIllustrate !== false,
+          suppressionWindow: Math.max(1, Math.min(5, parseInt(s.suppressionWindow) || 2)),
+          artStyleKey: s.artStyleKey || "default",
+          customStylePrefix: s.customStylePrefix || "",
+          customStyleNegative: s.customStyleNegative || "",
+        };
+  }
+  async function saveSettings() { await setMisc("settings", settings); }
+  async function loadAvatarCaches() {
+    charAvatars = await getMisc("charAvatars", {});
+    if (!charAvatars || typeof charAvatars !== "object") charAvatars = {};
+    userAvatars = await getMisc("userAvatars", {});
+    if (!userAvatars || typeof userAvatars !== "object") userAvatars = {};
+  }
+
+  async function listChats() { return await db.chats.orderBy("lastMessageAt").reverse().toArray(); }
+  async function loadChatById(id) {
+    const chat = await db.chats.get(id);
+    if (!chat) return null;
+    const msgs = await db.messages.where("chatId").equals(id).sortBy("createdAt");
+    return { chat, messages: msgs };
+  }
+  async function saveChat(chat) { await db.chats.put(chat); }
+  async function addMessage(chatId, role, content, extras) {
+    const m = { chatId, role, content, createdAt: Date.now() };
+    if (extras && extras.cutsceneUrl) m.cutsceneUrl = extras.cutsceneUrl;
+    if (extras && extras.cutscenePrompt) m.cutscenePrompt = extras.cutscenePrompt;
+    const id = await db.messages.add(m);
+    m.id = id;
+    return m;
+  }
+  async function updateMessageCutscene(msgId, url, prompt) {
+    await db.messages.update(msgId, { cutsceneUrl: url, cutscenePrompt: prompt });
+  }
+  async function touchChat(chatId) { await db.chats.update(chatId, { lastMessageAt: Date.now() }); }
+  // Save the tracked info of the current chat to disk. The in-memory
+  // currentChat.trackedInfo is the source of truth.
+  async function saveCurrentChatTrackedInfo() {
+    if (!currentChat) return;
+    await db.chats.update(currentChat.id, { trackedInfo: currentChat.trackedInfo || "" });
+  }
+
+  // =====================================================================
+  // AVATARS
+  // =====================================================================
+  // personaHash uses ONLY visual-affecting fields. Voice/personality edits
+  // don't burn an image-gen call.
+  function personaHash(p) {
+    const name = (p && p.name) || "";
+    const appearance = (p && p.appearance) || "";
+    const desc = (p && p.description) || "";
+    const s = name + "\n" + appearance + (appearance ? "" : "\n" + desc);
+    if (!s.trim()) return "";
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
+    }
+    return (h >>> 0).toString(36);
+  }
+  async function resolveCharAvatar() {
+    const hash = personaHash(character);
+    currentCharAvatarHash = hash;
+    if (!hash) {
+      currentCharAvatarUrl = ""; currentCharAvatarPending = false;
+      refreshCharAvatars(); return;
+    }
+    if (charAvatars[hash]) {
+      currentCharAvatarUrl = charAvatars[hash]; currentCharAvatarPending = false;
+      refreshCharAvatars(); return;
+    }
+    currentCharAvatarUrl = ""; currentCharAvatarPending = true; refreshCharAvatars();
+    try {
+      const res = await root.generateCharacterAvatar(character);
+      if (personaHash(character) !== hash) return;
+      if (res && res.url) {
+        charAvatars[hash] = res.url;
+        await setMisc("charAvatars", charAvatars);
+        currentCharAvatarUrl = res.url;
+      } else if (res && res.error) showError("char avatar", res.error);
+    } catch (e) {
+      if (personaHash(character) !== hash) return;
+      showError("char avatar", e);
+    } finally {
+      if (personaHash(character) === hash) {
+        currentCharAvatarPending = false; refreshCharAvatars();
+      }
+    }
+  }
+  async function resolveUserAvatar() {
+    const hash = personaHash(personality);
+    currentUserAvatarHash = hash;
+    if (!hash) {
+      currentUserAvatarUrl = ""; currentUserAvatarPending = false;
+      refreshUserAvatars(); return;
+    }
+    if (userAvatars[hash]) {
+      currentUserAvatarUrl = userAvatars[hash]; currentUserAvatarPending = false;
+      refreshUserAvatars(); return;
+    }
+    currentUserAvatarUrl = ""; currentUserAvatarPending = true; refreshUserAvatars();
+    try {
+      const res = await root.generateUserAvatar(personality);
+      if (personaHash(personality) !== hash) return;
+      if (res && res.url) {
+        userAvatars[hash] = res.url;
+        await setMisc("userAvatars", userAvatars);
+        currentUserAvatarUrl = res.url;
+      } else if (res && res.error) showError("user avatar", res.error);
+    } catch (e) {
+      if (personaHash(personality) !== hash) return;
+      showError("user avatar", e);
+    } finally {
+      if (personaHash(personality) === hash) {
+        currentUserAvatarPending = false; refreshUserAvatars();
+      }
+    }
+  }
+  function applyAvatar(wrap, role) {
+    const av = wrap.querySelector(".avatar");
+    if (!av) return;
+    av.classList.remove("default-char", "default-user", "pending");
+    av.style.backgroundImage = "";
+    av.dataset.imgUrl = "";
+    let url = "";
+    if (role === "assistant") {
+      url = currentCharAvatarUrl || "";
+      if (!url) {
+        if (currentCharAvatarPending) av.classList.add("pending", "default-char");
+        else av.classList.add("default-char");
+        return;
+      }
+    } else {
+      url = currentUserAvatarUrl || "";
+      if (!url) {
+        if (currentUserAvatarPending) av.classList.add("pending", "default-user");
+        else av.classList.add("default-user");
+        return;
+      }
+    }
+    av.style.backgroundImage = `url("${url.replace(/"/g, '%22')}")`;
+    av.dataset.imgUrl = url;
+  }
+  function refreshCharAvatars() {
+    document.querySelectorAll(".msg.char:not(.error) .avatar").forEach(av => {
+      const parent = av.closest(".msg");
+      if (parent) applyAvatar(parent, "assistant");
+    });
+  }
+  function refreshUserAvatars() {
+    document.querySelectorAll(".msg.user .avatar").forEach(av => {
+      const parent = av.closest(".msg");
+      if (parent) applyAvatar(parent, "user");
+    });
+  }
+
+  // =====================================================================
+  // STREAM CANCELLATION
+  // =====================================================================
+  function cancelStream() {
+    if (currentStream && typeof currentStream.stop === "function") {
+      try { currentStream.stop(); } catch (e) { console.warn("stream.stop() threw:", e); }
+    }
+    currentStream = null;
+    setStreamingUI(false);
+  }
+  function setStreamingUI(streaming) {
+    const stop = $("stopBtn"), send = $("sendBtn");
+    if (!stop || !send) return;
+    stop.hidden = !streaming;
+    send.hidden = streaming;
+  }
+
+  // =====================================================================
+  // CHAT RENDERING
+  // =====================================================================
+  function renderEmptyState(show) {
+    $("emptyState").style.display = show ? "flex" : "none";
+    $("messages").style.display = show ? "none" : "block";
+  }
+  function clearChatPanel() {
+    $("messages").innerHTML = "";
+    currentMessages = [];
+  }
+  function scrollChatToBottom() {
+    const c = $("chatPanel");
+    c.scrollTop = c.scrollHeight;
+  }
+  function renderBubble(role, text, opts) {
+    opts = opts || {};
+    const wrap = document.createElement("div");
+    wrap.className = "msg " + (role === "user" ? "user" : "char");
+    if (opts.id) wrap.dataset.id = opts.id;
+    const youLabel = (personality.name || "").trim();
+    const charLabel = (character.name || "").trim();
+    const who = role === "user"
+      ? (youLabel || "YOU")
+      : (charLabel || "CHARACTER");
+    wrap.innerHTML = `
+      <div class="avatar" role="img"></div>
+      <div class="msgWho">${escapeHTML(who.toUpperCase())}</div>
+      <div class="bubble"></div>
+      <div class="cutscene" hidden></div>
+      <div class="msgActions"></div>
+    `;
+    setBubbleText(wrap, text || "", role);
+    if (opts.cutsceneUrl) renderCutsceneImage(wrap, opts.cutsceneUrl);
+    applyAvatar(wrap, role === "user" ? "user" : "assistant");
+    buildBubbleActions(wrap);
+    $("messages").appendChild(wrap);
+    scrollChatToBottom();
+    return wrap;
+  }
+  function setBubbleText(wrap, text, role) {
+    if (!wrap) return;
+    const bubble = wrap.querySelector(".bubble");
+    if (!bubble) return;
+    role = role || (wrap.classList.contains("user") ? "user" : "char");
+    if (role === "user") {
+      bubble.textContent = text || "";
+    } else {
+      bubble.innerHTML = "";
+      const nodes = renderCharText(text || "");
+      nodes.forEach(n => bubble.appendChild(n));
+    }
+  }
+  function appendBubbleText(wrap, chunk, role) {
+    if (!wrap) return;
+    const existing = wrap._streamingRaw || "";
+    const updated = existing + chunk;
+    wrap._streamingRaw = updated;
+    setBubbleText(wrap, updated, role);
+    const caret = document.createElement("span");
+    caret.className = "caret";
+    wrap.querySelector(".bubble").appendChild(caret);
+    scrollChatToBottom();
+  }
+  function finalizeBubble(wrap, text, role) {
+    delete wrap._streamingRaw;
+    setBubbleText(wrap, text, role);
+  }
+  function renderCutsceneImage(wrap, url) {
+    const ctn = wrap.querySelector(".cutscene");
+    if (!ctn) return;
+    ctn.hidden = false;
+    ctn.classList.remove("failed");
+    ctn.innerHTML = `<img src="${escapeHTML(url)}" alt="">`;
+  }
+  function renderCutscenePending(wrap, statusText) {
+    const ctn = wrap.querySelector(".cutscene");
+    if (!ctn) return;
+    ctn.hidden = false;
+    ctn.classList.remove("failed");
+    ctn.innerHTML = `<div class="cutsceneStatus"><div class="spinner"></div><span>${escapeHTML(statusText || "Illustrating…")}</span></div>`;
+  }
+  function renderCutsceneFailed(wrap, errText) {
+    const ctn = wrap.querySelector(".cutscene");
+    if (!ctn) return;
+    ctn.hidden = false;
+    ctn.classList.add("failed");
+    ctn.innerHTML = `<div class="cutsceneStatus"><span>Could not illustrate: ${escapeHTML(errText || "unknown error")}</span></div>`;
+  }
+  function renderErrorBubble(where, errorText) {
+    const wrap = document.createElement("div");
+    wrap.className = "msg char error";
+    wrap.innerHTML = `
+      <div class="msgWho">${escapeHTML(where.toUpperCase())}</div>
+      <div class="bubble"></div>
+      <div class="msgActions"></div>
+    `;
+    wrap.querySelector(".bubble").textContent = errorText;
+    $("messages").appendChild(wrap);
+    buildBubbleActions(wrap);
+    scrollChatToBottom();
+    return wrap;
+  }
+  function removeBubble(wrap) {
+    if (!wrap) return;
+    wrap.remove();
+  }
+  function showTyping(on) {
+    $("typing").classList.toggle("active", !!on);
+    if (on) scrollChatToBottom();
+  }
+
+  // =====================================================================
+  // PER-MESSAGE ACTIONS
+  // =====================================================================
+  function buildBubbleActions(bubble) {
+    const slot = bubble.querySelector(".msgActions");
+    if (!slot) return;
+    slot.innerHTML = "";
+    if (bubble.classList.contains("error")) {
+      slot.appendChild(mkActBtn("✕", "Dismiss", () => removeBubble(bubble), true));
+      return;
+    }
+    const isChar = bubble.classList.contains("char");
+    if (isChar) {
+      const id = parseInt(bubble.dataset.id, 10);
+      const msg = currentMessages.find(m => m.id === id);
+      const hasCutscene = msg && msg.cutsceneUrl;
+      slot.appendChild(mkActBtn(
+        hasCutscene ? "↻ illustrate" : "🎬 illustrate",
+        hasCutscene ? "Re-generate illustration" : "Generate an illustration of this beat",
+        () => illustrateBubble(bubble),
+      ));
+    }
+    slot.appendChild(mkActBtn("✎ edit", "Edit this message", () => beginEditBubble(bubble)));
+    if (isChar && hasPrecedingUser(bubble)) {
+      slot.appendChild(mkActBtn("↻ regen", "Regenerate (drops following messages)", () => regenerateFromBubble(bubble)));
+    }
+    slot.appendChild(mkActBtn("✕ delete", "Delete this message", () => deleteBubble(bubble), true));
+  }
+  function mkActBtn(label, title, onclick, danger) {
+    const b = document.createElement("button");
+    b.className = "actBtn" + (danger ? " danger" : "");
+    b.textContent = label;
+    b.title = title;
+    b.type = "button";
+    b.onclick = onclick;
+    return b;
+  }
+  function hasPrecedingUser(bubble) {
+    const id = parseInt(bubble.dataset.id, 10);
+    if (!id) return false;
+    const idx = currentMessages.findIndex(m => m.id === id);
+    if (idx <= 0) return false;
+    for (let i = idx - 1; i >= 0; i--) {
+      if (currentMessages[i].role === "user") return true;
+    }
+    return false;
+  }
+  function refreshAllActionVisibility() {
+    $("messages").querySelectorAll(".msg").forEach(b => {
+      if (!b.classList.contains("editing")) buildBubbleActions(b);
+    });
+  }
+
+  function beginEditBubble(bubble) {
+    if (bubble.classList.contains("editing")) return;
+    $("messages").querySelectorAll(".msg.editing").forEach(b => cancelEditBubble(b));
+    bubble.classList.add("editing");
+    const id = parseInt(bubble.dataset.id, 10);
+    const msg = currentMessages.find(m => m.id === id);
+    const currentText = msg ? msg.content : "";
+    const bubbleEl = bubble.querySelector(".bubble");
+    bubble._editPrev = { text: msg ? msg.content : "" };
+    bubbleEl.innerHTML = `
+      <div class="editForm">
+        <textarea></textarea>
+        <div class="editFormButtons">
+          <button class="editCancel" type="button">CANCEL</button>
+          <button class="editSave" type="button">SAVE</button>
+        </div>
+      </div>
+    `;
+    const ta = bubbleEl.querySelector("textarea");
+    ta.value = currentText;
+    ta.focus();
+    ta.setSelectionRange(currentText.length, currentText.length);
+    bubbleEl.querySelector(".editCancel").onclick = () => cancelEditBubble(bubble);
+    bubbleEl.querySelector(".editSave").onclick = () => commitEditBubble(bubble);
+    ta.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { e.preventDefault(); cancelEditBubble(bubble); }
+      else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); commitEditBubble(bubble); }
+    });
+  }
+  function cancelEditBubble(bubble) {
+    if (!bubble.classList.contains("editing")) return;
+    bubble.classList.remove("editing");
+    const role = bubble.classList.contains("user") ? "user" : "char";
+    setBubbleText(bubble, (bubble._editPrev && bubble._editPrev.text) || "", role);
+    delete bubble._editPrev;
+    buildBubbleActions(bubble);
+  }
+  async function commitEditBubble(bubble) {
+    const id = parseInt(bubble.dataset.id, 10);
+    const msg = currentMessages.find(m => m.id === id);
+    if (!id || !msg) { cancelEditBubble(bubble); return; }
+    const ta = bubble.querySelector(".editForm textarea");
+    const newText = (ta ? ta.value : "").trim();
+    if (newText === msg.content) { cancelEditBubble(bubble); return; }
+    bubble.classList.remove("editing");
+    delete bubble._editPrev;
+    msg.content = newText;
+    const role = bubble.classList.contains("user") ? "user" : "char";
+    setBubbleText(bubble, newText, role);
+    buildBubbleActions(bubble);
+    try {
+      await db.messages.update(id, { content: newText });
+      await touchChat(currentChat.id);
+    } catch (e) {
+      showError("editMessage", e);
+    }
+  }
+
+  async function deleteBubble(bubble) {
+    const id = parseInt(bubble.dataset.id, 10);
+    if (!id) { removeBubble(bubble); return; }
+    const ok = await root.confirmAsync("Delete this message?\n\nThis cannot be undone.");
+    if (!ok) return;
+    try { await db.messages.delete(id); }
+    catch (e) { showError("deleteMessage", e); return; }
+    currentMessages = currentMessages.filter(m => m.id !== id);
+    removeBubble(bubble);
+    refreshAllActionVisibility();
+    await touchChat(currentChat.id);
+  }
+
+  async function regenerateFromBubble(bubble) {
+    if (state === "WRITING") return;
+    const id = parseInt(bubble.dataset.id, 10);
+    if (!id) return;
+    const idx = currentMessages.findIndex(m => m.id === id);
+    if (idx === -1) return;
+    if (!hasPrecedingUser(bubble)) {
+      showError("regenerate", "no user message precedes this");
+      return;
+    }
+    const after = currentMessages.slice(idx).map(m => m.id).filter(Boolean);
+    if (after.length > 1) {
+      const ok = await root.confirmAsync(
+        `Regenerating will also discard ${after.length - 1} message${after.length === 2 ? "" : "s"} that came after this one.\n\nContinue?`
+      );
+      if (!ok) return;
+    }
+    clearError();
+    cancelStream();
+    try {
+      await db.transaction("rw", db.messages, async () => {
+        for (const did of after) await db.messages.delete(did);
+      });
+    } catch (e) {
+      showError("regenerate.delete", e);
+      return;
+    }
+    currentMessages = currentMessages.slice(0, idx);
+    removeFromBubbleOnward(bubble);
+    await streamAssistantReply();
+  }
+  function removeFromBubbleOnward(bubble) {
+    const container = $("messages");
+    const all = [].slice.call(container.children);
+    const start = all.indexOf(bubble);
+    if (start === -1) return;
+    for (let i = all.length - 1; i >= start; i--) all[i].remove();
+  }
+
+  // Resolve the currently-selected art style into a { promptPrefix,
+  // negativePrompt } object for generateCutscene. For preset keys, reads
+  // the artStyles list from the top panel. For "custom", uses the user's
+  // saved custom values. Returns the default if anything goes wrong.
+  function resolveArtStyle() {
+    try {
+      const key = settings.artStyleKey || "default";
+      if (key === "custom") {
+        return {
+          promptPrefix: settings.customStylePrefix || "",
+          negativePrompt: settings.customStyleNegative || "",
+        };
+      }
+      // Look up the preset on the top panel. root.artStyleByKey returns
+      // the default when the key is unknown.
+      const preset = root.artStyleByKey ? root.artStyleByKey(key) : null;
+      if (preset) {
+        return {
+          promptPrefix: String(preset.promptPrefix || ""),
+          negativePrompt: String(preset.negativePrompt || ""),
+        };
+      }
+    } catch (e) {
+      console.warn("resolveArtStyle failed, using fallback:", e);
+    }
+    return { promptPrefix: "", negativePrompt: "" };
+  }
+
+  async function illustrateBubble(bubble) {
+    const id = parseInt(bubble.dataset.id, 10);
+    if (!id) return;
+    const idx = currentMessages.findIndex(m => m.id === id);
+    if (idx === -1) return;
+    const msg = currentMessages[idx];
+    renderCutscenePending(bubble, "Illustrating…");
+    try {
+      const recent = currentMessages.slice(Math.max(0, idx - 3), idx);
+      const res = await root.generateCutscene(
+        msg.content, recent, character, personality, chatScenario(), resolveArtStyle(),
+      );
+      if (res.error || !res.url) {
+        renderCutsceneFailed(bubble, res.error || "unknown");
+        showError("cutscene", res.error || "unknown");
+        return;
+      }
+      msg.cutsceneUrl = res.url;
+      msg.cutscenePrompt = res.prompt;
+      renderCutsceneImage(bubble, res.url);
+      await updateMessageCutscene(id, res.url, res.prompt);
+      refreshAllActionVisibility();
+    } catch (e) {
+      renderCutsceneFailed(bubble, errMsg(e));
+      showError("cutscene", e);
+    }
+  }
+
+  // =====================================================================
+  // SCENE / CHAT LIFECYCLE
+  // =====================================================================
+  function chatScenario() {
+    if (currentChat && currentChat.scenario) return currentChat.scenario;
+    return scenarioDefault || "";
+  }
+  // Current chat's tracked info. Returns "" if none. Per-chat, not global.
+  function chatTrackedInfo() {
+    return (currentChat && currentChat.trackedInfo) || "";
+  }
+
+  function updateChatSubtitle() {
+    const sub = $("chatSubtitle");
+    if (!sub) return;
+    if (currentChat) {
+      sub.textContent = currentChat.title || (character.name ? `with ${character.name}` : "Illustrated AI Chat");
+    } else {
+      sub.textContent = "Illustrated AI Chat";
+    }
+  }
+  function enableInput(on) {
+    $("input").disabled = !on;
+    $("sendBtn").disabled = !on || !$("input").value.trim();
+  }
+
+  async function activateChat(chatId) {
+    const loaded = await loadChatById(chatId);
+    if (!loaded) return;
+    currentChat = loaded.chat;
+    renderEmptyState(false);
+    clearChatPanel();
+    currentMessages = loaded.messages.map(m => ({
+      id: m.id, role: m.role, content: m.content,
+      cutsceneUrl: m.cutsceneUrl, cutscenePrompt: m.cutscenePrompt,
+    }));
+    for (const m of loaded.messages) {
+      const b = renderBubble(m.role, m.content, { id: m.id, cutsceneUrl: m.cutsceneUrl });
+      b.dataset.id = m.id;
+    }
+    refreshAllActionVisibility();
+    updateChatSubtitle();
+    enableInput(true);
+    scrollChatToBottom();
+    updateTrackedBtnState();
+    await setMisc("currentChatId", chatId);
+  }
+
+  async function startNewScene() {
+    if (state === "WRITING") return;
+    if (!character.name && !character.description) {
+      const ok = await root.confirmAsync(
+        "You haven't set up a character yet.\n\nThe Settings panel has fields for the character's name, voice, and appearance. The chat will work without these, but the AI will improvise everything itself.\n\nContinue without setting up a character?"
+      );
+      if (!ok) {
+        openSettings("panelChar");
+        return;
+      }
+    }
+    clearError();
+    cancelStream();
+    state = "WRITING";
+    const myDraw = ++drawId;
+    $("newBtn").classList.add("busy");
+
+    try {
+      const chatId = newId();
+      const newChat = {
+        id: chatId,
+        scenario: scenarioDefault || "",
+        trackedInfo: "",          // story state — see updateTrackedInfo
+        title: character.name ? `with ${character.name}` : "A new scene",
+        createdAt: Date.now(),
+        lastMessageAt: Date.now(),
+      };
+      await saveChat(newChat);
+      currentChat = newChat;
+      currentMessages = [];
+
+      renderEmptyState(false);
+      clearChatPanel();
+      updateChatSubtitle();
+
+      const bubble = renderBubble("assistant", "");
+      const inflight = await root.openScene(character, personality, chatScenario(), chatTrackedInfo(), (chunk) => {
+        if (myDraw !== drawId) return;
+        appendBubbleText(bubble, chunk, "char");
+      });
+      if (myDraw !== drawId) return;
+
+      let finalText = "";
+      let illustrateFlag = false;
+      if (inflight.error || !inflight.stream) {
+        showError("openScene", inflight.error || "stream did not start");
+        finalText = "*The character is quiet — the chat AI couldn't start the scene. Check the error banner and try again, or adjust your character settings.*";
+      } else {
+        currentStream = inflight.stream;
+        setStreamingUI(true);
+        try {
+          const data = await inflight.stream;
+          if (myDraw !== drawId) return;
+          if (data.stopReason === "error" || !data.generatedText || !data.generatedText.trim()) {
+            showError("openScene", "stopReason=" + (data.stopReason || "(none)") + " with empty text");
+            finalText = "*(the scene opened in silence)*";
+          } else {
+            const parsed = parseAndStripIllustrateTag(data.generatedText);
+            finalText = parsed.text;
+            illustrateFlag = parsed.illustrate;
+          }
+        } catch (e) {
+          if (myDraw !== drawId) return;
+          showError("openScene", e);
+          finalText = "*(the scene opened in silence)*";
+        } finally {
+          if (currentStream === inflight.stream) { currentStream = null; setStreamingUI(false); }
+        }
+      }
+      finalizeBubble(bubble, finalText, "char");
+
+      const savedMsg = await addMessage(chatId, "assistant", finalText);
+      currentMessages.push({ id: savedMsg.id, role: "assistant", content: finalText });
+      bubble.dataset.id = savedMsg.id;
+      refreshAllActionVisibility();
+      await touchChat(chatId);
+      await setMisc("currentChatId", chatId);
+
+      maybeAutoIllustrate(bubble, finalText, illustrateFlag, true);
+
+      state = "READY";
+      enableInput(true);
+      $("input").focus();
+    } catch (e) {
+      showError("startNewScene", e);
+      state = "READY";
+    } finally {
+      $("newBtn").classList.remove("busy");
+    }
+  }
+
+  async function sendUserMessage() {
+    if (!currentChat) return;
+    if (state === "WRITING") return;
+    const raw = $("input").value.trim();
+    if (!raw) return;
+
+    clearError();
+    enableInput(false);
+    $("input").value = "";
+    autoResizeInput();
+
+    const userBubble = renderBubble("user", raw);
+    let savedUserMsg = null;
+    try {
+      savedUserMsg = await addMessage(currentChat.id, "user", raw);
+      userBubble.dataset.id = savedUserMsg.id;
+      await touchChat(currentChat.id);
+    } catch (e) {
+      showError("db.addMessage", e);
+    }
+    currentMessages.push({ id: savedUserMsg ? savedUserMsg.id : null, role: "user", content: raw });
+    refreshAllActionVisibility();
+
+    await streamAssistantReply();
+  }
+
+  async function streamAssistantReply() {
+    if (state === "WRITING") return;
+    state = "WRITING";
+    const myTurn = ++drawId;
+    enableInput(false);
+    showTyping(true);
+    const bubble = renderBubble("assistant", "");
+    showTyping(false);
+
+    try {
+      const inflight = await root.chatReply(
+        currentMessages,
+        character, personality, chatScenario(), chatTrackedInfo(),
+        (chunk) => {
+          if (myTurn !== drawId) return;
+          appendBubbleText(bubble, chunk, "char");
+        },
+      );
+      if (myTurn !== drawId) return;
+      if (inflight.error || !inflight.stream) {
+        removeBubble(bubble);
+        renderErrorBubble("chatReply", inflight.error || "stream did not start");
+        showError("chatReply", inflight.error || "stream did not start");
+        return;
+      }
+      currentStream = inflight.stream;
+      setStreamingUI(true);
+      let finalText = "";
+      let aborted = false;
+      let illustrateFlag = false;
+      try {
+        const data = await inflight.stream;
+        if (myTurn !== drawId) return;
+        if (data.stopReason === "error" || !data.generatedText || !data.generatedText.trim()) {
+          const stopped = data.stopReason && /stop/i.test(data.stopReason);
+          if (stopped) { aborted = true; }
+          else {
+            removeBubble(bubble);
+            renderErrorBubble("chatReply", "stopReason=" + (data.stopReason || "(none)") + " with empty text");
+            showError("chatReply", "stopReason=" + (data.stopReason || "(none)") + " with empty text");
+          }
+        } else {
+          const cleaned = data.generatedText.trim().replace(/^\[\[[^\]]+\]\]:\s*/i, "").trim();
+          const parsed = parseAndStripIllustrateTag(cleaned);
+          finalText = parsed.text;
+          illustrateFlag = parsed.illustrate;
+        }
+      } catch (e) {
+        if (myTurn !== drawId) return;
+        removeBubble(bubble);
+        renderErrorBubble("chatReply", errMsg(e));
+        showError("chatReply", e);
+      } finally {
+        if (currentStream === inflight.stream) { currentStream = null; setStreamingUI(false); }
+      }
+
+      if (finalText && !aborted) {
+        finalizeBubble(bubble, finalText, "char");
+        try {
+          const savedMsg = await addMessage(currentChat.id, "assistant", finalText);
+          bubble.dataset.id = savedMsg.id;
+          currentMessages.push({ id: savedMsg.id, role: "assistant", content: finalText });
+          refreshAllActionVisibility();
+          await touchChat(currentChat.id);
+          maybeAutoIllustrate(bubble, finalText, illustrateFlag, false);
+        } catch (e) {
+          showError("db.addMessage", e);
+        }
+      } else if (aborted) {
+        removeBubble(bubble);
+        setStatus("Reply cancelled.");
+      }
+    } catch (e) {
+      if (myTurn !== drawId) return;
+      removeBubble(bubble);
+      renderErrorBubble("chatReply", errMsg(e));
+      showError("chatReply", e);
+    } finally {
+      showTyping(false);
+      if (state === "WRITING") state = "READY";
+      enableInput(true);
+      $("input").focus();
+    }
+  }
+
+  // =====================================================================
+  // ILLUSTRATE TAG + AUTO-ILLUSTRATE
+  // =====================================================================
+  function parseAndStripIllustrateTag(text) {
+    const t = (text || "").trim();
+    const re = /\s*<<\s*illustrate\s*>>\s*\.?\s*$/i;
+    if (re.test(t)) return { text: t.replace(re, "").trim(), illustrate: true };
+    return { text: t, illustrate: false };
+  }
+  function maybeAutoIllustrate(bubble, text, illustrateFlag, isOpening) {
+    if (!settings.autoIllustrate) return;
+    if (!illustrateFlag) return;
+    if (!text || text.length < 10) return;
+    const words = (text.match(/\b\S+\b/g) || []).length;
+    if (words < MIN_ILLUSTRATE_WORDS) {
+      console.log("[auto-illustrate] skipped: too short", words);
+      return;
+    }
+    const quoteChars = (text.match(/"[^"]*"|\u201C[^\u201D]*\u201D/g) || []).join("").length;
+    const dialogueFraction = quoteChars / Math.max(1, text.length);
+    if (dialogueFraction > MAX_DIALOGUE_FRACTION) {
+      console.log("[auto-illustrate] skipped: too much dialogue", dialogueFraction);
+      return;
+    }
+    if (!isOpening) {
+      const recent = currentMessages.slice(0, -1);
+      let since = 0;
+      for (let i = recent.length - 1; i >= 0; i--) {
+        if (recent[i].role === "assistant" && recent[i].cutsceneUrl) break;
+        since++;
+      }
+      if (since < settings.suppressionWindow) {
+        console.log("[auto-illustrate] skipped: suppression window", { since, window: settings.suppressionWindow });
+        return;
+      }
+    }
+    illustrateBubble(bubble);
+  }
+
+  // =====================================================================
+  // VN MODE
+  // =====================================================================
+  let vnFrames = [];
+  let vnIndex = 0;
+
+  function vnBuildFrames() {
+    vnFrames = currentMessages
+      .filter(m => m.role === "assistant" && m.cutsceneUrl)
+      .map(m => ({ msgId: m.id, cutsceneUrl: m.cutsceneUrl, dialogueText: m.content }));
+  }
+  function openVnMode() {
+    vnBuildFrames();
+    $("vnLayer").classList.add("open");
+    if (vnFrames.length === 0) {
+      $("vnEmpty").hidden = false;
+      $("vnPanel").style.display = "none";
+      $("vnNav").style.display = "none";
+      $("vnCounter").textContent = "0 / 0";
+      $("vnBg").style.backgroundImage = "";
+      return;
+    }
+    $("vnEmpty").hidden = true;
+    $("vnPanel").style.display = "block";
+    $("vnNav").style.display = "flex";
+    vnIndex = vnFrames.length - 1;
+    renderVnFrame();
+  }
+  function closeVnMode() {
+    $("vnLayer").classList.remove("open");
+    $("vnBg").style.backgroundImage = "";
+  }
+  function renderVnFrame() {
+    if (vnIndex < 0) vnIndex = 0;
+    if (vnIndex >= vnFrames.length) vnIndex = vnFrames.length - 1;
+    const f = vnFrames[vnIndex];
+    if (!f) return;
+    const bg = $("vnBg");
+    bg.classList.add("fading");
+    setTimeout(() => {
+      bg.style.backgroundImage = `url("${f.cutsceneUrl.replace(/"/g, '%22')}")`;
+      bg.classList.remove("fading");
+    }, 220);
+    $("vnSpeaker").textContent = (character.name || "CHARACTER").toUpperCase();
+    const textEl = $("vnText");
+    textEl.innerHTML = "";
+    renderCharText(f.dialogueText).forEach(n => textEl.appendChild(n));
+    $("vnCounter").textContent = `${vnIndex + 1} / ${vnFrames.length}`;
+    $("vnPrev").disabled = vnIndex === 0;
+    $("vnNext").disabled = vnIndex === vnFrames.length - 1;
+  }
+  $("vnExit").onclick = closeVnMode;
+  $("vnPrev").onclick = () => { vnIndex--; renderVnFrame(); };
+  $("vnNext").onclick = () => { vnIndex++; renderVnFrame(); };
+  $("vnBtn").onclick = openVnMode;
+  document.addEventListener("keydown", (e) => {
+    if (!$("vnLayer").classList.contains("open")) return;
+    if (e.key === "Escape") { e.preventDefault(); closeVnMode(); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); if (vnIndex > 0) { vnIndex--; renderVnFrame(); } }
+    else if (e.key === "ArrowRight") { e.preventDefault(); if (vnIndex < vnFrames.length - 1) { vnIndex++; renderVnFrame(); } }
+  });
+
+  // =====================================================================
+  // LIGHTBOX
+  // =====================================================================
+  function openLightbox(url, alt) {
+    if (!url) return;
+    $("lightboxImg").src = url;
+    $("lightboxImg").alt = alt || "";
+    $("lightbox").classList.add("open");
+  }
+  function closeLightbox() {
+    $("lightbox").classList.remove("open");
+    $("lightboxImg").src = "";
+  }
+  $("lightbox").onclick = (e) => {
+    if (e.target === $("lightbox") || e.target === $("lightboxClose")) closeLightbox();
+  };
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && $("lightbox").classList.contains("open")) closeLightbox();
+  });
+  document.addEventListener("click", (e) => {
+    const t = e.target;
+    if (t.tagName === "IMG" && t.closest(".cutscene")) {
+      e.stopPropagation();
+      openLightbox(t.src, t.alt);
+      return;
+    }
+    if (t.classList && t.classList.contains("avatar") && t.dataset.imgUrl) {
+      e.stopPropagation();
+      openLightbox(t.dataset.imgUrl, "");
+      return;
+    }
+  });
+
+  // =====================================================================
+  // INPUT WIRING
+  // =====================================================================
+  function autoResizeInput() {
+    const el = $("input");
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 140) + "px";
+  }
+  $("input").addEventListener("input", () => {
+    autoResizeInput();
+    $("sendBtn").disabled = $("input").disabled || !$("input").value.trim();
+  });
+  $("input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (!$("sendBtn").disabled) sendUserMessage();
+    }
+  });
+  $("sendBtn").onclick = sendUserMessage;
+  $("stopBtn").onclick = () => cancelStream();
+  $("newBtn").onclick = startNewScene;
+
+  // =====================================================================
+  // SETTINGS MODAL
+  // =====================================================================
+  function openModal(id) {
+    document.querySelectorAll(".modal.open").forEach(m => m.classList.remove("open"));
+    const m = document.getElementById(id);
+    if (m) m.classList.add("open");
+  }
+  function closeModal(id) {
+    const m = document.getElementById(id);
+    if (m) m.classList.remove("open");
+  }
+  document.querySelectorAll("[data-close]").forEach(b => {
+    b.onclick = () => closeModal(b.getAttribute("data-close"));
+  });
+  // Also close when clicking the dark backdrop (outside the modalCard).
+  document.querySelectorAll(".modal").forEach(m => {
+    m.addEventListener("click", (e) => {
+      if (e.target === m) closeModal(m.id);
+    });
+  });
+
+  let lastPanel = "panelChar";
+  function activatePanel(panelId) {
+    lastPanel = panelId;
+    document.querySelectorAll(".settingsTab").forEach(t => {
+      t.setAttribute("aria-selected", t.dataset.panel === panelId ? "true" : "false");
+    });
+    document.querySelectorAll(".settingsPanel").forEach(p => {
+      p.classList.toggle("active", p.id === panelId);
+      p.hidden = (p.id !== panelId);
+    });
+    if (panelId === "panelChar") {
+      $("charName").value = character.name || "";
+      $("charDesc").value = character.description || "";
+      $("charAppearance").value = character.appearance || "";
+      $("charAssistStatus").textContent = "";
+      $("charAssistStatus").classList.remove("err");
+      updateLengthNotice("charDesc", "charLengthNotice");
+    } else if (panelId === "panelYou") {
+      $("youName").value = personality.name || "";
+      $("youDesc").value = personality.description || "";
+      $("youAppearance").value = personality.appearance || "";
+      $("youAssistStatus").textContent = "";
+      $("youAssistStatus").classList.remove("err");
+      refreshYouAssistAvailability();
+      updateLengthNotice("youDesc", "youLengthNotice");
+    } else if (panelId === "panelScene") {
+      $("scenarioText").value = scenarioDefault || "";
+      $("autoIllustrate").checked = !!settings.autoIllustrate;
+      $("suppressionWindow").value = settings.suppressionWindow;
+      $("suppressionVal").textContent = settings.suppressionWindow;
+      populateArtStyleSelect();
+      $("artStyleSelect").value = settings.artStyleKey || "default";
+      $("customStylePrefix").value = settings.customStylePrefix || "";
+      $("customStyleNegative").value = settings.customStyleNegative || "";
+      toggleCustomStyleFields();
+      $("scenarioAssistStatus").textContent = "";
+      $("scenarioAssistStatus").classList.remove("err");
+      updateLengthNotice("scenarioText", "scenarioLengthNotice");
+    } else if (panelId === "panelMem") {
+      renderMemList();
+    } else if (panelId === "panelHist") {
+      renderHistory();
+    }
+  }
+  document.querySelectorAll(".settingsTab").forEach(tab => {
+    tab.onclick = () => activatePanel(tab.dataset.panel);
+  });
+  function openSettings(initialPanel) {
+    activatePanel(initialPanel || lastPanel);
+    openModal("settingsModal");
+  }
+  $("settingsBtn").onclick = () => openSettings();
+
+  // =====================================================================
+  // TRACKED INFO MODAL (per-chat story state)
+  // =====================================================================
+  // Opens populated with the current chat's trackedInfo, and writes back
+  // to currentChat + DB on save. The "Auto-update" button calls the
+  // separate AI helper to refresh the state from recent chat history.
+  function openTrackedModal() {
+    if (!currentChat) {
+      // No active chat — gently prompt; the empty state can't really
+      // produce useful tracked info.
+      setStatus("Start a new scene first — tracked state lives inside a scene.");
+      return;
+    }
+    $("trackedInfoText").value = currentChat.trackedInfo || "";
+    $("trackedUpdateStatus").textContent = "";
+    $("trackedUpdateStatus").classList.remove("err");
+    updateLengthNotice("trackedInfoText", "trackedLengthNotice");
+    openModal("trackedModal");
+  }
+  $("trackedBtn").onclick = openTrackedModal;
+  $("trackedInfoText").addEventListener("input", () => updateLengthNotice("trackedInfoText", "trackedLengthNotice"));
+
+  $("trackedClear").onclick = async () => {
+    if (!($("trackedInfoText").value || "").trim()) return;
+    const ok = await root.confirmAsync(
+      "Clear the tracked state for this scene?\n\nYou can still cancel before saving."
+    );
+    if (!ok) return;
+    $("trackedInfoText").value = "";
+    updateLengthNotice("trackedInfoText", "trackedLengthNotice");
+  };
+
+  $("trackedUpdate").onclick = async () => {
+    if (!currentChat) return;
+    const btn = $("trackedUpdate");
+    const status = $("trackedUpdateStatus");
+    if (btn.classList.contains("busy")) return;
+    if (currentMessages.length === 0) {
+      status.classList.add("err");
+      status.textContent = "Nothing to read from yet — send a few messages first.";
+      return;
+    }
+    status.classList.remove("err");
+    status.textContent = "Reading recent messages and updating the tracker…";
+    btn.classList.add("busy");
+    try {
+      // Pass the live textarea contents (in case the user edited but
+      // didn't save yet) so AI builds on their edits rather than the
+      // last-saved version.
+      const current = ($("trackedInfoText").value || "").trim();
+      const res = await root.updateTrackedInfo(
+        current, currentMessages, character, personality, chatScenario(),
+      );
+      if (res.error && !res.trackedInfo) {
+        status.classList.add("err");
+        status.textContent = res.error;
+        showError("updateTrackedInfo", res.error);
+      } else {
+        $("trackedInfoText").value = res.trackedInfo || "";
+        updateLengthNotice("trackedInfoText", "trackedLengthNotice");
+        status.textContent = res.error ? `Updated (with warning: ${res.error})` : "Updated. Review the changes and SAVE if you're happy.";
+      }
+    } catch (e) {
+      status.classList.add("err");
+      status.textContent = errMsg(e);
+      showError("updateTrackedInfo", e);
+    } finally {
+      btn.classList.remove("busy");
+    }
+  };
+
+  $("trackedSave").onclick = async () => {
+    if (!currentChat) { closeModal("trackedModal"); return; }
+    try {
+      currentChat.trackedInfo = ($("trackedInfoText").value || "").trim();
+      await saveCurrentChatTrackedInfo();
+      closeModal("trackedModal");
+      updateTrackedBtnState();
+    } catch (e) {
+      showError("saveTrackedInfo", e);
+    }
+  };
+
+  // Visual hint on the title-bar button — filled circle when there's
+  // tracked info, hollow when empty. Cheap discoverability.
+  function updateTrackedBtnState() {
+    const btn = $("trackedBtn");
+    if (!btn) return;
+    const has = !!(currentChat && currentChat.trackedInfo && currentChat.trackedInfo.trim());
+    btn.classList.toggle("has-content", has);
+  }
+
+  // ---- Length notice (token budget warning, lifted from ai-chat) ----
+  function updateLengthNotice(taId, noticeId) {
+    const ta = $(taId), notice = $(noticeId);
+    if (!ta || !notice) return;
+    const len = (ta.value || "").length;
+    if (len > 3000) {
+      notice.hidden = false;
+      notice.textContent = `⚠️ very long (${len.toLocaleString()} chars) — may reduce model memory of the chat`;
+    } else if (len > 1500) {
+      notice.hidden = false;
+      notice.textContent = `⚠️ long (${len.toLocaleString()} chars) — consider tightening`;
+    } else {
+      notice.hidden = true;
+    }
+  }
+  $("charDesc").addEventListener("input", () => updateLengthNotice("charDesc", "charLengthNotice"));
+  $("youDesc").addEventListener("input", () => updateLengthNotice("youDesc", "youLengthNotice"));
+  $("scenarioText").addEventListener("input", () => updateLengthNotice("scenarioText", "scenarioLengthNotice"));
+
+  // ---- CHARACTER panel handlers ----
+  $("charClear").onclick = async () => {
+    const ok = await root.confirmAsync("Clear all character fields?\n\nYou can still cancel before saving.");
+    if (!ok) return;
+    $("charName").value = "";
+    $("charDesc").value = "";
+    $("charAppearance").value = "";
+    updateLengthNotice("charDesc", "charLengthNotice");
+  };
+  $("charAssist").onclick = async () => {
+    const btn = $("charAssist");
+    const status = $("charAssistStatus");
+    if (btn.classList.contains("busy")) return;
+    status.classList.remove("err");
+    status.textContent = "Drafting the character…";
+    btn.classList.add("busy");
+    try {
+      const result = await root.synthesizeCharacter(
+        ($("charName").value || "").trim(),
+        ($("charDesc").value || "").trim(),
+        ($("charAppearance").value || "").trim(),
+      );
+      if (result.error) {
+        status.classList.add("err");
+        status.textContent = result.error;
+        showError("synthesizeCharacter", result.error);
+      } else {
+        if (result.name && !$("charName").value.trim()) $("charName").value = result.name;
+        if (result.description) {
+          $("charDesc").value = result.description;
+          updateLengthNotice("charDesc", "charLengthNotice");
+        }
+        if (result.appearance) $("charAppearance").value = result.appearance;
+        status.textContent = "Draft complete. Edit it however you like, then SAVE.";
+      }
+    } catch (e) {
+      status.classList.add("err");
+      status.textContent = errMsg(e);
+      showError("synthesizeCharacter", e);
+    } finally {
+      btn.classList.remove("busy");
+    }
+  };
+  $("charSave").onclick = async () => {
+    try {
+      character = {
+        name: ($("charName").value || "").trim(),
+        description: ($("charDesc").value || "").trim(),
+        appearance: ($("charAppearance").value || "").trim(),
+      };
+      await saveCharacter();
+      closeModal("settingsModal");
+      // Relabel all character bubbles
+      const newLabel = (character.name || "CHARACTER").toUpperCase();
+      document.querySelectorAll(".msg.char:not(.error) .msgWho").forEach(el => {
+        el.textContent = newLabel;
+      });
+      updateChatSubtitle();
+      // Re-resolve avatar (may trigger generation)
+      resolveCharAvatar();
+    } catch (e) {
+      showError("saveCharacter", e);
+    }
+  };
+
+  // ---- YOU panel handlers ----
+  function refreshYouAssistAvailability() {
+    const btn = $("youAssist");
+    const count = memory.filter(m => m && String(m).trim()).length;
+    if (count === 0) {
+      btn.disabled = true;
+      btn.querySelector("span:last-child").textContent = "Add memories first — then this can draft your persona";
+    } else {
+      btn.disabled = false;
+      btn.querySelector("span:last-child").textContent =
+        `Draft this from your ${count} memor${count === 1 ? "y" : "ies"}`;
+    }
+  }
+  $("youAssist").onclick = async () => {
+    const btn = $("youAssist");
+    const status = $("youAssistStatus");
+    if (btn.disabled || btn.classList.contains("busy")) return;
+    status.classList.remove("err");
+    status.textContent = "Drafting your persona from memories…";
+    btn.classList.add("busy");
+    try {
+      const result = await root.synthesizePersona(
+        memory,
+        ($("youName").value || "").trim(),
+        ($("youDesc").value || "").trim(),
+        ($("youAppearance").value || "").trim(),
+      );
+      if (result.error) {
+        status.classList.add("err");
+        status.textContent = result.error;
+        showError("synthesizePersona", result.error);
+      } else {
+        if (result.name && !$("youName").value.trim()) $("youName").value = result.name;
+        if (result.description) $("youDesc").value = result.description;
+        if (result.appearance) $("youAppearance").value = result.appearance;
+        status.textContent = "Draft complete. Edit it however you like, then SAVE.";
+      }
+    } catch (e) {
+      status.classList.add("err");
+      status.textContent = errMsg(e);
+      showError("synthesizePersona", e);
+    } finally {
+      btn.classList.remove("busy");
+    }
+  };
+  $("youSave").onclick = async () => {
+    try {
+      personality = {
+        name: ($("youName").value || "").trim(),
+        description: ($("youDesc").value || "").trim(),
+        appearance: ($("youAppearance").value || "").trim(),
+      };
+      await savePersonality();
+      closeModal("settingsModal");
+      const newLabel = (personality.name || "YOU").toUpperCase();
+      document.querySelectorAll(".msg.user .msgWho").forEach(el => {
+        el.textContent = newLabel;
+      });
+      resolveUserAvatar();
+    } catch (e) {
+      showError("savePersonality", e);
+    }
+  };
+
+  // ---- SCENE panel handlers ----
+  $("scenarioAssist").onclick = async () => {
+    const btn = $("scenarioAssist");
+    const status = $("scenarioAssistStatus");
+    if (btn.classList.contains("busy")) return;
+    status.classList.remove("err");
+    status.textContent = "Inventing a scenario…";
+    btn.classList.add("busy");
+    try {
+      const result = await root.synthesizeScenario(
+        ($("scenarioText").value || "").trim(),
+        (character.description || character.name || "").trim(),
+      );
+      if (result.error) {
+        status.classList.add("err");
+        status.textContent = result.error;
+        showError("synthesizeScenario", result.error);
+      } else if (result.scenario) {
+        $("scenarioText").value = result.scenario;
+        updateLengthNotice("scenarioText", "scenarioLengthNotice");
+        status.textContent = "Scenario drafted. Edit it however you like, then SAVE.";
+      }
+    } catch (e) {
+      status.classList.add("err");
+      status.textContent = errMsg(e);
+      showError("synthesizeScenario", e);
+    } finally {
+      btn.classList.remove("busy");
+    }
+  };
+  $("suppressionWindow").addEventListener("input", (e) => {
+    $("suppressionVal").textContent = e.target.value;
+  });
+
+  // Build the art-style dropdown options from the top-panel's artStyles
+  // list. Run lazily each time the SCENE panel opens — safe to call
+  // multiple times (we clear before populating).
+  function populateArtStyleSelect() {
+    const sel = $("artStyleSelect");
+    if (!sel) return;
+    sel.innerHTML = "";
+    let styles = [];
+    try {
+      if (typeof root.listArtStyles === "function") styles = root.listArtStyles();
+    } catch (e) {
+      console.warn("listArtStyles failed:", e);
+    }
+    if (!styles.length) {
+      // Fallback if top panel is missing the data — keep the UI working.
+      styles = [{ key: "default", name: "Default" }, { key: "custom", name: "Custom" }];
+    }
+    for (const s of styles) {
+      const opt = document.createElement("option");
+      opt.value = s.key;
+      opt.textContent = s.name;
+      sel.appendChild(opt);
+    }
+  }
+  function toggleCustomStyleFields() {
+    const isCustom = $("artStyleSelect").value === "custom";
+    $("customStyleFields").hidden = !isCustom;
+  }
+  $("artStyleSelect").addEventListener("change", toggleCustomStyleFields);
+
+  $("sceneSave").onclick = async () => {
+    try {
+      scenarioDefault = ($("scenarioText").value || "").trim();
+      await saveScenarioDefault();
+      settings.autoIllustrate = !!$("autoIllustrate").checked;
+      settings.suppressionWindow = Math.max(1, Math.min(5, parseInt($("suppressionWindow").value) || 2));
+      settings.artStyleKey = $("artStyleSelect").value || "default";
+      settings.customStylePrefix = ($("customStylePrefix").value || "").trim();
+      settings.customStyleNegative = ($("customStyleNegative").value || "").trim();
+      await saveSettings();
+      closeModal("settingsModal");
+    } catch (e) {
+      showError("saveScene", e);
+    }
+  };
+
+  // ---- MEMORY panel handlers ----
+  function renderMemList() {
+    const list = $("memList");
+    list.innerHTML = "";
+    memory.forEach((entry, i) => {
+      const row = document.createElement("div");
+      row.className = "memItem";
+      row.innerHTML = `<input type="text" maxlength="500"><button class="del" type="button">✕</button>`;
+      const input = row.querySelector("input");
+      input.value = entry || "";
+      input.addEventListener("input", () => { memory[i] = input.value; });
+      row.querySelector(".del").onclick = () => {
+        memory.splice(i, 1);
+        renderMemList();
+      };
+      list.appendChild(row);
+    });
+    if (memory.length === 0) {
+      const empty = document.createElement("div");
+      empty.style.cssText = "font-style:italic;color:var(--ink-faint);font-size:12px;padding:14px;text-align:center;";
+      empty.textContent = "No memories yet. Add one below.";
+      list.appendChild(empty);
+    }
+  }
+  $("memAdd").onclick = () => { memory.push(""); renderMemList(); };
+  $("memSave").onclick = async () => {
+    try {
+      memory = memory.map(m => String(m || "").trim()).filter(Boolean);
+      await saveMemory();
+      closeModal("settingsModal");
+    } catch (e) {
+      showError("saveMemory", e);
+    }
+  };
+
+  // ---- HISTORY panel handlers ----
+  async function renderHistory() {
+    const chats = await listChats();
+    const list = $("histList");
+    list.innerHTML = "";
+    if (chats.length === 0) {
+      list.innerHTML = `<div class="histEmpty">No scenes yet. Press 📖 NEW SCENE to begin.</div>`;
+      return;
+    }
+    for (const c of chats) {
+      const row = document.createElement("div");
+      row.className = "histRow" + (currentChat && currentChat.id === c.id ? " current" : "");
+      const msgs = await db.messages.where("chatId").equals(c.id).sortBy("createdAt");
+      const preview = msgs.length > 0
+        ? msgs[0].content.slice(0, 200) + (msgs[0].content.length > 200 ? "…" : "")
+        : "(scene lost)";
+      const date = new Date(c.createdAt || c.lastMessageAt || Date.now());
+      const dateStr = date.toLocaleDateString(undefined, { month: "short", day: "numeric" })
+        + " · " + date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+      row.innerHTML = `
+        <div class="histTitle">${escapeHTML(c.title || "a scene")}</div>
+        <div class="histCount">${msgs.length} message${msgs.length === 1 ? "" : "s"}</div>
+        <div class="histPreview">${escapeHTML(preview)}</div>
+        <div class="histDate">${escapeHTML(dateStr)}</div>
+      `;
+      row.onclick = async () => {
+        closeModal("settingsModal");
+        await activateChat(c.id);
+      };
+      list.appendChild(row);
+    }
+  }
+  $("histReset").onclick = async () => {
+    const ok = await root.confirmAsync(
+      "Clear ALL chat history?\n\nThis removes every past scene. Your character, persona, and memory are NOT affected.\n\nContinue?"
+    );
+    if (!ok) return;
+    try {
+      await db.chats.clear();
+      await db.messages.clear();
+      await setMisc("currentChatId", null);
+      currentChat = null;
+      currentMessages = [];
+      clearChatPanel();
+      renderEmptyState(true);
+      enableInput(false);
+      updateTrackedBtnState();
+      closeModal("settingsModal");
+      setStatus("History cleared. Press 📖 NEW SCENE when you are ready.");
+    } catch (e) {
+      showError("clearHistory", e);
+    }
+  };
+
+  // =====================================================================
+  // BOOT
+  // =====================================================================
+  function assertRoot() {
+    const required = ["openScene", "chatReply", "generateCutscene", "generateCharacterAvatar", "generateUserAvatar", "synthesizeCharacter", "synthesizePersona", "synthesizeScenario", "confirmAsync", "artStyleByKey", "listArtStyles", "updateTrackedInfo"];
+    const missing = required.filter(fn => typeof root[fn] !== "function");
+    if (missing.length) {
+      throw new Error("Top-panel functions not loaded: " + missing.join(", "));
+    }
+  }
+
+  async function boot() {
+    try { assertRoot(); }
+    catch (e) { showError("init", e); setStatus(""); return; }
+
+    await loadCharacter();
+    await loadPersonality();
+    await loadScenarioDefault();
+    await loadMemory();
+    await loadSettings();
+    await loadAvatarCaches();
+    const ch = personaHash(character);
+    if (ch && charAvatars[ch]) { currentCharAvatarUrl = charAvatars[ch]; currentCharAvatarHash = ch; }
+    const ph = personaHash(personality);
+    if (ph && userAvatars[ph]) { currentUserAvatarUrl = userAvatars[ph]; currentUserAvatarHash = ph; }
+
+    try { root.aiTextPlugin({ preload: true }); }
+    catch (e) { showError("preload", e); }
+
+    const chats = await listChats();
+    if (chats.length > 0) {
+      // Activate either the previously-active chat or the most recent.
+      const lastId = await getMisc("currentChatId", null);
+      const target = (lastId && chats.find(c => c.id === lastId)) ? lastId : chats[0].id;
+      await activateChat(target);
+      setStatus("");
+    } else {
+      renderEmptyState(true);
+      setStatus(character.name ? "Press 📖 NEW SCENE to begin." : "Open ⚙ Settings to design a character, then begin a scene.");
+    }
+    resolveCharAvatar();
+    resolveUserAvatar();
+    state = "READY";
+  }
+
+  if (navigator.storage && navigator.storage.persist) {
+    navigator.storage.persist().catch(() => {});
+  }
+  boot();
+})();
+</script>
