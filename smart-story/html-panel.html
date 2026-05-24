@@ -11,67 +11,86 @@
     --err: #d4736b; --err-bg: #2d1a1a;
     --shadow: 0 6px 20px rgba(0,0,0,0.35); --shadow-sm: 0 2px 6px rgba(0,0,0,0.25);
   }
-  /* Alternate themes — applied via a class on <html>. Each block
-     overrides only the variables that change; paper/err/shadow are
-     intentionally consistent across themes so character bubbles +
-     errors look identical regardless of palette. */
-  html.theme-twilight {
-    --bg: #16121e; --surface: #211a2c; --surface-2: #2b2238; --surface-3: #3b3148;
-    --ink: #ece6f2; --ink-dim: #b0a4c2; --ink-faint: #6e6580;
-    --accent: #b48cf5; --accent-hi: #c9a8ff; --accent-dim: #7a5fa8;
+  /* Theme is now LIVE — set via JS at runtime by applyThemeColors().
+     The user picks 6 base colors (bg, surface, ink, accent, paper, err);
+     all the variants (-hi, -dim, -2, -3, ink-dim, ink-faint, paper-ink,
+     paper-dim, err-bg) are derived in JS by lightness shifts in HSL space.
+     Quick-start presets live in JS too — see THEME_PRESETS in the script. */
+
+  /* Color-picker grid in Settings → SCENE. Two columns on desktop,
+     one on mobile. Each row has a label + native color input + a tiny
+     hex readout. Native <input type="color"> opens the OS picker. */
+  .colorPickerGrid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px 12px; margin: 6px 0 10px;
   }
-  html.theme-ember {
-    --bg: #1c1410; --surface: #2a1d17; --surface-2: #34251e; --surface-3: #463127;
-    --ink: #f0e6dc; --ink-dim: #c4a896; --ink-faint: #7a6258;
-    --accent: #e07a3c; --accent-hi: #f0975a; --accent-dim: #9b5326;
+  .colorPickerRow {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px;
+    background: var(--surface-2); border: 1px solid var(--surface-3);
+    border-radius: 6px;
   }
-  html.theme-forest {
-    --bg: #161e18; --surface: #1f2a22; --surface-2: #28362b; --surface-3: #354536;
-    --ink: #e4ebdc; --ink-dim: #a4b09a; --ink-faint: #687060;
-    --accent: #8aab6e; --accent-hi: #a4c488; --accent-dim: #5b7c47;
+  .colorPickerRow label {
+    flex: 1; font-size: 11px; letter-spacing: 0.5px; color: var(--ink-dim);
+    text-transform: uppercase;
+    /* don't trigger native picker when label is clicked — too easy
+       to mis-tap on mobile; user clicks the swatch instead */
+    cursor: default;
   }
-  html.theme-slate {
-    --bg: #161a1f; --surface: #1f242b; --surface-2: #282e37; --surface-3: #353c47;
-    --ink: #e4e8ed; --ink-dim: #a8aeb8; --ink-faint: #6c7280;
-    --accent: #6ec3d4; --accent-hi: #8fd6e4; --accent-dim: #4a8a98;
+  .colorPickerRow .colorSwatch {
+    width: 28px; height: 28px; padding: 0; border: 1px solid var(--surface-3);
+    border-radius: 4px; cursor: pointer; background: transparent;
+    /* hide the native picker UI; the input itself IS our swatch */
+    -webkit-appearance: none; -moz-appearance: none; appearance: none;
   }
-  /* Theme swatch picker — small round color samples in Settings → SCENE. */
-  .themeSwatchRow {
-    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-    margin-bottom: 6px;
+  .colorPickerRow .colorSwatch::-webkit-color-swatch-wrapper { padding: 0; }
+  .colorPickerRow .colorSwatch::-webkit-color-swatch { border: none; border-radius: 3px; }
+  .colorPickerRow .colorSwatch::-moz-color-swatch { border: none; border-radius: 3px; }
+  .colorPickerRow .hexLabel {
+    font-family: ui-monospace, monospace; font-size: 10px;
+    color: var(--ink-faint); min-width: 56px; text-align: right;
   }
-  .themeSwatch {
-    width: 36px; height: 36px; padding: 0; cursor: pointer;
-    border-radius: 50%; border: 2px solid var(--surface-3);
-    transition: all 150ms; position: relative;
-    background: transparent;  /* the gradient lives on the inner span */
+  /* Preset chips above the picker grid. Compact, grid-arranged, each
+     a small ovoid showing the theme's accent + surface. Click applies
+     the preset to all 6 picker values. */
+  .themePresetGrid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: 6px; margin-bottom: 12px;
   }
-  .themeSwatch:hover { transform: scale(1.08); border-color: var(--ink-dim); }
-  .themeSwatch.active { border-color: var(--ink); border-width: 3px; }
-  .themeSwatch .swatchDot {
-    position: absolute; inset: 2px;
-    border-radius: 50%; display: block;
-    /* Two-stop gradient: accent into surface. Gives a clear sense of
-       "what dominates the look" per theme. */
-    background: linear-gradient(135deg, var(--sw-accent) 0% 50%, var(--sw-surface) 50% 100%);
+  .themePreset {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; cursor: pointer;
+    background: var(--surface-2); border: 1px solid var(--surface-3);
+    border-radius: 6px; transition: all 120ms;
+    font-family: inherit; font-size: 11px; color: var(--ink-dim);
+    text-align: left;
   }
-  .themeSwatch[data-theme="default"]   { --sw-accent: #d4be93; --sw-surface: #232831; }
-  .themeSwatch[data-theme="twilight"]  { --sw-accent: #c9a8ff; --sw-surface: #211a2c; }
-  .themeSwatch[data-theme="ember"]     { --sw-accent: #f0975a; --sw-surface: #2a1d17; }
-  .themeSwatch[data-theme="forest"]    { --sw-accent: #a4c488; --sw-surface: #1f2a22; }
-  .themeSwatch[data-theme="slate"]     { --sw-accent: #8fd6e4; --sw-surface: #1f242b; }
-  .themeSwatch .swatchLabel {
-    position: absolute; left: 50%; bottom: -18px;
-    transform: translateX(-50%);
-    font-size: 9px; letter-spacing: 0.5px;
-    color: var(--ink-faint); text-transform: uppercase;
-    white-space: nowrap; opacity: 0;
-    transition: opacity 150ms;
-    pointer-events: none;
+  .themePreset:hover { background: var(--surface-3); border-color: var(--accent-dim); }
+  .themePreset .presetDot {
+    width: 20px; height: 20px; border-radius: 50%;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, var(--p-accent, #888) 0% 50%, var(--p-surface, #444) 50% 100%);
+    border: 1px solid rgba(0,0,0,0.2);
   }
-  .themeSwatch:hover .swatchLabel,
-  .themeSwatch.active .swatchLabel { opacity: 1; }
-  .themeSwatchRow { padding-bottom: 22px; }  /* room for hover label */
+  .themePreset .presetLabel {
+    flex: 1; letter-spacing: 0.3px;
+  }
+  /* Compact 2-col grid for toggle/slider rows inside settings panels.
+     On mobile this collapses to 1-col automatically. */
+  .settingsGrid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 10px 14px;
+  }
+  .settingsGrid > .field { margin: 0; }
+  /* Side-by-side label / value layout for toggle rows to save vertical
+     space. The hint folds underneath at small widths. */
+  .toggleRow.compact {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px;
+    background: var(--surface-2); border: 1px solid var(--surface-3);
+    border-radius: 6px;
+  }
+  .toggleRow.compact .toggleLabel { flex: 1; }
   * { box-sizing: border-box; }
   html, body { background: var(--bg); }
   body {
@@ -80,7 +99,10 @@
     display: flex; flex-direction: column; align-items: center;
   }
   #app {
-    width: min(560px, 100vw); position: relative;
+    /* Desktop width: gives meaningful breathing room without making
+       lines too long to read. 760px ≈ a comfortable book page width;
+       the chat still feels intimate. On mobile we fill the viewport. */
+    width: min(760px, 100vw); position: relative;
     background: var(--surface);
     border-left: 1px solid var(--surface-3); border-right: 1px solid var(--surface-3);
     min-height: 100vh; display: flex; flex-direction: column;
@@ -123,6 +145,112 @@
     border-radius: 8px; text-align: center;
     pointer-events: none;
   }
+
+  /* Scenes popover — drops down from the 📚 title-bar button. Anchored
+     visually to the title bar; on mobile it fills more of the screen
+     for thumb-friendly scrolling. */
+  #scenesPopover {
+    position: absolute; z-index: 99999985;
+    top: 56px;        /* below the title bar */
+    right: 12px;
+    width: min(360px, calc(100vw - 24px));
+    max-height: min(70vh, 560px);
+    background: var(--surface);
+    border: 1px solid var(--surface-3); border-radius: 10px;
+    box-shadow: var(--shadow);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    /* The popover is rendered inside #app's box; on a narrow viewport
+       #app is full-width so `right: 12px` works. On desktop where #app
+       is narrower than the viewport, this still aligns to its
+       right edge — visually attached to the 📚 button. */
+  }
+  #scenesPopover[hidden] { display: none; }
+  #scenesPopover .popoverHeader {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px;
+    background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 100%);
+    border-bottom: 1px solid var(--surface-3);
+  }
+  #scenesPopover .popoverTitle {
+    font-family: 'Lora', serif; font-weight: 600; font-size: 14px;
+    color: var(--ink);
+  }
+  #scenesPopover .popoverClose {
+    background: transparent; color: var(--ink-dim);
+    border: 0; cursor: pointer; padding: 4px 8px;
+    font-size: 20px; line-height: 1; border-radius: 4px;
+  }
+  #scenesPopover .popoverClose:hover { color: var(--ink); background: var(--surface-2); }
+  .scenesNew {
+    margin: 8px 8px 6px; padding: 10px 12px;
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface-2); color: var(--accent-hi);
+    border: 1px dashed var(--accent-dim); border-radius: 8px;
+    cursor: pointer; font-family: inherit; font-weight: 600;
+    font-size: 12px; letter-spacing: 0.5px;
+    transition: all 120ms;
+  }
+  .scenesNew:hover { background: var(--surface-3); border-style: solid; border-color: var(--accent); }
+  .scenesNew .ico { font-size: 16px; }
+  .scenesList {
+    flex: 1; overflow-y: auto;
+    padding: 4px 8px 8px; margin: 0;
+    scrollbar-width: thin;
+  }
+  .sceneRow {
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 8px 10px; cursor: pointer;
+    background: transparent; border: 1px solid transparent;
+    border-radius: 6px; transition: all 120ms;
+    text-align: left; width: 100%;
+    font-family: inherit; color: var(--ink);
+  }
+  .sceneRow:hover { background: var(--surface-2); border-color: var(--surface-3); }
+  .sceneRow.current {
+    background: var(--surface-2); border-color: var(--accent-dim);
+  }
+  .sceneRow .sceneTitle {
+    font-size: 13px; font-weight: 600; color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .sceneRow .sceneTitle .currentTag {
+    font-size: 9px; font-weight: 700; color: var(--accent-hi);
+    background: var(--surface-3); padding: 1px 6px; border-radius: 4px;
+    margin-left: 6px; vertical-align: middle; letter-spacing: 0.5px;
+  }
+  .sceneRow .sceneMeta {
+    font-size: 11px; color: var(--ink-faint);
+  }
+  .sceneRow .scenePreview {
+    font-family: 'Lora', serif; font-style: italic;
+    font-size: 12px; color: var(--ink-dim);
+    overflow: hidden; text-overflow: ellipsis;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    margin-top: 2px;
+  }
+  .scenesEmpty {
+    text-align: center; padding: 24px 16px;
+    color: var(--ink-faint); font-style: italic; font-size: 12px;
+  }
+  #scenesPopover .popoverFooter {
+    padding: 8px 12px;
+    border-top: 1px solid var(--surface-3);
+    background: var(--surface-2);
+  }
+  .popoverFooterBtn {
+    width: 100%; background: transparent;
+    color: var(--ink-dim); border: 0; padding: 6px 0;
+    cursor: pointer; font-family: inherit; font-size: 12px;
+    border-radius: 4px;
+  }
+  .popoverFooterBtn:hover { color: var(--accent-hi); }
+  /* Light backdrop click area when popover is open. Created on demand
+     in JS so we don't need a separate element. */
+  .scenesBackdrop {
+    position: fixed; inset: 0; z-index: 99999984;
+    background: transparent;
+  }
   #chatPanel {
     flex: 1; overflow-y: auto; padding: 16px 14px 8px;
     scrollbar-width: thin; scrollbar-color: var(--surface-3) transparent;
@@ -137,6 +265,30 @@
   #emptyState .hint {
     font-family: 'Lora', serif; font-style: italic;
     color: var(--ink-dim); font-size: 16px; line-height: 1.6; max-width: 380px;
+  }
+  /* Inline empty-state for modal bodies — used when a modal opens
+     against a state where its main feature doesn't yet apply (e.g.
+     tracked-state modal opened before any scene exists). Same visual
+     vocabulary as #emptyState but compact and contained. */
+  .emptyStateInline {
+    display: flex; flex-direction: column; align-items: center;
+    text-align: center; gap: 12px;
+    padding: 20px 16px;
+  }
+  .emptyStateInline .emptyGlyph { font-size: 42px; opacity: 0.55; }
+  .emptyStateInline .emptyTitle {
+    font-family: 'Lora', serif; font-weight: 600; font-size: 16px;
+    color: var(--ink);
+  }
+  .emptyStateInline .emptyBody {
+    font-family: 'Lora', serif; font-style: italic;
+    color: var(--ink-dim); font-size: 14px; line-height: 1.55;
+    max-width: 420px;
+  }
+  .emptyStateInline .emptyHint {
+    margin-top: 4px;
+    font-size: 12px; color: var(--ink-faint);
+    letter-spacing: 0.5px;
   }
   .msg { margin: 14px 0; max-width: 94%; clear: both; display: grid; column-gap: 10px; align-items: flex-start; }
   .msg.user { grid-template-columns: 1fr 40px; }
@@ -503,46 +655,91 @@
   #toolbar { display: flex; gap: 6px; margin-bottom: 8px; }
   /* Speaker picker row — appears between the toolbar and the input
      in multi-character chats. */
-  #speakerRow {
+  /* Roster bar — pinned just under the title bar. Shows every character
+     in the current scene as a clickable chip (avatar + name). Click a
+     chip to make them the next speaker; hover-✕ to remove from scene;
+     ✚ button to add another from the library; 📜 Narrate sits alongside.
+     Replaces the old "Reply as:" dropdown + buried buttons. */
+  #rosterBar {
     display: flex; align-items: center; gap: 8px;
-    margin-bottom: 8px; padding: 6px 10px;
-    background: var(--surface-2); border: 1px solid var(--surface-3);
-    border-radius: 8px;
-    font-size: 12px;
+    padding: 8px 14px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--surface-3);
+    overflow-x: auto;        /* on narrow screens, scroll horizontally */
+    scrollbar-width: thin;
   }
-  #speakerRow[hidden] { display: none; }
-  #speakerRow label {
-    color: var(--ink-dim); font-weight: 600;
-    letter-spacing: 0.5px; text-transform: uppercase;
-    font-size: 10px;
+  #rosterBar[hidden] { display: none; }
+  #rosterChips {
+    display: flex; align-items: center; gap: 6px; flex: 1;
+    min-width: 0;            /* allow children to shrink */
   }
-  #speakerSelect {
-    flex: 1; padding: 5px 8px; font-size: 13px; font-family: inherit;
-    color: var(--ink); background: var(--surface);
-    border: 1px solid var(--surface-3); border-radius: 6px;
+  .rosterChip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px 4px 4px;
+    background: var(--surface); color: var(--ink-dim);
+    border: 1px solid var(--surface-3); border-radius: 999px;
+    cursor: pointer; font-family: inherit; font-size: 12px;
+    transition: all 120ms;
+    position: relative; flex-shrink: 0;
+    max-width: 200px;
   }
-  #speakerSelect:focus { outline: 2px solid var(--accent-dim); }
-  /* +Add character button inside the speaker row. Same height as the
-     select so the row aligns. Tinted with accent so it's visually
-     distinct from the (non-action) label. */
-  .speakerRowBtn {
-    padding: 5px 10px; font-size: 12px; font-family: inherit;
+  .rosterChip:hover {
+    background: var(--surface-3);
+    border-color: var(--accent-dim);
+    color: var(--ink);
+  }
+  .rosterChip.active {
+    background: var(--surface-3);
+    border-color: var(--accent);
     color: var(--accent-hi);
-    background: var(--surface);
-    border: 1px solid var(--accent-dim); border-radius: 6px;
-    cursor: pointer;
+    box-shadow: 0 0 0 1px var(--accent) inset;
+  }
+  .rosterChip .chipAvatar {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--surface-2);
+    background-size: cover; background-position: center;
+    flex-shrink: 0;
+    /* fallback when no avatar yet — show initials */
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 600; color: var(--ink-faint);
+    overflow: hidden;
+  }
+  .rosterChip.active .chipAvatar { color: var(--accent-hi); }
+  .rosterChip .chipName {
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 140px;
+  }
+  /* Hover-✕ removal: a tiny "x" appears on the chip; click to remove.
+     Hidden in solo mode (can't remove the last character). */
+  .rosterChip .chipRemove {
+    width: 16px; height: 16px;
+    display: none; align-items: center; justify-content: center;
+    background: transparent; border: 0; border-radius: 50%;
+    color: var(--ink-faint); cursor: pointer; padding: 0;
+    font-size: 12px; line-height: 1;
     transition: all 120ms;
   }
-  .speakerRowBtn:hover { background: var(--surface-3); border-color: var(--accent); }
-  .speakerRowBtn:disabled { opacity: 0.4; cursor: not-allowed; }
-  /* When the chat has only 1 character (no need for a "Reply as:"
-     dropdown), hide the label + select but keep the action buttons. */
-  #speakerRow.solo #speakerLabel,
-  #speakerRow.solo #speakerSelect,
-  #speakerRow.no-roster #speakerLabel,
-  #speakerRow.no-roster #speakerSelect { display: none; }
-  /* Empty-roster legacy chats: hide the ✕ Remove button entirely. */
-  #speakerRow.no-roster #removeCharacterBtn { display: none; }
+  .rosterChip:hover .chipRemove,
+  .rosterChip:focus-within .chipRemove { display: inline-flex; }
+  .rosterChip .chipRemove:hover { color: var(--err); background: var(--err-bg); }
+  #rosterBar.solo .chipRemove { display: none !important; }
+  .rosterActions {
+    display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+  }
+  .rosterActionBtn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 10px;
+    background: var(--surface); color: var(--accent-hi);
+    border: 1px solid var(--accent-dim); border-radius: 999px;
+    cursor: pointer; font-family: inherit; font-size: 12px;
+    transition: all 120ms; white-space: nowrap;
+  }
+  .rosterActionBtn:hover { background: var(--surface-3); border-color: var(--accent); }
+  .rosterActionBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+  /* On narrow screens, hide the "Narrate" word — keep just the icon. */
+  @media (max-width: 540px) {
+    .rosterActionBtn .rosterActionLbl { display: none; }
+  }
   .tbtn {
     flex: 1; font-family: inherit; font-weight: 600; font-size: 12px;
     letter-spacing: 0.5px; padding: 9px 12px; cursor: pointer; user-select: none;
@@ -573,7 +770,9 @@
   }
   .modal.open { display: flex; }
   .modalCard {
-    width: min(620px, 100%); max-height: 92vh;
+    /* Settings + import modals need horizontal room for compact grids
+       on desktop, but should fill the viewport on mobile. */
+    width: min(820px, 100%); max-height: 92vh;
     background: var(--surface); border: 1px solid var(--surface-3);
     border-radius: 12px; box-shadow: var(--shadow);
     display: flex; flex-direction: column; overflow: hidden;
@@ -609,6 +808,16 @@
   .settingsTab[aria-selected="true"] {
     color: var(--accent-hi); border-bottom-color: var(--accent);
     background: var(--surface-2);
+  }
+  /* Dirty-state indicator — a small accent dot in the upper-right of a
+     tab when that tab has an in-progress draft (autosaved in the
+     background; will be committed on SAVE or close-time prompt). */
+  .settingsTab { position: relative; }
+  .settingsTab.is-dirty::after {
+    content: ""; position: absolute; top: 5px; right: 8px;
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 1.5px var(--surface);
   }
   /* Import-modal tab buttons — flatter, simpler look than the settings tabs. */
   .importTab {
@@ -812,7 +1021,15 @@
   .assistBtn.busy { cursor: progress; filter: brightness(0.7); }
   .assistStatus { margin-top: 6px; font-style: italic; font-size: 12px; color: var(--ink-dim); min-height: 1em; }
   .assistStatus.err { font-family: ui-monospace, monospace; font-style: normal; color: var(--err); }
-  .memItem { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+  /* Memory items — two-column grid on desktop, single column on
+     narrow screens. Saves vertical space when the user has a lot of
+     memories. */
+  #memList {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 6px;
+  }
+  .memItem { display: flex; gap: 6px; align-items: center; margin-bottom: 0; }
   .memItem input { flex: 1; }
   .memItem .del {
     background: var(--surface-2); color: var(--ink-dim);
@@ -827,7 +1044,13 @@
     border: 1px dashed var(--surface-3); border-radius: 4px;
   }
   #memAdd:hover { border-color: var(--accent-dim); }
-  #histList { display: flex; flex-direction: column; gap: 6px; }
+  /* Chat history rows — two-column grid on desktop, single column on
+     mobile. Each row is a card with title + counts + preview + date. */
+  #histList {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 6px;
+  }
   .histRow {
     padding: 10px 12px; cursor: pointer; user-select: none;
     background: var(--surface-2); border: 1px solid var(--surface-3);
@@ -955,10 +1178,50 @@
       <div id="appTitle">Smart Story</div>
       <div id="chatSubtitle">Illustrated AI Chat</div>
     </div>
+    <button id="scenesBtn" class="titleBtn" title="Switch scene · see your stories">📚</button>
     <button id="trackedBtn" class="titleBtn" title="Tracked story state">📋</button>
     <button id="vnBtn" class="titleBtn" title="Visual Novel mode">🎭</button>
     <button id="profileBtn" class="titleBtn" title="Profile &amp; achievements"><span>🏆</span><span class="titleBtnBadge" id="profileBadge" hidden>0</span></button>
     <button id="settingsBtn" class="titleBtn" title="Settings">⚙</button>
+  </div>
+
+  <!-- Scenes popover — opens from the 📚 button. Lists recent scenes
+       with click-to-switch, and a "+ NEW SCENE" affordance at top.
+       Replaces the buried Settings→HISTORY→row click for the common
+       "switch to a different story" workflow. -->
+  <div id="scenesPopover" hidden role="dialog" aria-label="Scenes">
+    <div class="popoverHeader">
+      <div class="popoverTitle">Your Stories</div>
+      <button class="popoverClose" id="scenesPopoverClose" aria-label="Close">×</button>
+    </div>
+    <button id="scenesNewBtn" class="scenesNew">
+      <span class="ico">📖</span><span>Start a new scene</span>
+    </button>
+    <div id="scenesList" class="scenesList" role="listbox" aria-label="Recent scenes"></div>
+    <div class="popoverFooter">
+      <button id="scenesManageBtn" class="popoverFooterBtn">
+        Manage all in Settings →
+      </button>
+    </div>
+  </div>
+
+  <!-- Roster bar — who's in the current scene. Always visible whenever
+       there's an active chat. Chips show each character's avatar + name;
+       the active (next-to-reply) speaker is highlighted; click any chip
+       to change who replies next; hover-✕ removes a character from the
+       scene; the trailing ✚ button adds a character from the library;
+       📜 Narrate produces a narrator beat. This consolidates what used to
+       be a dropdown + three buttons buried in the composer area. -->
+  <div id="rosterBar" hidden>
+    <div id="rosterChips" role="tablist" aria-label="Characters in this scene"></div>
+    <div class="rosterActions">
+      <button id="rosterAddBtn" class="rosterActionBtn" title="Bring a new character into this scene" aria-label="Add character">
+        <span aria-hidden="true">✚</span>
+      </button>
+      <button id="rosterNarrateBtn" class="rosterActionBtn" title="Generate a narrative beat — scene description without character dialogue">
+        <span aria-hidden="true">📜</span><span class="rosterActionLbl">Narrate</span>
+      </button>
+    </div>
   </div>
 
   <div id="chatPanel" aria-live="polite">
@@ -980,20 +1243,6 @@
       <button id="newBtn" class="tbtn primary" title="Start a new scene">
         <span class="ico">📖</span><span>NEW SCENE</span>
       </button>
-    </div>
-    <!-- Speaker picker (multi-character chats only). Hidden by default;
-         shown when the chat's roster has 2+ characters. Lets the user
-         choose who replies to their next message. -->
-    <!-- Speaker / cast row. Shown whenever the chat has a non-empty
-         roster. Houses the "Reply as:" dropdown (2+ characters only),
-         and roster-management + narrator buttons that are always
-         reachable. -->
-    <div id="speakerRow" hidden>
-      <label id="speakerLabel" for="speakerSelect">Reply as:</label>
-      <select id="speakerSelect" aria-label="Choose which character replies"></select>
-      <button id="narrateBtn" class="speakerRowBtn" title="Generate a narrative beat — scene description without character dialogue">📜 Narrate</button>
-      <button id="addCharacterBtn" class="speakerRowBtn" title="Bring a new character into this scene">✚ Add</button>
-      <button id="removeCharacterBtn" class="speakerRowBtn" title="Remove a character from this scene">✕ Remove</button>
     </div>
     <div id="inputRow">
       <textarea id="input" rows="1" placeholder="Write your reply… (Enter to send)" disabled></textarea>
@@ -1113,9 +1362,11 @@
           <div id="scenarioAssistStatus" class="assistStatus"></div>
         </div>
         <div style="margin-top: 24px;">
-          <label style="display:block; font-weight:600; font-size:11px; letter-spacing:0.5px; color:var(--ink); text-transform:uppercase; margin-bottom:8px;">Theme</label>
-          <div id="themeSwatchRow" class="themeSwatchRow"></div>
-          <div class="hint">Pick a color palette for the app. Changes apply immediately and persist across sessions.</div>
+          <label style="display:block; font-weight:600; font-size:11px; letter-spacing:0.5px; color:var(--ink); text-transform:uppercase; margin-bottom:8px;">Theme — colors</label>
+          <div class="hint" style="margin-bottom: 8px;">Pick from a preset or build your own palette. Variants (highlight / dim shades) are derived automatically. Changes apply live and persist across sessions.</div>
+          <div id="themePresetGrid" class="themePresetGrid"></div>
+          <div id="themeColorPickerGrid" class="colorPickerGrid"></div>
+          <button id="themeReset" class="secondaryBtn" type="button" style="margin-top: 4px;">RESET TO DEFAULT</button>
         </div>
         <div style="margin-top: 24px;">
           <label style="display:block; font-weight:600; font-size:11px; letter-spacing:0.5px; color:var(--ink); text-transform:uppercase; margin-bottom:8px;">Illustration settings</label>
@@ -1132,24 +1383,32 @@
             <textarea id="customStyleNegative" rows="2" placeholder="e.g. 'photorealistic, 3d render, low quality, deformed'"></textarea>
             <div class="hint">What to keep OUT of the image. Sent separately to the image model.</div>
           </div>
-          <label class="toggleRow">
-            <input id="autoIllustrate" type="checkbox" checked>
-            <span class="toggleLabel">Auto-illustrate scenes</span>
-          </label>
-          <div class="hint" style="margin-top: 4px;">When on, the chat AI marks vivid moments and the system illustrates them automatically.</div>
-          <div class="field" style="margin-top: 16px;">
-            <label>Suppression window — messages between auto-illustrations</label>
-            <div class="sliderRow">
-              <input id="suppressionWindow" type="range" min="1" max="5" step="1" value="2">
-              <span class="sliderVal" id="suppressionVal">2</span>
+          <!-- Toggle rows + slider arranged as a compact grid. Each row
+               is self-contained with its label + control + inline hint. -->
+          <div class="settingsGrid" style="margin-top: 12px;">
+            <div class="field" style="margin: 0;">
+              <label class="toggleRow compact">
+                <input id="autoIllustrate" type="checkbox" checked>
+                <span class="toggleLabel">Auto-illustrate scenes</span>
+              </label>
+              <div class="hint" style="margin-top: 4px;">When on, the chat AI marks vivid moments and illustrates them automatically.</div>
             </div>
-            <div class="hint">Higher = fewer illustrations. Manual 🎬 button always works regardless.</div>
+            <div class="field" style="margin: 0;">
+              <label class="toggleRow compact">
+                <input id="suggestActions" type="checkbox">
+                <span class="toggleLabel">Suggest actions after each reply</span>
+              </label>
+              <div class="hint" style="margin-top: 4px;">Adds three short "what to do/say next" buttons under each reply.</div>
+            </div>
+            <div class="field" style="margin: 0;">
+              <label>Auto-illustration spacing</label>
+              <div class="sliderRow">
+                <input id="suppressionWindow" type="range" min="1" max="5" step="1" value="2">
+                <span class="sliderVal" id="suppressionVal">2</span>
+              </div>
+              <div class="hint">Messages between auto-illustrations. Higher = fewer. Manual 🎬 always works.</div>
+            </div>
           </div>
-          <label class="toggleRow" style="margin-top: 18px;">
-            <input id="suggestActions" type="checkbox">
-            <span class="toggleLabel">Suggest actions after each reply</span>
-          </label>
-          <div class="hint" style="margin-top: 4px;">When on, three short "what to do/say next" buttons appear under the most recent reply. Clicking one fills your input — you can still edit it before sending.</div>
         </div>
         <div class="panelActions">
           <div class="spacer"></div>
@@ -1199,21 +1458,41 @@
       <button class="modalClose" data-close="trackedModal">CLOSE</button>
     </div>
     <div class="modalBody">
-      <div class="field">
-        <div class="hint" style="margin-bottom:8px;">A freeform note attached to <i>this scene only</i>. The character sees it in every reply and treats it as fact. Use it for things you want remembered across many turns: locations, items, time of day, who knows what, relationships, the ticking clock.</div>
-        <textarea id="trackedInfoText" rows="14" placeholder="# Character&#10;Items: brass key, water-stained letter&#10;Knows: the warehouse was rented under a fake name&#10;&#10;# World&#10;Location: rooming house on Pier Street&#10;Time: 2am, third night of rain&#10;&#10;# Events&#10;Day 4 of an unofficial 7-day deadline"></textarea>
-        <div id="trackedLengthNotice" class="lengthNotice" hidden></div>
+      <!-- Empty state: shown when no scene is active yet. Lets new users
+           discover what tracked state IS without forcing them to start
+           a scene first. The editor below is hidden in this mode. -->
+      <div id="trackedEmpty" class="emptyStateInline" hidden>
+        <div class="emptyGlyph">📋</div>
+        <div class="emptyTitle">No scene yet</div>
+        <div class="emptyBody">
+          Tracked story state is a freeform note attached to a single scene — a place to write
+          down items, locations, time of day, who knows what, relationships, deadlines. The
+          character sees it in every reply and treats it as fact.
+        </div>
+        <div class="emptyBody">
+          Once you start your first scene (📖 NEW SCENE), this is where you'll keep its
+          persistent details so they're not forgotten over a long conversation.
+        </div>
+        <div class="emptyHint">Press 📖 NEW SCENE in the toolbar to begin.</div>
       </div>
-      <div class="assistRow">
-        <button id="trackedUpdate" class="assistBtn" type="button">
-          <span class="ico">↻</span><span>Auto-update from recent chat</span>
-        </button>
-        <div id="trackedUpdateStatus" class="assistStatus"></div>
-      </div>
-      <div class="panelActions">
-        <button id="trackedClear" class="secondaryBtn">CLEAR</button>
-        <div class="spacer"></div>
-        <button id="trackedSave" class="saveBtn">SAVE</button>
+      <!-- Real editor: shown only when there IS an active scene. -->
+      <div id="trackedEditor">
+        <div class="field">
+          <div class="hint" style="margin-bottom:8px;">A freeform note attached to <i>this scene only</i>. The character sees it in every reply and treats it as fact. Use it for things you want remembered across many turns: locations, items, time of day, who knows what, relationships, the ticking clock.</div>
+          <textarea id="trackedInfoText" rows="14" placeholder="# Character&#10;Items: brass key, water-stained letter&#10;Knows: the warehouse was rented under a fake name&#10;&#10;# World&#10;Location: rooming house on Pier Street&#10;Time: 2am, third night of rain&#10;&#10;# Events&#10;Day 4 of an unofficial 7-day deadline"></textarea>
+          <div id="trackedLengthNotice" class="lengthNotice" hidden></div>
+        </div>
+        <div class="assistRow">
+          <button id="trackedUpdate" class="assistBtn" type="button">
+            <span class="ico">↻</span><span>Auto-update from recent chat</span>
+          </button>
+          <div id="trackedUpdateStatus" class="assistStatus"></div>
+        </div>
+        <div class="panelActions">
+          <button id="trackedClear" class="secondaryBtn">CLEAR</button>
+          <div class="spacer"></div>
+          <button id="trackedSave" class="saveBtn">SAVE</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1242,7 +1521,7 @@
       <!-- Paste mode -->
       <div id="importPane_paste" class="importPane">
         <div class="field">
-          <textarea id="importPasteText" rows="10" placeholder="Paste JSON character data, FurAI 'Name: ...' text, or any exported chat blob…" style="font-family: ui-monospace, monospace; font-size: 12px;"></textarea>
+          <textarea id="importPasteText" rows="10" placeholder="Paste JSON character data, FurAI 'Name: ...' text, a SillyTavern group chat (.jsonl contents), or any exported chat blob…" style="font-family: ui-monospace, monospace; font-size: 12px;"></textarea>
         </div>
       </div>
 
@@ -1250,8 +1529,8 @@
       <div id="importPane_file" class="importPane" hidden>
         <div class="field">
           <label>Choose a backup or character file</label>
-          <input id="importFileInput" type="file" accept=".json,.txt,application/json,text/plain">
-          <div class="hint">Supported: <code>.json</code> backups, FurAI exports, TavernAI cards, plain text character files.</div>
+          <input id="importFileInput" type="file" accept=".json,.jsonl,.txt,application/json,application/x-jsonlines,text/plain">
+          <div class="hint">Supported: <code>.json</code> backups, <code>.jsonl</code> SillyTavern group chat exports, FurAI exports, TavernAI cards, plain text character files.</div>
         </div>
       </div>
 
@@ -1386,32 +1665,6 @@
         <button id="addCharCancel" class="secondaryBtn">CANCEL</button>
         <div class="spacer"></div>
         <button id="addCharConfirm" class="saveBtn" disabled>BRING IN</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Remove-character-from-scene modal — pick a roster member to leave
-     the scene. Single-select. The character isn't deleted from the
-     library; they just exit this scene. Past messages from them stay
-     intact. -->
-<div id="removeCharModal" class="modal" role="dialog" aria-label="Remove a character from this scene">
-  <div class="modalCard">
-    <div class="modalHeader">
-      <div class="modalTitle">✕ Send a character off</div>
-      <button class="modalClose" data-close="removeCharModal">CANCEL</button>
-    </div>
-    <div class="modalBody">
-      <div class="hint" style="margin-bottom: 12px;">
-        Pick a character to leave the scene. Their past messages stay; they just
-        won't be in the scene anymore. A short system note will be added so the
-        AI knows. They can be brought back later with <b>✚ Add</b>.
-      </div>
-      <div id="removeCharList"></div>
-      <div class="panelActions">
-        <button id="removeCharCancel" class="secondaryBtn">CANCEL</button>
-        <div class="spacer"></div>
-        <button id="removeCharConfirm" class="saveBtn" disabled>SEND OFF</button>
       </div>
     </div>
   </div>
@@ -1874,7 +2127,7 @@
   async function loadSettings() {
     const s = await getMisc("settings", null);
     settings = (!s || typeof s !== "object")
-      ? { autoIllustrate: true, suppressionWindow: 2, artStyleKey: "default", customStylePrefix: "", customStyleNegative: "", suggestActions: false, themeKey: "default" }
+      ? { autoIllustrate: true, suppressionWindow: 2, artStyleKey: "default", customStylePrefix: "", customStyleNegative: "", suggestActions: false, theme: null }
       : {
           autoIllustrate: s.autoIllustrate !== false,
           suppressionWindow: Math.max(1, Math.min(5, parseInt(s.suppressionWindow) || 2)),
@@ -1882,7 +2135,11 @@
           customStylePrefix: s.customStylePrefix || "",
           customStyleNegative: s.customStyleNegative || "",
           suggestActions: !!s.suggestActions,
-          themeKey: s.themeKey || "default",
+          // Theme is now a {bg, surface, ink, accent, paper, err} object.
+          // Legacy installs may still have settings.themeKey set; we
+          // preserve it here so migrateLegacyTheme() can read it on init.
+          theme: (s.theme && typeof s.theme === "object" && s.theme.bg) ? s.theme : null,
+          themeKey: s.themeKey || null,
         };
   }
   async function saveSettings() { await setMisc("settings", settings); }
@@ -2757,50 +3014,101 @@
     return character.name || "";
   }
 
-  // Show/hide and populate the composer's "Reply as" picker. Only
-  // visible when the current chat's roster has 2+ characters — for
-  // single-character chats it stays hidden so the UI is identical to
-  // the pre-multichar experience. Always sync with `nextReplyCharacterId`.
+  // Build / refresh the roster bar — one chip per character in the
+  // current scene. Click any chip to switch the "next replier"; the
+  // active chip is highlighted. The chip-set replaces the old "Reply
+  // as:" dropdown + ✕ Remove button — interactions are now inline.
+  // Hidden entirely when there's no active chat or no roster.
   function refreshSpeakerPicker() {
-    const row = $("speakerRow");
-    const sel = $("speakerSelect");
-    const addBtn = $("addCharacterBtn");
-    const removeBtn = $("removeCharacterBtn");
-    const narrateBtn = $("narrateBtn");
-    if (!row || !sel) return;
+    const bar = $("rosterBar");
+    const chipsHost = $("rosterChips");
+    const addBtn = $("rosterAddBtn");
+    const narrateBtn = $("rosterNarrateBtn");
+    if (!bar || !chipsHost) return;
     const ids = (currentChat && Array.isArray(currentChat.characterIds))
       ? currentChat.characterIds.filter(id => chatRoster.has(id))
       : [];
-    // Show the row whenever there's an active chat. Use modifier
-    // classes to control which child controls are visible:
-    //   .no-roster — empty roster (legacy single-character chats):
-    //                hide dropdown + ✕ Remove. Narrate + ✚ Add still work.
-    //   .solo      — 1 character in roster: hide dropdown + ✕ Remove
-    //                (can't remove the last one). Narrate + ✚ Add work.
-    //   (default)  — 2+ characters: show everything.
-    row.classList.toggle("no-roster", ids.length === 0);
-    row.classList.toggle("solo", ids.length === 1);
     if (!currentChat) {
-      row.hidden = true;
-      sel.innerHTML = "";
+      bar.hidden = true;
+      chipsHost.innerHTML = "";
       return;
     }
-    row.hidden = false;
-    sel.innerHTML = "";
-    if (ids.length >= 2) {
-      for (const id of ids) {
-        const r = chatRoster.get(id);
-        if (!r) continue;
-        const o = document.createElement("option");
-        o.value = String(id);
-        o.textContent = r.name || `(untitled #${id})`;
-        if (id === nextReplyCharacterId) o.selected = true;
-        sel.appendChild(o);
+    // For empty-roster legacy chats: still show the bar so user can
+    // discover ✚ Add and 📜 Narrate, but render no chips. .solo class
+    // hides the ✕ Remove on chips (only one character; can't go to zero).
+    bar.hidden = false;
+    bar.classList.toggle("solo", ids.length <= 1);
+
+    chipsHost.innerHTML = "";
+    for (const id of ids) {
+      const r = chatRoster.get(id);
+      if (!r) continue;
+      const isActive = id === nextReplyCharacterId;
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "rosterChip" + (isActive ? " active" : "");
+      chip.dataset.characterId = String(id);
+      chip.setAttribute("role", "tab");
+      chip.setAttribute("aria-selected", isActive ? "true" : "false");
+      chip.title = isActive ? `${r.name} is replying next — click another to switch` : `Click to make ${r.name} reply next`;
+
+      // Avatar: use the cached portrait URL if available, otherwise
+      // fall back to two-letter initials. The avatar lookup uses the
+      // hash-keyed cache, same as bubble rendering.
+      const av = document.createElement("span");
+      av.className = "chipAvatar";
+      const avatarUrl = avatarUrlFor(r);
+      if (avatarUrl) {
+        av.style.backgroundImage = `url(${JSON.stringify(avatarUrl)})`;
+      } else {
+        av.textContent = initialsOf(r.name);
       }
+      chip.appendChild(av);
+
+      const name = document.createElement("span");
+      name.className = "chipName";
+      name.textContent = r.name || `(untitled #${id})`;
+      chip.appendChild(name);
+
+      // ✕ remove button — appears on hover. Only meaningful with 2+
+      // characters (CSS hides it in solo mode).
+      const x = document.createElement("button");
+      x.type = "button";
+      x.className = "chipRemove";
+      x.title = `Remove ${r.name} from this scene`;
+      x.setAttribute("aria-label", `Remove ${r.name}`);
+      x.textContent = "✕";
+      x.onclick = async (e) => {
+        e.stopPropagation();   // don't also activate the chip
+        // Confirm before removing — removal is a moderately significant
+        // action (inserts a "leaves" note in the scene and the character
+        // can't speak until brought back via ✚ Add).
+        const ok = await root.confirmAsync(
+          `Send ${r.name || "this character"} out of the scene?\n\nA "leaves" note will be added. You can bring them back later via ✚ Add.`
+        );
+        if (!ok) return;
+        sendCharacterOutOfScene(id).catch(err => showError("removeChar", err));
+      };
+      chip.appendChild(x);
+
+      // Whole-chip click: switch active speaker. (The ✕ stops
+      // propagation above so removal doesn't double as a speaker switch.)
+      chip.onclick = async () => {
+        if (id === nextReplyCharacterId) return;
+        nextReplyCharacterId = id;
+        if (currentChat) {
+          currentChat.nextReplyCharacterId = id;
+          try { await db.chats.update(currentChat.id, { nextReplyCharacterId: id }); }
+          catch (e) { console.warn("[speaker] couldn't persist nextReplyCharacterId:", e); }
+        }
+        // Re-render to update active state.
+        refreshSpeakerPicker();
+      };
+
+      chipsHost.appendChild(chip);
     }
-    // The +Add button is always reachable when the row is shown. We
-    // disable it if the library has no additional characters available.
-    // Async check — result lands later, button enables/disables.
+
+    // ✚ Add: open the library picker. Disable when no candidates.
     if (addBtn) {
       addBtn.disabled = false;
       listCharacters().then(all => {
@@ -2808,43 +3116,35 @@
         const candidates = all.filter(c => !inRoster.has(c.id));
         addBtn.disabled = candidates.length === 0;
         addBtn.title = candidates.length === 0
-          ? "Library has no additional characters. Create one in Settings → CHARACTER."
-          : "Bring a new character into this scene";
+          ? "Library has no additional characters. Create one in Settings → CHARACTER first."
+          : "Bring a character into this scene";
       }).catch(() => {});
     }
-    // Remove button: only enabled when roster has 2+ characters (the
-    // last one cannot be removed — would leave the scene with no speaker).
-    if (removeBtn) {
-      removeBtn.disabled = ids.length < 2;
-      removeBtn.title = ids.length < 2
-        ? "Scenes need at least one character. Add another before removing one."
-        : "Remove a character from this scene";
-    }
-    // Narrate button: always usable on an active chat. (Legacy chats
-    // with no roster still get a narrator from the global character.)
     if (narrateBtn) narrateBtn.disabled = false;
   }
 
-  // User picked a different replier. Persist on the chat row so it
-  // survives reloads (each chat remembers its last "who speaks next").
-  if ($("speakerSelect")) {
-    $("speakerSelect").addEventListener("change", async () => {
-      const sel = $("speakerSelect");
-      const id = parseInt(sel.value, 10);
-      if (!id || !chatRoster.has(id)) return;
-      nextReplyCharacterId = id;
-      if (currentChat) {
-        currentChat.nextReplyCharacterId = id;
-        try { await db.chats.update(currentChat.id, { nextReplyCharacterId: id }); }
-        catch (e) { console.warn("[speaker] couldn't persist nextReplyCharacterId:", e); }
-      }
-    });
+  // Resolve the cached avatar URL for a character record. Returns
+  // empty string when no avatar is available; the caller falls back
+  // to initials.
+  function avatarUrlFor(record) {
+    if (!record) return "";
+    try {
+      const key = personaHash(record);
+      return (key && charAvatars && charAvatars[key]) || "";
+    } catch (e) { return ""; }
   }
 
-  // +Add character: open the picker, then on confirm, bring the
-  // picked character into the current chat's roster.
-  if ($("addCharacterBtn")) {
-    $("addCharacterBtn").onclick = async () => {
+  // Two-letter initials fallback for chips with no avatar yet.
+  function initialsOf(name) {
+    const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return "?";
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  // ✚ Add character button (now on the roster bar).
+  if ($("rosterAddBtn")) {
+    $("rosterAddBtn").onclick = async () => {
       if (!currentChat) return;
       try {
         const all = await listCharacters();
@@ -2859,31 +3159,11 @@
     };
   }
 
-  // Narrate: generate a narrator beat (scene description prose) that
-  // continues the conversation without putting words in a character's
-  // mouth. Streams in like a normal reply but uses role:"narrator".
-  if ($("narrateBtn")) {
-    $("narrateBtn").onclick = () => {
+  // Narrate button (now on the roster bar).
+  if ($("rosterNarrateBtn")) {
+    $("rosterNarrateBtn").onclick = () => {
       if (!currentChat) return;
       streamNarratorBeat().catch(e => showError("narrate", e));
-    };
-  }
-
-  // Remove a character from the scene. Open the modal with the current
-  // roster as candidates; the user picks one.
-  if ($("removeCharacterBtn")) {
-    $("removeCharacterBtn").onclick = async () => {
-      if (!currentChat) return;
-      const rosterIds = (currentChat.characterIds || []).filter(id => chatRoster.has(id));
-      if (rosterIds.length < 2) return;  // guard duplicate of refreshSpeakerPicker's disable
-      try {
-        const candidates = rosterIds.map(id => chatRoster.get(id)).filter(Boolean);
-        const picked = await pickCharacterToRemoveAsync(candidates);
-        if (!picked) return;
-        await sendCharacterOutOfScene(picked);
-      } catch (e) {
-        showError("removeChar", e);
-      }
     };
   }
 
@@ -3114,72 +3394,6 @@
     } catch (e) {
       showError("addChar.note", e);
     }
-  }
-
-  // Show the remove-character modal. Resolves to a character id (the
-  // picked one) on confirm, or null on cancel. `candidates` is the
-  // roster (current chat's characters) since you can only remove what's
-  // currently in the scene.
-  function pickCharacterToRemoveAsync(candidates) {
-    return new Promise((resolve) => {
-      const list = $("removeCharList");
-      const confirmBtn = $("removeCharConfirm");
-      const cancelBtn = $("removeCharCancel");
-      list.innerHTML = "";
-      let pickedId = null;
-
-      const ordered = [...candidates].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-      for (const c of ordered) {
-        const row = document.createElement("label");
-        row.className = "castPickRow";
-        const radio = document.createElement("input");
-        radio.type = "radio";
-        radio.name = "removeCharPick";
-        radio.value = String(c.id);
-        radio.addEventListener("change", () => {
-          if (radio.checked) {
-            pickedId = c.id;
-            confirmBtn.disabled = false;
-          }
-        });
-        const txt = document.createElement("div");
-        txt.style.flex = "1";
-        const nameEl = document.createElement("div");
-        nameEl.className = "castPickName";
-        nameEl.textContent = c.name || `(untitled #${c.id})`;
-        const descEl = document.createElement("div");
-        descEl.className = "castPickDesc";
-        descEl.textContent = c.description || "(no description)";
-        txt.appendChild(nameEl);
-        txt.appendChild(descEl);
-        row.appendChild(radio);
-        row.appendChild(txt);
-        list.appendChild(row);
-      }
-      confirmBtn.disabled = true;
-
-      const modalEl = $("removeCharModal");
-      function cleanup(answer) {
-        closeModal("removeCharModal");
-        confirmBtn.onclick = null;
-        cancelBtn.onclick = null;
-        if (cleanup._backdropListener) {
-          modalEl.removeEventListener("click", cleanup._backdropListener, true);
-          cleanup._backdropListener = null;
-        }
-        resolve(answer);
-      }
-      confirmBtn.onclick = () => cleanup(pickedId);
-      cancelBtn.onclick = () => cleanup(null);
-      const closeBtn = modalEl.querySelector('[data-close="removeCharModal"]');
-      if (closeBtn) closeBtn.onclick = () => cleanup(null);
-      function onBackdrop(ev) {
-        if (ev.target === modalEl) cleanup(null);
-      }
-      cleanup._backdropListener = onBackdrop;
-      modalEl.addEventListener("click", onBackdrop, true);
-      openModal("removeCharModal");
-    });
   }
 
   // Remove a character from the current scene. The library entry is
@@ -3904,6 +4118,312 @@
     });
   });
 
+  // ---------------------------------------------------------------
+  // Settings drafts (background autosave)
+  // ---------------------------------------------------------------
+  // Each settings tab autosaves its in-progress edits to a per-panel
+  // draft row in IndexedDB (db.misc with keys "draft:panelChar" etc).
+  // The user can switch tabs freely; their edits ride along in the
+  // draft. On modal close, if any draft differs from persisted state,
+  // we prompt SAVE-ALL / DISCARD-ALL / CANCEL.
+  //
+  // Saving a single tab (via that tab's SAVE button) commits the draft
+  // to its real storage and clears the draft for that panel.
+  //
+  // Why per-panel keys? Lets us iterate drafts at close-time without
+  // having to know what state shape each tab uses, and lets a partial
+  // commit (save one tab but not another) work cleanly.
+  //
+  // Why IndexedDB and not just memory? Survives accidental tab close /
+  // refresh — the user opens settings later and their edits are right
+  // where they left them, with a visible "dirty" dot on each affected
+  // tab.
+
+  const DRAFT_PANELS = ["panelChar", "panelYou", "panelScene", "panelMem"];
+  // Hist tab has no editable fields, so it's not in the list.
+
+  let draftSaveTimer = null;
+  // A debounce per panel — multiple keystrokes in panelChar shouldn't
+  // queue multiple writes. Map of panelId → timeoutId.
+  const draftSaveTimers = {};
+
+  // Snapshot the current DOM/state for a panel into the shape we'll
+  // persist as a draft. Returns null when the panel doesn't expose
+  // dirty-able fields.
+  function snapshotPanelFromDom(panelId) {
+    switch (panelId) {
+      case "panelChar":
+        return {
+          name: ($("charName").value || ""),
+          description: ($("charDesc").value || ""),
+          appearance: ($("charAppearance").value || ""),
+        };
+      case "panelYou":
+        return {
+          name: ($("youName").value || ""),
+          description: ($("youDesc").value || ""),
+          appearance: ($("youAppearance").value || ""),
+        };
+      case "panelScene":
+        return {
+          scenarioText: ($("scenarioText").value || ""),
+          autoIllustrate: !!$("autoIllustrate").checked,
+          suggestActions: !!$("suggestActions").checked,
+          suppressionWindow: parseInt($("suppressionWindow").value, 10) || 2,
+          artStyleKey: $("artStyleSelect").value || "default",
+          customStylePrefix: $("customStylePrefix").value || "",
+          customStyleNegative: $("customStyleNegative").value || "",
+        };
+      case "panelMem":
+        // memory is mutated live by add/delete buttons; snapshot a copy.
+        return { entries: memory.slice() };
+    }
+    return null;
+  }
+
+  // The "canonical" state for a panel — what's already persisted to
+  // real storage. Compared against drafts to decide if a panel is dirty.
+  function persistedPanelState(panelId) {
+    switch (panelId) {
+      case "panelChar":
+        return {
+          name: character.name || "",
+          description: character.description || "",
+          appearance: character.appearance || "",
+        };
+      case "panelYou":
+        return {
+          name: personality.name || "",
+          description: personality.description || "",
+          appearance: personality.appearance || "",
+        };
+      case "panelScene":
+        return {
+          scenarioText: scenarioDefault || "",
+          autoIllustrate: !!settings.autoIllustrate,
+          suggestActions: !!settings.suggestActions,
+          suppressionWindow: settings.suppressionWindow,
+          artStyleKey: settings.artStyleKey || "default",
+          customStylePrefix: settings.customStylePrefix || "",
+          customStyleNegative: settings.customStyleNegative || "",
+        };
+      case "panelMem":
+        return { entries: (memory || []).slice() };
+    }
+    return null;
+  }
+
+  function draftKey(panelId) { return "draft:" + panelId; }
+
+  async function readDraft(panelId) {
+    try {
+      const row = await db.misc.get(draftKey(panelId));
+      return row && typeof row.value === "object" ? row.value : null;
+    } catch (e) { return null; }
+  }
+  async function writeDraft(panelId, snapshot) {
+    try { await setMisc(draftKey(panelId), snapshot); }
+    catch (e) { console.warn("[draft] write failed:", panelId, e); }
+  }
+  async function clearDraft(panelId) {
+    try { await db.misc.delete(draftKey(panelId)); }
+    catch (e) {}
+  }
+
+  // True when the draft snapshot meaningfully differs from the
+  // persisted state. Uses JSON.stringify for whole-object equality —
+  // cheap and good enough for the small objects we deal with here.
+  function snapshotDiffers(panelId, snapshot) {
+    if (!snapshot) return false;
+    return JSON.stringify(snapshot) !== JSON.stringify(persistedPanelState(panelId));
+  }
+
+  // Track which tabs currently have dirty drafts (for the indicator dot).
+  // Populated from disk on modal open + refreshed on every draft write.
+  let dirtyPanels = new Set();
+
+  function updateDirtyIndicators() {
+    document.querySelectorAll(".settingsTab").forEach(tab => {
+      tab.classList.toggle("is-dirty", dirtyPanels.has(tab.dataset.panel));
+    });
+  }
+
+  // Debounced autosave. Called from input/change listeners attached to
+  // every editable field in the settings panels. ~400ms feels right —
+  // not so short that we write per keystroke, not so long that a quick
+  // close loses the draft.
+  function scheduleDraftSave(panelId) {
+    if (!DRAFT_PANELS.includes(panelId)) return;
+    if (draftSaveTimers[panelId]) clearTimeout(draftSaveTimers[panelId]);
+    draftSaveTimers[panelId] = setTimeout(async () => {
+      delete draftSaveTimers[panelId];
+      const snap = snapshotPanelFromDom(panelId);
+      if (!snap) return;
+      if (snapshotDiffers(panelId, snap)) {
+        await writeDraft(panelId, snap);
+        dirtyPanels.add(panelId);
+      } else {
+        // Snapshot now matches persisted state (user undid their edits) —
+        // clear the draft so close-time sees a clean state.
+        await clearDraft(panelId);
+        dirtyPanels.delete(panelId);
+      }
+      updateDirtyIndicators();
+    }, 400);
+  }
+
+  // For the Memory panel, the array is mutated synchronously by buttons
+  // (add/remove). Those callers can ping us directly rather than waiting
+  // for an input event.
+  function noteMemoryMutated() { scheduleDraftSave("panelMem"); }
+
+  // Populate panel fields from a draft IF one exists, otherwise from the
+  // persisted state. Called by activatePanel.
+  async function populatePanelFromDraftOrPersisted(panelId) {
+    const draft = await readDraft(panelId);
+    const src = draft || persistedPanelState(panelId);
+    if (!src) return;
+    switch (panelId) {
+      case "panelChar":
+        $("charName").value = src.name || "";
+        $("charDesc").value = src.description || "";
+        $("charAppearance").value = src.appearance || "";
+        break;
+      case "panelYou":
+        $("youName").value = src.name || "";
+        $("youDesc").value = src.description || "";
+        $("youAppearance").value = src.appearance || "";
+        break;
+      case "panelScene":
+        $("scenarioText").value = src.scenarioText || "";
+        $("autoIllustrate").checked = !!src.autoIllustrate;
+        $("suggestActions").checked = !!src.suggestActions;
+        $("suppressionWindow").value = src.suppressionWindow || 2;
+        $("suppressionVal").textContent = src.suppressionWindow || 2;
+        // The artStyleSelect needs the options populated first, which is
+        // done by activatePanel before calling us.
+        $("artStyleSelect").value = src.artStyleKey || "default";
+        $("customStylePrefix").value = src.customStylePrefix || "";
+        $("customStyleNegative").value = src.customStyleNegative || "";
+        break;
+      case "panelMem":
+        if (draft && Array.isArray(draft.entries)) {
+          memory = draft.entries.slice();
+        }
+        renderMemList();
+        break;
+    }
+  }
+
+  // On modal open: load every panel's dirty status from disk so the
+  // tab dots are correct from frame one.
+  async function loadDirtyPanelsFromDisk() {
+    dirtyPanels = new Set();
+    for (const p of DRAFT_PANELS) {
+      const draft = await readDraft(p);
+      if (draft && snapshotDiffers(p, draft)) dirtyPanels.add(p);
+      else if (draft) await clearDraft(p);  // stale (matches persisted)
+    }
+    updateDirtyIndicators();
+  }
+
+  // Commit a single panel's draft. Each tab's SAVE button already does
+  // the heavy lifting (writes to character/personality/etc. and to
+  // IndexedDB). All this helper does is clear the now-redundant draft.
+  async function commitDraftAfterSave(panelId) {
+    await clearDraft(panelId);
+    dirtyPanels.delete(panelId);
+    updateDirtyIndicators();
+  }
+
+  // SAVE ALL DIRTY — used by the close-time prompt. Walks each dirty
+  // panel and triggers its save button. We DO NOT want any of these
+  // saves to close the modal under us, so the save handlers check the
+  // `dirtyBulkInProgress` flag before calling closeModal().
+  let dirtyBulkInProgress = false;
+  async function commitAllDirtyDrafts() {
+    dirtyBulkInProgress = true;
+    try {
+      const order = ["panelChar", "panelYou", "panelScene", "panelMem"];
+      for (const p of order) {
+        if (!dirtyPanels.has(p)) continue;
+        // Each panel's fields need to be populated from the draft before
+        // its save handler reads them — otherwise we'd save whatever
+        // the currently-active tab has in its DOM, which is wrong.
+        await populatePanelFromDraftOrPersisted(p);
+        // Trigger the save handler synchronously via .click() so its
+        // logic runs against the just-populated DOM.
+        const btn = $(p === "panelChar" ? "charSave" :
+                      p === "panelYou" ? "youSave" :
+                      p === "panelScene" ? "sceneSave" : "memSave");
+        if (btn) {
+          btn.click();
+          // The save handlers are async. We yield 50ms between clicks
+          // to keep their start order deterministic — but if the saves
+          // complete out of order (or after this whole function returns),
+          // it's harmless: they write to separate misc keys, and any
+          // late closeModal() call is idempotent.
+          await new Promise(r => setTimeout(r, 50));
+        }
+      }
+      // Wipe any drafts that didn't get cleared by the save handlers
+      // (e.g. if a save failed silently).
+      for (const p of DRAFT_PANELS) await clearDraft(p);
+      dirtyPanels = new Set();
+      updateDirtyIndicators();
+    } finally {
+      dirtyBulkInProgress = false;
+    }
+  }
+
+  async function discardAllDirtyDrafts() {
+    for (const p of DRAFT_PANELS) await clearDraft(p);
+    dirtyPanels = new Set();
+    updateDirtyIndicators();
+    // Re-populate the currently-active panel from persisted state so the
+    // user sees the revert immediately.
+    const active = document.querySelector(".settingsPanel.active");
+    if (active) await populatePanelFromDraftOrPersisted(active.id);
+  }
+
+  // Prompt the user when there are unsaved drafts and they try to close
+  // the modal. Returns true if the close should proceed, false if not.
+  async function guardModalClose() {
+    if (tutorial) return true;       // tutorials don't surface this prompt
+    if (dirtyBulkInProgress) return true;   // we're mid-bulk-save
+    if (dirtyPanels.size === 0) return true;
+    const names = Array.from(dirtyPanels).map(panelLabel).join(", ");
+    const choice = await root.choiceAsync(
+      `You have unsaved changes in: ${names}.\n\nSave them, discard, or stay in Settings?`,
+      [
+        { key: "cancel",  label: "Stay here" },
+        { key: "discard", label: "Discard changes", danger: true },
+        { key: "save",    label: "Save changes",    primary: true },
+      ]
+    );
+    if (choice === "save") {
+      await commitAllDirtyDrafts();
+      return true;
+    }
+    if (choice === "discard") {
+      await discardAllDirtyDrafts();
+      return true;
+    }
+    return false;
+  }
+
+  function panelLabel(panelId) {
+    return ({
+      panelChar:  "CHARACTER",
+      panelYou:   "YOU",
+      panelScene: "SCENE",
+      panelMem:   "MEMORY",
+      panelHist:  "HISTORY",
+    })[panelId] || panelId;
+  }
+
+  // ---------------------------------------------------------------
+
   let lastPanel = "panelChar";
   function activatePanel(panelId) {
     lastPanel = panelId;
@@ -3917,9 +4437,9 @@
     // Notify the onboarding tutorial. No-op when no tutorial is running.
     tutEmit("panel-" + panelId);
     if (panelId === "panelChar") {
-      $("charName").value = character.name || "";
-      $("charDesc").value = character.description || "";
-      $("charAppearance").value = character.appearance || "";
+      // Field population is now draft-aware: if there's a pending draft
+      // for this panel, restore from it; otherwise from persisted state.
+      populatePanelFromDraftOrPersisted("panelChar").catch(e => console.warn("[draft]", e));
       $("charAssistStatus").textContent = "";
       $("charAssistStatus").classList.remove("err");
       updateLengthNotice("charDesc", "charLengthNotice");
@@ -3928,29 +4448,23 @@
       // away from current" affordance.
       refreshCharLibSelect().catch(e => console.warn("[charLib] refresh failed:", e));
     } else if (panelId === "panelYou") {
-      $("youName").value = personality.name || "";
-      $("youDesc").value = personality.description || "";
-      $("youAppearance").value = personality.appearance || "";
+      populatePanelFromDraftOrPersisted("panelYou").catch(e => console.warn("[draft]", e));
       $("youAssistStatus").textContent = "";
       $("youAssistStatus").classList.remove("err");
       refreshYouAssistAvailability();
       updateLengthNotice("youDesc", "youLengthNotice");
     } else if (panelId === "panelScene") {
-      $("scenarioText").value = scenarioDefault || "";
-      $("autoIllustrate").checked = !!settings.autoIllustrate;
-      $("suppressionWindow").value = settings.suppressionWindow;
-      $("suppressionVal").textContent = settings.suppressionWindow;
-      $("suggestActions").checked = !!settings.suggestActions;
+      // Art-style options must be populated BEFORE
+      // populatePanelFromDraftOrPersisted sets the dropdown's .value,
+      // otherwise the value won't stick (option must exist first).
       populateArtStyleSelect();
-      $("artStyleSelect").value = settings.artStyleKey || "default";
-      $("customStylePrefix").value = settings.customStylePrefix || "";
-      $("customStyleNegative").value = settings.customStyleNegative || "";
+      populatePanelFromDraftOrPersisted("panelScene").catch(e => console.warn("[draft]", e));
       toggleCustomStyleFields();
       $("scenarioAssistStatus").textContent = "";
       $("scenarioAssistStatus").classList.remove("err");
       updateLengthNotice("scenarioText", "scenarioLengthNotice");
     } else if (panelId === "panelMem") {
-      renderMemList();
+      populatePanelFromDraftOrPersisted("panelMem").catch(e => console.warn("[draft]", e));
     } else if (panelId === "panelHist") {
       renderHistory();
     }
@@ -3960,6 +4474,9 @@
   });
   function openSettings(initialPanel) {
     openModal("settingsModal");
+    // Refresh the dirty indicators from disk so users see the dot on
+    // any tab with pending drafts (even from previous sessions).
+    loadDirtyPanelsFromDisk().catch(e => console.warn("[draft]", e));
     // Notify the onboarding tutorial BEFORE we activate the panel, so the
     // implicit "panel-X" gesture that follows is observed in the correct
     // order (settings-opened → panel-X). Otherwise the tutorial step for
@@ -3969,6 +4486,47 @@
   }
   $("settingsBtn").onclick = () => openSettings();
 
+  // Wire delegated input/change listeners on each draftable panel.
+  // Any keystroke/toggle/slider change in the panel triggers a
+  // debounced background save of that panel's draft.
+  for (const pid of DRAFT_PANELS) {
+    const panel = $(pid);
+    if (!panel) continue;
+    const handler = () => scheduleDraftSave(pid);
+    panel.addEventListener("input", handler);
+    panel.addEventListener("change", handler);
+  }
+
+  // Modal close — guard against silently losing unsaved drafts.
+  // Hook the existing close button + backdrop click, both of which
+  // funnel through closeModal("settingsModal"). Easiest: wrap
+  // closeModal-for-settings in a guard step. We replace the original
+  // settings close button's behavior to check first.
+  function guardedSettingsClose() {
+    guardModalClose().then(ok => {
+      if (ok) closeModal("settingsModal");
+    }).catch(e => {
+      console.warn("[draft] guard failed; closing anyway:", e);
+      closeModal("settingsModal");
+    });
+  }
+  // The .modalClose button in settings has [data-close="settingsModal"].
+  // The generic .modalClose handler attached earlier just calls
+  // closeModal directly; we override for settings specifically.
+  document.querySelectorAll('[data-close="settingsModal"]').forEach(btn => {
+    btn.onclick = guardedSettingsClose;
+  });
+  // Backdrop click on the settings modal — also guarded.
+  $("settingsModal").addEventListener("click", (e) => {
+    if (e.target === $("settingsModal") && !tutorial) {
+      // The generic modal-close listener (registered earlier) will also
+      // fire here. To prevent a double-close, we mark this event handled
+      // and run our own guarded close first.
+      e.stopImmediatePropagation();
+      guardedSettingsClose();
+    }
+  }, true);  // capture phase so we run before the generic listener
+
   // =====================================================================
   // TRACKED INFO MODAL (per-chat story state)
   // =====================================================================
@@ -3976,12 +4534,19 @@
   // to currentChat + DB on save. The "Auto-update" button calls the
   // separate AI helper to refresh the state from recent chat history.
   function openTrackedModal() {
+    const empty = $("trackedEmpty");
+    const editor = $("trackedEditor");
     if (!currentChat) {
-      // No active chat — gently prompt; the empty state can't really
-      // produce useful tracked info.
-      setStatus("Start a new scene first — tracked state lives inside a scene.");
+      // No active scene yet — open the modal anyway, but show an empty
+      // state so the user can discover what this feature is. The editor
+      // section is hidden (nothing to save against).
+      if (empty) empty.hidden = false;
+      if (editor) editor.hidden = true;
+      openModal("trackedModal");
       return;
     }
+    if (empty) empty.hidden = true;
+    if (editor) editor.hidden = false;
     $("trackedInfoText").value = currentChat.trackedInfo || "";
     $("trackedUpdateStatus").textContent = "";
     $("trackedUpdateStatus").classList.remove("err");
@@ -4258,7 +4823,11 @@
       // legacy misc:character cache.
       await saveCharacter();
       const savedId = await getMisc("currentCharacterId", null);
-      closeModal("settingsModal");
+      // Clear the panel's draft — it's now redundant with persisted state.
+      await commitDraftAfterSave("panelChar");
+      // Don't close the modal when we're chaining saves through
+      // commitAllDirtyDrafts — that wrapper does its own close handling.
+      if (!dirtyBulkInProgress) closeModal("settingsModal");
       // Relabel bubbles. In multi-character chats only the bubbles
       // belonging to THIS character should be relabeled — other roster
       // members' bubbles are unrelated to this edit. Empty roster falls
@@ -4335,7 +4904,8 @@
         appearance: ($("youAppearance").value || "").trim(),
       };
       await savePersonality();
-      closeModal("settingsModal");
+      await commitDraftAfterSave("panelYou");
+      if (!dirtyBulkInProgress) closeModal("settingsModal");
       const newLabel = (personality.name || "YOU").toUpperCase();
       document.querySelectorAll(".msg.user .msgWho").forEach(el => {
         el.textContent = newLabel;
@@ -4411,7 +4981,8 @@
       await saveSettings();
       // If the toggle was turned off, remove any existing suggestion strip.
       if (!settings.suggestActions) clearAllSuggestionStrips();
-      closeModal("settingsModal");
+      await commitDraftAfterSave("panelScene");
+      if (!dirtyBulkInProgress) closeModal("settingsModal");
     } catch (e) {
       showError("saveScene", e);
     }
@@ -4427,10 +4998,17 @@
       row.innerHTML = `<input type="text" maxlength="500"><button class="del" type="button">✕</button>`;
       const input = row.querySelector("input");
       input.value = entry || "";
-      input.addEventListener("input", () => { memory[i] = input.value; });
+      // Input edits update both the array (so live state matches) and
+      // poke the draft system (so the dirty dot appears and the draft
+      // is persisted).
+      input.addEventListener("input", () => {
+        memory[i] = input.value;
+        noteMemoryMutated();
+      });
       row.querySelector(".del").onclick = () => {
         memory.splice(i, 1);
         renderMemList();
+        noteMemoryMutated();
       };
       list.appendChild(row);
     });
@@ -4441,12 +5019,17 @@
       list.appendChild(empty);
     }
   }
-  $("memAdd").onclick = () => { memory.push(""); renderMemList(); };
+  $("memAdd").onclick = () => {
+    memory.push("");
+    renderMemList();
+    noteMemoryMutated();
+  };
   $("memSave").onclick = async () => {
     try {
       memory = memory.map(m => String(m || "").trim()).filter(Boolean);
       await saveMemory();
-      closeModal("settingsModal");
+      await commitDraftAfterSave("panelMem");
+      if (!dirtyBulkInProgress) closeModal("settingsModal");
     } catch (e) {
       showError("saveMemory", e);
     }
@@ -4478,12 +5061,121 @@
         <div class="histDate">${escapeHTML(dateStr)}</div>
       `;
       row.onclick = async () => {
+        // Activating another chat supersedes any in-progress edits in
+        // the current settings — those drafts referred to the old chat's
+        // character/persona/scene. Discard them silently.
+        await discardAllDirtyDrafts();
         closeModal("settingsModal");
         await activateChat(c.id);
       };
       list.appendChild(row);
     }
   }
+
+  // ---------------------------------------------------------------
+  // Scenes popover — top-of-page quick-switcher
+  // ---------------------------------------------------------------
+  // A lightweight scenes list that drops down from the 📚 title-bar
+  // button. Same data source as the Settings → HISTORY tab but reached
+  // in one click instead of three. Tap a row to switch scenes; tap the
+  // top "+ Start a new scene" to create one; tap "Manage all in
+  // Settings" to fall through to the full HISTORY tab if needed.
+
+  async function renderScenesPopover() {
+    const list = $("scenesList");
+    if (!list) return;
+    list.innerHTML = "";
+    let chats;
+    try { chats = await listChats(); }
+    catch (e) {
+      list.innerHTML = `<div class="scenesEmpty">Couldn't load scenes.</div>`;
+      return;
+    }
+    if (!chats || chats.length === 0) {
+      list.innerHTML = `<div class="scenesEmpty">No scenes yet. Tap “Start a new scene” above.</div>`;
+      return;
+    }
+    // Cap to most recent 30 to keep the popover snappy; full list is
+    // still available via "Manage all in Settings".
+    const recent = chats.slice(0, 30);
+    for (const c of recent) {
+      const row = document.createElement("button");
+      row.type = "button";
+      const isCurrent = currentChat && currentChat.id === c.id;
+      row.className = "sceneRow" + (isCurrent ? " current" : "");
+      row.setAttribute("role", "option");
+      row.setAttribute("aria-selected", isCurrent ? "true" : "false");
+      // Build the row content. We don't fetch messages per row here —
+      // that would be expensive for 30 scenes. The lastMessageAt /
+      // title gets us most of the way; preview lives in HISTORY tab.
+      const titleHtml = escapeHTML(c.title || "(untitled scene)") +
+        (isCurrent ? `<span class="currentTag">CURRENT</span>` : "");
+      const date = new Date(c.lastMessageAt || c.createdAt || Date.now());
+      const dateStr = date.toLocaleDateString(undefined, { month: "short", day: "numeric" })
+        + " · " + date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+      row.innerHTML = `
+        <div class="sceneTitle">${titleHtml}</div>
+        <div class="sceneMeta">${escapeHTML(dateStr)}</div>
+      `;
+      row.onclick = async () => {
+        if (isCurrent) { closeScenesPopover(); return; }
+        // Same teardown as the HISTORY-tab row click: drafts referred
+        // to the OLD chat's character/persona; they don't apply now.
+        await discardAllDirtyDrafts();
+        closeScenesPopover();
+        await activateChat(c.id);
+      };
+      list.appendChild(row);
+    }
+  }
+
+  function openScenesPopover() {
+    const pop = $("scenesPopover");
+    if (!pop) return;
+    pop.hidden = false;
+    // Backdrop catches outside-clicks. Inserted-on-demand to avoid an
+    // always-present invisible layer interfering with other UI.
+    const backdrop = document.createElement("div");
+    backdrop.className = "scenesBackdrop";
+    backdrop.onclick = closeScenesPopover;
+    document.body.appendChild(backdrop);
+    pop._backdrop = backdrop;
+    renderScenesPopover();
+    // ESC to close.
+    pop._escHandler = (e) => { if (e.key === "Escape") closeScenesPopover(); };
+    document.addEventListener("keydown", pop._escHandler);
+  }
+  function closeScenesPopover() {
+    const pop = $("scenesPopover");
+    if (!pop) return;
+    pop.hidden = true;
+    if (pop._backdrop) { pop._backdrop.remove(); pop._backdrop = null; }
+    if (pop._escHandler) { document.removeEventListener("keydown", pop._escHandler); pop._escHandler = null; }
+  }
+
+  if ($("scenesBtn")) {
+    $("scenesBtn").onclick = () => {
+      const pop = $("scenesPopover");
+      if (pop && !pop.hidden) closeScenesPopover();
+      else openScenesPopover();
+    };
+  }
+  if ($("scenesPopoverClose")) $("scenesPopoverClose").onclick = closeScenesPopover;
+  if ($("scenesNewBtn")) {
+    $("scenesNewBtn").onclick = () => {
+      closeScenesPopover();
+      // Defer to the same flow as the toolbar NEW SCENE button.
+      const newBtn = $("newBtn");
+      if (newBtn) newBtn.click();
+    };
+  }
+  if ($("scenesManageBtn")) {
+    $("scenesManageBtn").onclick = () => {
+      closeScenesPopover();
+      openSettings("panelHist");
+    };
+  }
+
   $("histReset").onclick = async () => {
     const ok = await root.confirmAsync(
       "Clear ALL chat history?\n\nThis removes every past scene. Your character, persona, and memory are NOT affected.\n\nContinue?"
@@ -4503,6 +5195,7 @@
       renderEmptyState(true);
       enableInput(false);
       updateTrackedBtnState();
+      await discardAllDirtyDrafts();  // history wipe trumps any in-progress edits
       closeModal("settingsModal");
       setStatus("History cleared. Press 📖 NEW SCENE when you are ready.");
     } catch (e) {
@@ -4591,6 +5284,7 @@
       "ai-character-chat":"ai-character-chat character",
       "tavern-v2":        "TavernAI v2 character card",
       "tavern-v1":        "TavernAI v1 / generic character card",
+      "tavern-group-chat":"TavernAI / SillyTavern group chat",
       "tableau-backup":   "Smart Story backup (full app state)",
     };
     return labels[key] || key;
@@ -4625,6 +5319,11 @@
       if (parsed.openingMessage) bits.push("has opening message");
       if (parsed.scenario) bits.push("has scenario");
       if (parsed.personality && parsed.personality.name) bits.push(`persona "${parsed.personality.name}"`);
+      // Multi-character group chats: surface the cast count.
+      if (parsed.multiCharacter && Array.isArray(parsed.cast) && parsed.cast.length) {
+        const total = 1 + parsed.cast.length;  // primary + others
+        bits.push(`${total}-character cast`);
+      }
       if (parsed.format === "tableau-backup" && parsed.extras) {
         bits.length = 0;
         bits.push(`${parsed.extras.chatCount || 0} chats`);
@@ -4635,23 +5334,34 @@
       $("importActions").style.display = "flex";
       $("importActionsHint").style.display = "block";
       status.textContent = "";
-      // Smart Story backups go through a different restore path — disable
-      // the per-character action buttons since they're whole-app restores.
+      // Per-button state depends on what kind of import this is.
       const settingsBtn = $("importAsSettings");
       const newChatBtn = $("importAsNewChat");
       const libraryBtn = $("importAsLibrary");
       if (parsed.format === "tableau-backup") {
+        // Smart Story backups go through a dedicated whole-app restore.
         settingsBtn.disabled = true;
         settingsBtn.title = "Smart Story backups are full app restores; the settings-only mode doesn't apply.";
         libraryBtn.disabled = true;
         libraryBtn.title = "Smart Story backups are full app restores; restore replaces your library entirely.";
         newChatBtn.textContent = "RESTORE BACKUP";
+      } else if (parsed.multiCharacter) {
+        // Group chat: USE AS CURRENT would silently drop all the other
+        // characters. Disable it and steer users toward the two flows
+        // that DO preserve the cast.
+        settingsBtn.disabled = true;
+        settingsBtn.title = "This import has multiple characters. 'Use as Current' would only keep the primary character and drop the others. Use 'ADD TO LIBRARY' or 'IMPORT & CONTINUE' instead.";
+        libraryBtn.disabled = false;
+        libraryBtn.title = "Adds all characters from this group chat to your library. Messages are discarded.";
+        newChatBtn.textContent = "IMPORT & CONTINUE";
+        newChatBtn.title = "Creates a new multi-character scene with the full cast and the imported messages.";
       } else {
         settingsBtn.disabled = false;
         settingsBtn.title = "";
         libraryBtn.disabled = false;
         libraryBtn.title = "";
         newChatBtn.textContent = "IMPORT & CONTINUE";
+        newChatBtn.title = "";
       }
     } catch (e) {
       status.classList.add("err");
@@ -4687,6 +5397,9 @@
         await saveScenarioDefault();
       }
       closeModal("importModal");
+      // Import overrides character/persona/scenario — discard any
+      // in-progress settings drafts since they referenced the OLD state.
+      await discardAllDirtyDrafts();
       closeModal("settingsModal");
       const sceneHint = character.firstMessage
         ? "Press 📖 NEW SCENE — it will start with the imported opening message."
@@ -4742,20 +5455,44 @@
         showError("import.library", "Nothing to add — the import has no character fields.");
         return;
       }
-      // Add to the library directly. Carries the first message so a
-      // future "use as current + new scene" path can use it; library
-      // entries store firstMessage even when nothing currently consumes it.
-      const created = await addCharacterToLibrary({
+      // Always add the primary character first.
+      const createdPrimary = await addCharacterToLibrary({
         name, description, appearance,
         firstMessage: p.openingMessage || "",
       });
+      // Multi-character imports: add each cast member too. Each gets a
+      // skeletal library entry; users can flesh out descriptions /
+      // appearances in Settings → CHARACTER. If they want full character
+      // data, they should also import the individual character PNGs.
+      const castAdded = [];
+      if (p.multiCharacter && Array.isArray(p.cast)) {
+        for (const c of p.cast) {
+          const n = (c && c.name) || "";
+          if (!n) continue;
+          try {
+            const created = await addCharacterToLibrary({
+              name: n,
+              description: (c && c.description) || "",
+              appearance: (c && c.appearance) || "",
+              firstMessage: "",
+            });
+            castAdded.push(created.name);
+          } catch (e) {
+            console.warn("[import.library] cast member failed:", n, e);
+          }
+        }
+      }
       // Update the dropdown if the Settings panel is currently visible.
       try { await refreshCharLibSelect(); } catch (e) {}
-      // Refresh the +Add button's enabled state in case the user is
-      // mid-scene and the imported character is now a candidate to bring in.
       refreshSpeakerPicker();
       closeModal("importModal");
-      setStatus(`Added "${created.name || "character"}" to your library. Open Settings → CHARACTER to pick them, or press ✚ Add in a scene to bring them in.`);
+      let msg;
+      if (castAdded.length) {
+        msg = `Added "${createdPrimary.name}" and ${castAdded.length} cast member${castAdded.length === 1 ? "" : "s"} (${castAdded.join(", ")}) to your library. Open Settings → CHARACTER to fill in descriptions/appearances, or press ✚ Add in a scene to bring them in.`;
+      } else {
+        msg = `Added "${createdPrimary.name || "character"}" to your library. Open Settings → CHARACTER to pick them, or press ✚ Add in a scene to bring them in.`;
+      }
+      setStatus(msg);
     } catch (e) {
       showError("import.library", e);
     }
@@ -4773,7 +5510,7 @@
         await restoreTableauBackup(p.extras.raw);
         return;
       }
-      // 1. Set the character + persona + scenario as global.
+      // 1. Set the primary character + persona + scenario as global.
       character = {
         name: (p.character && p.character.name) || "",
         description: (p.character && p.character.description) || "",
@@ -4788,44 +5525,87 @@
         };
         await savePersonality();
       }
-      // The library now has the imported character (saveCharacter
+      // The library now has the imported primary character (saveCharacter
       // creates a fresh entry when no currentCharacterId exists). Look
       // it up to stamp the new chat's roster.
       const importedCharacterId = await getMisc("currentCharacterId", null);
       const importedSpeakerName = (character.name || "").trim();
 
-      // 2. Create a fresh chat carrying the imported scenario + trackedInfo.
+      // 2. For multi-character group chats: also add each cast member to
+      // the library as a skeletal entry. Build a name→id lookup so we
+      // can resolve speakerName on each message to a characterId.
+      // (Cast entries carry only name from the .jsonl — description and
+      // appearance are empty until the user fills them in.)
+      const nameToCharId = {};
+      if (importedSpeakerName) nameToCharId[importedSpeakerName] = importedCharacterId;
+      const rosterIds = importedCharacterId ? [importedCharacterId] : [];
+      if (p.multiCharacter && Array.isArray(p.cast)) {
+        for (const c of p.cast) {
+          const n = (c && c.name || "").trim();
+          if (!n) continue;
+          // Skip if a library character with this exact name already
+          // exists — re-imports of the same group shouldn't duplicate.
+          let existing = null;
+          try {
+            const all = await listCharacters();
+            existing = all.find(x => x.name === n);
+          } catch (e) {}
+          if (existing) {
+            nameToCharId[n] = existing.id;
+            if (!rosterIds.includes(existing.id)) rosterIds.push(existing.id);
+            continue;
+          }
+          try {
+            const created = await addCharacterToLibrary({
+              name: n,
+              description: (c && c.description) || "",
+              appearance: (c && c.appearance) || "",
+              firstMessage: "",
+            });
+            nameToCharId[n] = created.id;
+            rosterIds.push(created.id);
+          } catch (e) {
+            console.warn("[import.chat] cast member failed:", n, e);
+          }
+        }
+      }
+
+      // 3. Create the chat carrying the full roster.
       const chatId = newId();
       const newChat = {
         id: chatId,
         scenario: p.scenario || scenarioDefault || "",
         trackedInfo: p.trackedInfo || "",
         title: p.title || (character.name ? `with ${character.name}` : "Imported scene"),
-        characterIds: importedCharacterId ? [importedCharacterId] : [],
-        nextReplyCharacterId: importedCharacterId || null,
+        characterIds: rosterIds,
+        nextReplyCharacterId: rosterIds[0] || null,
         createdAt: Date.now(),
         lastMessageAt: Date.now(),
       };
       await saveChat(newChat);
 
-      // 3. Seed messages. If the parser surfaced an openingMessage but no
-      // messages array, treat the opening as the first assistant message.
-      // Stamp assistant messages with the imported character's id + name
-      // so labels render correctly on reload (and survive library
-      // deletion via the denormalized speakerName).
+      // 4. Seed messages. For each message:
+      //    - User messages: role:"user", no character stamp.
+      //    - Assistant messages: stamp with the resolved characterId +
+      //      speakerName. For single-character imports, speakerName is
+      //      missing and we fall back to the primary character. For
+      //      multi-character imports, the parser provided speakerName
+      //      per message; we resolve it via nameToCharId.
       const seedMessages = [];
       if (p.openingMessage && (!p.messages || p.messages.length === 0)) {
-        seedMessages.push({ role: "assistant", content: p.openingMessage, createdAt: Date.now() });
+        seedMessages.push({
+          role: "assistant", content: p.openingMessage, createdAt: Date.now(),
+          speakerName: importedSpeakerName,
+        });
       }
       if (p.messages && p.messages.length) {
-        // Use the source's createdAt if present, otherwise stamp sequentially
-        // so messages keep their order on reload.
         const base = Date.now() - p.messages.length * 1000;
         p.messages.forEach((m, i) => {
           seedMessages.push({
             role: m.role === "user" ? "user" : "assistant",
             content: m.content || "",
             createdAt: m.createdAt || (base + i * 1000),
+            speakerName: m.speakerName || "",
           });
         });
       }
@@ -4833,23 +5613,32 @@
         const rec = {
           chatId, role: m.role, content: m.content, createdAt: m.createdAt,
         };
-        // Stamp only assistant messages — user messages are spoken by
-        // the user persona, not a library character.
-        if (m.role === "assistant" && importedCharacterId) {
-          rec.characterId = importedCharacterId;
-          if (importedSpeakerName) rec.speakerName = importedSpeakerName;
+        if (m.role === "assistant") {
+          // Resolve speakerName to a library characterId. For
+          // multi-character imports the parser provided speakerName per
+          // message; for single-character imports we use the primary.
+          const speakerName = (m.speakerName || importedSpeakerName || "").trim();
+          const resolvedId = nameToCharId[speakerName] || importedCharacterId;
+          if (resolvedId) rec.characterId = resolvedId;
+          if (speakerName) rec.speakerName = speakerName;
         }
         await db.messages.add(rec);
       }
       await db.chats.update(chatId, { lastMessageAt: Date.now() });
 
-      // 4. Activate the new chat and re-render.
+      // 5. Activate the new chat and re-render.
       closeModal("importModal");
       closeModal("settingsModal");
       await activateChat(chatId);
       resolveCharAvatar();
       if (p.personality && p.personality.name) resolveUserAvatar();
-      setStatus(`Imported ${seedMessages.length} message${seedMessages.length === 1 ? "" : "s"} into a new scene. Continue chatting or run 🎬 to illustrate a moment.`);
+      let statusMsg = `Imported ${seedMessages.length} message${seedMessages.length === 1 ? "" : "s"} into a new scene.`;
+      if (p.multiCharacter && p.cast && p.cast.length) {
+        statusMsg += ` Cast: ${rosterIds.length} characters. Their descriptions are empty — fill them in via Settings → CHARACTER if you want richer prompts.`;
+      } else {
+        statusMsg += " Continue chatting or run 🎬 to illustrate a moment.";
+      }
+      setStatus(statusMsg);
     } catch (e) {
       showError("import.fullChat", e);
     }
@@ -4993,18 +5782,6 @@
       setStatus(`Restored backup: ${(raw.chats || []).length} chats, ${(raw.messages || []).length} messages.`);
     } catch (e) {
       showError("restore", e);
-    }
-  }
-
-  // Triggers a download of the current app state as a Smart Story backup JSON.
-  // Used by both the direct (legacy) call and the export modal.
-  async function exportTableauBackup() {
-    try {
-      const data = await buildTableauBackup();
-      downloadJson(data, `smart-story-backup-${new Date().toISOString().slice(0, 10)}.json`);
-      setStatus(`Backup downloaded (${data.chats.length} chats, ${data.messages.length} messages).`);
-    } catch (e) {
-      showError("export", e);
     }
   }
 
@@ -5574,52 +6351,245 @@
   window.__startTutorial = startTutorial;
 
   // =====================================================================
-  // THEME
+  // THEME — LIVE COLOR PICKERS
   // =====================================================================
-  // Class-based theming: each named theme is a CSS class on <html>
-  // that overrides the design tokens. The "default" theme uses :root's
-  // baseline values (no class). User pick persists in settings.themeKey.
+  // Theme is now per-user, fully customizable. The user picks 6 base
+  // colors via native <input type="color"> swatches; all the variants
+  // (-hi, -dim, surface-2, surface-3, ink-dim, ink-faint, paper-ink,
+  // paper-dim, err-bg) are derived in JS by lightness shifts in HSL space.
+  //
+  // Persisted at settings.theme = { bg, surface, ink, accent, paper, err }.
+  // Legacy settings.themeKey from earlier versions is migrated on first
+  // load (see loadSettings).
+  //
+  // Writes are debounced — dragging the OS color picker fires `input`
+  // events continuously; we update the CSS instantly but only persist
+  // to IndexedDB once the user pauses for ~300ms.
 
-  const THEMES = [
-    { key: "default",  label: "Default"  },
-    { key: "twilight", label: "Twilight" },
-    { key: "ember",    label: "Ember"    },
-    { key: "forest",   label: "Forest"   },
-    { key: "slate",    label: "Slate"    },
+  // The six pickable colors and their labels.
+  const COLOR_PICKERS = [
+    { key: "bg",      label: "Background", desc: "Outermost color — the page behind everything." },
+    { key: "surface", label: "Surface",    desc: "Panels, modals, the app container." },
+    { key: "ink",     label: "Text",       desc: "Primary text color. Dim variants are derived." },
+    { key: "accent",  label: "Accent",     desc: "Highlights, links, focused buttons." },
+    { key: "paper",   label: "Bubble",     desc: "Character message bubble background." },
+    { key: "err",     label: "Error",      desc: "Error messages and danger actions." },
   ];
 
-  // Apply the theme to the document. Removes any prior theme-* class
-  // and adds the new one. "default" means: no class (use :root vars).
-  function applyTheme(key) {
-    const html = document.documentElement;
-    for (const t of THEMES) html.classList.remove("theme-" + t.key);
-    if (key && key !== "default") html.classList.add("theme-" + key);
+  // Quick-start presets — replace the old fixed theme classes. Picking
+  // a preset fills in the six base colors; user can then tweak any of
+  // them individually. The variants ARE auto-derived (no manual hi/dim
+  // values needed) — these presets only specify the bases.
+  const THEME_PRESETS = [
+    { key: "default",  label: "Default",  bg: "#1a1d24", surface: "#232831", ink: "#e8e6e0", accent: "#c0a878", paper: "#f0ece2", err: "#d4736b" },
+    { key: "twilight", label: "Twilight", bg: "#16121e", surface: "#211a2c", ink: "#ece6f2", accent: "#b48cf5", paper: "#f0ece2", err: "#d4736b" },
+    { key: "ember",    label: "Ember",    bg: "#1c1410", surface: "#2a1d17", ink: "#f0e6dc", accent: "#e07a3c", paper: "#f0ece2", err: "#d4736b" },
+    { key: "forest",   label: "Forest",   bg: "#161e18", surface: "#1f2a22", ink: "#e4ebdc", accent: "#8aab6e", paper: "#f0ece2", err: "#d4736b" },
+    { key: "slate",    label: "Slate",    bg: "#161a1f", surface: "#1f242b", ink: "#e4e8ed", accent: "#6ec3d4", paper: "#f0ece2", err: "#d4736b" },
+    { key: "light",    label: "Light",    bg: "#f5f2eb", surface: "#ffffff", ink: "#2a2a28", accent: "#7a4f1d", paper: "#fffdf6", err: "#a14437" },
+    { key: "parchment",label: "Parchment",bg: "#ebe4d2", surface: "#f6efd8", ink: "#3a2a18", accent: "#9a5e1f", paper: "#fffaee", err: "#a14437" },
+  ];
+
+  // The current theme — initialized from settings.theme or the default
+  // preset, then mutated as the user picks colors.
+  let currentTheme = null;
+
+  // --- Color math (HSL conversion + lightness shifts) ---
+
+  // #rrggbb → {h: 0-360, s: 0-100, l: 0-100}. We work in HSL because
+  // lightness shifts are the natural way to derive -hi/-dim variants.
+  function hexToHsl(hex) {
+    const m = String(hex || "").match(/^#?([0-9a-f]{6})$/i);
+    if (!m) return { h: 0, s: 0, l: 50 };
+    const r = parseInt(m[1].slice(0, 2), 16) / 255;
+    const g = parseInt(m[1].slice(2, 4), 16) / 255;
+    const b = parseInt(m[1].slice(4, 6), 16) / 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    const l = (max + min) / 2;
+    let h = 0, s = 0;
+    if (max !== min) {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch (max) {
+        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+        case g: h = (b - r) / d + 2; break;
+        case b: h = (r - g) / d + 4; break;
+      }
+      h /= 6;
+    }
+    return { h: h * 360, s: s * 100, l: l * 100 };
   }
 
-  // Populate the swatch row in Settings → SCENE. Builds one button per
-  // theme; clicking picks + persists + applies immediately.
-  function renderThemeSwatches() {
-    const host = $("themeSwatchRow");
+  function hslToHex(h, s, l) {
+    h = ((h % 360) + 360) % 360 / 360;
+    s = Math.max(0, Math.min(100, s)) / 100;
+    l = Math.max(0, Math.min(100, l)) / 100;
+    let r, g, b;
+    if (s === 0) {
+      r = g = b = l;
+    } else {
+      const hue2rgb = (p, q, t) => {
+        if (t < 0) t += 1;
+        if (t > 1) t -= 1;
+        if (t < 1 / 6) return p + (q - p) * 6 * t;
+        if (t < 1 / 2) return q;
+        if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+        return p;
+      };
+      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+      const p = 2 * l - q;
+      r = hue2rgb(p, q, h + 1 / 3);
+      g = hue2rgb(p, q, h);
+      b = hue2rgb(p, q, h - 1 / 3);
+    }
+    const toHex = c => ("0" + Math.round(c * 255).toString(16)).slice(-2);
+    return "#" + toHex(r) + toHex(g) + toHex(b);
+  }
+
+  // Shift a color's lightness by `dl` percentage points, clamped to [0,100].
+  function shiftL(hex, dl) {
+    const { h, s, l } = hexToHsl(hex);
+    return hslToHex(h, s, Math.max(0, Math.min(100, l + dl)));
+  }
+
+  // Build the full set of CSS variables from the six base colors. The
+  // dim/hi shifts depend on the BASE color's lightness — if the user
+  // picked a light surface (light theme), we shift toward darker for
+  // "more prominent" rather than lighter.
+  function deriveCssVars(theme) {
+    const isDarkSurface = hexToHsl(theme.surface).l < 50;
+    // Direction of "more prominent" depends on whether we're on a dark
+    // or light surface. On dark: lighter = more prominent. On light:
+    // darker = more prominent. The sign of the shift flips.
+    const sign = isDarkSurface ? 1 : -1;
+    return {
+      "--bg":          theme.bg,
+      "--surface":     theme.surface,
+      "--surface-2":   shiftL(theme.surface, sign * 4),
+      "--surface-3":   shiftL(theme.surface, sign * 9),
+      "--ink":         theme.ink,
+      "--ink-dim":     shiftL(theme.ink, -sign * 22),
+      "--ink-faint":   shiftL(theme.ink, -sign * 38),
+      "--accent":      theme.accent,
+      "--accent-hi":   shiftL(theme.accent, sign * 8),
+      "--accent-dim":  shiftL(theme.accent, -sign * 20),
+      "--paper":       theme.paper,
+      "--paper-ink":   shiftL(theme.paper, -82),  // always toward dark for legibility
+      "--paper-dim":   shiftL(theme.paper, -45),
+      "--err":         theme.err,
+      "--err-bg":      shiftL(theme.err, isDarkSurface ? -45 : 40),  // muted background
+    };
+  }
+
+  function applyThemeColors(theme) {
+    const vars = deriveCssVars(theme);
+    const root = document.documentElement;
+    for (const k in vars) root.style.setProperty(k, vars[k]);
+  }
+
+  // Migrate legacy settings.themeKey into settings.theme. Called from
+  // loadSettings; idempotent (does nothing if settings.theme already exists).
+  function migrateLegacyTheme(s) {
+    if (s && s.theme && typeof s.theme === "object" && s.theme.bg) return s.theme;
+    const key = (s && s.themeKey) || "default";
+    const preset = THEME_PRESETS.find(p => p.key === key) || THEME_PRESETS[0];
+    return { bg: preset.bg, surface: preset.surface, ink: preset.ink, accent: preset.accent, paper: preset.paper, err: preset.err };
+  }
+
+  // Debounced save. Multiple calls within `wait` ms collapse to a
+  // single setMisc write. The CSS updates are NOT debounced — they
+  // happen on every input event for live preview.
+  let themeSaveTimer = null;
+  function scheduleThemeSave() {
+    if (themeSaveTimer) clearTimeout(themeSaveTimer);
+    themeSaveTimer = setTimeout(async () => {
+      themeSaveTimer = null;
+      try {
+        settings.theme = currentTheme;
+        await saveSettings();
+      } catch (e) {
+        console.warn("[theme] save failed:", e);
+      }
+    }, 300);
+  }
+
+  // Render the theme presets row.
+  function renderThemePresets() {
+    const host = $("themePresetGrid");
     if (!host) return;
     host.innerHTML = "";
-    const current = (settings && settings.themeKey) || "default";
-    for (const t of THEMES) {
+    for (const p of THEME_PRESETS) {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "themeSwatch" + (t.key === current ? " active" : "");
-      btn.dataset.theme = t.key;
-      btn.title = t.label;
-      btn.setAttribute("aria-label", `${t.label} theme`);
-      btn.innerHTML = `<span class="swatchDot"></span><span class="swatchLabel">${escapeHTML(t.label)}</span>`;
-      btn.onclick = async () => {
-        settings.themeKey = t.key;
-        try { await saveSettings(); } catch (e) { showError("theme.save", e); }
-        applyTheme(t.key);
-        // Update active state on all swatches without re-rendering.
-        host.querySelectorAll(".themeSwatch").forEach(el => el.classList.toggle("active", el.dataset.theme === t.key));
+      btn.className = "themePreset";
+      btn.title = `Apply the "${p.label}" preset — you can still tweak individual colors after.`;
+      btn.style.setProperty("--p-accent", p.accent);
+      btn.style.setProperty("--p-surface", p.surface);
+      btn.innerHTML = `<span class="presetDot"></span><span class="presetLabel">${escapeHTML(p.label)}</span>`;
+      btn.onclick = () => {
+        currentTheme = { bg: p.bg, surface: p.surface, ink: p.ink, accent: p.accent, paper: p.paper, err: p.err };
+        applyThemeColors(currentTheme);
+        // Update each picker's input.value so the UI reflects the preset.
+        for (const c of COLOR_PICKERS) {
+          const input = $("theme_" + c.key);
+          if (input) input.value = currentTheme[c.key];
+          const hex = $("themeHex_" + c.key);
+          if (hex) hex.textContent = currentTheme[c.key].toUpperCase();
+        }
+        scheduleThemeSave();
       };
       host.appendChild(btn);
     }
+  }
+
+  // Render the six color pickers as a grid.
+  function renderThemeColorPickers() {
+    const host = $("themeColorPickerGrid");
+    if (!host) return;
+    host.innerHTML = "";
+    for (const c of COLOR_PICKERS) {
+      const row = document.createElement("div");
+      row.className = "colorPickerRow";
+      row.innerHTML = `
+        <input type="color" id="theme_${c.key}" class="colorSwatch" value="${currentTheme[c.key] || "#000000"}" title="${escapeHTML(c.desc)}">
+        <label for="theme_${c.key}">${escapeHTML(c.label)}</label>
+        <span class="hexLabel" id="themeHex_${c.key}">${(currentTheme[c.key] || "").toUpperCase()}</span>
+      `;
+      host.appendChild(row);
+      const input = row.querySelector(".colorSwatch");
+      // `input` fires on every drag step → apply CSS live, debounce save.
+      // `change` fires when the OS picker closes → final commit.
+      input.addEventListener("input", () => {
+        currentTheme[c.key] = input.value;
+        applyThemeColors(currentTheme);
+        $("themeHex_" + c.key).textContent = input.value.toUpperCase();
+        scheduleThemeSave();
+      });
+    }
+  }
+
+  // Public entry: load the persisted theme + render all pickers.
+  function initThemeUI() {
+    if (!currentTheme) currentTheme = migrateLegacyTheme(settings);
+    applyThemeColors(currentTheme);
+    renderThemePresets();
+    renderThemeColorPickers();
+  }
+
+  // Reset button: snap back to the Default preset.
+  if ($("themeReset")) {
+    $("themeReset").onclick = () => {
+      const def = THEME_PRESETS.find(p => p.key === "default");
+      currentTheme = { bg: def.bg, surface: def.surface, ink: def.ink, accent: def.accent, paper: def.paper, err: def.err };
+      applyThemeColors(currentTheme);
+      for (const c of COLOR_PICKERS) {
+        const input = $("theme_" + c.key);
+        if (input) input.value = currentTheme[c.key];
+        const hex = $("themeHex_" + c.key);
+        if (hex) hex.textContent = currentTheme[c.key].toUpperCase();
+      }
+      scheduleThemeSave();
+    };
   }
 
   // =====================================================================
@@ -5651,15 +6621,26 @@
 
   // Compute the user's stats by scanning the DB. Cheap — these are
   // count queries over a few thousand rows max in normal use.
+  //
+  // NOTE: we derive user/assistant counts from the single `toArray()`
+  // scan rather than `db.messages.where("role").equals("user").count()`.
+  // The messages table is indexed on `++id, chatId, createdAt` only —
+  // `role` is NOT a Dexie index, so `where("role")` throws "KeyPath role
+  // on object store messages is not indexed." Adding a v3 schema
+  // migration would work but isn't necessary: one scan is enough for
+  // every stat we need.
   async function computeStats() {
-    const [userMsgs, asstMsgs, chats, allMsgs, libCount] = await Promise.all([
-      db.messages.where("role").equals("user").count(),
-      db.messages.where("role").equals("assistant").count(),
+    const [chats, allMsgs, libCount] = await Promise.all([
       db.chats.toArray(),
-      db.messages.toArray(),  // for cutscene count + active-days span
+      db.messages.toArray(),
       db.characters.count(),
     ]);
-    const cutscenes = allMsgs.reduce((n, m) => n + (m.cutsceneUrl ? 1 : 0), 0);
+    let userMsgs = 0, asstMsgs = 0, cutscenes = 0;
+    for (const m of allMsgs) {
+      if (m.role === "user") userMsgs++;
+      else if (m.role === "assistant") asstMsgs++;
+      if (m.cutsceneUrl) cutscenes++;
+    }
     const multiCharScenes = chats.reduce(
       (n, c) => n + (Array.isArray(c.characterIds) && c.characterIds.length >= 2 ? 1 : 0),
       0,
@@ -5801,7 +6782,7 @@
   // BOOT
   // =====================================================================
   function assertRoot() {
-    const required = ["openScene", "chatReply", "narrate", "generateCutscene", "generateCharacterAvatar", "generateUserAvatar", "synthesizeCharacter", "synthesizePersona", "synthesizeScenario", "confirmAsync", "artStyleByKey", "listArtStyles", "updateTrackedInfo", "detectAndParseImport", "fetchImportFromUrl"];
+    const required = ["openScene", "chatReply", "narrate", "generateCutscene", "generateCharacterAvatar", "generateUserAvatar", "synthesizeCharacter", "synthesizePersona", "synthesizeScenario", "confirmAsync", "choiceAsync", "artStyleByKey", "listArtStyles", "updateTrackedInfo", "detectAndParseImport", "fetchImportFromUrl"];
     const missing = required.filter(fn => typeof root[fn] !== "function");
     if (missing.length) {
       throw new Error("Top-panel functions not loaded: " + missing.join(", "));
@@ -5819,10 +6800,9 @@
     await loadSettings();
     await loadAvatarCaches();
     // Apply persisted theme before anything renders so users don't see
-    // a brief flash of the default palette. (loadSettings already
-    // populated settings.themeKey.)
-    applyTheme(settings.themeKey || "default");
-    renderThemeSwatches();
+    // a brief flash of the default palette. Migrates legacy
+    // settings.themeKey into the new settings.theme shape if needed.
+    initThemeUI();
     // Load the persisted set of acknowledged achievements + compute the
     // initial badge count.
     try {

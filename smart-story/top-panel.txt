@@ -5,7 +5,7 @@ $meta
   async dynamic(inputs) =>
     return {
       title: "Smart Story — Illustrated AI Chat",
-      description: "Chat with a character of your own design, the story is illustrated as it unfolds. Import your history from Fur-Ai, SillyTavern, Ai-Character-Chat, and more!",
+      description: "Chat with a character of your own design. The story is illustrated as it unfolds — AI writes the scene, AI paints it.",
     };
 deps = {import:ai-character-chat-dependencies-v1}
 aiTextPlugin = {import:ai-text-plugin}
@@ -1084,6 +1084,49 @@ async confirmAsync(message) =>
     document.body.appendChild(overlay);
   });
 
+// 3-button choice prompt. Used by the Settings dirty-tab guard:
+// SAVE writes the user's edits, DISCARD throws them away, CANCEL
+// keeps the user on the current tab. Resolves to the picked option key
+// (a string) or "cancel" on background-click / Escape.
+//   options: { label, key, primary?, danger? }[]
+async choiceAsync(message, options) =>
+  return new Promise(resolve => {
+    let opts = Array.isArray(options) && options.length ? options : [
+      { key: "ok", label: "Okay", primary: true }
+    ];
+    let overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;z-index:99999999;display:grid;place-items:center;background:rgba(0,0,0,.65);font:16px system-ui;padding:16px;";
+    let card = document.createElement("div");
+    card.style.cssText = "max-width:480px;width:100%;padding:18px;background:#fff;color:#000;border:2px solid #000;border-radius:8px;";
+    let p = document.createElement("p");
+    p.style.cssText = "margin:0 0 18px;white-space:pre-wrap;line-height:1.5;";
+    p.textContent = message;
+    let actions = document.createElement("div");
+    actions.style.cssText = "display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;";
+    let done = v => { overlay.remove(); resolve(v); };
+    for (let opt of opts) {
+      let btn = document.createElement("button");
+      btn.textContent = opt.label;
+      let base = "padding:8px 14px;border-radius:4px;font:inherit;cursor:pointer;border:1px solid #888;";
+      if (opt.primary) base += "background:#3a4a5a;color:#fff;border-color:#3a4a5a;";
+      else if (opt.danger) base += "background:#a83a3a;color:#fff;border-color:#a83a3a;";
+      else base += "background:#fff;color:#000;";
+      btn.style.cssText = base;
+      btn.onclick = () => done(opt.key);
+      actions.appendChild(btn);
+    }
+    card.appendChild(p);
+    card.appendChild(actions);
+    overlay.appendChild(card);
+    // Background click → resolve as "cancel" (only when explicitly labeled).
+    overlay.addEventListener("click", e => { if(e.target === overlay) done("cancel"); });
+    // Escape key → also "cancel".
+    let escHandler = e => { if(e.key === "Escape") { done("cancel"); document.removeEventListener("keydown", escHandler); } };
+    document.addEventListener("keydown", escHandler);
+    document.body.appendChild(overlay);
+  });
+
+
 // =====================================================================
 // IMPORTERS — factory-style format detection and parsing
 // =====================================================================
@@ -1444,7 +1487,186 @@ parseTavernCard(obj) =>
 // Our own export format. Round-trips perfectly. The on-disk format string
 // is "tableau" (preserved from the app's original name) so backups from
 // older builds still detect — do not change the literal string.
-parseTableauBackup(obj) =>
+// --- Parser: TavernAI / SillyTavern group chat ---------------------
+// Input: an array of parsed JSONL records from a SillyTavern group chat
+// export (.jsonl file). The first record is the chat header; subsequent
+// records are messages.
+//
+// What we know about this format (verified against SillyTavern source):
+//   - First record has `chat_metadata` and identifies the chat
+//   - Group chats: first message has `is_group: true` flag
+//   - Each message has: name (speaker), is_user (boolean), is_system
+//     (boolean, optional), send_date (string OR number), mes (the text),
+//     plus optional force_avatar, original_avatar, extra, swipes
+//
+// Reality: the .jsonl does NOT carry character defs. It only references
+// characters by name. So we reconstruct SKELETAL character entries from
+// the unique non-user/non-system speakers. Users can flesh out the
+// characters' descriptions/appearances after import via Settings, or
+// import each character's PNG card separately via "ADD TO LIBRARY".
+//
+// Returns the standard import shape with two new fields:
+//   - cast: array of additional characters beyond the primary (empty for
+//           single-character chats; non-empty for groups)
+//   - multiCharacter: true when cast is non-empty (signals the UI to
+//           offer multi-character import flows)
+parseTavernGroupChat(records) =>
+  if(!Array.isArray(records) || records.length === 0) {
+    return { ok: false, error: "TavernAI group chat: no records" };
+  }
+
+  // First record should be a header with chat_metadata. We tolerate
+  // missing headers (older exports / hand-edited files) by treating
+  // everything as messages and skipping any record that lacks `mes`.
+  let header = null;
+  let messageRecords = [];
+  if(records[0] && typeof records[0] === "object" && (records[0].chat_metadata || records[0].user_name)) {
+    header = records[0];
+    messageRecords = records.slice(1);
+  } else {
+    messageRecords = records.slice();
+  }
+
+  // Determine the user's name. SillyTavern stores it in the header
+  // (`user_name`) and on each user message (`name` with `is_user: true`).
+  // Prefer the header value; fall back to scanning messages.
+  let userName = "";
+  if(header && header.user_name) userName = asString(header.user_name).trim();
+  if(!userName) {
+    for(let r of messageRecords) {
+      if(r && r.is_user && r.name) { userName = asString(r.name).trim(); break; }
+    }
+  }
+  if(!userName) userName = "User";
+
+  // Collect unique non-user, non-system speakers in order of first appearance.
+  // These become the cast (skeletal characters).
+  let speakerSet = new Map();   // name -> { firstAvatar, firstMessage }
+  for(let r of messageRecords) {
+    if(!r || typeof r !== "object") continue;
+    if(!r.mes) continue;
+    if(r.is_user) continue;
+    if(r.is_system) continue;
+    let n = asString(r.name).trim();
+    if(!n) continue;
+    if(n === userName) continue;
+    if(!speakerSet.has(n)) {
+      speakerSet.set(n, {
+        firstAvatar: asString(r.force_avatar || r.original_avatar || "").trim(),
+      });
+    }
+  }
+  let speakerNames = Array.from(speakerSet.keys());
+
+  // The "primary" character — used as the import's main subject when the
+  // UI offers single-character paths. We pick the FIRST roster member
+  // (most chats open with one character's greeting, then others join in).
+  let primary = speakerNames[0] || "Imported Character";
+  let cast = speakerNames.slice(1).map(n => ({
+    name: n,
+    description: "",      // not in the .jsonl
+    appearance: "",
+    avatar: speakerSet.get(n).firstAvatar,
+  }));
+
+  // Translate messages into the normalized shape. Each non-user/non-system
+  // message carries its speakerName (the character's display name); the
+  // import flow will resolve speakerName to a characterId after the
+  // characters are added to the library.
+  let outMessages = [];
+  let openingMessage = "";
+  let scenario = "";
+  // SillyTavern stores scenario in chat metadata on some exports. Best-effort.
+  if(header && header.chat_metadata && typeof header.chat_metadata === "object") {
+    // SillyTavern doesn't put scenario in chat_metadata by default — but
+    // some plugins do. Tolerate either shape.
+    let m = header.chat_metadata;
+    if(m.scenario) scenario = asString(m.scenario).trim();
+    else if(m.world_info && m.world_info.scenario) scenario = asString(m.world_info.scenario).trim();
+  }
+  for(let r of messageRecords) {
+    if(!r || typeof r !== "object") continue;
+    if(!r.mes) continue;
+    // is_system messages in SillyTavern are "system_message_types" — they
+    // include things like /sys commands, internal markers, etc. We
+    // generally drop them since they don't correspond to story content.
+    // Exception: explicit narrator-style scene direction would be useful
+    // but ST has no marker for it; we skip is_system entirely.
+    if(r.is_system) continue;
+    let text = asString(r.mes).trim();
+    if(!text) continue;
+    if(r.is_user) {
+      outMessages.push({ role: "user", content: text });
+    } else {
+      let speakerName = asString(r.name).trim();
+      outMessages.push({
+        role: "assistant",
+        content: text,
+        speakerName: speakerName || primary,
+      });
+    }
+  }
+
+  // If the very first message is from the primary character (a greeting
+  // and no user turn before it), pull it out as the openingMessage so
+  // the import flow can treat it as the scene-opening line rather than
+  // a regular message. Only do this when message[0] is from primary AND
+  // there are no user messages before it.
+  // (Single-line condition — the Perchance DSL parser is whitespace-sensitive
+  // and misreads continuation indentation as list nesting.)
+  if(outMessages.length > 0 && outMessages[0].role === "assistant" && outMessages[0].speakerName === primary) {
+    openingMessage = outMessages[0].content;
+    outMessages = outMessages.slice(1);
+  }
+
+  return {
+    ok: true,
+    format: "tavern-group-chat",
+    character: {
+      name: primary,
+      description: "",   // not present in .jsonl
+      appearance: "",
+    },
+    personality: {
+      name: userName === "User" ? "" : userName,  // don't default-set "User" as persona name
+      description: "",
+      appearance: "",
+    },
+    scenario,
+    openingMessage,
+    messages: outMessages,
+    trackedInfo: "",
+    title: cast.length
+      ? `Group chat with ${primary}${cast.length === 1 ? ` and ${cast[0].name}` : ` and ${cast.length} others`}`
+      : `with ${primary}`,
+    cast,
+    multiCharacter: cast.length > 0,
+    extras: {
+      messageCount: outMessages.length,
+      castCount: cast.length + 1,  // primary + cast
+      hadHeader: !!header,
+    },
+  };
+
+// Parse JSONL text — one JSON object per line. Returns the array of
+// parsed objects, skipping blank lines and lines that fail to parse
+// (graceful degradation matches SillyTavern's own loader).
+parseJsonlLines(text) =>
+  let out = [];
+  let lines = asString(text).split(/\r?\n/);
+  for(let line of lines) {
+    let t = line.trim();
+    if(!t) continue;
+    try {
+      let parsed = JSON.parse(t);
+      out.push(parsed);
+    } catch(e) {
+      // Skip malformed lines — match SillyTavern's tolerant behavior.
+    }
+  }
+  return out;
+
+
   if(!obj || obj.app !== "tableau") return { ok: false, error: "Smart Story: missing app marker" };
   // Smart Story backups carry the full state and are restored by the importer
   // differently — through a dedicated restore path. We still produce the
@@ -1474,6 +1696,7 @@ parseTableauBackup(obj) =>
 // Tries each parser in order of specificity; returns the first that succeeds.
 detectAndParseImport(input) =>
   let obj = null;
+  let jsonlRecords = null;  // set when we successfully parsed as JSONL
   if(typeof input === "string") {
     let trimmed = input.trim();
     if(!trimmed) return { ok: false, error: "Empty input." };
@@ -1482,7 +1705,26 @@ detectAndParseImport(input) =>
       try {
         obj = JSON.parse(trimmed);
       } catch(e) {
-        return { ok: false, error: "Looks like JSON but failed to parse: " + (e.message || e) };
+        // JSON.parse failed — but this might be JSONL (one JSON object
+        // per line), used by SillyTavern group chat exports. Detect by
+        // checking the first line parses cleanly on its own AND the
+        // input contains additional lines.
+        if(trimmed.indexOf("\n") > 0) {
+          let firstNl = trimmed.indexOf("\n");
+          let firstLine = trimmed.slice(0, firstNl).trim();
+          if(firstLine.startsWith("{") || firstLine.startsWith("[")) {
+            try {
+              JSON.parse(firstLine);   // probe — does line-1 parse?
+              jsonlRecords = parseJsonlLines(trimmed);
+            } catch(e2) {
+              return { ok: false, error: "Looks like JSON but failed to parse: " + (e.message || e) };
+            }
+          } else {
+            return { ok: false, error: "Looks like JSON but failed to parse: " + (e.message || e) };
+          }
+        } else {
+          return { ok: false, error: "Looks like JSON but failed to parse: " + (e.message || e) };
+        }
       }
     } else if(/^name\s*:/i.test(trimmed)) {
       // FurAI human-readable text.
@@ -1490,10 +1732,20 @@ detectAndParseImport(input) =>
     } else {
       return { ok: false, error: "Unrecognized format. Expected JSON, FurAI text starting with 'Name:', or a Perchance URL." };
     }
+  } else if(Array.isArray(input)) {
+    // Already-parsed array — could be JSONL records.
+    jsonlRecords = input;
   } else if(typeof input === "object" && input !== null) {
     obj = input;
   } else {
     return { ok: false, error: "Unsupported input type." };
+  }
+
+  // JSONL path: SillyTavern group/single chat exports. Dispatch to the
+  // group chat parser, which handles both single-character and
+  // multi-character chats (single-character produces an empty cast).
+  if(jsonlRecords) {
+    return parseTavernGroupChat(jsonlRecords);
   }
 
   // Dispatch by shape — most specific first.
