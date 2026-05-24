@@ -799,3 +799,477 @@ async confirmAsync(message) =>
     overlay.querySelector("[data-o]").onclick = () => done(true);
     document.body.appendChild(overlay);
   });
+
+// =====================================================================
+// IMPORTERS — factory-style format detection and parsing
+// =====================================================================
+// Detects and parses character/chat data from other Perchance AI apps so
+// users can continue their progress in Tableau without losing data.
+//
+// Supported formats:
+//   - FurAI single-chat export      { chat: {...}, profile: {...} }
+//   - FurAI character JSON          { ver: "1.0", type: "character", instruction, openingMessage, ... }
+//   - FurAI human-readable text     "Name: ...\nInstruction: ...\n--- VISUALS ---\n..."
+//   - ai-character-chat character   { botName, botDescription, scenario, chatLogs, userName, ... }
+//   - ai-character-chat URL hash    https://perchance.org/ai-character-chat#data=NAME~FILEID  (fetches & gunzips)
+//   - TavernAI v2 character card    { spec: "chara_card_v2", data: { name, description, ... } }
+//   - TavernAI v1 / generic         { name, description, first_mes, ... } at root
+//   - Tableau native backup         { app: "tableau", version: 1, chats, messages, character, ... }
+//
+// Every parser produces the same normalized output:
+//   {
+//     ok: true,
+//     format: "furai-chat" | "furai-character" | ... | "tableau-backup",
+//     character: { name, description, appearance, avatar? },
+//     personality: { name, description, appearance, avatar? },
+//     scenario: "",
+//     openingMessage: "",          // if format includes one; used to seed a new chat
+//     messages: [{ role, content, createdAt? }],   // optional
+//     trackedInfo: "",             // optional
+//     title: "",
+//     extras: { ... },             // raw stash of fields we didn't map
+//   }
+//   { ok: false, error: "..." }
+//
+// The detect() function is the single entry point: it takes a string (text)
+// or an object (already-parsed JSON) and routes to the right parser.
+
+// --- Tiny helpers ---------------------------------------------------
+asString(x) =>
+  if(x === null || x === undefined) return "";
+  if(typeof x === "string") return x;
+  return String(x);
+
+substitutePlaceholders(text, userName, charName) =>
+  if(!text) return "";
+  let s = asString(text);
+  // {{user}} / {{char}} are the de-facto TavernAI/AICC placeholders.
+  // We strip them so the imported text reads naturally in Tableau.
+  let userRepl = userName || "you";
+  let charRepl = charName || "the character";
+  s = s.replace(/\{\{user\}\}/gi, userRepl);
+  s = s.replace(/\{\{char\}\}/gi, charRepl);
+  return s;
+
+// --- Parser: ai-character-chat chatLogs textarea ---------------------
+// Format: a single string with alternating speakers separated by newlines.
+//   "{{char}}: opening line *with action*..."
+//   ""
+//   "{{user}}: reply text"
+//   ""
+//   "BotName: another line"
+// Speakers are detected by leading "BotName:" or "{{char}}:" or "{{user}}:"
+// We rebuild a typed message list.
+parseAiChatLogs(chatLogsText, botName, userName) =>
+  let raw = asString(chatLogsText).trim();
+  if(!raw) return [];
+  // Split on speaker boundaries. We anchor on lines starting with
+  // BotName:, UserName:, {{char}}:, or {{user}}: — only at the START of a
+  // line (not inside dialogue).
+  let bn = (botName || "").trim();
+  let un = (userName || "").trim();
+  // Build a regex that matches any of the known speaker prefixes.
+  let speakerAlternatives = ["\\{\\{char\\}\\}", "\\{\\{user\\}\\}"];
+  if(bn) speakerAlternatives.push(bn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  if(un) speakerAlternatives.push(un.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  let pattern = new RegExp(`(^|\\n\\n+|\\n)(${speakerAlternatives.join("|")}):\\s*`, "gi");
+
+  // Tokenize: walk through matches and slice the text between them.
+  let messages = [];
+  let lastIdx = 0;
+  let lastSpeaker = null;
+  let match;
+  while((match = pattern.exec(raw)) !== null) {
+    if(lastSpeaker !== null) {
+      let content = raw.slice(lastIdx, match.index).trim();
+      if(content) {
+        messages.push({ speaker: lastSpeaker, content });
+      }
+    }
+    lastSpeaker = match[2];
+    lastIdx = match.index + match[0].length;
+  }
+  if(lastSpeaker !== null) {
+    let content = raw.slice(lastIdx).trim();
+    if(content) {
+      messages.push({ speaker: lastSpeaker, content });
+    }
+  }
+  // If we found no speakers, treat the whole blob as a single assistant message.
+  if(messages.length === 0) {
+    messages.push({ speaker: bn || "{{char}}", content: raw });
+  }
+  // Resolve roles: anything matching the user is "user", everything else is "assistant".
+  let userPatterns = ["{{user}}", un].filter(Boolean).map(s => s.toLowerCase());
+  let out = messages.map(m => {
+    let role = userPatterns.includes(m.speaker.toLowerCase()) ? "user" : "assistant";
+    let content = substitutePlaceholders(m.content, un, bn);
+    return { role, content };
+  });
+  return out;
+
+// --- Parser: FurAI human-readable profile text ----------------------
+// Mirrors fur-ai's parseHumanReadableProfile but produces normalized output.
+parseFuraiHumanReadable(text) =>
+  let raw = asString(text);
+  let parts = raw.split(/--- VISUALS ---/i);
+  let mainBlock = parts[0];
+  // We only need name + instruction + openingMessage for the import; the
+  // visuals block is FurAI-specific (emotion sprites/avatars) and doesn't
+  // map onto Tableau's model.
+
+  let pick = (re) => {
+    let m = mainBlock.match(re);
+    return m ? m[1].trim() : "";
+  };
+  let name = pick(/^Name:\s*(.*)$/m);
+  if(!name) return { ok: false, error: "Plain text format: missing 'Name:' line" };
+  let avatar = pick(/^Avatar:\s*(.*)$/m);
+  // Opening message ends at the next labeled section.
+  let openingMessage = "";
+  let openingMatch = mainBlock.match(/Opening Message:\s*([\s\S]*?)(?=\nOpening Background:|\nCustom Background:|\nCustom Background Opacity:|\nCustom Background Blur:|\nOpening Lorebook:|\nDedicated Lorebook:|\nInstruction:|$)/i);
+  if(openingMatch) openingMessage = openingMatch[1].trim();
+  let instMatch = mainBlock.match(/Instruction:\s*([\s\S]*)$/);
+  let instruction = instMatch ? instMatch[1].trim() : "";
+
+  return {
+    ok: true,
+    format: "furai-text",
+    character: {
+      name,
+      description: instruction,
+      appearance: "",  // FurAI bundles appearance into the instruction
+      avatar,
+    },
+    personality: { name: "", description: "", appearance: "" },
+    scenario: "",
+    openingMessage,
+    messages: [],
+    trackedInfo: "",
+    title: name ? `with ${name}` : "Imported scene",
+    extras: { sourceText: raw },
+  };
+
+// --- Parser: ai-character-chat character data -----------------------
+// Either a plain character object {botName, botDescription, scenario, chatLogs}
+// or the same wrapped in addCharacter{}.
+parseAiCharacterChat(obj) =>
+  if(!obj || typeof obj !== "object") return { ok: false, error: "ai-character-chat: not an object" };
+  let src = obj.addCharacter || obj;
+  let botName = asString(src.botName).trim();
+  let botDesc = asString(src.botDescription).trim();
+  let userName = asString(src.userName).trim();
+  let userDesc = asString(src.userDescription).trim();
+  let scenario = asString(src.scenario).trim();
+  let chatLogs = asString(src.chatLogs);
+  let botAvatar = asString(src.botAvatarUrl).trim();
+  let userAvatar = asString(src.userAvatarUrl).trim();
+  if(!botName && !botDesc && !chatLogs) {
+    return { ok: false, error: "ai-character-chat: no recognizable fields" };
+  }
+
+  // Substitute placeholders in narrative fields once we know the names.
+  let desc = substitutePlaceholders(botDesc, userName, botName);
+  let scen = substitutePlaceholders(scenario, userName, botName);
+  let userD = substitutePlaceholders(userDesc, userName, botName);
+
+  let messages = parseAiChatLogs(chatLogs, botName, userName);
+  // If chatLogs had a single message and no clear user/char split, the
+  // first message becomes our "opening" and there's no actual back-and-forth.
+  let openingMessage = "";
+  if(messages.length === 1 && messages[0].role === "assistant") {
+    openingMessage = messages[0].content;
+    messages = [];
+  }
+
+  return {
+    ok: true,
+    format: "ai-character-chat",
+    character: {
+      name: botName || "Imported Character",
+      description: desc,
+      appearance: "",  // bundled in description
+      avatar: botAvatar,
+    },
+    personality: {
+      name: userName,
+      description: userD,
+      appearance: "",
+      avatar: userAvatar,
+    },
+    scenario: scen,
+    openingMessage,
+    messages,
+    trackedInfo: "",
+    title: botName ? `with ${botName}` : "Imported scene",
+    extras: {
+      backgroundImageUrl: asString(src.backgroundImageUrl),
+      backgroundAudioUrl: asString(src.backgroundAudioUrl),
+    },
+  };
+
+// --- Parser: FurAI character JSON -----------------------------------
+// FurAI's standalone character format. Carries character only, no messages.
+// Has `ver` and `instruction` keys at root.
+parseFuraiCharacter(obj) =>
+  if(!obj || typeof obj !== "object") return { ok: false, error: "FurAI character: not an object" };
+  let name = asString(obj.name).trim();
+  let instruction = asString(obj.instruction).trim();
+  let openingMessage = asString(obj.openingMessage).trim();
+  let avatar = asString(obj.avatar).trim();
+  if(!name && !instruction) return { ok: false, error: "FurAI character: missing name/instruction" };
+  return {
+    ok: true,
+    format: "furai-character",
+    character: {
+      name: name || "Imported Character",
+      description: instruction,
+      appearance: "",
+      avatar,
+    },
+    personality: { name: "", description: "", appearance: "", avatar: "" },
+    scenario: "",
+    openingMessage,
+    messages: [],
+    trackedInfo: "",
+    title: name ? `with ${name}` : "Imported scene",
+    extras: {
+      hashTag: asString(obj.hashTag),
+      defaultSprite: asString(obj.defaultSprite),
+      // We keep these so users can later round-trip back to FurAI.
+      customEmotions: obj.customEmotions || {},
+      emotionAvatars: obj.emotionAvatars || {},
+      emotionSprites: obj.emotionSprites || {},
+      viewMode: asString(obj.viewMode),
+    },
+  };
+
+// --- Parser: FurAI single-chat export -------------------------------
+// Shape:  { chat: {id, title, messages: [{uid, role, content, ...}], ...}, profile: {...} }
+// Role in messages is "user" or "ai".
+parseFuraiChatExport(obj) =>
+  if(!obj || !obj.chat) return { ok: false, error: "FurAI export: missing 'chat' field" };
+  let chat = obj.chat;
+  let profile = obj.profile || {};
+
+  // Character info lives across chat + profile. The chat has the title;
+  // the profile has the bots[] (each with name/description) and user{}.
+  let bots = (profile.bots && profile.bots.length) ? profile.bots : [];
+  let firstBot = bots[0] || {};
+  let user = profile.user || {};
+
+  let charName = asString(firstBot.name || chat.title || "").trim();
+  let charDesc = asString(firstBot.description || firstBot.instruction || "").trim();
+  let charAvatar = asString(firstBot.avatar || "").trim();
+  let userName = asString(user.name || "").trim();
+  let userDesc = asString(user.description || "").trim();
+  let userAvatar = asString(user.avatar || "").trim();
+
+  let rawMessages = Array.isArray(chat.messages) ? chat.messages : [];
+  let messages = rawMessages.map(m => {
+    // FurAI uses role: "user" | "ai". Tableau uses "user" | "assistant".
+    let role = m.role === "user" ? "user" : "assistant";
+    let content = substitutePlaceholders(asString(m.content || ""), userName, charName);
+    let out = { role, content };
+    if(m.createdAt) out.createdAt = m.createdAt;
+    return out;
+  }).filter(m => m.content);
+
+  return {
+    ok: true,
+    format: "furai-chat",
+    character: {
+      name: charName || "Imported Character",
+      description: substitutePlaceholders(charDesc, userName, charName),
+      appearance: "",
+      avatar: charAvatar,
+    },
+    personality: {
+      name: userName,
+      description: substitutePlaceholders(userDesc, userName, charName),
+      appearance: "",
+      avatar: userAvatar,
+    },
+    scenario: substitutePlaceholders(asString(chat.scenario || ""), userName, charName),
+    openingMessage: "",  // FurAI bakes the opening into the messages array
+    messages,
+    trackedInfo: "",
+    title: asString(chat.title || "").trim() || (charName ? `with ${charName}` : "Imported scene"),
+    extras: {
+      furaiViewMode: asString(chat.viewMode || ""),
+      furaiBackground: asString(chat.background || ""),
+      furaiReference: asString(chat.reference || ""),
+      furaiTimestamp: chat.timestamp,
+      sourceFormat: "FurAI single-chat export",
+    },
+  };
+
+// --- Parser: TavernAI v2 character card -----------------------------
+// Shape: { spec: "chara_card_v2", spec_version: "2.0", data: { name, description, personality, scenario, first_mes, mes_example, creator_notes, ... } }
+// Also handles v1 (the data fields at root, no spec wrapper).
+parseTavernCard(obj) =>
+  if(!obj || typeof obj !== "object") return { ok: false, error: "Tavern card: not an object" };
+  let isV2 = (obj.spec === "chara_card_v2" || obj.spec_version) && obj.data && typeof obj.data === "object";
+  let src = isV2 ? obj.data : obj;
+  let name = asString(src.name || "").trim();
+  let description = asString(src.description || "").trim();
+  let personality = asString(src.personality || "").trim();
+  let scenario = asString(src.scenario || "").trim();
+  let firstMes = asString(src.first_mes || src.firstMes || "").trim();
+  let avatar = asString(src.avatar || src.avatar_url || "").trim();
+  // Skip cards that look like our own export (round-trip safety).
+  if(obj.app === "tableau") return { ok: false, error: "Tavern card: this is a Tableau backup" };
+  if(!name && !description && !firstMes) {
+    return { ok: false, error: "Tavern card: no recognizable fields" };
+  }
+  // Compose voice/personality into one description (Tavern splits them).
+  let fullDesc = description;
+  if(personality) {
+    fullDesc = fullDesc ? (description + "\n\n# Personality\n" + personality) : personality;
+  }
+  return {
+    ok: true,
+    format: isV2 ? "tavern-v2" : "tavern-v1",
+    character: {
+      name: name || "Imported Character",
+      description: fullDesc,
+      appearance: "",
+      avatar,
+    },
+    personality: { name: "", description: "", appearance: "", avatar: "" },
+    scenario,
+    openingMessage: firstMes,
+    messages: [],
+    trackedInfo: "",
+    title: name ? `with ${name}` : "Imported scene",
+    extras: {
+      creator: asString(src.creator || ""),
+      creator_notes: asString(src.creator_notes || ""),
+      tags: src.tags || [],
+      mes_example: asString(src.mes_example || ""),
+      character_version: asString(src.character_version || ""),
+    },
+  };
+
+// --- Parser: Tableau native backup ---------------------------------
+// Our own export format. Round-trips perfectly.
+parseTableauBackup(obj) =>
+  if(!obj || obj.app !== "tableau") return { ok: false, error: "Tableau: missing app marker" };
+  // Tableau backups carry the full state and are restored by the importer
+  // differently — through a dedicated restore path. We still produce the
+  // normalized shape here so the UI can preview.
+  let char = obj.character || { name: "", description: "", appearance: "" };
+  let pers = obj.personality || { name: "", description: "", appearance: "" };
+  return {
+    ok: true,
+    format: "tableau-backup",
+    character: { name: asString(char.name), description: asString(char.description), appearance: asString(char.appearance) },
+    personality: { name: asString(pers.name), description: asString(pers.description), appearance: asString(pers.appearance) },
+    scenario: asString(obj.scenarioDefault || ""),
+    openingMessage: "",
+    messages: [],
+    trackedInfo: "",
+    title: "Tableau backup",
+    extras: {
+      isTableauBackup: true,
+      raw: obj,    // the full backup blob; the UI restore path will use this.
+      chatCount: (obj.chats || []).length,
+      messageCount: (obj.messages || []).length,
+    },
+  };
+
+// --- Factory dispatcher -------------------------------------------
+// Takes either a string (paste/file contents) or an already-parsed object.
+// Tries each parser in order of specificity; returns the first that succeeds.
+detectAndParseImport(input) =>
+  let obj = null;
+  if(typeof input === "string") {
+    let trimmed = input.trim();
+    if(!trimmed) return { ok: false, error: "Empty input." };
+    // Try JSON first.
+    if(trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        obj = JSON.parse(trimmed);
+      } catch(e) {
+        return { ok: false, error: "Looks like JSON but failed to parse: " + (e.message || e) };
+      }
+    } else if(/^name\s*:/i.test(trimmed)) {
+      // FurAI human-readable text.
+      return parseFuraiHumanReadable(trimmed);
+    } else {
+      return { ok: false, error: "Unrecognized format. Expected JSON, FurAI text starting with 'Name:', or a Perchance URL." };
+    }
+  } else if(typeof input === "object" && input !== null) {
+    obj = input;
+  } else {
+    return { ok: false, error: "Unsupported input type." };
+  }
+
+  // Dispatch by shape — most specific first.
+  if(obj.app === "tableau") return parseTableauBackup(obj);
+  if(obj.spec === "chara_card_v2" || obj.spec_version) return parseTavernCard(obj);
+  if(obj.chat && (obj.profile || obj.chat.messages !== undefined)) return parseFuraiChatExport(obj);
+  if(obj.ver && (obj.instruction || obj.openingMessage)) return parseFuraiCharacter(obj);
+  if(obj.botName !== undefined || obj.botDescription !== undefined || obj.chatLogs !== undefined) return parseAiCharacterChat(obj);
+  if(obj.addCharacter) return parseAiCharacterChat(obj);
+  // Generic Tavern-shaped JSON (just has the fields).
+  if(obj.name || obj.description || obj.first_mes) return parseTavernCard(obj);
+
+  return { ok: false, error: "Unrecognized format. Could not identify the import source." };
+
+// --- URL fetcher for share links -----------------------------------
+// Handles the two URL conventions used by AI chat apps:
+//   1. ai-character-chat: https://perchance.org/...#data=NAME~FILEID  (gzip-compressed JSON at user.uploads.dev/file/FILEID)
+//   2. FurAI: https://perchance.org/...?char_import=https://.../file.json
+//   3. Generic: any direct URL that resolves to JSON
+//
+// Returns { ok: true, text } or { ok: false, error }.
+async fetchImportFromUrl(url) =>
+  url = asString(url).trim();
+  if(!url) return { ok: false, error: "Empty URL." };
+
+  try {
+    // Case 1: ai-character-chat share link with #data=NAME~FILEID
+    let aiccMatch = url.match(/[#?&]data=([^~&]+)~([^&]+)/);
+    if(aiccMatch) {
+      let fileId = aiccMatch[2];
+      let fetchUrl = `https://user.uploads.dev/file/${fileId}`;
+      let res = await fetch(fetchUrl);
+      if(!res.ok) return { ok: false, error: `Fetch failed (${res.status}) for ${fetchUrl}` };
+      // Try gzip decompression first (their format), fall back to plain JSON.
+      try {
+        let blob = await res.blob();
+        let ds = new DecompressionStream("gzip");
+        let stream = blob.stream().pipeThrough(ds);
+        let text = await new Response(stream).text();
+        return { ok: true, text };
+      } catch(e) {
+        // Re-fetch and try as plain text (in case it wasn't actually gzipped).
+        let res2 = await fetch(fetchUrl);
+        let text = await res2.text();
+        return { ok: true, text };
+      }
+    }
+
+    // Case 2: FurAI char_import link
+    let furaiMatch = url.match(/[?&]char_import=(https?:\/\/[^&]+)/);
+    if(furaiMatch) {
+      let target = decodeURIComponent(furaiMatch[1]);
+      let res = await fetch(target);
+      if(!res.ok) return { ok: false, error: `Fetch failed (${res.status}) for ${target}` };
+      let text = await res.text();
+      return { ok: true, text };
+    }
+
+    // Case 3: Direct URL — fetch it and let the parser figure it out.
+    if(/^https?:\/\//i.test(url)) {
+      let res = await fetch(url);
+      if(!res.ok) return { ok: false, error: `Fetch failed (${res.status}) for ${url}` };
+      let text = await res.text();
+      return { ok: true, text };
+    }
+
+    return { ok: false, error: "URL doesn't match any known import pattern." };
+  } catch(e) {
+    return { ok: false, error: (e && e.message) || String(e) };
+  }

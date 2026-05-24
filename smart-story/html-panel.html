@@ -307,6 +307,19 @@
     color: var(--accent-hi); border-bottom-color: var(--accent);
     background: var(--surface-2);
   }
+  /* Import-modal tab buttons — flatter, simpler look than the settings tabs. */
+  .importTab {
+    flex: 1; padding: 8px 4px; cursor: pointer;
+    background: var(--surface); color: var(--ink-dim);
+    border: 1px solid var(--surface-3); border-radius: 6px;
+    font-family: inherit; font-weight: 500; font-size: 12px;
+    transition: all 150ms;
+  }
+  .importTab:hover { color: var(--ink); border-color: var(--accent-dim); }
+  .importTab[aria-selected="true"] {
+    color: var(--bg); background: var(--accent); border-color: var(--accent);
+  }
+  .importPane { /* lives inside the modal body */ }
   .settingsPanel { display: none; }
   .settingsPanel.active { display: block; }
   .modalBody {
@@ -694,8 +707,15 @@
 
       <div id="panelHist" class="settingsPanel" role="tabpanel" hidden>
         <div id="histList"></div>
-        <div class="panelActions" style="margin-top:14px;">
+        <div class="panelActions" style="margin-top:14px; flex-wrap:wrap; gap:6px;">
+          <button id="histImport" class="secondaryBtn" style="color: var(--accent-hi); border-color: var(--accent-dim);">📥 IMPORT</button>
+          <button id="histExport" class="secondaryBtn" style="color: var(--accent-hi); border-color: var(--accent-dim);">📤 EXPORT BACKUP</button>
+          <div class="spacer"></div>
           <button id="histReset" class="secondaryBtn" style="color: var(--err); border-color: var(--err);">CLEAR ALL HISTORY</button>
+        </div>
+        <div class="hint" style="margin-top: 10px;">
+          Import from FurAI, ai-character-chat, TavernAI character cards, or a Tableau backup file.
+          Export the whole app state (all chats + character + settings) as a backup file you can re-import later.
         </div>
       </div>
     </div>
@@ -726,6 +746,121 @@
         <div class="spacer"></div>
         <button id="trackedSave" class="saveBtn">SAVE</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Import modal — factory-style importer for FurAI / ai-character-chat / TavernAI / Tableau -->
+<div id="importModal" class="modal" role="dialog" aria-label="Import">
+  <div class="modalCard">
+    <div class="modalHeader">
+      <div class="modalTitle">📥 Import</div>
+      <button class="modalClose" data-close="importModal">CLOSE</button>
+    </div>
+    <div class="modalBody">
+      <div class="hint" style="margin-bottom: 12px;">
+        Paste, upload, or link to a character / chat from FurAI, ai-character-chat, TavernAI, or a Tableau backup.
+        The format is detected automatically.
+      </div>
+
+      <!-- Source selector -->
+      <div id="importTabs" style="display:flex; gap:4px; margin-bottom: 12px;">
+        <button class="importTab" data-source="paste" aria-selected="true">📋 Paste</button>
+        <button class="importTab" data-source="file" aria-selected="false">📁 File</button>
+        <button class="importTab" data-source="url" aria-selected="false">🔗 URL</button>
+      </div>
+
+      <!-- Paste mode -->
+      <div id="importPane_paste" class="importPane">
+        <div class="field">
+          <textarea id="importPasteText" rows="10" placeholder="Paste JSON character data, FurAI 'Name: ...' text, or any exported chat blob…" style="font-family: ui-monospace, monospace; font-size: 12px;"></textarea>
+        </div>
+      </div>
+
+      <!-- File mode -->
+      <div id="importPane_file" class="importPane" hidden>
+        <div class="field">
+          <label>Choose a backup or character file</label>
+          <input id="importFileInput" type="file" accept=".json,.txt,application/json,text/plain">
+          <div class="hint">Supported: <code>.json</code> backups, FurAI exports, TavernAI cards, plain text character files.</div>
+        </div>
+      </div>
+
+      <!-- URL mode -->
+      <div id="importPane_url" class="importPane" hidden>
+        <div class="field">
+          <label>Share link</label>
+          <input id="importUrlInput" type="url" placeholder="https://perchance.org/ai-character-chat?data=...~...">
+          <div class="hint">
+            Accepts: ai-character-chat share links (<code>?data=NAME~FILEID</code>),
+            FurAI character links (<code>?char_import=...</code>), or any direct URL to a JSON file.
+          </div>
+        </div>
+      </div>
+
+      <!-- Detection / preview -->
+      <div class="panelActions" style="margin-top: 4px; padding-top: 4px; border-top: 0;">
+        <button id="importDetectBtn" class="secondaryBtn">🔍 DETECT</button>
+        <div class="spacer"></div>
+      </div>
+      <div id="importPreview" hidden style="margin-top: 8px; padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--surface-3); border-radius: 6px;">
+        <div style="font-size: 11px; color: var(--ink-faint); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 6px;" id="importPreviewFormat">Format</div>
+        <div style="font-family: 'Lora', serif; font-size: 14px; color: var(--ink);" id="importPreviewTitle">—</div>
+        <div style="font-size: 12px; color: var(--ink-dim); margin-top: 4px;" id="importPreviewMeta">—</div>
+      </div>
+      <div id="importStatus" class="assistStatus"></div>
+
+      <!-- Destination actions -->
+      <div class="panelActions" id="importActions" style="display:none;">
+        <button id="importAsSettings" class="secondaryBtn">USE CHARACTER ONLY</button>
+        <div class="spacer"></div>
+        <button id="importAsNewChat" class="saveBtn">IMPORT & CONTINUE</button>
+      </div>
+      <div class="hint" id="importActionsHint" style="display:none; margin-top: 4px;">
+        <b>Import &amp; Continue</b>: full import into a new scene, including any message history.<br>
+        <b>Use Character Only</b>: load the character/persona/scenario into Settings as a template. Messages are discarded.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Export modal — multiple format choices for compatibility with other apps -->
+<div id="exportModal" class="modal" role="dialog" aria-label="Export">
+  <div class="modalCard">
+    <div class="modalHeader">
+      <div class="modalTitle">📤 Export</div>
+      <button class="modalClose" data-close="exportModal">CLOSE</button>
+    </div>
+    <div class="modalBody">
+      <div class="hint" style="margin-bottom: 14px;">
+        Choose a format. Tableau backups are best for moving between devices. TavernAI cards are character-only — they work in SillyTavern, RisuAI, Janitor, and most other AI chat apps. ai-character-chat exports keep chat history along with the character.
+      </div>
+
+      <div class="field">
+        <label>Format</label>
+        <select id="exportFormat">
+          <option value="tableau-backup">Tableau backup (full app — round-trips perfectly)</option>
+          <option value="tavern-v2">TavernAI v2 character card (character only)</option>
+          <option value="ai-character-chat">ai-character-chat (character + current chat history)</option>
+        </select>
+        <div class="hint" id="exportFormatHint">Includes every chat, character, persona, settings, and avatars in this app.</div>
+      </div>
+
+      <div class="field" id="exportScopeField" hidden>
+        <label>What to export</label>
+        <select id="exportScope">
+          <option value="current">Current scene only</option>
+          <option value="character">Character only (no messages)</option>
+        </select>
+        <div class="hint" id="exportScopeHint"></div>
+      </div>
+
+      <div class="panelActions">
+        <div class="spacer"></div>
+        <button id="exportCopyBtn" class="secondaryBtn">📋 COPY JSON</button>
+        <button id="exportDownloadBtn" class="saveBtn">💾 DOWNLOAD</button>
+      </div>
+      <div id="exportStatus" class="assistStatus"></div>
     </div>
   </div>
 </div>
@@ -847,7 +982,11 @@
   let state = "LOADING";
   let currentChat = null;
   let currentMessages = [];
-  let character = { name: "", description: "", appearance: "" };
+  // firstMessage: when set (typically by import), the next "NEW SCENE" uses
+  // this exact text as the character's opening line, then clears the field.
+  // Acts as a single-use template — the next scene afterward goes back to
+  // AI-generated openings. Mirrors TavernAI's `first_mes` semantics.
+  let character = { name: "", description: "", appearance: "", firstMessage: "" };
   let personality = { name: "", description: "", appearance: "" };
   let scenarioDefault = "";
   let memory = [];
@@ -882,8 +1021,13 @@
   async function loadCharacter() {
     const stored = await getMisc("character", null);
     character = (!stored || typeof stored !== "object")
-      ? { name: "", description: "", appearance: "" }
-      : { name: stored.name || "", description: stored.description || "", appearance: stored.appearance || "" };
+      ? { name: "", description: "", appearance: "", firstMessage: "" }
+      : {
+          name: stored.name || "",
+          description: stored.description || "",
+          appearance: stored.appearance || "",
+          firstMessage: stored.firstMessage || "",
+        };
   }
   async function saveCharacter() { await setMisc("character", character); }
   async function loadPersonality() {
@@ -1496,40 +1640,56 @@
       updateChatSubtitle();
 
       const bubble = renderBubble("assistant", "");
-      const inflight = await root.openScene(character, personality, chatScenario(), chatTrackedInfo(), (chunk) => {
-        if (myDraw !== drawId) return;
-        appendBubbleText(bubble, chunk, "char");
-      });
-      if (myDraw !== drawId) return;
 
+      // If the character has a stored first message (typically from an
+      // import), use it verbatim as the opening and skip the openScene AI
+      // call. The field is single-use — cleared so the next NEW SCENE
+      // generates a fresh opening normally.
       let finalText = "";
       let illustrateFlag = false;
-      if (inflight.error || !inflight.stream) {
-        showError("openScene", inflight.error || "stream did not start");
-        finalText = "*The character is quiet — the chat AI couldn't start the scene. Check the error banner and try again, or adjust your character settings.*";
+      let usedFirstMessage = false;
+      if (character.firstMessage && character.firstMessage.trim()) {
+        finalText = character.firstMessage.trim();
+        usedFirstMessage = true;
+        // Render immediately — no streaming for a static template.
+        finalizeBubble(bubble, finalText, "char");
+        // Consume it.
+        character.firstMessage = "";
+        await saveCharacter();
       } else {
-        currentStream = inflight.stream;
-        setStreamingUI(true);
-        try {
-          const data = await inflight.stream;
+        const inflight = await root.openScene(character, personality, chatScenario(), chatTrackedInfo(), (chunk) => {
           if (myDraw !== drawId) return;
-          if (data.stopReason === "error" || !data.generatedText || !data.generatedText.trim()) {
-            showError("openScene", "stopReason=" + (data.stopReason || "(none)") + " with empty text");
+          appendBubbleText(bubble, chunk, "char");
+        });
+        if (myDraw !== drawId) return;
+
+        if (inflight.error || !inflight.stream) {
+          showError("openScene", inflight.error || "stream did not start");
+          finalText = "*The character is quiet — the chat AI couldn't start the scene. Check the error banner and try again, or adjust your character settings.*";
+        } else {
+          currentStream = inflight.stream;
+          setStreamingUI(true);
+          try {
+            const data = await inflight.stream;
+            if (myDraw !== drawId) return;
+            if (data.stopReason === "error" || !data.generatedText || !data.generatedText.trim()) {
+              showError("openScene", "stopReason=" + (data.stopReason || "(none)") + " with empty text");
+              finalText = "*(the scene opened in silence)*";
+            } else {
+              const parsed = parseAndStripIllustrateTag(data.generatedText);
+              finalText = parsed.text;
+              illustrateFlag = parsed.illustrate;
+            }
+          } catch (e) {
+            if (myDraw !== drawId) return;
+            showError("openScene", e);
             finalText = "*(the scene opened in silence)*";
-          } else {
-            const parsed = parseAndStripIllustrateTag(data.generatedText);
-            finalText = parsed.text;
-            illustrateFlag = parsed.illustrate;
+          } finally {
+            if (currentStream === inflight.stream) { currentStream = null; setStreamingUI(false); }
           }
-        } catch (e) {
-          if (myDraw !== drawId) return;
-          showError("openScene", e);
-          finalText = "*(the scene opened in silence)*";
-        } finally {
-          if (currentStream === inflight.stream) { currentStream = null; setStreamingUI(false); }
         }
+        finalizeBubble(bubble, finalText, "char");
       }
-      finalizeBubble(bubble, finalText, "char");
 
       const savedMsg = await addMessage(chatId, "assistant", finalText);
       currentMessages.push({ id: savedMsg.id, role: "assistant", content: finalText });
@@ -2053,6 +2213,9 @@
         name: ($("charName").value || "").trim(),
         description: ($("charDesc").value || "").trim(),
         appearance: ($("charAppearance").value || "").trim(),
+        // Preserve any pending opening from import — the user editing
+        // the character shouldn't accidentally drop it.
+        firstMessage: character.firstMessage || "",
       };
       await saveCharacter();
       closeModal("settingsModal");
@@ -2303,10 +2466,600 @@
   };
 
   // =====================================================================
+  // IMPORT / EXPORT
+  // =====================================================================
+  // Factory-style importer for FurAI, ai-character-chat, TavernAI cards,
+  // and Tableau's own backup format. The detection logic lives on the top
+  // panel (detectAndParseImport, fetchImportFromUrl). This UI is just the
+  // user-facing wrapping.
+
+  // Holds the last successful parse so the destination buttons can act
+  // on it without re-parsing.
+  let pendingImport = null;
+
+  function openImportModal() {
+    pendingImport = null;
+    $("importPasteText").value = "";
+    $("importFileInput").value = "";
+    $("importUrlInput").value = "";
+    $("importPreview").hidden = true;
+    $("importActions").style.display = "none";
+    $("importActionsHint").style.display = "none";
+    $("importStatus").textContent = "";
+    $("importStatus").classList.remove("err");
+    setImportSource("paste");
+    openModal("importModal");
+  }
+  $("histImport").onclick = openImportModal;
+
+  function setImportSource(source) {
+    document.querySelectorAll(".importTab").forEach(t => {
+      t.setAttribute("aria-selected", t.dataset.source === source ? "true" : "false");
+    });
+    document.querySelectorAll(".importPane").forEach(p => {
+      p.hidden = (p.id !== "importPane_" + source);
+    });
+    // Reset preview/destination since the input changed.
+    pendingImport = null;
+    $("importPreview").hidden = true;
+    $("importActions").style.display = "none";
+    $("importActionsHint").style.display = "none";
+    $("importStatus").textContent = "";
+    $("importStatus").classList.remove("err");
+  }
+  document.querySelectorAll(".importTab").forEach(t => {
+    t.onclick = () => setImportSource(t.dataset.source);
+  });
+
+  // Gather the raw text from whichever source mode is active.
+  // Returns { ok, text } or { ok: false, error }.
+  async function gatherImportInput() {
+    const active = document.querySelector('.importTab[aria-selected="true"]');
+    const source = active ? active.dataset.source : "paste";
+    if (source === "paste") {
+      const text = $("importPasteText").value.trim();
+      if (!text) return { ok: false, error: "Paste box is empty." };
+      return { ok: true, text };
+    }
+    if (source === "file") {
+      const file = $("importFileInput").files[0];
+      if (!file) return { ok: false, error: "No file selected." };
+      const text = await file.text();
+      return { ok: true, text };
+    }
+    if (source === "url") {
+      const url = $("importUrlInput").value.trim();
+      if (!url) return { ok: false, error: "URL is empty." };
+      const result = await root.fetchImportFromUrl(url);
+      if (!result.ok) return { ok: false, error: result.error };
+      return { ok: true, text: result.text };
+    }
+    return { ok: false, error: "Unknown source." };
+  }
+
+  // Friendly label for the format key returned by the parser.
+  function formatLabel(key) {
+    const labels = {
+      "furai-chat":       "FurAI single-chat export",
+      "furai-character":  "FurAI character",
+      "furai-text":       "FurAI plain-text character",
+      "ai-character-chat":"ai-character-chat character",
+      "tavern-v2":        "TavernAI v2 character card",
+      "tavern-v1":        "TavernAI v1 / generic character card",
+      "tableau-backup":   "Tableau backup (full app state)",
+    };
+    return labels[key] || key;
+  }
+
+  $("importDetectBtn").onclick = async () => {
+    const status = $("importStatus");
+    status.classList.remove("err");
+    status.textContent = "Reading…";
+    $("importPreview").hidden = true;
+    $("importActions").style.display = "none";
+    $("importActionsHint").style.display = "none";
+    try {
+      const input = await gatherImportInput();
+      if (!input.ok) {
+        status.classList.add("err");
+        status.textContent = input.error;
+        return;
+      }
+      const parsed = root.detectAndParseImport(input.text);
+      if (!parsed.ok) {
+        status.classList.add("err");
+        status.textContent = parsed.error;
+        return;
+      }
+      pendingImport = parsed;
+      // Build the preview.
+      $("importPreviewFormat").textContent = "DETECTED: " + formatLabel(parsed.format);
+      $("importPreviewTitle").textContent = (parsed.character && parsed.character.name) || parsed.title || "Untitled";
+      const bits = [];
+      if (parsed.messages && parsed.messages.length) bits.push(`${parsed.messages.length} message${parsed.messages.length === 1 ? "" : "s"}`);
+      if (parsed.openingMessage) bits.push("has opening message");
+      if (parsed.scenario) bits.push("has scenario");
+      if (parsed.personality && parsed.personality.name) bits.push(`persona "${parsed.personality.name}"`);
+      if (parsed.format === "tableau-backup" && parsed.extras) {
+        bits.length = 0;
+        bits.push(`${parsed.extras.chatCount || 0} chats`);
+        bits.push(`${parsed.extras.messageCount || 0} messages total`);
+      }
+      $("importPreviewMeta").textContent = bits.length ? bits.join(" · ") : "(character data only)";
+      $("importPreview").hidden = false;
+      $("importActions").style.display = "flex";
+      $("importActionsHint").style.display = "block";
+      status.textContent = "";
+      // Tableau backups go through a different restore path — disable the
+      // settings-only button since they're whole-app restores.
+      const settingsBtn = $("importAsSettings");
+      const newChatBtn = $("importAsNewChat");
+      if (parsed.format === "tableau-backup") {
+        settingsBtn.disabled = true;
+        settingsBtn.title = "Tableau backups are full app restores; the settings-only mode doesn't apply.";
+        newChatBtn.textContent = "RESTORE BACKUP";
+      } else {
+        settingsBtn.disabled = false;
+        settingsBtn.title = "";
+        newChatBtn.textContent = "IMPORT & CONTINUE";
+      }
+    } catch (e) {
+      status.classList.add("err");
+      status.textContent = errMsg(e);
+      showError("import.detect", e);
+    }
+  };
+
+  // Settings-only import: load the parsed character/persona/scenario into
+  // Settings as drafts. No new chat, no messages.
+  $("importAsSettings").onclick = async () => {
+    if (!pendingImport) return;
+    try {
+      const p = pendingImport;
+      character = {
+        name: (p.character && p.character.name) || "",
+        description: (p.character && p.character.description) || "",
+        appearance: (p.character && p.character.appearance) || "",
+        // Carry the imported opening message so the next NEW SCENE uses it.
+        firstMessage: p.openingMessage || "",
+      };
+      await saveCharacter();
+      if (p.personality && (p.personality.name || p.personality.description)) {
+        personality = {
+          name: p.personality.name || "",
+          description: p.personality.description || "",
+          appearance: p.personality.appearance || "",
+        };
+        await savePersonality();
+      }
+      if (p.scenario) {
+        scenarioDefault = p.scenario;
+        await saveScenarioDefault();
+      }
+      closeModal("importModal");
+      closeModal("settingsModal");
+      const sceneHint = character.firstMessage
+        ? "Press 📖 NEW SCENE — it will start with the imported opening message."
+        : "Press 📖 NEW SCENE to begin.";
+      setStatus(`Imported character "${character.name}". ${sceneHint}`);
+      // Trigger a fresh avatar for the new character.
+      resolveCharAvatar();
+      if (p.personality && p.personality.name) resolveUserAvatar();
+      // Re-render the open chat's labels in case there was one going.
+      if (currentChat) {
+        const newCharLabel = (character.name || "CHARACTER").toUpperCase();
+        document.querySelectorAll(".msg.char:not(.error) .msgWho").forEach(el => { el.textContent = newCharLabel; });
+        updateChatSubtitle();
+      }
+    } catch (e) {
+      showError("import.settings", e);
+    }
+  };
+
+  // Full import: creates a new chat with the imported messages, then
+  // sets the imported character as the current one. Carries every field
+  // the parser surfaced.
+  $("importAsNewChat").onclick = async () => {
+    if (!pendingImport) return;
+    const p = pendingImport;
+    try {
+      // Special path for Tableau backups: restore the whole DB.
+      if (p.format === "tableau-backup") {
+        await restoreTableauBackup(p.extras.raw);
+        return;
+      }
+      // 1. Set the character + persona + scenario as global.
+      character = {
+        name: (p.character && p.character.name) || "",
+        description: (p.character && p.character.description) || "",
+        appearance: (p.character && p.character.appearance) || "",
+      };
+      await saveCharacter();
+      if (p.personality && (p.personality.name || p.personality.description)) {
+        personality = {
+          name: p.personality.name || "",
+          description: p.personality.description || "",
+          appearance: p.personality.appearance || "",
+        };
+        await savePersonality();
+      }
+      // 2. Create a fresh chat carrying the imported scenario + trackedInfo.
+      const chatId = newId();
+      const newChat = {
+        id: chatId,
+        scenario: p.scenario || scenarioDefault || "",
+        trackedInfo: p.trackedInfo || "",
+        title: p.title || (character.name ? `with ${character.name}` : "Imported scene"),
+        createdAt: Date.now(),
+        lastMessageAt: Date.now(),
+      };
+      await saveChat(newChat);
+
+      // 3. Seed messages. If the parser surfaced an openingMessage but no
+      // messages array, treat the opening as the first assistant message.
+      const seedMessages = [];
+      if (p.openingMessage && (!p.messages || p.messages.length === 0)) {
+        seedMessages.push({ role: "assistant", content: p.openingMessage, createdAt: Date.now() });
+      }
+      if (p.messages && p.messages.length) {
+        // Use the source's createdAt if present, otherwise stamp sequentially
+        // so messages keep their order on reload.
+        const base = Date.now() - p.messages.length * 1000;
+        p.messages.forEach((m, i) => {
+          seedMessages.push({
+            role: m.role === "user" ? "user" : "assistant",
+            content: m.content || "",
+            createdAt: m.createdAt || (base + i * 1000),
+          });
+        });
+      }
+      for (const m of seedMessages) {
+        await db.messages.add({
+          chatId, role: m.role, content: m.content, createdAt: m.createdAt,
+        });
+      }
+      await db.chats.update(chatId, { lastMessageAt: Date.now() });
+
+      // 4. Activate the new chat and re-render.
+      closeModal("importModal");
+      closeModal("settingsModal");
+      await activateChat(chatId);
+      resolveCharAvatar();
+      if (p.personality && p.personality.name) resolveUserAvatar();
+      setStatus(`Imported ${seedMessages.length} message${seedMessages.length === 1 ? "" : "s"} into a new scene. Continue chatting or run 🎬 to illustrate a moment.`);
+    } catch (e) {
+      showError("import.fullChat", e);
+    }
+  };
+
+  // ---------------------------------------------------------------
+  // Tableau backup: export + restore
+  // ---------------------------------------------------------------
+
+  // Gathers everything in the DB into a single JSON object. This is the
+  // canonical "round-trip" format — what you export here can be re-imported
+  // into a fresh Tableau instance with zero loss.
+  async function buildTableauBackup() {
+    const chats = await db.chats.toArray();
+    const messages = await db.messages.toArray();
+    return {
+      app: "tableau",
+      version: 1,
+      exportedAt: Date.now(),
+      // Misc keys we surface explicitly so the format is self-documenting.
+      character,
+      personality,
+      scenarioDefault,
+      memory,
+      settings,
+      charAvatars,
+      userAvatars,
+      // Chats and messages tables, verbatim.
+      chats,
+      messages,
+    };
+  }
+
+  // Wipes the local DB and replaces it with the backup's contents.
+  // Confirmation gate is up to the caller.
+  async function restoreTableauBackup(raw) {
+    if (!raw || raw.app !== "tableau") {
+      showError("restore", "Not a Tableau backup.");
+      return;
+    }
+    const ok = await root.confirmAsync(
+      `Restore this Tableau backup?\n\n` +
+      `This will REPLACE ALL existing chats and character data with the backup's contents.\n\n` +
+      `Backup has ${(raw.chats || []).length} chats and ${(raw.messages || []).length} messages.\n\n` +
+      `This cannot be undone. Continue?`
+    );
+    if (!ok) return;
+    try {
+      cancelStream();
+      await db.chats.clear();
+      await db.messages.clear();
+      // Misc keys.
+      if (raw.character) {
+        // Backwards compat: older backups don't have firstMessage. Default it.
+        character = {
+          name: raw.character.name || "",
+          description: raw.character.description || "",
+          appearance: raw.character.appearance || "",
+          firstMessage: raw.character.firstMessage || "",
+        };
+        await saveCharacter();
+      }
+      if (raw.personality) { personality = raw.personality; await savePersonality(); }
+      if (typeof raw.scenarioDefault === "string") { scenarioDefault = raw.scenarioDefault; await saveScenarioDefault(); }
+      if (Array.isArray(raw.memory)) { memory = raw.memory; await saveMemory(); }
+      if (raw.settings) {
+        settings = {
+          autoIllustrate: raw.settings.autoIllustrate !== false,
+          suppressionWindow: Math.max(1, Math.min(5, parseInt(raw.settings.suppressionWindow) || 2)),
+          artStyleKey: raw.settings.artStyleKey || "default",
+          customStylePrefix: raw.settings.customStylePrefix || "",
+          customStyleNegative: raw.settings.customStyleNegative || "",
+        };
+        await saveSettings();
+      }
+      if (raw.charAvatars && typeof raw.charAvatars === "object") { charAvatars = raw.charAvatars; await setMisc("charAvatars", charAvatars); }
+      if (raw.userAvatars && typeof raw.userAvatars === "object") { userAvatars = raw.userAvatars; await setMisc("userAvatars", userAvatars); }
+      // Chats and messages.
+      if (Array.isArray(raw.chats)) {
+        for (const c of raw.chats) await db.chats.add(c);
+      }
+      if (Array.isArray(raw.messages)) {
+        // We drop the original IDs and let Dexie auto-increment, but we
+        // also rewrite messages with their original IDs preserved so chat
+        // references stay valid. Use bulkAdd so id is honored.
+        await db.messages.bulkAdd(raw.messages);
+      }
+      // Activate the most recent chat.
+      const list = await db.chats.orderBy("lastMessageAt").reverse().toArray();
+      if (list.length) {
+        await activateChat(list[0].id);
+      } else {
+        currentChat = null;
+        currentMessages = [];
+        clearChatPanel();
+        renderEmptyState(true);
+      }
+      // Re-resolve avatars.
+      currentCharAvatarUrl = ""; currentUserAvatarUrl = "";
+      resolveCharAvatar();
+      resolveUserAvatar();
+      closeModal("importModal");
+      closeModal("settingsModal");
+      setStatus(`Restored backup: ${(raw.chats || []).length} chats, ${(raw.messages || []).length} messages.`);
+    } catch (e) {
+      showError("restore", e);
+    }
+  }
+
+  // Triggers a download of the current app state as a Tableau backup JSON.
+  // Used by both the direct (legacy) call and the export modal.
+  async function exportTableauBackup() {
+    try {
+      const data = await buildTableauBackup();
+      downloadJson(data, `tableau-backup-${new Date().toISOString().slice(0, 10)}.json`);
+      setStatus(`Backup downloaded (${data.chats.length} chats, ${data.messages.length} messages).`);
+    } catch (e) {
+      showError("export", e);
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Export to standard formats (compatibility with other AI chat apps)
+  // ---------------------------------------------------------------
+
+  // Build a TavernAI v2 character card from current state. The card holds
+  // character data only — no message history (Tavern cards are templates,
+  // not chat snapshots).
+  function buildTavernV2Card() {
+    // Tavern splits voice/personality from physical description, but we
+    // keep our description holistic. We put everything into `description`
+    // and leave `personality` short. The two halves go in separate places
+    // so apps that read either still get useful info.
+    const desc = (character.description || "").trim();
+    const app = (character.appearance || "").trim();
+    const combinedDesc = app
+      ? (desc ? `${desc}\n\n# Appearance\n${app}` : `# Appearance\n${app}`)
+      : desc;
+    return {
+      spec: "chara_card_v2",
+      spec_version: "2.0",
+      data: {
+        name: character.name || "Untitled Character",
+        description: combinedDesc,
+        personality: "",  // bundled into description; leaving empty is valid per spec
+        scenario: scenarioDefault || (currentChat && currentChat.scenario) || "",
+        first_mes: character.firstMessage || "",
+        mes_example: "",
+        creator_notes: "Exported from Tableau",
+        system_prompt: "",
+        post_history_instructions: "",
+        alternate_greetings: [],
+        character_book: undefined,  // we don't have a lorebook concept
+        tags: [],
+        creator: "",
+        character_version: "1.0",
+        extensions: {
+          tableau: {
+            appearance: app,                     // surface our split for round-trip
+            personality: { name: personality.name || "", description: personality.description || "" },
+          },
+        },
+      },
+    };
+  }
+
+  // Serialize Tableau's messages to ai-character-chat's chatLogs string.
+  // Format: "BotName: ...\n\nUserName: ...\n\nBotName: ..."
+  // Empty bot/user names fall back to "{{char}}" / "{{user}}".
+  function buildAccChatLogs(messages, botName, userName) {
+    const bot = (botName || "{{char}}").trim() || "{{char}}";
+    const user = (userName || "{{user}}").trim() || "{{user}}";
+    return messages.map(m => {
+      const speaker = m.role === "user" ? user : bot;
+      return `${speaker}: ${m.content}`;
+    }).join("\n\n");
+  }
+
+  // Build an ai-character-chat character export from current state. Carries
+  // character + persona + scenario + current chat history (or empty if
+  // character-only scope).
+  async function buildAccCharacter(scope) {
+    const includeMessages = scope === "current" && currentChat && currentMessages.length;
+    return {
+      botName: character.name || "",
+      botDescription: character.description || "",
+      botAvatarUrl: currentCharAvatarUrl || "",
+      userName: personality.name || "",
+      userDescription: personality.description || "",
+      userAvatarUrl: currentUserAvatarUrl || "",
+      scenario: (currentChat && currentChat.scenario) || scenarioDefault || "",
+      chatLogs: includeMessages ? buildAccChatLogs(currentMessages, character.name, personality.name) : "",
+      // Tableau-specific extras so round-trips don't lose data:
+      _tableau: {
+        appearance: character.appearance || "",
+        personaAppearance: personality.appearance || "",
+        firstMessage: character.firstMessage || "",
+        trackedInfo: (currentChat && currentChat.trackedInfo) || "",
+        artStyleKey: settings.artStyleKey,
+      },
+    };
+  }
+
+  // Generic JSON download helper.
+  function downloadJson(data, filename) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  // Assemble the export payload for the currently-selected format + scope.
+  // Returns { data, filename, summary } or { error }.
+  async function buildExportPayload() {
+    const fmt = $("exportFormat").value;
+    const scope = $("exportScope").value;
+    const safeName = (character.name || "tableau").replace(/[^a-z0-9]+/gi, "-").toLowerCase().slice(0, 40) || "tableau";
+    const stamp = new Date().toISOString().slice(0, 10);
+    try {
+      if (fmt === "tableau-backup") {
+        const data = await buildTableauBackup();
+        return {
+          data,
+          filename: `tableau-backup-${stamp}.json`,
+          summary: `Tableau backup: ${data.chats.length} chats, ${data.messages.length} messages.`,
+        };
+      }
+      if (fmt === "tavern-v2") {
+        const data = buildTavernV2Card();
+        return {
+          data,
+          filename: `${safeName}-card-v2.json`,
+          summary: `TavernAI v2 character card for "${data.data.name}".`,
+        };
+      }
+      if (fmt === "ai-character-chat") {
+        if (scope === "current" && !currentChat) {
+          return { error: "No active scene — pick 'Character only' or start a scene first." };
+        }
+        const data = await buildAccCharacter(scope);
+        const msgCount = scope === "current" ? currentMessages.length : 0;
+        return {
+          data,
+          filename: `${safeName}-acc.json`,
+          summary: msgCount
+            ? `ai-character-chat export: "${data.botName}", ${msgCount} message${msgCount === 1 ? "" : "s"}.`
+            : `ai-character-chat character: "${data.botName}".`,
+        };
+      }
+      return { error: "Unknown format." };
+    } catch (e) {
+      return { error: errMsg(e) };
+    }
+  }
+
+  // Update scope field visibility + hint text based on chosen format.
+  function refreshExportUi() {
+    const fmt = $("exportFormat").value;
+    const scopeField = $("exportScopeField");
+    const fmtHint = $("exportFormatHint");
+    if (fmt === "tableau-backup") {
+      scopeField.hidden = true;
+      fmtHint.textContent = "Includes every chat, character, persona, settings, and avatars in this app. Best for moving between devices or browsers.";
+    } else if (fmt === "tavern-v2") {
+      scopeField.hidden = true;
+      fmtHint.textContent = "Standard character card supported by SillyTavern, RisuAI, JanitorAI, and most other AI chat apps. Character only — no message history.";
+    } else if (fmt === "ai-character-chat") {
+      scopeField.hidden = false;
+      fmtHint.textContent = "Compatible with perchance.org/ai-character-chat. Can include the current scene's messages.";
+      const hint = $("exportScopeHint");
+      if ($("exportScope").value === "current") {
+        hint.textContent = currentChat
+          ? `Will include ${currentMessages.length} message${currentMessages.length === 1 ? "" : "s"} from "${currentChat.title || "the current scene"}".`
+          : "No active scene — switch to 'Character only' or start a scene first.";
+      } else {
+        hint.textContent = "Character data only. No chat history.";
+      }
+    }
+  }
+  $("exportFormat").addEventListener("change", refreshExportUi);
+  $("exportScope").addEventListener("change", refreshExportUi);
+
+  function openExportModal() {
+    // Default scope choice depends on whether a chat is loaded.
+    $("exportScope").value = currentChat ? "current" : "character";
+    $("exportFormat").value = "tableau-backup";
+    $("exportStatus").textContent = "";
+    $("exportStatus").classList.remove("err");
+    refreshExportUi();
+    openModal("exportModal");
+  }
+  $("histExport").onclick = openExportModal;
+
+  $("exportDownloadBtn").onclick = async () => {
+    const status = $("exportStatus");
+    status.classList.remove("err");
+    status.textContent = "Building…";
+    const result = await buildExportPayload();
+    if (result.error) {
+      status.classList.add("err");
+      status.textContent = result.error;
+      return;
+    }
+    downloadJson(result.data, result.filename);
+    status.textContent = "Downloaded. " + result.summary;
+  };
+
+  $("exportCopyBtn").onclick = async () => {
+    const status = $("exportStatus");
+    status.classList.remove("err");
+    status.textContent = "Building…";
+    const result = await buildExportPayload();
+    if (result.error) {
+      status.classList.add("err");
+      status.textContent = result.error;
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(result.data, null, 2));
+      status.textContent = "Copied to clipboard. " + result.summary;
+    } catch (e) {
+      status.classList.add("err");
+      status.textContent = "Could not access clipboard: " + errMsg(e);
+    }
+  };
+
+  // =====================================================================
   // BOOT
   // =====================================================================
   function assertRoot() {
-    const required = ["openScene", "chatReply", "generateCutscene", "generateCharacterAvatar", "generateUserAvatar", "synthesizeCharacter", "synthesizePersona", "synthesizeScenario", "confirmAsync", "artStyleByKey", "listArtStyles", "updateTrackedInfo"];
+    const required = ["openScene", "chatReply", "generateCutscene", "generateCharacterAvatar", "generateUserAvatar", "synthesizeCharacter", "synthesizePersona", "synthesizeScenario", "confirmAsync", "artStyleByKey", "listArtStyles", "updateTrackedInfo", "detectAndParseImport", "fetchImportFromUrl"];
     const missing = required.filter(fn => typeof root[fn] !== "function");
     if (missing.length) {
       throw new Error("Top-panel functions not loaded: " + missing.join(", "));
