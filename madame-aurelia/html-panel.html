@@ -367,8 +367,21 @@
   /* ---- TOOLBAR ---- */
   #toolbar {
     margin: 0 32px 6px;
-    display: grid; grid-template-columns: 1fr auto auto auto auto; gap: 6px;
+    display: grid; grid-template-columns: 1fr auto; gap: 6px;
   }
+  /* Stop button mirrors send button geometry. Visible only while a stream
+     is in flight; otherwise hidden. */
+  #stopBtn {
+    font-family: 'Merienda', serif; font-weight: 700; font-size: 16px;
+    padding: 8px 12px; cursor: pointer;
+    background: linear-gradient(180deg, #3a0a0a 0%, #1a0a05 100%);
+    border: 2px solid var(--err);
+    color: var(--err);
+    box-shadow: inset 0 0 0 1px rgba(255,107,107,0.4),
+                inset 0 -2px 0 rgba(255,107,107,0.18);
+    transition: filter 200ms;
+  }
+  #stopBtn:hover { filter: brightness(1.2); }
   .tbtn {
     font-family: 'Merienda', serif; font-weight: 700; font-size: 12px;
     letter-spacing: 2px; color: var(--gold-hi);
@@ -427,10 +440,162 @@
     display: flex; gap: 6px; justify-content: flex-end;
   }
 
+  /* ---- Settings modal: tabs + panels ---- */
+  .settingsTabs {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 0;
+    border-bottom: 1px solid var(--burgundy-deep);
+    background: linear-gradient(180deg, #1a0d0a 0%, #14080a 100%);
+  }
+  .settingsTab {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    padding: 10px 4px;
+    background: transparent; color: var(--gold-dim);
+    border: 0;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    font-family: 'Merienda', serif; font-weight: 600; font-size: 10px;
+    letter-spacing: 2px;
+    transition: color 150ms, border-color 150ms, background 150ms;
+  }
+  .settingsTab .ico { font-size: 18px; line-height: 1; }
+  .settingsTab .lbl { font-size: 10px; }
+  .settingsTab:hover:not([aria-selected="true"]) {
+    color: var(--gold); background: rgba(214,165,72,0.05);
+  }
+  .settingsTab[aria-selected="true"] {
+    color: var(--gold-hi);
+    border-bottom-color: var(--ember);
+    background: rgba(255,138,60,0.06);
+  }
+  .settingsPanel { display: none; }
+  .settingsPanel.active { display: block; }
+  /* Panel-level action row, replaces sheetFooter for the tabbed layout */
+  .panelActions {
+    display: flex; align-items: center; gap: 6px;
+    margin-top: 16px; padding-top: 12px;
+    border-top: 1px dashed var(--gold-dim);
+  }
+  .panelActions .spacer { flex: 1; }
+
+  /* Token-budget warning lifted from ai-chat */
+  .lengthNotice {
+    margin-top: 6px; padding: 4px 8px;
+    font-family: 'Merienda', serif; font-size: 11px; letter-spacing: 1px;
+    color: #cb6900; background: rgba(255,138,60,0.08);
+    border: 1px solid rgba(255,138,60,0.35);
+  }
+
+  /* ---- AVATARS ---- */
+  /* Each chat bubble row uses a 2-column grid: avatar on outer side,
+     bubble + label + actions on inner. The bubble can grow; the avatar
+     stays a fixed circle. On narrow screens (<500px) avatars hide. */
+  .msg.user, .msg.madame {
+    display: grid;
+    grid-template-columns: 1fr 36px;
+    column-gap: 8px;
+    align-items: flex-start;
+    max-width: 92%;
+  }
+  .msg.user   { grid-template-columns: 1fr 36px; }
+  .msg.madame { grid-template-columns: 36px 1fr; }
+  .msg.user .msgWho     { grid-column: 1; grid-row: 1; }
+  .msg.user .bubble     { grid-column: 1; grid-row: 2; }
+  .msg.user .msgActions { grid-column: 1; grid-row: 3; }
+  .msg.user .avatar     { grid-column: 2; grid-row: 1 / span 3; }
+  .msg.madame .msgWho     { grid-column: 2; grid-row: 1; }
+  .msg.madame .bubble     { grid-column: 2; grid-row: 2; }
+  .msg.madame .msgActions { grid-column: 2; grid-row: 3; }
+  .msg.madame .avatar     { grid-column: 1; grid-row: 1 / span 3; }
+  /* Error bubbles fall back to single column (no avatar) */
+  .msg.error { display: block; }
+
+  .avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--plum) center/cover no-repeat;
+    border: 1px solid var(--gold-dim);
+    box-shadow: 0 0 0 1px rgba(214,165,72,0.18), 0 2px 6px rgba(0,0,0,0.45);
+    margin-top: 18px; /* aligns with bubble first line, below the WHO label */
+    cursor: pointer;
+    transition: filter 120ms;
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .avatar:hover { filter: brightness(1.18); }
+  .avatar.pending { background: var(--plum); }
+  .avatar.pending::after {
+    content: ""; position: absolute; inset: 4px; border-radius: 50%;
+    border: 1px dashed var(--gold-dim);
+    animation: orb-rot 6s linear infinite;
+  }
+  /* Default SVG avatars when no URL is set */
+  .avatar.default-madame {
+    background: radial-gradient(circle at 50% 40%,
+      rgba(255,255,255,0.25) 0%,
+      rgba(182,108,255,0.45) 25%,
+      rgba(80,30,140,0.85) 60%,
+      rgba(20,8,40,0.95) 100%);
+    box-shadow: 0 0 0 1px rgba(214,165,72,0.18),
+                inset -3px -4px 8px rgba(0,0,0,0.45),
+                inset 3px 4px 6px rgba(255,255,255,0.10),
+                0 2px 6px rgba(0,0,0,0.45);
+  }
+  .avatar.default-user {
+    background: linear-gradient(180deg, #2a1410 0%, #1a0a08 100%);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--gold-dim); font-size: 18px;
+  }
+  .avatar.default-user::before {
+    content: "🧍"; filter: grayscale(0.6) brightness(0.85);
+  }
+  @media (max-width: 500px) {
+    /* Hide avatars on narrow screens — matches ai-chat's behavior */
+    .msg.user, .msg.madame { grid-template-columns: 1fr; max-width: 88%; }
+    .msg .avatar { display: none; }
+    .msg.user .bubble, .msg.user .msgWho, .msg.user .msgActions { grid-column: 1; }
+    .msg.madame .bubble, .msg.madame .msgWho, .msg.madame .msgActions { grid-column: 1; }
+  }
+
+  /* ---- LIGHTBOX (click any image to expand) ---- */
+  #lightbox {
+    position: fixed; inset: 0; z-index: 99999998;
+    background: rgba(0,0,0,0.92);
+    display: none; align-items: center; justify-content: center;
+    padding: 24px;
+    cursor: zoom-out;
+  }
+  #lightbox.open { display: flex; }
+  #lightboxImg {
+    max-width: 92vw; max-height: 88vh;
+    object-fit: contain;
+    box-shadow: 0 0 0 1px var(--gold-dim), 0 0 40px rgba(214,165,72,0.25);
+    border: 2px solid var(--gold);
+  }
+  #lightboxClose {
+    position: absolute; top: 16px; right: 20px;
+    background: transparent; color: var(--ivory);
+    border: 1px solid var(--gold-dim);
+    padding: 6px 12px; cursor: pointer;
+    font-family: 'Merienda', serif; font-size: 13px; letter-spacing: 2px;
+  }
+  #lightboxClose:hover { color: var(--gold-hi); border-color: var(--gold); }
+
+  /* Cursor signal that images are clickable */
+  #stampImg, .inlineFig img, .avatar { cursor: zoom-in; }
+  .avatar.default-madame, .avatar.default-user, .avatar.pending { cursor: default; }
+
   .field { margin-bottom: 12px; }
   .field label {
     display: block; font-family: 'Merienda', serif; font-weight: 600; font-size: 11px;
     letter-spacing: 2px; color: var(--gold); margin-bottom: 4px;
+  }
+  /* Field-kind badge: "(words)" for chat-AI fields, "(image)" for
+     image-AI fields. Distinguishes the two halves of the profile so
+     users know which AI reads which field. */
+  .field label .fieldKind {
+    font-family: 'IM Fell English', serif; font-style: italic; font-weight: 400;
+    font-size: 11px; letter-spacing: 0; color: var(--gold-dim);
+    margin-left: 6px; text-transform: none;
   }
   .field input, .field textarea {
     width: 100%; padding: 8px 10px; font-family: 'IM Fell English', serif;
@@ -631,6 +796,7 @@
 
     <div id="inputPanel">
       <textarea id="input" rows="1" placeholder="Speak softly to Madame… (Enter ↵ to send)" disabled></textarea>
+      <button id="stopBtn" title="Stop Madame mid-reply" hidden>🛑</button>
       <button id="sendBtn" disabled>SEND</button>
     </div>
 
@@ -638,100 +804,125 @@
       <button id="newBtn" class="tbtn primary" title="Draw a new fortune">
         <span class="icon">🪙</span><span class="lbl">NEW FORTUNE</span>
       </button>
-      <button id="charBtn" class="tbtn" title="Madame (character)"><span class="icon">🔮</span></button>
-      <button id="youBtn"  class="tbtn" title="You (personality)"><span class="icon">🧍</span></button>
-      <button id="memBtn"  class="tbtn" title="Memory"><span class="icon">📜</span></button>
-      <button id="histBtn" class="tbtn" title="Past readings"><span class="icon">📚</span></button>
+      <button id="settingsBtn" class="tbtn" title="Settings"><span class="icon">⚙</span></button>
     </div>
 
     <div id="status">Loading the booth…</div>
     <div id="debug"></div>
 
-    <div id="sheetChar" class="sheet" role="dialog" aria-label="Character editor">
+    <!-- Single Settings modal with 4 tabs. Replaces the previous separate
+         character/persona/memory/history sheets. The "panels" sit on top
+         of each other; the active tab toggles which is visible. -->
+    <div id="sheetSettings" class="sheet" role="dialog" aria-label="Settings">
       <div class="sheetHeader">
-        <div class="sheetTitle">🔮 THE FORTUNE TELLER</div>
-        <button class="sheetClose" data-close="sheetChar">CLOSE</button>
+        <div class="sheetTitle">⚙ SETTINGS</div>
+        <button class="sheetClose" data-close="sheetSettings">CLOSE</button>
+      </div>
+      <div class="settingsTabs" role="tablist">
+        <button class="settingsTab" role="tab" data-panel="panelChar" aria-selected="true">
+          <span class="ico">🔮</span><span class="lbl">Madame</span>
+        </button>
+        <button class="settingsTab" role="tab" data-panel="panelYou" aria-selected="false">
+          <span class="ico">🧍</span><span class="lbl">You</span>
+        </button>
+        <button class="settingsTab" role="tab" data-panel="panelMem" aria-selected="false">
+          <span class="ico">📜</span><span class="lbl">Memory</span>
+        </button>
+        <button class="settingsTab" role="tab" data-panel="panelHist" aria-selected="false">
+          <span class="ico">📚</span><span class="lbl">History</span>
+        </button>
       </div>
       <div class="sheetBody">
-        <div class="field">
-          <label>Name</label>
-          <input id="charName" type="text" placeholder="Madame Aurelia" maxlength="60">
+        <!-- Madame panel -->
+        <div id="panelChar" class="settingsPanel active" role="tabpanel">
+          <div class="field">
+            <label>Name</label>
+            <input id="charName" type="text" placeholder="Madame Aurelia" maxlength="60">
+          </div>
+          <div class="field">
+            <label>Voice &amp; manner <span class="fieldKind">(words)</span></label>
+            <textarea id="charDesc" rows="8" placeholder="Describe who is reading your fortune — their voice, presence, and habits."></textarea>
+            <div class="hint">Read by the chat AI. Cover voice, tone, manner, theatrical habits. NOT looks — visual details go in the field below.</div>
+            <div id="charLengthNotice" class="lengthNotice" hidden></div>
+          </div>
+          <div class="field">
+            <label>Appearance <span class="fieldKind">(image)</span></label>
+            <textarea id="charAppearance" rows="4" placeholder="A vivid portrait brief: age, build, hair, clothing, accessories, atmosphere."></textarea>
+            <div class="hint">Read by the image AI for the Stamp card and avatars. Concrete visual details only — write it like a commission brief for a portrait painter.</div>
+          </div>
+          <div class="assistRow">
+            <button id="charAssist" class="assistBtn" type="button">
+              <span class="icon">✨</span><span>Have Madame describe herself from a seed</span>
+            </button>
+            <div id="charAssistStatus" class="assistStatus"></div>
+          </div>
+          <div class="panelActions">
+            <button id="charRestore" class="sheetClose">↺ RESTORE DEFAULT</button>
+            <div class="spacer"></div>
+            <button id="charSave" class="saveBtn">SAVE</button>
+          </div>
         </div>
-        <div class="field">
-          <label>Voice &amp; manner</label>
-          <textarea id="charDesc" rows="12" placeholder="Describe who is reading your fortune — their voice, presence, and habits."></textarea>
-          <div class="hint">This IS the fortune teller. Edit freely to change everything about who reads your cards — a stern oracle, a cheerful tea-leaf reader, a sphinx who only speaks in riddles. The "Restore default" button below brings back Madame Aurelia as she was.</div>
-        </div>
-      </div>
-      <div class="sheetFooter">
-        <button id="charRestore" class="sheetClose" style="margin-right:auto;">↺ RESTORE DEFAULT</button>
-        <button class="sheetClose" data-close="sheetChar">CANCEL</button>
-        <button id="charSave" class="saveBtn">SAVE</button>
-      </div>
-    </div>
 
-    <!-- Personality (the user roleplaying themselves) -->
-    <div id="sheetYou" class="sheet" role="dialog" aria-label="Your personality">
-      <div class="sheetHeader">
-        <div class="sheetTitle">🧍 YOUR PERSONA</div>
-        <button class="sheetClose" data-close="sheetYou">CLOSE</button>
-      </div>
-      <div class="sheetBody">
-        <div class="field">
-          <label>Your name (optional)</label>
-          <input id="youName" type="text" placeholder="leave blank to remain anonymous" maxlength="60">
-          <div class="hint">If you set a name, Madame will address you by it and the chat labels you with it instead of "YOU".</div>
+        <!-- You (persona) panel -->
+        <div id="panelYou" class="settingsPanel" role="tabpanel" hidden>
+          <div class="field">
+            <label>Your name (optional)</label>
+            <input id="youName" type="text" placeholder="leave blank to remain anonymous" maxlength="60">
+            <div class="hint">If you set a name, Madame will address you by it and the chat labels you with it instead of "YOU".</div>
+          </div>
+          <div class="field">
+            <label>Who you are tonight <span class="fieldKind">(words)</span></label>
+            <textarea id="youDesc" rows="5" placeholder="Describe yourself as you'd like Madame to see you. Could be the real you, or a character you're playing."></textarea>
+            <div class="hint">Read by the chat AI. e.g. "I am Wren — a quiet librarian, autistic, recently engaged, here for clarity about a job offer in Berlin." NOT looks — visual details go below.</div>
+            <div id="youLengthNotice" class="lengthNotice" hidden></div>
+          </div>
+          <div class="field">
+            <label>How you look <span class="fieldKind">(image)</span></label>
+            <textarea id="youAppearance" rows="3" placeholder="A short visual sketch — age, build, hair, clothing. Leave blank to be drawn loosely from your description."></textarea>
+            <div class="hint">Read by the image AI for your avatar. Optional. If empty, the avatar will be drawn loosely from your description.</div>
+          </div>
+          <div class="assistRow">
+            <button id="youAssist" class="assistBtn" type="button">
+              <span class="icon">✦</span><span>Have Madame draft this from your memories</span>
+            </button>
+            <div id="youAssistStatus" class="assistStatus"></div>
+          </div>
+          <div class="panelActions">
+            <div class="spacer"></div>
+            <button id="youSave" class="saveBtn">SAVE</button>
+          </div>
         </div>
-        <div class="field">
-          <label>Who you are tonight</label>
-          <textarea id="youDesc" rows="6" placeholder="Describe yourself as you'd like Madame to see you. Could be the real you, or a character you're playing."></textarea>
-          <div class="hint">Sit across from Madame as whoever you'd like to be. She'll tailor her reading to this person. e.g. "I am Wren — a quiet librarian, autistic, recently engaged, here for clarity about a job offer in Berlin." Leave blank for a generic reading.</div>
-        </div>
-        <div class="assistRow">
-          <button id="youAssist" class="assistBtn" type="button">
-            <span class="icon">✦</span><span>Have Madame draft this from your memories</span>
-          </button>
-          <div id="youAssistStatus" class="assistStatus"></div>
-        </div>
-      </div>
-      <div class="sheetFooter">
-        <button class="sheetClose" data-close="sheetYou">CANCEL</button>
-        <button id="youSave" class="saveBtn">SAVE</button>
-      </div>
-    </div>
 
-    <div id="sheetMem" class="sheet" role="dialog" aria-label="Memory editor">
-      <div class="sheetHeader">
-        <div class="sheetTitle">📜 WHAT MADAME REMEMBERS</div>
-        <button class="sheetClose" data-close="sheetMem">CLOSE</button>
-      </div>
-      <div class="sheetBody">
-        <div class="field">
-          <label>Quiet memories</label>
-          <div class="hint" style="margin-bottom:8px;">Facts about you that Madame will quietly hold in mind. She uses them, rarely names them aloud. e.g. "I am called Wren." · "I work nights." · "My partner's name is Mara."</div>
-          <div id="memList"></div>
-          <button id="memAdd">+ ADD A MEMORY</button>
+        <!-- Memory panel -->
+        <div id="panelMem" class="settingsPanel" role="tabpanel" hidden>
+          <div class="field">
+            <label>What Madame quietly remembers</label>
+            <div class="hint" style="margin-bottom:8px;">Facts about you that Madame will quietly hold in mind. She uses them, rarely names them aloud. e.g. "I am called Wren." · "I work nights." · "My partner's name is Mara."</div>
+            <div id="memList"></div>
+            <button id="memAdd">+ ADD A MEMORY</button>
+          </div>
+          <div class="panelActions">
+            <div class="spacer"></div>
+            <button id="memSave" class="saveBtn">SAVE</button>
+          </div>
         </div>
-      </div>
-      <div class="sheetFooter">
-        <button class="sheetClose" data-close="sheetMem">CANCEL</button>
-        <button id="memSave" class="saveBtn">SAVE</button>
-      </div>
-    </div>
 
-    <div id="sheetHist" class="sheet" role="dialog" aria-label="Past readings">
-      <div class="sheetHeader">
-        <div class="sheetTitle">📚 PAST READINGS</div>
-        <button class="sheetClose" data-close="sheetHist">CLOSE</button>
-      </div>
-      <div class="sheetBody">
-        <div id="histList"></div>
-      </div>
-      <div class="sheetFooter">
-        <button id="histReset" class="sheetClose" style="border-color:#7d1f15;color:#ffb39c;">CLEAR ALL HISTORY</button>
+        <!-- History panel -->
+        <div id="panelHist" class="settingsPanel" role="tabpanel" hidden>
+          <div id="histList"></div>
+          <div class="panelActions" style="margin-top:14px;">
+            <button id="histReset" class="sheetClose" style="border-color:#7d1f15;color:#ffb39c;">CLEAR ALL HISTORY</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
+</div>
+
+<!-- Lightbox: click-to-expand for avatars, the Stamp, and inline images -->
+<div id="lightbox" role="dialog" aria-label="Image preview">
+  <button id="lightboxClose">✕ CLOSE</button>
+  <img id="lightboxImg" alt="">
 </div>
 
 <footer class="footer">
@@ -810,6 +1001,16 @@
     "the curtain) are welcome but used like seasoning, not garnish.",
     "Unhurried but never long-winded. You believe in fortune, kindly.",
   ].join("\n");
+
+  // Visual portrait brief — fed to the image AI for avatars/cards, NOT
+  // to the chat AI. Concrete, third-person, no personality content.
+  const DEFAULT_CHARACTER_APPEARANCE = [
+    "A middle-aged woman with warm olive skin, kohl-lined eyes, and dark",
+    "hair pinned up under an embroidered headscarf. She wears layered",
+    "velvet shawls in burgundy and gold, brass earrings, and a string of",
+    "small ornaments. Her hands are heavy with rings. Soft candlelight",
+    "from below, the rich shadows of a carnival booth behind her.",
+  ].join(" ");
 
   // --- Motif bank (lives here as plain JS — no Perchance list access) ---
   // Each motif: { card: "...", image: "..." } — card name + a sensory
@@ -949,12 +1150,20 @@
   let displayedNumber = 0;
   let currentChat = null;
   let currentMessages = [];
-  let character = { name: DEFAULT_CHARACTER_NAME, description: DEFAULT_CHARACTER_DESCRIPTION };
-  let personality = { name: "", description: "" }; // who the seeker presents as
+  let character = { name: DEFAULT_CHARACTER_NAME, description: DEFAULT_CHARACTER_DESCRIPTION, appearance: DEFAULT_CHARACTER_APPEARANCE };
+  let personality = { name: "", description: "", appearance: "" }; // who the seeker presents as
   let memory = [];
   let recentMotifIds = [];
   let drawId = 0; // monotonic — guards async results across re-rolls
   let currentStream = null; // active aiTextPlugin stream (for .stop())
+
+  // User-avatar cache. Keyed by a short hash of (name+description) so the
+  // avatar changes when the user rewrites their persona but stays stable
+  // otherwise. { hash: url } — persisted in db.misc("userAvatars").
+  let userAvatars = {};            // {hash: url}
+  let currentUserAvatarUrl = "";   // resolved URL for the active persona hash
+  let currentUserAvatarPending = false; // true while a generation is in flight
+  let currentUserAvatarHash = "";  // hash that the current URL belongs to
 
   // Cancel any in-flight aiTextPlugin stream. Safe to call when nothing
   // is running. The associated bubble's stale chunks are filtered out by
@@ -965,6 +1174,21 @@
       try { currentStream.stop(); } catch (e) { console.warn("stream.stop() threw:", e); }
     }
     currentStream = null;
+    setStreamingUI(false);
+  }
+  // Show/hide the 🛑 stop button + tweak input affordances during streaming.
+  // The send button is disabled (the input is too, via enableInput) while
+  // a stream is in flight; the stop button takes its place visually.
+  function setStreamingUI(streaming) {
+    const stop = $("stopBtn"), send = $("sendBtn");
+    if (!stop || !send) return;
+    if (streaming) {
+      stop.hidden = false;
+      send.hidden = true;
+    } else {
+      stop.hidden = true;
+      send.hidden = false;
+    }
   }
 
   // --- Bubble state (raw text + image-prompt → URL map) -------------
@@ -1137,20 +1361,115 @@
   async function loadCharacter() {
     const stored = await getMisc("character", null);
     if (!stored || typeof stored !== "object") {
-      character = { name: DEFAULT_CHARACTER_NAME, description: DEFAULT_CHARACTER_DESCRIPTION };
+      character = { name: DEFAULT_CHARACTER_NAME, description: DEFAULT_CHARACTER_DESCRIPTION, appearance: DEFAULT_CHARACTER_APPEARANCE };
     } else {
+      // Backwards-compatible load: old records have only name + description.
+      // We don't touch the description (the user's edits, if any, persist),
+      // but we add a default appearance so the image side has something to
+      // work with. Users can replace either at any time.
       character = {
         name: stored.name || DEFAULT_CHARACTER_NAME,
         description: stored.description != null ? stored.description : DEFAULT_CHARACTER_DESCRIPTION,
+        appearance: stored.appearance != null ? stored.appearance : DEFAULT_CHARACTER_APPEARANCE,
       };
     }
   }
   async function saveCharacter() { await setMisc("character", character); }
   async function loadPersonality() {
-    personality = await getMisc("personality", { name: "", description: "" });
-    if (!personality || typeof personality !== "object") personality = { name: "", description: "" };
+    const stored = await getMisc("personality", null);
+    if (!stored || typeof stored !== "object") {
+      personality = { name: "", description: "", appearance: "" };
+    } else {
+      // Migration: older personality records lack `appearance`. Default to
+      // empty so the avatar generator falls back to description (existing
+      // behaviour) until the user fills in a dedicated visual brief.
+      personality = {
+        name: stored.name || "",
+        description: stored.description || "",
+        appearance: stored.appearance || "",
+      };
+    }
   }
   async function savePersonality() { await setMisc("personality", personality); }
+
+  // --- User avatar storage --------------------------------------------
+  // A short hash of (name + description). Used as the cache key for the
+  // user's auto-generated avatar so it regenerates when persona changes.
+  // FNV-1a 32-bit variant — non-cryptographic, fast, plenty of entropy
+  // for this use. Returns "" when both fields are empty (no avatar).
+  function personaHash(p) {
+    // Include only the fields that affect visual output. Voice/manner
+    // edits should NOT trigger a new avatar generation — the whole point
+    // of splitting `appearance` out is so users can iterate on their
+    // chat voice without burning image-gen calls. We do include `name`
+    // because some avatar fallback paths use it when appearance is empty.
+    const name = (p && p.name) || "";
+    const appearance = (p && p.appearance) || "";
+    const desc = (p && p.description) || "";
+    // If appearance is set, it's the only visual input we use; description
+    // doesn't enter the avatar prompt at all. Only include description in
+    // the hash for legacy personas where appearance is empty.
+    const s = name + "\n" + appearance + (appearance ? "" : "\n" + desc);
+    if (!s.trim()) return "";
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
+    }
+    return (h >>> 0).toString(36);
+  }
+  async function loadUserAvatars() {
+    userAvatars = await getMisc("userAvatars", {});
+    if (!userAvatars || typeof userAvatars !== "object") userAvatars = {};
+  }
+  async function saveUserAvatars() { await setMisc("userAvatars", userAvatars); }
+  // Resolve which avatar URL belongs to the current persona. If a URL is
+  // already cached for this hash, use it. Otherwise kick off generation.
+  // Idempotent — calling this many times is safe (concurrent generations
+  // are guarded by currentUserAvatarHash).
+  async function resolveUserAvatar() {
+    const hash = personaHash(personality);
+    currentUserAvatarHash = hash;
+    if (!hash) {
+      // No persona → no avatar
+      currentUserAvatarUrl = "";
+      currentUserAvatarPending = false;
+      refreshUserAvatars();
+      return;
+    }
+    if (userAvatars[hash]) {
+      currentUserAvatarUrl = userAvatars[hash];
+      currentUserAvatarPending = false;
+      refreshUserAvatars();
+      return;
+    }
+    // Need to generate. Mark pending so bubbles show the spinner.
+    currentUserAvatarUrl = "";
+    currentUserAvatarPending = true;
+    refreshUserAvatars();
+    try {
+      const res = await root.generateUserAvatar(personality);
+      // If the user has edited their persona in the meantime, abort:
+      // the hash has moved on and another resolveUserAvatar() is in flight.
+      if (personaHash(personality) !== hash) return;
+      if (res && res.url) {
+        userAvatars[hash] = res.url;
+        await saveUserAvatars();
+        currentUserAvatarUrl = res.url;
+      } else {
+        if (res && res.error) showError("generateUserAvatar", res.error);
+      }
+    } catch (e) {
+      if (personaHash(personality) !== hash) return;
+      showError("generateUserAvatar", e);
+    } finally {
+      if (personaHash(personality) === hash) {
+        currentUserAvatarPending = false;
+        refreshUserAvatars();
+      }
+    }
+  }
+
   async function loadMemory() {
     memory = await getMisc("memory", []);
     if (!Array.isArray(memory)) memory = [];
@@ -1228,6 +1547,7 @@
       ? (youName ? youName.toUpperCase() : "YOU")
       : (character.name || "MADAME").toUpperCase();
     wrap.innerHTML = `
+      <div class="avatar" role="img"></div>
       <div class="msgWho">${escapeHTML(who)}</div>
       <div class="bubble"><span class="content"></span></div>
       <div class="msgActions"></div>
@@ -1244,9 +1564,56 @@
       kickoffImages(wrap);
       renderBubbleFromState(wrap);
     }
+    applyAvatar(wrap, role);
     buildBubbleActions(wrap);
     scrollChatToBottom();
     return wrap;
+  }
+
+  // --- Avatar wiring -------------------------------------------------
+  // Madame's avatar = the current chat's Stamp URL. The Stamp is per-chat
+  // (one per draw), so it doubles cleanly as her "speaker icon" within that
+  // thread. When the Stamp arrives or changes, all of her bubbles update.
+  //
+  // User's avatar = an auto-generated portrait keyed by the persona's
+  // (name + description) hash. Cached in db.misc("userAvatars") as
+  // { [hash]: url }. Regenerates lazily when the description hash changes
+  // and the user opens (or already has) a chat. Manual override TODO.
+  //
+  // Empty/default state: an SVG-styled placeholder via CSS class.
+  function applyAvatar(wrap, role) {
+    const av = wrap.querySelector(".avatar");
+    if (!av) return;
+    av.classList.remove("default-madame", "default-user", "pending");
+    av.style.backgroundImage = "";
+    let url = "";
+    if (role === "assistant") {
+      url = (currentChat && currentChat.stampUrl) || "";
+      if (!url) { av.classList.add("default-madame"); return; }
+    } else {
+      url = currentUserAvatarUrl || "";
+      if (!url) {
+        if (currentUserAvatarPending) av.classList.add("pending", "default-user");
+        else av.classList.add("default-user");
+        return;
+      }
+    }
+    av.style.backgroundImage = `url("${url.replace(/"/g, '%22')}")`;
+    av.dataset.imgUrl = url;
+  }
+  // After the Stamp finishes generating, every Madame bubble in the
+  // active thread needs to refresh its avatar background.
+  function refreshMadameAvatars() {
+    document.querySelectorAll(".msg.madame:not(.error) .avatar").forEach(av => {
+      const parent = av.closest(".msg");
+      if (parent) applyAvatar(parent, "assistant");
+    });
+  }
+  function refreshUserAvatars() {
+    document.querySelectorAll(".msg.user .avatar").forEach(av => {
+      const parent = av.closest(".msg");
+      if (parent) applyAvatar(parent, "user");
+    });
   }
 
   // --- Per-bubble actions (Edit / Delete / Regenerate) ---------------
@@ -1491,6 +1858,7 @@
         return;
       }
       currentStream = inflight.stream;
+      setStreamingUI(true);
       let finalText = "";
       let aborted = false;
       try {
@@ -1515,7 +1883,7 @@
         renderErrorBubble("chatReply", errMsg(e));
         showError("chatReply", e);
       } finally {
-        if (currentStream === inflight.stream) currentStream = null;
+        if (currentStream === inflight.stream) { currentStream = null; setStreamingUI(false); }
       }
 
       if (finalText && !aborted) {
@@ -1603,7 +1971,7 @@
   // Surfaces a real error if the top panel didn't load correctly,
   // instead of letting calls fail with cryptic TypeErrors.
   function assertRoot() {
-    const required = ["readCounter", "tickCounter", "getFortune", "chatReply", "generateSeal", "synthesizePersona", "confirmAsync"];
+    const required = ["readCounter", "tickCounter", "getFortune", "chatReply", "generateSeal", "generateUserAvatar", "synthesizePersona", "synthesizeCharacter", "confirmAsync"];
     const missing = required.filter(fn => typeof root[fn] !== "function");
     if (missing.length) {
       throw new Error("Top-panel functions not loaded: " + missing.join(", "));
@@ -1625,6 +1993,14 @@
     await loadPersonality();
     await loadMemory();
     await loadRecentMotifs();
+    await loadUserAvatars();
+    // Sync the in-memory avatar URL from cache (no generation yet — the
+    // resolveUserAvatar call below will trigger one if needed).
+    const ph = personaHash(personality);
+    if (ph && userAvatars[ph]) {
+      currentUserAvatarUrl = userAvatars[ph];
+      currentUserAvatarHash = ph;
+    }
 
     try {
       if (window.innerWidth < 500) setTimeout(() => root.aiTextPlugin({ preload: true }), 5000);
@@ -1658,6 +2034,8 @@
         ? "The booth has just opened. Be the first to have your fortune read."
         : "Press 🪙 NEW FORTUNE to draw your first card.");
     }
+    // Kick off avatar resolution (lazy, won't block boot)
+    resolveUserAvatar();
   }
 
   async function activateChat(chatId) {
@@ -1763,6 +2141,7 @@
         finalText = inflight.fallback || "";
       } else {
         currentStream = inflight.stream;
+        setStreamingUI(true);
         try {
           const data = await inflight.stream;
           if (myDraw !== drawId) return;
@@ -1777,7 +2156,7 @@
           showError("getFortune", e);
           finalText = inflight.fallback || "";
         } finally {
-          if (currentStream === inflight.stream) currentStream = null;
+          if (currentStream === inflight.stream) { currentStream = null; setStreamingUI(false); }
         }
       }
 
@@ -1801,6 +2180,9 @@
           setStamp({ number: n, url: sealRes.url, busy: false, label: motif ? motif.card : "your card" });
           await db.chats.update(chatId, { stampUrl: sealRes.url });
           if (currentChat && currentChat.id === chatId) currentChat.stampUrl = sealRes.url;
+          // The Stamp doubles as Madame's per-chat avatar — refresh every
+          // bubble now that we have a URL.
+          refreshMadameAvatars();
         } else {
           setStamp({ number: n, url: null, busy: false, label: motif ? motif.card : "your card" });
           if (sealRes && sealRes.error) showError("generateSeal", sealRes.error);
@@ -1901,8 +2283,14 @@
   });
   $("sendBtn").onclick = sendUserMessage;
   $("newBtn").onclick = drawNewFortune;
+  // Stop button cancels the active stream. The button is shown/hidden by
+  // setStreamingUI() depending on whether currentStream is live.
+  $("stopBtn").onclick = () => { cancelStream(); };
 
   // --- Sheet management ---------------------------------------------
+  // There's now only one sheet (#sheetSettings) with internal tabs.
+  // The open/close helpers stay generic in case future modal sheets are
+  // added, but the public API for the four legacy panels is openPanel().
   function openSheet(id) {
     document.querySelectorAll(".sheet.open").forEach(s => s.classList.remove("open"));
     const sheet = document.getElementById(id);
@@ -1916,28 +2304,143 @@
     b.onclick = () => closeSheet(b.getAttribute("data-close"));
   });
 
-  // --- Character editor ---------------------------------------------
-  $("charBtn").onclick = () => {
-    $("charName").value = character.name || "";
-    $("charDesc").value = character.description || "";
-    openSheet("sheetChar");
+  // Switch which panel is visible inside #sheetSettings.
+  // panelId is one of: panelChar, panelYou, panelMem, panelHist.
+  // Side-effects: refreshes panel-specific UI bits (e.g. history list
+  // population, memory list rebuild) since they may have changed since
+  // the modal was last open.
+  function activatePanel(panelId) {
+    document.querySelectorAll(".settingsTab").forEach(t => {
+      t.setAttribute("aria-selected", t.dataset.panel === panelId ? "true" : "false");
+    });
+    document.querySelectorAll(".settingsPanel").forEach(p => {
+      p.classList.toggle("active", p.id === panelId);
+      p.hidden = (p.id !== panelId);
+    });
+    // Per-panel population
+    if (panelId === "panelChar") {
+      $("charName").value = character.name || "";
+      $("charDesc").value = character.description || "";
+      $("charAppearance").value = character.appearance || "";
+      $("charAssistStatus").textContent = "";
+      $("charAssistStatus").classList.remove("err");
+      updateLengthNotice("charDesc", "charLengthNotice");
+    } else if (panelId === "panelYou") {
+      $("youName").value = personality.name || "";
+      $("youDesc").value = personality.description || "";
+      $("youAppearance").value = personality.appearance || "";
+      $("youAssistStatus").textContent = "";
+      $("youAssistStatus").classList.remove("err");
+      refreshYouAssistAvailability();
+      updateLengthNotice("youDesc", "youLengthNotice");
+    } else if (panelId === "panelMem") {
+      renderMemList();
+    } else if (panelId === "panelHist") {
+      renderHistory();
+    }
+  }
+  document.querySelectorAll(".settingsTab").forEach(tab => {
+    tab.onclick = () => activatePanel(tab.dataset.panel);
+  });
+  // The unified ⚙ button opens the settings sheet on whatever panel
+  // was last viewed (defaults to Madame). Future: remember last panel.
+  let lastSettingsPanel = "panelChar";
+  $("settingsBtn").onclick = () => {
+    activatePanel(lastSettingsPanel);
+    openSheet("sheetSettings");
   };
+  // Track the last-viewed panel so re-opening lands you where you left off.
+  document.querySelectorAll(".settingsTab").forEach(tab => {
+    const orig = tab.onclick;
+    tab.onclick = () => { lastSettingsPanel = tab.dataset.panel; orig(); };
+  });
+
+  // Token-budget warning, lifted from ai-chat's approach.
+  // Currently uses character count as a proxy for tokens (no countTokens
+  // utility wired in). Threshold at ~3000 chars matches the long-text
+  // warning territory in ai-chat. Updates live as the user types.
+  function updateLengthNotice(textareaId, noticeId) {
+    const ta = $(textareaId), notice = $(noticeId);
+    if (!ta || !notice) return;
+    const len = (ta.value || "").length;
+    // ~3000 chars is roughly half the typical context budget the model uses.
+    if (len > 3000) {
+      notice.hidden = false;
+      notice.textContent = `⚠️ very long (${len.toLocaleString()} chars) — may reduce Madame's memory of the chat`;
+    } else if (len > 1500) {
+      notice.hidden = false;
+      notice.textContent = `⚠️ long (${len.toLocaleString()} chars) — consider tightening`;
+    } else {
+      notice.hidden = true;
+    }
+  }
+  $("charDesc").addEventListener("input", () => updateLengthNotice("charDesc", "charLengthNotice"));
+  $("youDesc").addEventListener("input", () => updateLengthNotice("youDesc", "youLengthNotice"));
+
+  // --- Character editor handlers ---
   $("charRestore").onclick = async () => {
     const ok = await root.confirmAsync(
-      "Restore the default fortune teller (Madame Aurelia)?\n\nThis replaces whatever is currently in the editor. You can still cancel before saving."
+      "Restore the default fortune teller (Madame Aurelia)?\n\nThis replaces both the voice description AND the appearance with the defaults. You can still cancel before saving."
     );
     if (!ok) return;
     $("charName").value = DEFAULT_CHARACTER_NAME;
     $("charDesc").value = DEFAULT_CHARACTER_DESCRIPTION;
+    $("charAppearance").value = DEFAULT_CHARACTER_APPEARANCE;
+    updateLengthNotice("charDesc", "charLengthNotice");
+  };
+  // ✨ "Have Madame describe herself from a seed" — calls synthesizeCharacter
+  // with whatever is currently in the fields. Always enabled (no Memory
+  // dependency); from a blank canvas the AI invents a persona from scratch.
+  $("charAssist").onclick = async () => {
+    const btn = $("charAssist");
+    const status = $("charAssistStatus");
+    if (btn.classList.contains("busy")) return;
+    status.classList.remove("err");
+    status.textContent = "Madame is drawing her own portrait in words…";
+    btn.classList.add("busy");
+    try {
+      const result = await root.synthesizeCharacter(
+        ($("charName").value || "").trim(),
+        ($("charDesc").value || "").trim(),
+        ($("charAppearance").value || "").trim(),
+      );
+      if (result.error) {
+        status.classList.add("err");
+        status.textContent = result.error;
+        showError("synthesizeCharacter", result.error);
+      } else {
+        // Preserve user's typing — only overwrite empty fields. The
+        // synthesis function blends with existing values when they're
+        // non-empty, so we trust whatever it returned for those.
+        if (result.name && !$("charName").value.trim()) {
+          $("charName").value = result.name;
+        }
+        if (result.description) {
+          $("charDesc").value = result.description;
+          updateLengthNotice("charDesc", "charLengthNotice");
+        }
+        if (result.appearance) {
+          $("charAppearance").value = result.appearance;
+        }
+        status.textContent = "Draft complete. Edit it however you like, then SAVE.";
+      }
+    } catch (e) {
+      status.classList.add("err");
+      status.textContent = errMsg(e);
+      showError("synthesizeCharacter", e);
+    } finally {
+      btn.classList.remove("busy");
+    }
   };
   $("charSave").onclick = async () => {
     try {
       character = {
         name: ($("charName").value || "").trim() || DEFAULT_CHARACTER_NAME,
         description: ($("charDesc").value || "").trim() || DEFAULT_CHARACTER_DESCRIPTION,
+        appearance: ($("charAppearance").value || "").trim() || DEFAULT_CHARACTER_APPEARANCE,
       };
       await saveCharacter();
-      closeSheet("sheetChar");
+      closeSheet("sheetSettings");
       // Re-label all Madame bubbles in the active chat
       document.querySelectorAll(".msg.madame:not(.error) .msgWho").forEach(el => {
         el.textContent = (character.name || "Madame").toUpperCase();
@@ -1965,14 +2468,6 @@
         `Have Madame draft this from your ${count} memor${count === 1 ? "y" : "ies"}`;
     }
   }
-  $("youBtn").onclick = () => {
-    $("youName").value = personality.name || "";
-    $("youDesc").value = personality.description || "";
-    $("youAssistStatus").textContent = "";
-    $("youAssistStatus").classList.remove("err");
-    refreshYouAssistAvailability();
-    openSheet("sheetYou");
-  };
   $("youAssist").onclick = async () => {
     const btn = $("youAssist");
     const status = $("youAssistStatus");
@@ -1987,18 +2482,21 @@
         memory,
         ($("youName").value || "").trim(),
         ($("youDesc").value || "").trim(),
+        ($("youAppearance").value || "").trim(),
       );
       if (result.error) {
         status.classList.add("err");
         status.textContent = result.error;
         showError("synthesizePersona", result.error);
       } else {
-        // Only overwrite name if we don't already have one (preserve user's typing)
         if (result.name && !$("youName").value.trim()) {
           $("youName").value = result.name;
         }
         if (result.description) {
           $("youDesc").value = result.description;
+        }
+        if (result.appearance) {
+          $("youAppearance").value = result.appearance;
         }
         status.textContent = "Draft complete. Edit it however you like, then SAVE.";
       }
@@ -2015,14 +2513,17 @@
       personality = {
         name: ($("youName").value || "").trim(),
         description: ($("youDesc").value || "").trim(),
+        appearance: ($("youAppearance").value || "").trim(),
       };
       await savePersonality();
-      closeSheet("sheetYou");
+      closeSheet("sheetSettings");
       // Re-label all user bubbles in the active chat
       const newLabel = (personality.name || "YOU").toUpperCase();
       document.querySelectorAll(".msg.user .msgWho").forEach(el => {
         el.textContent = newLabel;
       });
+      // Persona changed → avatar hash changed → resolve (may regenerate)
+      resolveUserAvatar();
     } catch (e) {
       showError("savePersonality", e);
     }
@@ -2050,13 +2551,12 @@
       list.appendChild(empty);
     }
   }
-  $("memBtn").onclick = () => { renderMemList(); openSheet("sheetMem"); };
   $("memAdd").onclick = () => { memory.push(""); renderMemList(); };
   $("memSave").onclick = async () => {
     try {
       memory = memory.map(m => String(m || "").trim()).filter(Boolean);
       await saveMemory();
-      closeSheet("sheetMem");
+      closeSheet("sheetSettings");
     } catch (e) {
       showError("saveMemory", e);
     }
@@ -2089,13 +2589,12 @@
         <div class="histDate">${escapeHTML(dateStr)} · ${msgs.length} message${msgs.length === 1 ? "" : "s"}</div>
       `;
       row.onclick = async () => {
-        closeSheet("sheetHist");
+        closeSheet("sheetSettings");
         await activateChat(c.id);
       };
       list.appendChild(row);
     }
   }
-  $("histBtn").onclick = async () => { await renderHistory(); openSheet("sheetHist"); };
   $("histReset").onclick = async () => {
     const ok = await root.confirmAsync(
       "Clear ALL chat history?\n\nThis removes every past reading and conversation. The shared counter is unaffected and cannot be reset.\n\nContinue?"
@@ -2113,7 +2612,7 @@
       renderEmptyState(true);
       setStamp({ number: null, url: null, busy: false, label: "awaiting a coin" });
       enableInput(false);
-      closeSheet("sheetHist");
+      closeSheet("sheetSettings");
       setStatus("History cleared. Press 🪙 NEW FORTUNE when you are ready.");
     } catch (e) {
       showError("clearHistory", e);
@@ -2121,6 +2620,51 @@
   };
 
   // --- Resize + final wiring ----------------------------------------
+  // --- Lightbox: click any image to expand to fullscreen ------------
+  // Delegated handler — picks up any avatar / Stamp / inline image click.
+  // Avatars without an image (default-madame, default-user, pending)
+  // are intentionally not clickable; their CSS cursor signals this.
+  function openLightbox(url, alt) {
+    if (!url) return;
+    $("lightboxImg").src = url;
+    $("lightboxImg").alt = alt || "";
+    $("lightbox").classList.add("open");
+  }
+  function closeLightbox() {
+    $("lightbox").classList.remove("open");
+    $("lightboxImg").src = "";
+  }
+  $("lightbox").onclick = (e) => {
+    // Click on backdrop OR close button closes; click on the image itself
+    // does not (so users can click around to zoom-pan in browsers that support it).
+    if (e.target === $("lightbox") || e.target === $("lightboxClose")) closeLightbox();
+  };
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && $("lightbox").classList.contains("open")) closeLightbox();
+  });
+  // Delegated click on the chat area + Stamp for image expansion.
+  document.addEventListener("click", (e) => {
+    const t = e.target;
+    // Inline image inside a Madame bubble
+    if (t.tagName === "IMG" && t.closest(".inlineFig")) {
+      e.stopPropagation();
+      openLightbox(t.src, t.alt);
+      return;
+    }
+    // The Stamp
+    if (t.id === "stampImg" && t.classList.contains("ready")) {
+      e.stopPropagation();
+      openLightbox(t.src, "Tonight's card");
+      return;
+    }
+    // Avatar — only if it has an actual image (default/pending have no dataset.imgUrl)
+    if (t.classList && t.classList.contains("avatar") && t.dataset.imgUrl) {
+      e.stopPropagation();
+      openLightbox(t.dataset.imgUrl, "");
+      return;
+    }
+  });
+
   window.addEventListener("resize", () => fitText(fmt(displayedNumber)));
   if (navigator.storage && navigator.storage.persist) {
     navigator.storage.persist().catch(() => {});

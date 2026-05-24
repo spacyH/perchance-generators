@@ -280,49 +280,60 @@ async generateSeal(n, motif) =>
 // existingName, existingDesc: any current values in the editor (so we
 // don't overwrite a half-filled form, we blend with it).
 //
-// Returns { name, description, error? }
-//   name        — suggested seeker name (empty string if none can be inferred)
-//   description — a 2–4 sentence persona description in first person
+// Returns { name, description, appearance, error? }
+//   name        — suggested seeker name ("" if none inferable)
+//   description — 2-4 sentence persona description in first person (voice)
+//   appearance  — 1-2 sentence portrait sketch for image gen (visual)
 //
-// On failure: { name: "", description: "", error: "..." }
-async synthesizePersona(memoryEntries, existingName, existingDesc) =>
+// On failure: { name: "", description: "", appearance: "", error: "..." }
+async synthesizePersona(memoryEntries, existingName, existingDesc, existingAppearance) =>
   let entries = Array.isArray(memoryEntries) ? memoryEntries.filter(m => m && String(m).trim()) : [];
   if(entries.length === 0) {
-    return { name: "", description: "", error: "no memory entries to synthesize from" };
+    return { name: "", description: "", appearance: "", error: "no memory entries to synthesize from" };
   }
   let bullets = entries.map(m => "  - " + String(m).trim()).join("\n");
   let nameHint = existingName ? `The seeker has provided this name: "${existingName}". Keep it.` : "";
   let descHint = existingDesc ? `The seeker has already started a description: "${existingDesc}". Blend it with the new draft if it fits; otherwise replace it.` : "";
+  let apprHint = existingAppearance ? `The seeker has already sketched an appearance: "${existingAppearance}". Blend it in or refine it.` : "";
 
   let instruction = [
-    "You are helping a person fill out a SHORT self-description for a",
+    "You are helping a person fill out a self-description for a",
     "fortune-teller app. They have saved some memories about themselves.",
-    "Read those memories and write a brief, warm persona description as",
-    "if the person themselves wrote it (FIRST PERSON: \"I am...\", \"I",
-    "work...\", etc.). The fortune teller will read this to know who is",
-    "sitting across the table from her.",
+    "You will write TWO separate things from those memories:",
+    "  1. DESCRIPTION — who they are, in their own voice (first person).",
+    "  2. APPEARANCE  — a short portrait sketch for an artist to draw.",
+    "These are different things and should not overlap. The description",
+    "is read by the fortune teller. The appearance is fed to an image",
+    "model. The fortune teller does not need to know what they look like.",
     "",
-    "RULES:",
+    "DESCRIPTION rules:",
     "- 2 to 4 sentences. Around 30–80 words.",
     "- First-person voice (\"I am\", \"I have\", \"I'm here because\").",
-    "- Include factual details from the memories: name, occupation,",
-    "  relationships, current situation, what's on their mind.",
-    "- Do not invent facts not present in the memories. If something is",
-    "  not stated, leave it out.",
-    "- Plain prose. No lists, no bullets, no markdown, no quotes around",
-    "  the output.",
-    "- If a name is clearly stated (e.g. \"My name is Wren\", \"I am",
-    "  called X\", \"They call me X\"), extract it. Otherwise leave name",
-    "  empty.",
+    "- Focus on identity, occupation, situation, what's on their mind.",
+    "- Do not include physical appearance — that goes in the other field.",
+    "",
+    "APPEARANCE rules:",
+    "- 1 to 2 short sentences. Around 15–40 words.",
+    "- Third-person, concrete visual details: age range, build, hair,",
+    "  clothing style, distinguishing features. Like a commission brief.",
+    "- If the memories don't mention how they look, infer a reasonable",
+    "  default from age, profession, or interests — but only gentle hints,",
+    "  no invented specifics. Better to be brief than to fabricate.",
+    "- Plain prose. No lists or markdown.",
+    "",
+    "NAME: extract a first name only if clearly stated in memory",
+    "(\"my name is X\", \"called X\"). Otherwise leave empty.",
     nameHint,
     descHint,
+    apprHint,
     "",
     "The seeker's saved memories:",
     bullets,
     "",
-    "Reply with ONLY this exact format on two lines, nothing else:",
+    "Reply with ONLY this exact format on three lines, nothing else:",
     "NAME: <just the first name or empty>",
-    "DESCRIPTION: <the 2-4 sentence first-person description>",
+    "DESCRIPTION: <2-4 sentence first-person description>",
+    "APPEARANCE: <1-2 sentence visual sketch>",
   ].filter(Boolean).join("\n");
 
   try {
@@ -334,28 +345,156 @@ async synthesizePersona(memoryEntries, existingName, existingDesc) =>
     });
     let data = await streamObj;
     if(data.stopReason === "error" || !data.generatedText || !data.generatedText.trim()) {
-      return { name: "", description: "", error: "aiTextPlugin returned stopReason=" + (data.stopReason || "(none)") };
+      return { name: "", description: "", appearance: "", error: "aiTextPlugin returned stopReason=" + (data.stopReason || "(none)") };
     }
     let raw = data.generatedText.trim();
-    // Parse "NAME: X\nDESCRIPTION: Y" — tolerate variants in case the model strays.
     let nameMatch = raw.match(/^\s*NAME:\s*(.*?)\s*$/im);
-    let descMatch = raw.match(/^\s*DESCRIPTION:\s*([\s\S]*?)\s*$/im);
+    // For multi-line fields, match until the next FIELD: marker or end.
+    let descMatch = raw.match(/^\s*DESCRIPTION:\s*([\s\S]*?)(?=\n\s*APPEARANCE:|$)/im);
+    let apprMatch = raw.match(/^\s*APPEARANCE:\s*([\s\S]*?)$/im);
     let name = nameMatch ? nameMatch[1].trim() : "";
     let description = descMatch ? descMatch[1].trim() : "";
-    // Sanitize: strip wrapping quotes the model may add despite the rule
+    let appearance = apprMatch ? apprMatch[1].trim() : "";
+    // Strip wrapping quotes
     name = name.replace(/^["']|["']$/g, "").trim();
     description = description.replace(/^["']|["']$/g, "").trim();
-    // If parsing failed, fall back to the whole raw text as description
-    if(!description && !name) {
+    appearance = appearance.replace(/^["']|["']$/g, "").trim();
+    // Salvage if parsing failed entirely
+    if(!description && !name && !appearance) {
       description = raw.replace(/^NAME:.*\n?/im, "").replace(/^DESCRIPTION:\s*/im, "").trim();
     }
-    if(!description) {
-      return { name, description: "", error: "could not parse a description from model output" };
+    if(!description && !appearance) {
+      return { name, description: "", appearance: "", error: "could not parse fields from model output" };
     }
-    return { name, description };
+    return { name, description, appearance };
   } catch(e) {
     console.error("synthesizePersona failed:", e);
-    return { name: "", description: "", error: (e && e.message) || String(e) };
+    return { name: "", description: "", appearance: "", error: (e && e.message) || String(e) };
+  }
+
+// --- Character synthesis from a seed ----------------------------------
+// Helps the user write a fortune teller persona. Takes their existing
+// (often short or empty) name and description and expands it into a
+// full, vivid voice & manner description. Mirrors synthesizePersona but
+// targets the fortune-teller side instead of the seeker side.
+//
+// existingName, existingDesc are passed through so we can enrich rather
+// than overwrite. If both are empty, the AI starts from a blank canvas.
+//
+// Returns { name, description, appearance, error? }
+//   description — the voice/manner (what the chat AI uses)
+//   appearance  — the visual portrait sketch (what the image AI uses)
+async synthesizeCharacter(existingName, existingDesc, existingAppearance) =>
+  let nameHint = existingName ? `The user has provided this name: "${existingName}". Keep it.` : "";
+  let descHint = existingDesc ? `The user has written this seed/sketch for VOICE: "${existingDesc}". Expand and refine it. Preserve their intent.` : "";
+  let apprHint = existingAppearance ? `The user has written this seed/sketch for APPEARANCE: "${existingAppearance}". Expand and refine it.` : "";
+  let blankCanvas = (!existingDesc && !existingAppearance);
+
+  let instruction = [
+    "You are helping a user design a fortune-teller character for an AI",
+    "chat app. The character has TWO separate descriptive fields you must",
+    "write. These are kept apart on purpose: each is fed to a different",
+    "AI downstream and they must not overlap.",
+    "",
+    "  1. DESCRIPTION — the voice and manner. Fed to the CHAT AI.",
+    "  2. APPEARANCE  — the visual portrait. Fed to the IMAGE AI.",
+    "",
+    "DESCRIPTION rules:",
+    "- Written in SECOND PERSON (\"You are...\", \"You speak...\").",
+    "- 4 to 8 sentences, around 80–180 words.",
+    "- Cover: who they are (the angle), voice/tone/speech patterns,",
+    "  manner toward the seeker, theatrical habits, sensory presence",
+    "  of their space.",
+    "- NO physical/visual details. No clothing, no body type, no",
+    "  hair colour. Those go in APPEARANCE.",
+    "- Vivid and specific. Names of things over abstractions.",
+    "- No dialogue examples. No lists or markdown.",
+    "",
+    "APPEARANCE rules:",
+    "- Third-person commission brief for an artist.",
+    "- 2 to 4 short sentences, around 30–80 words.",
+    "- Concrete visual details ONLY: age range, build, hair, eyes,",
+    "  skin/fur/scales, clothing, accessories, posture, lighting cues.",
+    "- Write it like a brief for a portrait painter — concrete,",
+    "  iconic, recognizable. Match the personality but stay visual.",
+    "- No personality traits. No backstory. No internal life.",
+    "",
+    "NAME: if a name fits the concept and one wasn't given, suggest one.",
+    blankCanvas ? "The user has provided nothing — invent an interesting, original fortune-teller from scratch." : "",
+    nameHint,
+    descHint,
+    apprHint,
+    "",
+    "Reply with ONLY this exact format on three lines, nothing else:",
+    "NAME: <the fortune teller's name>",
+    "DESCRIPTION: <4-8 sentence voice & manner, second person>",
+    "APPEARANCE: <2-4 sentence visual portrait brief, third person>",
+  ].filter(Boolean).join("\n");
+
+  try {
+    let streamObj = root.aiTextPlugin({
+      instruction,
+      startWith: "NAME: ",
+      hideStartWith: false,
+      stopSequences: ["\n\n", "\nNAME:"],
+    });
+    let data = await streamObj;
+    if(data.stopReason === "error" || !data.generatedText || !data.generatedText.trim()) {
+      return { name: "", description: "", appearance: "", error: "aiTextPlugin returned stopReason=" + (data.stopReason || "(none)") };
+    }
+    let raw = data.generatedText.trim();
+    let nameMatch = raw.match(/^\s*NAME:\s*(.*?)\s*$/im);
+    let descMatch = raw.match(/^\s*DESCRIPTION:\s*([\s\S]*?)(?=\n\s*APPEARANCE:|$)/im);
+    let apprMatch = raw.match(/^\s*APPEARANCE:\s*([\s\S]*?)$/im);
+    let name = nameMatch ? nameMatch[1].trim().replace(/^["']|["']$/g, "") : "";
+    let description = descMatch ? descMatch[1].trim().replace(/^["']|["']$/g, "") : "";
+    let appearance = apprMatch ? apprMatch[1].trim().replace(/^["']|["']$/g, "") : "";
+    if(!description && !name && !appearance) {
+      description = raw.replace(/^NAME:.*\n?/im, "").replace(/^DESCRIPTION:\s*/im, "").trim();
+    }
+    if(!description && !appearance) {
+      return { name, description: "", appearance: "", error: "could not parse fields from model output" };
+    }
+    return { name, description, appearance };
+  } catch(e) {
+    console.error("synthesizeCharacter failed:", e);
+    return { name: "", description: "", appearance: "", error: (e && e.message) || String(e) };
+  }
+
+// --- User-avatar generation ------------------------------------------
+// Produces a portrait-style avatar for the seeker, based on their
+// persona. The image is square (avatar use-case), with a tarot/painted
+// aesthetic that matches the booth's visual language.
+//
+// Returns { url, error? }
+//   On success: { url: imageUrl }
+//   On failure: { url: "", error: "..." }
+async generateUserAvatar(personality) =>
+  try {
+    let name = (personality && personality.name) ? String(personality.name).trim() : "";
+    let appearance = (personality && personality.appearance) ? String(personality.appearance).trim() : "";
+    let desc = (personality && personality.description) ? String(personality.description).trim() : "";
+    if(!name && !appearance && !desc) return { url: "", error: "no persona to draw from" };
+    // Prefer the dedicated appearance field — it's a clean visual brief
+    // without voice/manner noise. Fall back to description for backwards
+    // compatibility with personas saved before the field split.
+    let subject = appearance || desc || `a person named ${name}`;
+    let prompt = [
+      "portrait of",
+      subject,
+      ", head-and-shoulders, centered, vertical composition,",
+      "painted in a vintage carnival tarot-card style,",
+      "warm candlelight, deep velvet background of midnight blue and burgundy,",
+      "soft gold accents, weathered parchment texture,",
+      "single subject, dignified expression, painterly brushwork,",
+      "vintage illustration, oil-painting feel, 1920s",
+    ].join(" ");
+    let url = await root.textToImagePlugin({ prompt });
+    if(!url) return { url: "", error: "textToImagePlugin returned empty url" };
+    return { url };
+  } catch(e) {
+    console.error("generateUserAvatar failed:", e);
+    return { url: "", error: (e && e.message) || String(e) };
   }
 
 // --- confirmAsync (Promise-based confirm dialog) -----------------------
