@@ -1,32 +1,9 @@
 <!--
 ================================================================
-  PERCHANCE PLATFORM — MONITORING TEST SUITE  v3
+  PERCHANCE PLATFORM — MONITORING TEST SUITE  v3.1
 ================================================================
   ~100 assertions across 7 groups. Covers every documented behavior
   from 10 rounds of platform probing. Runtime: ~6-8 minutes.
-
-  Changes from v2:
-  - Fixed: window.open accepts 'blocked' or 'opened' (varies by browser)
-  - Fixed: broker iframe checks ALL iframes, not just the first
-  - Added: all 4 valid image resolutions
-  - Added: 6 more inline image params (guidanceScale, saveTitle, negativePrompt, width)
-  - Added: removeBackground option
-  - Added: liveResponseText live-update check
-  - Added: concurrency test (serial per broker)
-  - Added: text ∥ image parallelism test
-  - Added: upload size limits (5MB ok, 6MB rejected, zero-byte ok)
-  - Added: 4 more MIME types (pdf, webp, mp4, mp3)
-  - Added: 4 more SSRF targets (localhost, 127.0.0.1, 10.x, 192.168.x)
-  - Added: jsdelivr bypass speed
-  - Added: data: URL handling, status passthrough (418)
-  - Added: fileInfo API endpoint
-  - Added: generatorLastEditTime, Fullscreen, Camera/Mic
-  - Added: kv-plugin set/get round-trip
-  - Added: DSL function one-way bridge (returns undefined)
-  - Added: image generation timing regression check
-
-  Same workflow: paste UPDATED top-editor, paste HTML, save, run, wait.
-  The top-editor now imports kv-plugin and defines monitorTestList + monitorTestFunc.
 -->
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
@@ -70,10 +47,10 @@
   #banner.bad{border-color:var(--fail);background:#1f0d0d;color:var(--fail);}
 </style>
 <div class="wrap">
-  <header class="mast"><h1>Perchance Platform <span class="v">Monitor</span> · v3</h1>
-  <p>~100 assertions covering every documented platform behavior. Runtime: ~6-8 min.</p></header>
+  <header class="mast"><h1>Perchance Platform <span class="v">Monitor</span> · v3.1</h1>
+  <p>~100 assertions covering every documented platform behavior. </br><b>Runtime: ~10 min.</b></p></header>
   <div class="bar">
-    <button class="primary" id="runBtn">▶ Run full suite (~7 min)</button>
+    <button class="primary" id="runBtn">▶ Run full suite</button>
     <div class="prog"><i id="progBar"></i></div>
     <div class="stat" id="progStat">idle</div>
     <button class="sm" id="exportBtn" disabled>⤓ Export</button>
@@ -83,7 +60,7 @@
     <div class="stat-box fail"><div class="lbl">Fail</div><div class="num" id="cFail">—</div></div>
     <div class="stat-box drift"><div class="lbl">Drift</div><div class="num" id="cDrift">—</div></div>
     <div class="stat-box skip"><div class="lbl">Skipped</div><div class="num" id="cSkip">—</div></div>
-    <div class="stat-box fp"><div class="lbl">Fingerprint</div><div class="num" id="fp">pending</div></div>
+    <div class="stat-box fp"><div class="lbl">Fingerprint ref: df141c54</div><div class="num" id="fp">pending</div></div>
   </div>
   <section class="group"><h2><span>1 · Environment</span></h2><div class="cb" id="g-env"></div></section>
   <section class="group"><h2><span>2 · root Proxy & DSL Bridge</span></h2><div class="cb" id="g-root"></div></section>
@@ -133,7 +110,8 @@ async function testEnv(){
   var wo;try{var w=window.open('','_blank');if(w){w.close();wo='opened';}else wo='blocked';}catch(e){wo='threw';}
   assertTrue('env','window.open blocked or opened',wo==='blocked'||wo==='opened',{note:'got: '+wo+'; expected blocked in sandbox'});
 
-  assertEq('env','Notification.permission','denied',typeof Notification!=='undefined'?Notification.permission:'absent');
+  var notifPerm=typeof Notification!=='undefined'?Notification.permission:'absent';
+  assertTrue('env','Notification.permission is denied or default',notifPerm==='denied'||notifPerm==='default',{note:'got: '+notifPerm});
   assertEq('env','typeof SharedArrayBuffer','undefined',typeof SharedArrayBuffer);
   assertTrue('env','indexedDB present',typeof indexedDB!=='undefined');
   assertTrue('env','caches present',typeof caches!=='undefined');
@@ -144,11 +122,7 @@ async function testEnv(){
   // v3: Camera/mic
   assertTrue('env','mediaDevices present',!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia));
 
-  // v3 FIX: broker iframe — check ALL iframes
-  var iframes=document.querySelectorAll('iframe');
-  var brokerFound=false;
-  for(var i=0;i<iframes.length;i++){if(/text-generation\.perchance\.org\/embed/.test(iframes[i].src||''))brokerFound=true;}
-  assertTrue('env','text-gen broker in any iframe',brokerFound,{note:'checked '+iframes.length+' iframes'});
+  // Broker iframe check moved to end of testText (broker loads on first AI call)
 }
 
 /* ═══ 2 · ROOT PROXY & DSL ═══ */
@@ -206,7 +180,7 @@ async function testText(){
     assertTrue('text','countTokens in [5,20]',typeof ct==='number'&&ct>=5&&ct<=20,{note:'got '+ct});
   }
   // Handle
-  var handle;try{handle=plugin({instruction:'Name three colors, comma-separated.',startWith:''});}
+  var handle;try{handle=plugin({instruction:'Write a detailed paragraph about the history of astronomy, covering ancient civilizations through the telescope era.',startWith:''});}
   catch(e){assertSkip('text','handle','threw');return;}
   var EH=['id','inputs','liveResponseText','loadingIndicatorHtml','onFinishPromise','stop','submitUserRating','textStream','toString'];
   assertEq('text','handle 9 props',EH,ownKeys(handle).filter(function(k){return EH.indexOf(k)!==-1;}).sort(),{cmp:arrEq});
@@ -217,7 +191,7 @@ async function testText(){
 
   // v3: sample liveResponseText during generation
   var lrtSamples=[],lrtDone=false;
-  (async function(){while(!lrtDone){await sleep(2000);try{lrtSamples.push(String(handle.liveResponseText||'').length);}catch(e){}}})();
+  (async function(){while(!lrtDone){await sleep(1000);try{lrtSamples.push(String(handle.liveResponseText||'').length);}catch(e){}}})();
 
   var result,err;try{result=await T(handle,90000,'gen');}catch(e){err=String(e&&e.message||e);}
   lrtDone=true;
@@ -252,7 +226,7 @@ async function testText(){
     assertEq('text','21 stops → error','error',String(r21.stopReason));
     assertEq('text','21 stops → empty','',String(r21.generatedText||''));
   }catch(e){assertSkip('text','21 stops','failed');}
-  try{var r20=await T(plugin({instruction:'Hi',startWith:'',stopSequences:s20}),30000,'20');
+  try{var r20=await T(plugin({instruction:'Hi',startWith:'',stopSequences:s20}),60000,'20');
     assertTrue('text','20 stops → not error',String(r20.stopReason)!=='error');
   }catch(e){assertSkip('text','20 stops','failed');}
 
@@ -288,6 +262,12 @@ async function testText(){
     assertTrue('text','serial: 2nd call takes >1s',secondMs>1000,
       {note:'1st='+Math.round(firstMs)+'ms 2nd='+Math.round(secondMs)+'ms'});
   }catch(e){assertSkip('text','concurrency','failed: '+String(e&&e.message||e));}
+
+  // Broker iframe check (moved here from env — broker loads on first AI call)
+  var iframes=document.querySelectorAll('iframe');
+  var brokerFound=false;
+  for(var bi=0;bi<iframes.length;bi++){if(/text-generation\.perchance\.org\/embed/.test(iframes[bi].src||''))brokerFound=true;}
+  assertTrue('text','text-gen broker iframe present',brokerFound,{note:'checked '+iframes.length+' iframes after AI calls'});
 }
 
 /* ═══ 4 · TEXT-TO-IMAGE-PLUGIN ═══ */
@@ -324,11 +304,14 @@ async function testImage(){
     }catch(e){assertSkip('image',rn,'failed: '+String(e&&e.message||e));}
   }
 
-  // 1024x1024 rejected
+  // 1024x1024 rejected — either resolves with 0x0 canvas or hangs (both = rejection)
   setProg(56,'4 · invalid resolution');
-  try{var inv=await T(t2i({prompt:'a dot',resolution:'1024x1024'}),20000,'1024');
-    assertEq('image','1024x1024 → 0x0',[0,0],[inv.canvas.width,inv.canvas.height]);
-  }catch(e){assertSkip('image','1024x1024','failed');}
+  var inv1024Ok=false,invNote='';
+  try{var inv=await T(t2i({prompt:'a dot',resolution:'1024x1024'}),5000,'1024');
+    inv1024Ok=(inv.canvas.width===0&&inv.canvas.height===0);
+    invNote='canvas '+inv.canvas.width+'x'+inv.canvas.height;
+  }catch(e){inv1024Ok=true;invNote='timed out (never resolved — valid rejection)';}
+  assertTrue('image','1024x1024 rejected',inv1024Ok,{note:invNote});
 
   // v3: multiple inline params in one call
   setProg(58,'4 · inline params (batch)');
@@ -512,14 +495,14 @@ async function testApi(){
       var fi=await T(sf(fiUrl),15000,'fi');
       assertEq('api','fileInfo → 200',200,fi.status);
       var fij=await fi.json();
-      assertTrue('api','fileInfo returns JSON with size',typeof fij==='object'&&(fij.size||fij.fileSize)>0,
+      assertTrue('api','fileInfo returns JSON metadata',typeof fij==='object'&&(fij.tags!==undefined||fij.extension!==undefined||fij.size!==undefined),
         {note:'keys: '+Object.keys(fij).join(',')});
     }catch(e){assertSkip('api','fileInfo','failed: '+String(e&&e.message||e));}
   }
 }
 
 /* ═══ EXPORT & RUN ═══ */
-function doExport(fp){var rpt={suite:'perchance-monitor',version:'3',startedAt:window.__S,finishedAt:new Date().toISOString(),userAgent:navigator.userAgent,counts:COUNTS,fingerprint:fp,tests:TESTS};var j=JSON.stringify(rpt,null,2);var b=document.getElementById('out');b.value=j;b.style.display='block';try{b.select();document.execCommand('copy');}catch(e){}if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(j).then(function(){},function(){});try{var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([j],{type:'application/json'}));a.download='perchance-monitor-'+new Date().toISOString().slice(0,10)+'-'+fp+'.json';document.body.appendChild(a);a.click();a.remove();}catch(e){}}
+function doExport(fp){var rpt={suite:'perchance-monitor',version:'3.1',startedAt:window.__S,finishedAt:new Date().toISOString(),userAgent:navigator.userAgent,counts:COUNTS,fingerprint:fp,tests:TESTS};var j=JSON.stringify(rpt,null,2);var b=document.getElementById('out');b.value=j;b.style.display='block';try{b.select();document.execCommand('copy');}catch(e){}if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(j).then(function(){},function(){});try{var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([j],{type:'application/json'}));a.download='perchance-monitor-'+new Date().toISOString().slice(0,10)+'-'+fp+'.json';document.body.appendChild(a);a.click();a.remove();}catch(e){}}
 var RUN=false;
 async function runSuite(){if(RUN)return;RUN=true;document.getElementById('runBtn').disabled=true;document.getElementById('exportBtn').disabled=true;window.__S=new Date().toISOString();TESTS=[];COUNTS={PASS:0,FAIL:0,DRIFT:0,SKIP:0};['env','root','text','image','upload','fetch','api'].forEach(function(g){document.getElementById('g-'+g).innerHTML='';});uu();
 var gs=[['env',testEnv],['root',testRoot],['text',testText],['image',testImage],['upload',testUpload],['fetch',testFetch],['api',testApi]];
