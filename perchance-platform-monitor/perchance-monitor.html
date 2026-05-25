@@ -1,0 +1,665 @@
+<!--
+================================================================
+  PERCHANCE PLATFORM — MONITORING TEST SUITE  v1
+================================================================
+
+  Purpose
+  -------
+  Repeatable regression check across every documented platform
+  behavior. Each assertion has an EXPECTED value baked in.
+  Anything that no longer matches is flagged DRIFT.
+
+  Output
+  ------
+  - Per-test PASS / FAIL / DRIFT / SKIP rows on screen
+  - A fingerprint hash summarising the run — two clean runs
+    with no drift will produce the same hash. A different hash
+    means SOMETHING changed; the row-level output shows what.
+  - Full JSON report auto-downloaded for archival.
+
+  How to use
+  ----------
+  1. Paste the matching top-editor file into the Perchance editor.
+  2. Save. Click Run. Wait for the green banner.
+  3. Archive the report alongside the run date.
+  4. To check for platform drift later: re-run, compare fingerprints.
+     If the hash matches → nothing has changed worth caring about.
+     If it differs → scroll to the FAIL/DRIFT rows.
+
+  Required top-editor file:
+    perchance-monitor-top-editor.txt  (same content as previous
+    probe top-editor files — just imports the four plugins).
+
+  Runtime: ~3 minutes. Performs ~6 short AI calls + ~3 images +
+  uploads + superFetch probes + public-API checks.
+-->
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+  *{box-sizing:border-box;}
+  :root{
+    --bg:#0a0d11;--panel:#11151b;--panel2:#181d25;--line:#262e3a;
+    --ink:#c7d2dc;--dim:#6a7787;
+    --pass:#5fcf80;--fail:#e5604f;--drift:#e2a13c;--skip:#6a7787;--info:#5aa9e6;
+    --accent:#b08cd9;
+  }
+  body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.5 'IBM Plex Mono',monospace;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1180px;margin:0 auto;padding:20px 16px 90px;}
+  header.mast{border:1px solid var(--line);background:repeating-linear-gradient(135deg,transparent 0 9px,rgba(176,140,217,.04) 9px 10px),var(--panel);padding:16px 18px;margin-bottom:14px;}
+  header.mast h1{margin:0;font-size:16px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;}
+  header.mast h1 .v{color:var(--accent);}
+  header.mast p{margin:6px 0 0;color:var(--dim);font-size:11.5px;}
+
+  .bar{position:sticky;top:0;z-index:50;background:var(--bg);display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);margin-bottom:14px;}
+  button{font-family:inherit;font-size:12px;font-weight:600;background:var(--panel2);color:var(--ink);border:1px solid var(--line);padding:8px 13px;cursor:pointer;letter-spacing:.3px;}
+  button:hover:not(:disabled){border-color:var(--accent);}
+  button:disabled{opacity:.4;cursor:not-allowed;}
+  button.primary{background:var(--accent);color:#170d22;border-color:var(--accent);}
+  button.sm{font-size:11px;padding:5px 9px;}
+  .prog{flex:1;min-width:160px;height:8px;background:var(--panel2);border:1px solid var(--line);overflow:hidden;}
+  .prog>i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s;}
+  .stat{font-size:11px;color:var(--dim);min-width:240px;}
+
+  /* summary panel */
+  .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:14px;}
+  .stat-box{border:1px solid var(--line);background:var(--panel);padding:10px 12px;}
+  .stat-box .lbl{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--dim);}
+  .stat-box .num{font-size:22px;font-weight:700;margin-top:2px;}
+  .stat-box.pass .num{color:var(--pass);} .stat-box.fail .num{color:var(--fail);}
+  .stat-box.drift .num{color:var(--drift);} .stat-box.skip .num{color:var(--skip);}
+  .stat-box.fp .num{font-size:13px;font-family:monospace;color:var(--accent);word-break:break-all;line-height:1.3;}
+
+  /* test rows */
+  section.group{border:1px solid var(--line);background:var(--panel);margin-bottom:12px;}
+  section.group>h2{margin:0;padding:9px 13px;font-size:11.5px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;border-bottom:1px solid var(--line);background:var(--panel2);display:flex;justify-content:space-between;}
+  section.group>h2 .rt{font-size:10px;font-weight:600;color:var(--dim);}
+  .cb{padding:4px 13px 8px;}
+  .row{display:grid;grid-template-columns:65px 240px 1fr;gap:9px;padding:4px 0;border-bottom:1px dotted var(--line);align-items:baseline;}
+  .row:last-child{border-bottom:0;}
+  .row.spin{color:var(--dim);}
+  .lvl{font-weight:700;font-size:10.5px;letter-spacing:.8px;}
+  .lvl.PASS{color:var(--pass);}.lvl.FAIL{color:var(--fail);}.lvl.DRIFT{color:var(--drift);}.lvl.SKIP{color:var(--skip);}.lvl.INFO{color:var(--info);}
+  .name{color:var(--ink);}
+  .detail{color:var(--dim);font-size:11.5px;word-break:break-word;white-space:pre-wrap;}
+  .detail .exp{color:var(--dim);}
+  .detail .got{color:var(--ink);}
+  .detail .bad{color:var(--fail);}
+  .detail .ok{color:var(--pass);}
+
+  #out{width:100%;height:220px;margin-top:8px;background:var(--bg);color:var(--ink);border:1px solid var(--line);font:11px/1.4 monospace;padding:9px;resize:vertical;display:none;}
+  #banner{display:none;margin-top:10px;padding:12px 14px;font-size:13px;font-weight:700;border-width:2px;border-style:solid;}
+  #banner.ok{border-color:var(--pass);background:#0d1f11;color:var(--pass);}
+  #banner.bad{border-color:var(--fail);background:#1f0d0d;color:var(--fail);}
+</style>
+
+<div class="wrap">
+  <header class="mast">
+    <h1>Perchance Platform <span class="v">Monitor</span> · v1</h1>
+    <p>Repeatable regression suite. Same fingerprint = nothing changed. Different fingerprint = check the FAIL/DRIFT rows.</p>
+  </header>
+
+  <div class="bar">
+    <button class="primary" id="runBtn">▶ Run suite (wait for green banner)</button>
+    <div class="prog"><i id="progBar"></i></div>
+    <div class="stat" id="progStat">idle — click Run, then wait ~3 min</div>
+    <button class="sm" id="exportBtn" disabled>⤓ Export report</button>
+  </div>
+
+  <div class="summary">
+    <div class="stat-box pass"><div class="lbl">Pass</div><div class="num" id="cPass">—</div></div>
+    <div class="stat-box fail"><div class="lbl">Fail</div><div class="num" id="cFail">—</div></div>
+    <div class="stat-box drift"><div class="lbl">Drift</div><div class="num" id="cDrift">—</div></div>
+    <div class="stat-box skip"><div class="lbl">Skipped</div><div class="num" id="cSkip">—</div></div>
+    <div class="stat-box fp"><div class="lbl">Fingerprint</div><div class="num" id="fp">pending</div></div>
+  </div>
+
+  <section class="group"><h2><span>1 · Environment</span><span class="rt">capabilities & globals</span></h2><div class="cb" id="g-env"></div></section>
+  <section class="group"><h2><span>2 · root Proxy</span><span class="rt">bridge characteristics</span></h2><div class="cb" id="g-root"></div></section>
+  <section class="group"><h2><span>3 · ai-text-plugin</span><span class="rt">handle shape, stopReason, limits</span></h2><div class="cb" id="g-text"></div></section>
+  <section class="group"><h2><span>4 · text-to-image-plugin</span><span class="rt">return shape, inline params, validation</span></h2><div class="cb" id="g-image"></div></section>
+  <section class="group"><h2><span>5 · upload-plugin</span><span class="rt">return shape, MIME, expires</span></h2><div class="cb" id="g-upload"></div></section>
+  <section class="group"><h2><span>6 · superFetch</span><span class="rt">headers, cache, SSRF, bypass</span></h2><div class="cb" id="g-fetch"></div></section>
+  <section class="group"><h2><span>7 · Public HTTP API</span><span class="rt">endpoint availability</span></h2><div class="cb" id="g-api"></div></section>
+
+  <div id="banner"></div>
+  <textarea id="out" readonly></textarea>
+</div>
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ASSERTION FRAMEWORK
+═══════════════════════════════════════════════════════════════════════ */
+
+var TESTS=[]; // collected results
+var COUNTS={PASS:0,FAIL:0,DRIFT:0,SKIP:0};
+
+/*
+  Test status semantics:
+    PASS   — observed matched expected
+    FAIL   — observed differs from expected in a way that breaks documented behavior
+    DRIFT  — observed differs but is non-critical (e.g. timing changed by 2x)
+    SKIP   — preconditions unmet (plugin not loaded, network blocked, etc.)
+*/
+
+function assertEq(group, name, expected, actual, opts){
+  opts=opts||{};
+  var pass = (opts.cmp ? opts.cmp(expected,actual) : JSON.stringify(expected)===JSON.stringify(actual));
+  var status = pass ? 'PASS' : (opts.softFail ? 'DRIFT' : 'FAIL');
+  recordTest(group,name,status,expected,actual,opts.note);
+  return pass;
+}
+function assertTrue(group, name, actual, opts){
+  return assertEq(group,name,true,!!actual,opts);
+}
+function assertSkip(group, name, reason){
+  recordTest(group,name,'SKIP',null,null,reason);
+}
+function recordTest(group,name,status,expected,actual,note){
+  TESTS.push({group:group,name:name,status:status,expected:expected,actual:actual,note:note||null});
+  COUNTS[status]=(COUNTS[status]||0)+1;
+  render(group,name,status,expected,actual,note);
+  updateCounters();
+}
+
+function render(group,name,status,expected,actual,note){
+  var host=document.getElementById('g-'+group);
+  if(!host) return;
+  var row=document.createElement('div');row.className='row';
+  var detail='';
+  if(status==='PASS'){
+    detail='<span class="got ok">'+escapeHtml(brief(actual))+'</span>';
+  }else if(status==='SKIP'){
+    detail='<span class="exp">'+escapeHtml(note||'')+'</span>';
+  }else{
+    detail='<span class="exp">expected: '+escapeHtml(brief(expected))+'</span>\n'
+          +'<span class="bad">got: '+escapeHtml(brief(actual))+'</span>';
+  }
+  if(note && status!=='SKIP') detail+='\n<span class="exp">'+escapeHtml(note)+'</span>';
+  row.innerHTML='<span class="lvl '+status+'">'+status+'</span>'
+               +'<span class="name"></span>'
+               +'<span class="detail">'+detail+'</span>';
+  row.children[1].textContent=name;
+  host.appendChild(row);
+}
+function brief(v){
+  if(v===undefined) return 'undefined';
+  if(v===null) return 'null';
+  if(typeof v==='string'){ return v.length>80?JSON.stringify(v.slice(0,80))+'...['+v.length+'ch]':JSON.stringify(v); }
+  if(typeof v==='object'){ try{ var s=JSON.stringify(v); return s.length>100?s.slice(0,100)+'...':s; }catch(e){ return '[object]'; } }
+  return String(v);
+}
+function escapeHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function updateCounters(){
+  document.getElementById('cPass').textContent=COUNTS.PASS||0;
+  document.getElementById('cFail').textContent=COUNTS.FAIL||0;
+  document.getElementById('cDrift').textContent=COUNTS.DRIFT||0;
+  document.getElementById('cSkip').textContent=COUNTS.SKIP||0;
+}
+function setProg(pct,msg){
+  document.getElementById('progBar').style.width=Math.min(100,pct)+'%';
+  document.getElementById('progStat').textContent=msg||'';
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════════════════════════════════ */
+
+function grab(name){
+  try{if(typeof root!=='undefined'&&root[name]!==undefined)return root[name];}catch(e){}
+  try{if(window[name]!==undefined)return window[name];}catch(e){}
+  return undefined;
+}
+function ownKeys(obj){
+  if(obj==null) return [];
+  try{ return Object.getOwnPropertyNames(obj).filter(function(k){return !/^\d+$/.test(k)&&k!=='length';}).sort(); }
+  catch(e){ return []; }
+}
+function sleep(ms){return new Promise(function(r){setTimeout(r,ms);});}
+function withTimeout(p,ms,label){
+  return new Promise(function(resolve,reject){
+    var done=false;
+    var t=setTimeout(function(){if(!done){done=true;reject(new Error('TIMEOUT '+(label||'')));}},ms);
+    Promise.resolve(p).then(
+      function(v){if(!done){done=true;clearTimeout(t);resolve(v);}},
+      function(e){if(!done){done=true;clearTimeout(t);reject(e);}});
+  });
+}
+function arrayEqIgnoringOrder(a,b){
+  if(!Array.isArray(a)||!Array.isArray(b)) return false;
+  if(a.length!==b.length) return false;
+  var as=a.slice().sort(),bs=b.slice().sort();
+  for(var i=0;i<as.length;i++) if(as[i]!==bs[i]) return false;
+  return true;
+}
+function setSupersetOf(actual,expected){
+  if(!Array.isArray(actual)||!Array.isArray(expected)) return false;
+  return expected.every(function(k){return actual.indexOf(k)!==-1;});
+}
+async function fnv1aHex(str){
+  // small non-cryptographic hash, 32-bit FNV-1a → 8-hex
+  var h=0x811c9dc5;
+  for(var i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=(h*0x01000193)>>>0; }
+  return ('00000000'+h.toString(16)).slice(-8);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TEST GROUPS
+═══════════════════════════════════════════════════════════════════════ */
+
+/* --- 1 · Environment ----------------------------------------------------- */
+async function testEnvironment(){
+  setProg(2,'1 · Environment');
+
+  // crossOriginIsolated
+  assertEq('env','window.crossOriginIsolated',false,window.crossOriginIsolated);
+
+  // generatorPublicId looks like 32-hex (don't pin its value)
+  var pid=window.generatorPublicId;
+  assertTrue('env','generatorPublicId is 32 hex chars', typeof pid==='string' && /^[a-f0-9]{32}$/.test(pid),
+    {note:'value not pinned — varies per generator'});
+
+  // generatorName is a non-empty string
+  assertTrue('env','generatorName is a non-empty string', typeof window.generatorName==='string' && window.generatorName.length>0,
+    {note:'value not pinned — varies per generator'});
+
+  // Capability matrix — pin documented values
+  assertEq('env','window.open returns null',null,(function(){try{var w=window.open('','_blank');if(w){w.close();return w;}return null;}catch(e){return 'threw';}})());
+  assertEq('env','Notification.permission','denied', (typeof Notification!=='undefined'?Notification.permission:'absent'));
+  assertEq('env','typeof SharedArrayBuffer','undefined',typeof SharedArrayBuffer);
+  assertTrue('env','indexedDB available',typeof indexedDB!=='undefined');
+  assertTrue('env','caches available',typeof caches!=='undefined');
+  assertTrue('env','document.cookie writable',(function(){try{document.cookie='__monitor=1';return document.cookie.indexOf('__monitor=1')!==-1;}catch(e){return false;}})());
+
+  // Broker iframe presence
+  var brokerSrc=(document.querySelector('iframe')||{}).src||'';
+  assertTrue('env','text-generation broker iframe present', /text-generation\.perchance\.org\/embed/.test(brokerSrc),
+    {note:'first iframe src should reference text-generation broker'});
+}
+
+/* --- 2 · root Proxy ------------------------------------------------------ */
+async function testRoot(){
+  setProg(8,'2 · root Proxy');
+  if(typeof root==='undefined'){
+    assertSkip('root','root proxy','root is undefined — generator did not load properly');
+    return;
+  }
+
+  assertEq('root','typeof root','function',(function(){try{return typeof root;}catch(e){return 'threw';}})());
+  assertEq('root',"'aiTextPlugin' in root",true,(function(){try{return ('aiTextPlugin' in root);}catch(e){return 'threw';}})());
+  assertEq('root','root.<missing key> → undefined',undefined,(function(){try{return root.__definitely_not_a_real_key__;}catch(e){return 'threw';}})());
+  assertEq('root','Reflect.ownKeys(root) throws','threw',(function(){try{Reflect.ownKeys(root);return 'did-not-throw';}catch(e){return 'threw';}})());
+  assertEq('root','JSON.stringify(root) is undefined',undefined,(function(){try{return JSON.stringify(root);}catch(e){return 'threw';}})());
+
+  // Plugin handles present
+  var handles=['aiTextPlugin','textToImagePlugin','uploadPlugin','superFetch'];
+  for(var i=0;i<handles.length;i++){
+    var h=handles[i];
+    assertEq('root',"'"+h+"' in root",true,(function(){try{return (h in root);}catch(e){return 'threw';}})());
+  }
+  // NOTE: never call root() — it corrupts the Proxy. We test that property
+  // _reads_ work; calling root() is documented as fatal.
+}
+
+/* --- 3 · ai-text-plugin -------------------------------------------------- */
+async function testText(){
+  setProg(14,'3 · ai-text-plugin (this takes ~30-40s)');
+  var plugin=grab('aiTextPlugin');
+  if(typeof plugin!=='function'){
+    assertSkip('text','aiTextPlugin', 'plugin not callable');
+    return;
+  }
+
+  // getMetaObject
+  var meta;
+  try{ meta=plugin({getMetaObject:true}); }catch(e){ meta=null; }
+  assertTrue('text','getMetaObject returns object',meta && typeof meta==='object');
+  assertEq('text','metaObject.idealMaxContextTokens',6000,meta&&meta.idealMaxContextTokens);
+  assertEq('text','typeof metaObject.countTokens','function',typeof (meta&&meta.countTokens));
+
+  // Synchronous handle properties (the big R9-R10 finding)
+  var handle;
+  try{ handle=plugin({instruction:'Name three colors, comma-separated.',startWith:''}); }
+  catch(e){
+    assertSkip('text','synchronous handle','plugin threw: '+String(e&&e.message||e));
+    return;
+  }
+  var EXPECTED_HANDLE_KEYS=['id','inputs','liveResponseText','loadingIndicatorHtml','onFinishPromise',
+    'stop','submitUserRating','textStream','toString'];
+  var actualKeys=ownKeys(handle);
+  assertEq('text','handle has documented properties',
+    EXPECTED_HANDLE_KEYS,
+    actualKeys.filter(function(k){return EXPECTED_HANDLE_KEYS.indexOf(k)!==-1;}).sort(),
+    {cmp:arrayEqIgnoringOrder,
+     note:'extra props OK; missing documented props = drift. actual: '+actualKeys.join(',')});
+
+  // textStream is a ReadableStream
+  assertTrue('text','handle.textStream is a ReadableStream',
+    handle.textStream && (typeof ReadableStream!=='undefined') && (handle.textStream instanceof ReadableStream));
+
+  // id format
+  assertTrue('text','handle.id matches /^aiTextCompletion\\d+$/',
+    typeof handle.id==='string' && /^aiTextCompletion\d+$/.test(handle.id));
+
+  // submitUserRating arity
+  assertEq('text','submitUserRating.length',1,handle.submitUserRating&&handle.submitUserRating.length);
+
+  // Await it; record output
+  var result, err;
+  try{ result=await withTimeout(handle,90000,'short gen'); }catch(e){ err=String(e&&e.message||e); }
+  if(err){ assertSkip('text','generation','timed out / failed: '+err); return; }
+
+  // Boxed-String shape
+  assertTrue('text','result instanceof String', result instanceof String);
+  assertEq('text','typeof result','object',typeof result);
+  var resultKeys=ownKeys(result);
+  assertEq('text','result has [text, generatedText, stopReason]',
+    ['generatedText','stopReason','text'], resultKeys.sort(),
+    {cmp:arrayEqIgnoringOrder});
+
+  // stopReason vocabulary — must be one of the 4 documented values
+  var VALID_STOP=['natural','artificial','error','user'];
+  assertTrue('text','stopReason in valid vocabulary',
+    VALID_STOP.indexOf(String(result.stopReason))!==-1,
+    {note:'observed: '+String(result.stopReason)});
+
+  // 21 stopSequences must produce stopReason "error"
+  setProg(22,'3 · stopSequences hard limit');
+  var seqs=[];for(var i=0;i<21;i++)seqs.push('zz'+i);
+  var errResult;
+  try{ errResult=await withTimeout(plugin({instruction:'Say hi',startWith:'',stopSequences:seqs}),30000,'21 stops'); }
+  catch(e){ assertSkip('text','21 stopSequences → error','call threw: '+String(e&&e.message||e)); return; }
+  assertEq('text','21 stopSequences → stopReason "error"','error',String(errResult.stopReason),
+    {note:'documented maximum is 20'});
+  assertEq('text','21 stopSequences → empty generatedText','',String(errResult.generatedText||''));
+
+  // 20 stopSequences must NOT produce error
+  setProg(26,'3 · stopSequences ok at 20');
+  var seqs20=[];for(var j=0;j<20;j++)seqs20.push('yy'+j);
+  var okResult;
+  try{ okResult=await withTimeout(plugin({instruction:'Say hi',startWith:'',stopSequences:seqs20}),30000,'20 stops'); }
+  catch(e){ assertSkip('text','20 stopSequences → not error','call threw: '+String(e&&e.message||e)); return; }
+  assertTrue('text','20 stopSequences → stopReason not "error"',
+    String(okResult.stopReason)!=='error',
+    {note:'observed: '+String(okResult.stopReason)});
+
+  // .stop() yields stopReason "user"
+  setProg(30,'3 · .stop() → "user"');
+  var stopHandle, stopResult, stopErr;
+  try{
+    var seenChunks=0;
+    stopHandle=plugin({
+      instruction:'Count slowly from one to fifty in words.',startWith:'',
+      onChunk:function(){ seenChunks++; if(seenChunks>=2){try{stopHandle.stop();}catch(e){}} }
+    });
+    stopResult=await withTimeout(stopHandle,60000,'.stop()');
+  }catch(e){ stopErr=String(e&&e.message||e); }
+  if(stopErr){ assertSkip('text','.stop() → stopReason "user"','call threw: '+stopErr); }
+  else assertEq('text','.stop() → stopReason "user"','user',String(stopResult.stopReason));
+}
+
+/* --- 4 · text-to-image-plugin -------------------------------------------- */
+async function testImage(){
+  setProg(40,'4 · text-to-image-plugin');
+  var t2i=grab('textToImagePlugin');
+  if(typeof t2i!=='function'){
+    assertSkip('image','textToImagePlugin', 'plugin not callable');
+    return;
+  }
+
+  // Synchronous return shape — should NOT be a boxed String
+  var sync;
+  try{ sync=t2i({prompt:'a blue circle',resolution:'512x512'}); }catch(e){}
+  if(!sync){ assertSkip('image','synchronous return','plugin threw'); return; }
+  assertEq('image','sync return is NOT a boxed String',false, sync instanceof String);
+  var SYNC_KEYS=['evaluateItem','iframeHtml','onFinishPromise','toString'];
+  assertEq('image','sync return has [iframeHtml, evaluateItem, onFinishPromise, toString]',
+    SYNC_KEYS, ownKeys(sync).sort(), {cmp:arrayEqIgnoringOrder});
+
+  // Await result
+  var result,err;
+  try{ result=await withTimeout(sync,40000,'image'); }catch(e){ err=String(e&&e.message||e); }
+  if(err){ assertSkip('image','image generation','timed out / failed: '+err); return; }
+
+  // Awaited result shape
+  assertTrue('image','awaited result instanceof String',result instanceof String);
+  var RESULT_KEYS=['canvas','dataUrl','inputs'];
+  assertEq('image','awaited result has [canvas, dataUrl, inputs]',
+    RESULT_KEYS, ownKeys(result).sort(), {cmp:arrayEqIgnoringOrder});
+
+  // Canvas dimensions match requested resolution
+  assertEq('image','canvas is 512x512',[512,512],[result.canvas.width,result.canvas.height]);
+
+  // result.inputs default key set (subset check — extras are fine, missing isn't)
+  var EXPECTED_INPUT_KEYS=['prompt','seed','resolution','guidanceScale','negativePrompt'];
+  var inputKeys=ownKeys(result.inputs);
+  assertTrue('image','result.inputs contains documented keys',
+    setSupersetOf(inputKeys,EXPECTED_INPUT_KEYS),
+    {note:'expected superset of '+EXPECTED_INPUT_KEYS.join(',')+'; got: '+inputKeys.join(',')});
+
+  // guidanceScale default = 7
+  assertEq('image','guidanceScale default = 7',7,result.inputs.guidanceScale);
+
+  // Invalid resolution silently rejected
+  setProg(50,'4 · image: invalid resolution');
+  var invRes,invErr;
+  try{ invRes=await withTimeout(t2i({prompt:'a green square',resolution:'1024x1024'}),20000,'1024'); }
+  catch(e){ invErr=String(e&&e.message||e); }
+  if(invErr){ assertSkip('image','1024x1024 silently rejected','call threw: '+invErr); }
+  else assertEq('image','1024x1024 → canvas 0x0',[0,0],[invRes.canvas.width,invRes.canvas.height],
+    {note:'documented: client-side dropped, 0x0 canvas'});
+
+  // Inline param parsing — (seed:::42) should be extracted into inputs, stripped from prompt
+  setProg(55,'4 · image: inline params');
+  var inline,inlineErr;
+  try{ inline=await withTimeout(t2i({prompt:'a yellow triangle (seed:::42)'}),40000,'inline'); }
+  catch(e){ inlineErr=String(e&&e.message||e); }
+  if(inlineErr){ assertSkip('image','inline (seed:::42)','call threw: '+inlineErr); }
+  else{
+    assertEq('image','(seed:::42) → inputs.seed = 42',42,inline.inputs.seed);
+    assertTrue('image','(seed:::42) stripped from inputs.prompt',
+      String(inline.inputs.prompt).indexOf('seed:::')===-1,
+      {note:'observed prompt: '+JSON.stringify(String(inline.inputs.prompt))});
+  }
+}
+
+/* --- 5 · upload-plugin --------------------------------------------------- */
+async function testUpload(){
+  setProg(62,'5 · upload-plugin');
+  var up=grab('uploadPlugin');
+  if(typeof up!=='function'){ assertSkip('upload','uploadPlugin','plugin not callable'); return; }
+
+  // Basic upload + return shape
+  var blob=new Blob(['monitor v1 '+Math.random()],{type:'text/plain'});
+  var r,err;
+  try{ r=await withTimeout(up(blob),30000,'upload'); }catch(e){ err=String(e&&e.message||e); }
+  if(err){ assertSkip('upload','basic upload','call threw: '+err); return; }
+  var REQUIRED=['url','size','error','deletionUrl'];
+  var rKeys=ownKeys(r);
+  assertTrue('upload','result has [url, size, error, deletionUrl]',
+    setSupersetOf(rKeys,REQUIRED),
+    {note:'got: '+rKeys.join(',')});
+  assertTrue('upload','result.url is a boxed String', r.url instanceof String);
+  assertEq('upload','result.size equals blob byte length',blob.size,r.size);
+  assertTrue('upload','deletionUrl is upload.perchance.org/api/delete',
+    typeof r.deletionUrl==='string' && r.deletionUrl.indexOf('upload.perchance.org/api/delete')!==-1);
+
+  // text/html rejected
+  setProg(70,'5 · upload: text/html rejection');
+  var html,htmlErr;
+  try{ html=await withTimeout(up(new Blob(['<html></html>'],{type:'text/html'})),15000,'html'); }
+  catch(e){ htmlErr=String(e&&e.message||e); }
+  if(htmlErr){ assertSkip('upload','text/html → invalid_filetype','call threw: '+htmlErr); }
+  else assertEq('upload','text/html → error invalid_filetype','invalid_filetype',String(html&&html.error));
+
+  // expires option strict format
+  setProg(74,'5 · upload: expires validation');
+  var exp,expErr;
+  try{ exp=await withTimeout(up(new Blob(['x'+Math.random()],{type:'text/plain'}),{expires:3600}),15000,'expires'); }
+  catch(e){ expErr=String(e&&e.message||e); }
+  if(expErr){ assertSkip('upload','expires:3600 → invalid_expiry','call threw: '+expErr); }
+  else assertEq('upload','expires:3600 → error invalid_expiry','invalid_expiry',String(exp&&exp.error),
+    {note:'documents: option is real but format-strict'});
+}
+
+/* --- 6 · superFetch ------------------------------------------------------ */
+async function testFetch(){
+  setProg(80,'6 · superFetch');
+  var sf=grab('superFetch');
+  if(typeof sf!=='function'){ assertSkip('fetch','superFetch','plugin not callable'); return; }
+
+  // Custom header stripping
+  try{
+    var resp=await withTimeout(sf('https://httpbin.org/headers?_='+Date.now(),
+      {headers:{'X-Monitor-Probe':'monitor-secret-12345'}}),20000,'headers');
+    var json=await resp.json();
+    var leaked=JSON.stringify(json.headers||{}).indexOf('monitor-secret-12345')!==-1;
+    assertEq('fetch','custom request headers stripped',false,leaked,
+      {note:'sent X-Monitor-Probe; checked echoed headers'});
+  }catch(e){ assertSkip('fetch','custom headers stripped','call failed: '+String(e&&e.message||e)); }
+
+  // SSRF block on AWS metadata
+  var ssrfBlocked=false;
+  try{
+    await withTimeout(sf('http://169.254.169.254/latest/meta-data/'),15000,'ssrf');
+  }catch(e){ ssrfBlocked=true; }
+  assertEq('fetch','SSRF: AWS metadata blocked',true,ssrfBlocked);
+
+  // Proxy bypass — raw.githubusercontent should be faster than the proxy path
+  try{
+    var t0=performance.now();
+    var bypassResp=await withTimeout(sf('https://raw.githubusercontent.com/jquery/jquery/3.7.1/package.json'),20000,'bypass');
+    var bypassTime=performance.now()-t0;
+    var bypassText=await bypassResp.text();
+    assertTrue('fetch','raw.githubusercontent.com bypass is fast (<3s)',
+      bypassTime<3000,
+      {note:'measured '+bypassTime.toFixed(0)+'ms; proxy path would be ~5s+'});
+    assertTrue('fetch','raw.githubusercontent.com returns content',bypassText.length>100);
+  }catch(e){ assertSkip('fetch','bypass list','call failed: '+String(e&&e.message||e)); }
+
+  // No 100 KB response cap — fetch a known large file
+  try{
+    var bigResp=await withTimeout(sf('https://raw.githubusercontent.com/jquery/jquery/3.7.1/dist/jquery.js'),25000,'big');
+    var bigText=await bigResp.text();
+    var bigSize=new Blob([bigText]).size;
+    assertTrue('fetch','no 100 KB response cap',
+      bigSize>200000,
+      {note:'fetched '+bigSize.toLocaleString()+' bytes (jQuery ~290KB)'});
+  }catch(e){ assertSkip('fetch','no 100KB cap','call failed: '+String(e&&e.message||e)); }
+}
+
+/* --- 7 · Public HTTP API ------------------------------------------------- */
+async function testApi(){
+  setProg(92,'7 · Public HTTP API');
+  var sf=grab('superFetch');
+  if(typeof sf!=='function'){ assertSkip('api','public API','superFetch unavailable'); return; }
+
+  var gen='ai-text-plugin';
+  var endpoints=[
+    ['getGeneratorStats',  'https://perchance.org/api/getGeneratorStats?name='+gen,           200],
+    ['getGeneratorList',   'https://perchance.org/api/getGeneratorList?max=3',                200],
+    ['downloadGenerator',  'https://perchance.org/api/downloadGenerator?generatorName='+gen,  200],
+    ['getGeneratorsAndDependencies','https://perchance.org/api/getGeneratorsAndDependencies?generatorNames='+gen, 200],
+    ['getGeneratorScreenshot','https://perchance.org/api/getGeneratorScreenshot?generatorName='+gen, 200],
+  ];
+  for(var i=0;i<endpoints.length;i++){
+    var label=endpoints[i][0],url=endpoints[i][1],expectedStatus=endpoints[i][2];
+    try{
+      var resp=await withTimeout(sf(url),15000,label);
+      assertEq('api',label+' → HTTP '+expectedStatus, expectedStatus, resp.status);
+    }catch(e){ assertSkip('api',label,'call failed: '+String(e&&e.message||e)); }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   FINGERPRINT
+═══════════════════════════════════════════════════════════════════════ */
+
+// Build a deterministic string from the test outcomes — only the
+// status (PASS/FAIL/DRIFT/SKIP) per test, in declared order. A run
+// with all the same statuses produces the same fingerprint.
+async function computeFingerprint(){
+  var sig=TESTS.map(function(t){return t.group+':'+t.name+'='+t.status;}).join('|');
+  return await fnv1aHex(sig);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   EXPORT
+═══════════════════════════════════════════════════════════════════════ */
+
+function doExport(fingerprint){
+  var report={
+    suite:'perchance-monitor',
+    version:'1',
+    startedAt:window.__STARTED,
+    finishedAt:new Date().toISOString(),
+    userAgent:navigator.userAgent,
+    counts:COUNTS,
+    fingerprint:fingerprint,
+    tests:TESTS
+  };
+  var json=JSON.stringify(report,null,2);
+  var box=document.getElementById('out');
+  box.value=json; box.style.display='block';
+  try{box.select();document.execCommand('copy');}catch(e){}
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(json).then(function(){},function(){});
+  try{
+    var dateStr=new Date().toISOString().slice(0,10);
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([json],{type:'application/json'}));
+    a.download='perchance-monitor-'+dateStr+'-'+fingerprint+'.json';
+    document.body.appendChild(a); a.click(); a.remove();
+  }catch(e){}
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ORCHESTRATOR
+═══════════════════════════════════════════════════════════════════════ */
+
+var RUNNING=false;
+async function runSuite(){
+  if(RUNNING) return; RUNNING=true;
+  document.getElementById('runBtn').disabled=true;
+  document.getElementById('exportBtn').disabled=true;
+  window.__STARTED=new Date().toISOString();
+  TESTS=[]; COUNTS={PASS:0,FAIL:0,DRIFT:0,SKIP:0};
+  // clear all groups
+  ['env','root','text','image','upload','fetch','api'].forEach(function(g){
+    document.getElementById('g-'+g).innerHTML='';
+  });
+  updateCounters();
+
+  var groups=[
+    ['env',testEnvironment],['root',testRoot],['text',testText],
+    ['image',testImage],['upload',testUpload],['fetch',testFetch],['api',testApi]
+  ];
+  for(var i=0;i<groups.length;i++){
+    try{ await groups[i][1](); }
+    catch(e){ recordTest(groups[i][0],'orchestrator','FAIL','no-throw',String(e&&e.message||e),null); }
+  }
+
+  setProg(100,'complete');
+  var fp=await computeFingerprint();
+  document.getElementById('fp').textContent=fp;
+  doExport(fp);
+  document.getElementById('exportBtn').disabled=false;
+
+  var ban=document.getElementById('banner');
+  var allGood=(COUNTS.FAIL||0)===0;
+  ban.className=allGood?'ok':'bad'; ban.style.display='block';
+  if(allGood){
+    ban.textContent='\u2713 SUITE COMPLETE — '+COUNTS.PASS+' pass, '
+      +(COUNTS.DRIFT||0)+' drift, '+(COUNTS.SKIP||0)+' skipped. Fingerprint '+fp
+      +'. Report auto-copied and downloaded.';
+  }else{
+    ban.textContent='\u2717 '+COUNTS.FAIL+' FAILURE(S) — platform behavior changed. '
+      +'Check FAIL rows above. Fingerprint '+fp+'.';
+  }
+  document.getElementById('runBtn').disabled=false;
+  RUNNING=false;
+}
+document.getElementById('runBtn').onclick=runSuite;
+document.getElementById('exportBtn').onclick=function(){
+  computeFingerprint().then(doExport);
+};
+</script>
