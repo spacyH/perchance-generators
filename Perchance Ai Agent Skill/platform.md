@@ -131,7 +131,7 @@ The brokers are independent services, so calls to different services run in para
 | `count-plugin.perchance.org` | Counter/analytics plugin backend | Live (CORS-blocked) |
 | `db-plugin.perchance.org` | Database plugin backend | Live (CORS-blocked) |
 | `editor-collab.perchance.org` | Collaborative editing service | CT cert (untested) |
-| `editor-copilot.perchance.org` | AI copilot for the editor | Down (404) |
+| `editor-copilot.perchance.org` | AI copilot — `POST /api/findBugsInCode` (editor-only) | Active (editor context) |
 | `posts-plugin.perchance.org` | Posts CRUD API broker (WIP, source has bugs) | Down (HTTP 522 — origin timeout) |
 | `rss-feeds.perchance.org` | RSS feed per generator (path = name; strict CSP) | Live |
 | `server-plugin.perchance.org` | WebTransport/WebSocket gateway (wildcard: `*.server-plugin`) | Down (HTTP 526 — invalid SSL cert) |
@@ -168,7 +168,7 @@ automatically by every generator page on load):
 |----------|---------|
 | `/api/count?keys=uaine,abpsgp` | Counter/analytics (called on page load) |
 | `/api/cv?generatorName=...&isFromEmbed=0` | View counter (increments the `views` in `getGeneratorStats`) |
-| `/api/securityData` | Security configuration data (deferred load on every generator page) |
+| `/api/securityData` | Spam hostname blocklist — `{spamHostnames: string[58]}` |
 
 **Message protocol for one text-generation call:**
 
@@ -797,7 +797,8 @@ notes.
 The upload broker runs a Cloudflare Turnstile verification before the first anonymous
 upload of a session. The two Turnstile sitekeys are:
 - `0x4AAAAAAAJn3pYzPx4ATVOt` — text-generation broker
-- `0x4AAAAAAAA8g8NphwaSOT59` — image-generation and upload brokers It is usually invisible, but it is a real anti-abuse gate that can
+- `0x4AAAAAAAA8g8NphwaSOT59` — image-generation broker
+- `0x4AAAAAAAIXRUXRfqyYaEMy` — upload broker (distinct from image-gen!) It is usually invisible, but it is a real anti-abuse gate that can
 challenge automated upload pipelines. The first upload of a session is slow (it includes
 the verification); subsequent uploads reuse the token and are fast.
 
@@ -960,6 +961,8 @@ and work from anywhere — a server, a script, or another origin. They expose ge
 | `upload.perchance.org/api/fileInfo?url=...` or `?id=...` | JSON file information |
 | `upload.perchance.org/api/upload` | Upload endpoint — returns `anti_bot_verification_needed` without Turnstile |
 | `upload.perchance.org/api/delete?fileId=...&deletionKey=...` | Delete a file by ID + key |
+| `upload.perchance.org/api/checkVerificationStatus` | Check Turnstile verification state |
+| `upload.perchance.org/api/cloudflareTurnstileVerify` | Submit Turnstile token for verification |
 
 **Backend endpoints** (require broker-minted auth tokens — not directly callable):
 
@@ -1031,6 +1034,9 @@ Turnstile verification. The `v` parameter appears to be a build verification has
 None of these endpoints can drive AI generation. `aiTextPlugin` and `textToImagePlugin`
 require the in-page broker handshake, which requires a real browser loading a real
 generator page.
+
+**`/api/save`** (POST, session-based) — saves a generator. Only callable by the
+generator owner from the editor context.
 
 **Platform-internal endpoint details** (from probing — not a stable API):
 
@@ -1833,6 +1839,10 @@ Type preservation: `42` round-trips as `number`, `{x:1}` as `object`, `true` as
 `boolean`. Overwriting a key replaces the value. Operations are synchronous-fast
 (0-5ms) despite being async.
 
+**Backend:** IndexedDB database `"folder-db-kv-plugin"` v1. The database name is
+derived from `this.$root.$moduleName` in the plugin source, so forked plugins get
+their own isolated database. No server-side persistence — data is local to the browser.
+
 ### DSL List Plugins
 
 `dbPlugin = {import:db-plugin}` resolves to the DSL tree root (52 `$`-prefixed internal
@@ -1869,6 +1879,40 @@ generated-images    → undefined on root (backend: image CDN)
 Upload auth passes via URL **hash** (not query params): `{"email":false,"sessionToken":false}`.
 
 Upload response: `{type:"anonUploadResponse", requestId, result:{url:BoxedString, size, error, deletionUrl}}`.
+
+**Complete postMessage vocabulary** (from broker source code analysis):
+
+Text-generation broker: `embedIsReady`, `verified`, `verifying`, `streamData`,
+`streamEnd`, `streamError`, `tokenizerPerformance`, `ttft_withRecentRequest`,
+`ttft_withoutRecentRequest`.
+
+Image-generation broker: `readyForData`, `finished`, `plsGibAccessCodeForAdPoweredStuff`
+(requests ad token from ads iframe), `imageSavedToSubChannel`,
+`updateContentGuardVisibility`, `ImageFeatureExtractor`. Image generation is
+**queue-based** (`joinQueue`, `updateQueuePos` in broker source).
+
+Upload broker: `uploadEmbedIsReady`, `anonUploadResponse`, `file`.
+Outgoing from plugin: `anonUploadRequest`, `init`.
+
+**Runtime globals** set by the Perchance platform:
+
+```
+window.generatorName           // generator slug ("my-gen")
+window.generatorPublicId       // 32-hex string (= sandbox subdomain)
+window.generatorLastEditTime   // unix timestamp of last edit
+window.update(selector?)       // trigger DSL re-render
+window.createPerchanceTree     // DSL parser function
+window.logPerchanceListsFunctionError
+window.clearPerchanceErrors / window.__clearPerchanceErrors
+window.ignorePerchanceErrors
+```
+
+**Browser storage** used by the platform:
+
+- IndexedDB: `"folder-db-kv-plugin"` v1 — the kvPlugin.folder backend (local to browser)
+- Cache API: `"transformers-cache"` (2 entries) — RMBG-1.4 model cache for `removeBackground`
+- localStorage/sessionStorage: empty in the sandbox (used by the editor for backups)
+- Cookies: ad tracking (`_gid`, `_pubcid`, `__qca`, `cto_bundle`)
 
 ### Complete DSL List Accessor Map (35 accessors)
 
