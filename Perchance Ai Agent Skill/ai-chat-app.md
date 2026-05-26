@@ -1043,6 +1043,10 @@ if (countTokens(roleInstructionText) > budget * 0.3) {
 ```
 
 `countTokens` is approximate (a fast bigram estimator, not the real backend tokenizer).
+The backend loads the **DeepSeek-R1-0528 tokenizer** from HuggingFace for actual token
+counting (`deepseek-ai/DeepSeek-R1-0528/tokenizer.json`). Long prompts are truncated
+via the `middleOut` algorithm (`middleOutWithoutTokenizer()` for fast mode) before
+reaching the model. The broker sets `postData.didMiddleOut = true` when truncation occurs.
 Don't treat it as exact — leave headroom. `idealMaxContextTokens` (currently `6000`) is
 advisory; the real backend window is larger and inputs above it are processed without
 truncation. But going above it costs prefix-cache hits and latency.

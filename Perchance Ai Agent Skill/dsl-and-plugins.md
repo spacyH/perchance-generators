@@ -29,6 +29,14 @@ The DSL is indentation-structured. The HTML panel is plain HTML except that anyt
 square brackets `[…]` is evaluated as a Perchance template expression at page-render time
 and on every `update()`.
 
+**⚠ Curly-brace gotcha [VERIFIED R22]:** The DSL parser also scans the HTML panel —
+including `<script>` content — for `{...}` curly-brace patterns. String literals like
+`'{import:foo}'` or `'hello {world}'` will be intercepted as DSL commands. Regular JS
+object literals `{}` are safe; only DSL-matching patterns (`{word}`, `{import:x}`,
+`{A|B}`, `{1-10}`, `{s}`) cause problems. Fix by building such strings at runtime:
+`String.fromCharCode(123) + 'import:foo' + String.fromCharCode(125)`, or base64-encode
+the entire script: `<script>eval(atob("..."))</script>`.
+
 ---
 
 ## 2 · DSL Syntax Reference
@@ -380,6 +388,30 @@ gifts
 ```
 
 ---
+
+### Dollar-Prefixed Root Properties [VERIFIED R23]
+
+The `root` object supports `$`-prefixed metadata properties:
+- `root.$moduleName` → generator slug string (e.g. `"my-gen"`)
+- `root.$meta` → object containing the `$meta` DSL block
+- `root.$root` → circular reference to root itself
+- `root.$children` → child nodes of the DSL parse tree
+- `root.$perchanceCode` → **full DSL source code** of the generator
+
+**Warning:** `typeof root === "function"` (not `"object"`). `Object.keys(root)`
+throws due to a Proxy bug. Use `root.myList` access directly, never enumerate.
+
+### dynamicImport Behavior [VERIFIED R23]
+
+`root.dynamicImport(generatorName)` fetches a generator via
+`getGeneratorsAndDependencies`, parses it with `createPerchanceTree`, and returns
+the tree as an object. The return value depends on the generator type:
+- **Function plugins** (e.g. `markdown-plugin`): returns a function with `length`
+  indicating argument count.
+- **List generators** (e.g. `random-color-generator`): returns an object where
+  keys are top-level list names and values are list objects with `.getLength`.
+- Sub-imports are automatically compiled (e.g. `dice-roller` imports `rpg-icon-plugin`
+  and `dice-plugin`).
 
 ## 5 · The `update()` Global and HTML-ID Globals
 

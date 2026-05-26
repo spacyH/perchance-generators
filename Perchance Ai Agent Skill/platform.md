@@ -1038,6 +1038,48 @@ generator page.
 **`/api/save`** (POST, session-based) — saves a generator. Only callable by the
 generator owner from the editor context.
 
+**Complete API endpoint catalog** (34 endpoints from saved page source analysis):
+
+Public (no auth): `downloadGenerator`, `getGeneratorList`, `getGeneratorStats`,
+`getGeneratorScreenshot`, `getGeneratorsAndDependencies`, `getCommunityData`,
+`getDynamicMetaData`, `getGeneratorHtml`, `securityData`, `generate`, `cv`, `count`.
+
+Session-based (require `sessionToken`): `save`, `checkGeneratorOwnership`,
+`changeGeneratorName`, `changeGeneratorPrivacy`, `deleteGenerator`,
+`duplicateGenerator`, `getGeneratorsByUser`, `saveUserGeneratorFolderMap`,
+`getPrivateNotes`, `setPrivateNotes`, `getGeneratorDiffPatches`.
+
+Account management: `login`, `verify`, `changeEmail`, `changePassword`,
+`deleteAccount`, `requestPasswordResetCode`, `resetPassword`.
+
+Collab editing (all live, return JSON): `getCollabEditKey`
+(→ `{"status":"invalid-credentials"}` without auth), `validateCollabEditKey`
+(→ `{"status":"invalid"}`), `deleteCollabEditKey` (POST, → `{"status":"server-error"}`),
+`regenerateCollabEditKey` (POST, → `{"status":"server-error"}`).
+
+**API error vocabulary** (complete set observed R22-R23):
+`server-error`, `session-token-error`, `invalid-credentials`, `invalid`,
+`captcha-needed`, `incorrect-code`, `invalid_data_type`, `is-not-owner`, `is-owner`.
+
+Note: `getDynamicMetaData` is **GET-only** (404 on POST). `getGeneratorsByUser`
+returns the distinct `session-token-error` status (not generic `server-error`).
+`verify` accepts body and checks code without verifying user existence first.
+`/api/rateGeneratedText` is a quality-feedback endpoint (from broker source).
+
+Infrastructure: `clearCacheIfGeneratorOrImportsHaveBeenUpdated`,
+`getAccessCodeForAdPoweredStuff` (GET, returns 64-hex ad token — no auth needed),
+`aiHelper` (POST-only, GET times out), `alc` (GET, returns `1` — meaning TBD),
+`iusb` (GET, returns `0` — meaning TBD).
+
+Non-existent: `/api/generate` returns 404 on both GET and POST — it's referenced
+in source but doesn't exist as an endpoint.
+
+POST-only endpoints (404 on GET): `login` (returns `{"status":"captcha-needed"}`),
+`verify`, `changeGeneratorName`, `changeGeneratorPrivacy`, `deleteGenerator`,
+`duplicateGenerator`, `getGeneratorsByUser`, `saveUserGeneratorFolderMap`,
+`getPrivateNotes`, `setPrivateNotes`, `getGeneratorDiffPatches`,
+`requestPasswordResetCode`.
+
 **Platform-internal endpoint details** (from probing — not a stable API):
 
 `clearCacheIfGeneratorOrImportsHaveBeenUpdated` returns a boolean:
@@ -1894,6 +1936,33 @@ Image-generation broker: `readyForData`, `finished`, `plsGibAccessCodeForAdPower
 Upload broker: `uploadEmbedIsReady`, `anonUploadResponse`, `file`.
 Outgoing from plugin: `anonUploadRequest`, `init`.
 
+**Text-generation broker internals** (from 72,969-byte embed source) [R23]:
+
+- Streaming wire format: `postMessage({type:"streamData", requestId, value})` —
+  `value` is the token chunk. Stop: `{type:"stopStream", requestId}`.
+- LRU thread pool: `moveToLeastRecentlyUsedThread()` selects thread.
+  User identity: `localStorage["userKey-{thread}"]`, sent as URL query param.
+- Prompt truncation: `middleOut` algorithm (`middleOutWithoutTokenizer()` for
+  fast mode). Sets `postData.didMiddleOut = true` when active.
+- Hash function: `djb2Hash(str)` — `hash=5381; hash=((hash<<5)+hash)+charCode`.
+- **Tokenizer: DeepSeek-R1-0528** from HuggingFace (`deepseek-ai/DeepSeek-R1-0528`
+  `tokenizer.json` + `tokenizer_config.json`).
+- Quality feedback: `/api/rateGeneratedText` endpoint (new, not in original catalog).
+- Error tracking: Rollbar v2.26.0.
+- Token limits: `TokenCount`, `maxToken` references.
+- Turnstile flow: `verifyUser` with `alreadyVerifying` guard.
+
+**Image-generation broker internals** (from 76,155-byte embed source) [R23]:
+
+- Full parameter set: `joinQueue({prompt, seed, resolution, guidanceScale,
+  negativePrompt, referenceImage})`.
+- Ad token flow: `updateAdAccessCode()` — Promise-based, listens for postMessage
+  from parent with the 64-hex code. Tokens are time-bucketed (same token across requests).
+- Background removal: `removeBackground(imageUrl)` — uses transformers.js with
+  RMBG-1.4 model (cached in Cache API `"transformers-cache"`).
+- Gallery: `saveImageToGallery()` — modal UI with subChannel selection.
+- Content moderation: `contentGuardMessageEl` CSS class.
+
 **Runtime globals** set by the Perchance platform:
 
 ```
@@ -1906,6 +1975,65 @@ window.logPerchanceListsFunctionError
 window.clearPerchanceErrors / window.__clearPerchanceErrors
 window.ignorePerchanceErrors
 ```
+
+**⚠ DSL parser curly-brace warning:** The Perchance DSL parser scans the
+*entire* HTML panel — including `<script>` tag content — for `{...}` patterns
+before JavaScript executes. String literals containing `{import:...}`,
+`{word}`, `{A|B}`, or `{1-10}` will be interpreted as DSL commands and break
+your code. To avoid this, base64-encode complex scripts:
+`<script>eval(atob("base64encodedscript"))<` + `/script>`, or build such
+strings at runtime with `String.fromCharCode(123)` for `{`.
+
+**Google Analytics:** Property ID `G-YJWJRNESS5`. Cloudflare Real User
+Monitoring at `/cdn-cgi/rum`. Tracking keys via `/api/count?keys=uaine,abpsgp`.
+
+### The `root` Proxy [VERIFIED R23]
+
+`root` is a **Proxy wrapping a function** (`typeof root === "function"`), not
+a plain object. Behavioral details:
+
+- **get trap** works: `root.myList` returns the DSL list proxy.
+- **set trap** works: `root.x = 42` stores and retrieves correctly.
+- **has trap** works: `"aiTextPlugin" in root` → `true`, `"nonExistent"` → `false`.
+- **delete trap** works: `delete root.x` → `true`.
+- **ownKeys trap is BUGGY**: `Object.keys(root)` throws `"ownKeys trap result
+  did not include 'prototype'"` because the handler returns DSL list names but
+  omits `prototype` (required for function-based Proxy targets). Do NOT call
+  `Object.keys(root)`.
+- **toString()** picks a **random** top-level list name each call (nondeterministic).
+- **constructor** = `bound Object`.
+
+**Dollar-prefixed metadata properties** (accessible via get, but NOT in has trap):
+
+| Property | Type | Value |
+|---|---|---|
+| `root.$moduleName` | string | generator slug (e.g. "my-gen") |
+| `root.$meta` | object | the `$meta` DSL block contents |
+| `root.$root` | function | circular reference back to root |
+| `root.$children` | object | child nodes of the DSL tree |
+| `root.$perchanceCode` | string | **full DSL source** of the generator |
+| `root.$output` | undefined | NOT accessible (lives in tree, not proxy) |
+
+### Upload Plugin Behavior [VERIFIED R23]
+
+- **Result keys:** `url`, `error`, `size`, `deletionUrl`
+- **result.url is a boxed String** (`[object Object]`) — same as aiTextPlugin.
+  Always use `String(result.url)` to get a primitive string.
+- **File host:** `user.uploads.dev` (NOT `user-uploads.perchance.org`)
+- **Deletion URLs:** `https://user.uploads.dev/file/{hash}.{ext}`
+- **Type restriction:** `text/plain` Blobs return `error: "invalid_data_type"`.
+  Upload plugin accepts image types; other types may be rejected.
+- **Error on reject still returns deletionUrl** — partial result object.
+
+### Cross-Tab Coordination [VERIFIED R23]
+
+The platform does NOT use standard browser cross-tab APIs:
+- BroadcastChannel: channels can be created but no messages are exchanged.
+- SharedWorker: available but not used by the runtime.
+- localStorage events: 0 received.
+- navigator.locks: no locks held or pending.
+Tab coordination likely uses server-plugin's WebTransport/WebSocket connection
+(when server-plugin is operational).
 
 **Browser storage** used by the platform:
 
@@ -1961,6 +2089,102 @@ which is only available in the top editor, not in panel JavaScript.
 `selectOne` and `selectAll` return **list item objects** (the same type as `root.myList`),
 not plain strings. Use `String(list.selectOne)` or `list.evaluateItem` for a string.
 
+
+
+### PERCH Engine Runtime (~100 methods)
+
+**Important:** `window.PERCH` and `window.nlp` exist ONLY on the parent/editor
+frame — they are NOT available in the sandbox iframe where panel JS (`$output`,
+HTML panel scripts) executes. These methods are used internally by the runtime
+to process DSL, not as a public API for generator authors.
+
+The `window.PERCH` object is the DSL runtime engine. Key method groups
+(from saved page source analysis of `pa7xdy82ob.html`):
+
+**DSL parsing & evaluation:**
+`createPerchanceTree`, `evaluateText`, `evaluateCurlyBlock`, `evaluateSquareBlock`,
+`splitTextAtAllBlocks`, `splitTextAtCurlyBlocks`, `splitTextAtSquareBlocks`,
+`splitUpCurlyOrBlock`, `processEscapedBrackets`, `processEscapedCharacters`,
+`normaliseLineIndentsToTabs`, `stripCommentFromLine`, `collectTemplatableTextChunks`,
+`collectNonHoistedTopLevelDeclarations`, `collectImportedModuleNamesFromText`.
+
+**List item methods (exposed as DSL accessors):**
+`selectOneMethod`, `selectManyMethod`, `selectManyMethodStringNum`,
+`selectUniqueMethod`, `selectAllMethod`, `consumableListMethod`,
+`joinItemsMethod`, `replaceTextMethod`, `toStringMethod`, `valueOfMethod`.
+
+**Grammar transforms (powered by compromise.js v11.12.4):**
+`pastTenseMethod`, `presentTenseMethod`, `futureTenseMethod`, `pluralFormMethod`,
+`singularFormMethod`, `negativeFormMethod`, `pluralize`.
+
+**Case transforms:**
+`upperCaseMethod`, `lowerCaseMethod`, `titleCaseMethod`, `sentenceCaseMethod`.
+
+**Template & DOM:**
+`updateOutput`, `updateOutputMessageHandler`, `updateTemplatedNodes`,
+`addNodeMethods`, `addNodeTemplates`, `addAttributeTemplateToEl`,
+`isTemplatableAttributeName`, `isDomEventAttributeName`, `domEventAttributeNames`,
+`executeScriptTag`, `executeScriptTags`, `htmlToElements`,
+`reAttachAllDomElementEventsWithRoot`, `reAttachSpecificDomElementEventWithRoot`,
+`getAllDescendentNodesIncludingTextNodes`, `getAllTextNodeDescendents`.
+
+**Curly-block functions** (`{A|B}`, `{import:x}`, `{a/b}`, `{1-10}`, `{s}`):
+`curlyFunctions`, `curlyFunction_Or`, `curlyFunction_Import`,
+`curlyFunction_Range`, `curlyFunction_A`, `curlyFunction_S`.
+
+**Node/tree manipulation:**
+`duplicatePerchanceNode`, `clonedNodeToOriginalNodeWeakMap`,
+`getPrimitiveNodeDetails`, `getFunctionDetails`, `getFunctionHeaderDetails`,
+`getFunctionArgumentsDetails`, `getInlineFunctionDetails`,
+`getTextOddsDetails`, `oddsTextToNumber`, `chooseRandomTextByOdds`.
+
+**Error handling:**
+`perchanceError`, `perchanceErrorString`, `showPerchanceErrorBox`,
+`clearPerchanceErrors`, `ignorePerchanceErrors`, `currentPerchanceErrorCount`,
+`lastPerchanceErrorTime`, `maxPerchanceErrorCount`.
+
+**Utility:** `AvsAnSimple`, `escapeHTMLSpecialChars`, `getAllMatches`,
+`isValidJavaScriptIdentifier`, `isServedOnPerchanceSubdomain`,
+`updateGeneratorMetaData`, `dynamicMetaDataCache`.
+
+**NLP library:** `PERCH.nlpCompromise` — compromise.js v11.12.4, the NLP engine
+behind grammar transforms. Loaded from `perchance.org/lib/compromise-11.12.4.min.js`
+(URL-encoded inline in the runtime). Provides POS tagging, verb conjugation,
+noun pluralization, and other morphological transforms.
+
+### Editor Infrastructure
+
+**Editor bundle:** `editors.bundle.min.js` (847KB) — the CodeMirror-based editor with:
+
+- **Collab editing:** WebSocket to `wss://editor-collab.perchance.org` for real-time
+  multi-user editing. Key flow: `getCollabEditKey` → share link → `validateCollabEditKey`.
+  Keys can be regenerated (`regenerateCollabEditKey`) or deleted (`deleteCollabEditKey`).
+
+- **AI copilot:** Two POST endpoints on `editor-copilot.perchance.org`:
+  - `/api/autocomplete` — inline code completion (triggered by Tab, stored in
+    `localStorage.copilotIsEnabledV2`). Uses prefix/suffix context up to 20K chars.
+    Returns HTTP 400 from sandbox — requires editor context.
+  - `/api/findBugsInCode` — static analysis of DSL code, returns bug annotations
+    (empty `[]` array when no bugs found). Also returns 400 from sandbox.
+  Both endpoints are live but only accept requests from the editor frame
+  (`editors.bundle.min.js`), not from the sandbox iframe.
+  Copilot can be toggled; state is in `localStorage.copilotIsEnabledV2`.
+
+- **Linting:** ESLint v9.14.0 (`eslint-linter-browserify`) + htmlparser2 v9.1.0,
+  both loaded from `/lib/` on perchance.org.
+
+- **User session:** `app.store.data.user` = `{email, sessionToken, loggedIn}`.
+  Generator data: `generatorData` = `{name, imports, canLink}`.
+
+### Debug & Diagnostics
+
+- `null.perchance.org/debug-freeze` — debug freeze mode URL
+- `window.DEBUG_FREEZE_MODE` — enables freeze diagnostics
+- `window.codeWarningsArray` — collected editor warnings
+- `window.diffStuff` / `window.dmp` — diff-match-patch for generator versioning
+- `window.downloadLocalBackup` / `window.downloadTextFile` — backup utilities
+- Ad system: `window.freestar` (Freestar ad network), `window.adsAreShowing`,
+  `window.forceDisableAds`, `window.advertHeight`
 
 ---
 

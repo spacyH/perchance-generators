@@ -1032,6 +1032,40 @@ None of these endpoints can drive AI generation. `aiTextPlugin` and `textToImage
 require the in-page broker handshake, which requires a real browser loading a real
 generator page.
 
+**Complete API endpoint catalog** (34 endpoints from saved page source):
+
+Public (no auth): `downloadGenerator`, `getGeneratorList`, `getGeneratorStats`,
+`getGeneratorScreenshot`, `getGeneratorsAndDependencies`, `getCommunityData`,
+`getDynamicMetaData`, `getGeneratorHtml`, `securityData`, `generate`, `cv`, `count`.
+
+Session-based: `save`, `checkGeneratorOwnership`, `changeGeneratorName`,
+`changeGeneratorPrivacy`, `deleteGenerator`, `duplicateGenerator`,
+`getGeneratorsByUser`, `saveUserGeneratorFolderMap`, `getPrivateNotes`,
+`setPrivateNotes`, `getGeneratorDiffPatches`.
+
+Account management: `login`, `verify`, `changeEmail`, `changePassword`,
+`deleteAccount`, `requestPasswordResetCode`, `resetPassword`.
+
+Collab editing: `getCollabEditKey`, `validateCollabEditKey`,
+`deleteCollabEditKey`, `regenerateCollabEditKey`.
+
+Infrastructure: `clearCacheIfGeneratorOrImportsHaveBeenUpdated`,
+`getAccessCodeForAdPoweredStuff` (GET → 64-hex ad token, no auth),
+`aiHelper` (POST-only), `alc` (GET → `1`), `iusb` (GET → `0`).
+
+Non-existent: `/api/generate` → 404 (referenced in source but doesn't exist).
+
+POST-only (404 on GET): `login` (→ `{"status":"captcha-needed"}`), `verify`,
+`changeGeneratorName`, `changeGeneratorPrivacy`, `deleteGenerator`,
+`duplicateGenerator`, `getGeneratorsByUser`, `saveUserGeneratorFolderMap`,
+`getPrivateNotes`, `setPrivateNotes`, `getGeneratorDiffPatches`,
+`requestPasswordResetCode`.
+
+Collab editing (all live): `getCollabEditKey` (→ `{"status":"invalid-credentials"}`),
+`validateCollabEditKey` (→ `{"status":"invalid"}`),
+`deleteCollabEditKey` POST (→ `{"status":"server-error"}`),
+`regenerateCollabEditKey` POST (→ `{"status":"server-error"}`).
+
 **Platform-internal endpoint details** (from probing — not a stable API):
 
 `clearCacheIfGeneratorOrImportsHaveBeenUpdated` returns a boolean:
