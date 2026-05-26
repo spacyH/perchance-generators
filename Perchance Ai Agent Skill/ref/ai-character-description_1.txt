@@ -1,0 +1,443 @@
+ai = {import:ai-text-plugin}
+image = {import:text-to-image-plugin}
+visualStyles = {import:t2i-styles}
+comments = {import:comments-plugin}
+
+// for character share link stuff:
+prompt2 = {import:prompt2-plugin}
+uploadPlugin = {import:upload-plugin}
+
+// HEADS UP: The code below is somewhat complex. If you're new to Perchance and
+// want to create your own version, I'd recommend starting with one of these more
+// simple generators, and editing it until you've got the hang of things:
+//     https://perchance.org/ai-character-design-example-simple#edit
+//     https://perchance.org/ai-character-generator-with-user-input#edit
+//     https://perchance.org/ai-character-design-example#edit
+
+$meta
+  title = AI Character Description Generator (free, no sign-up, unlimited)
+  description = Generate a full character description based on your keywords/ideas, including personality, background, appearance, and images based on that appearance. Various styles/themes, including fantasy, D&D, anime, slice-of-life, realistic, fiction book/story characters, anthro/furry, creative OCs, villain ideas, etc. Completely free, online AI character maker - no login or sign-up.
+
+async regenerate() =>
+  // ensure last generation has stopped before we begin:
+  if(window.lastImageCaptionPromptStreamObj) await window.lastImageCaptionPromptStreamObj.stop();
+  if(window.lastCharacterPromptStreamObj) await window.lastCharacterPromptStreamObj.stop();
+  
+  generateBtn.disabled = true;
+  stopBtn.style.display = "";
+  
+  generateBtn.innerHTML = "✨ regenerate";
+  imagesAreaEl.style.display = "none";
+  clearOldImageStuff();
+  
+  window.lastCharacterPromptStreamObj = ai(fantasyCharacterPrompt);
+  outputEl.innerHTML = window.lastCharacterPromptStreamObj;
+  
+  await window.lastCharacterPromptStreamObj;
+  
+  stopBtn.style.display = "none";
+  generateBtn.disabled = false;
+  
+lengthSpecifiers
+  short = at most 1 short paragraph
+  medium = 1-2 paragraphs
+  long = 2-4 paragraphs
+
+fantasyCharacterPrompt
+  // edit this instruction, and the "startWith" below to whatever you want! you might have to put a decently long explanation in the instruction if you're trying to get to generate e.g. characters from a fairly niche fandom/world/series/etc. (the AI probably won't know about super niche, or super new stuff)
+  instruction
+    Please create an interesting and creative OC character including name, age, appearance, personality, etc.
+    Create a character that genuinely feels *real*, not cliche, or overwrought, or affected informality (this is a character description, not a place for rhetorical questions or fourth wall breaks). Sometimes it's the little "plain" details. Or specific things from their past that affected who they are (creativity seeds may help, but always stick to the implied world lore and the *underlying intention* behind the design notes). Aim for interesting worldbuilding within the character background. Use lean, unpretentious, crisp, descriptive passages that paint the character right into the reader's mind.
+    [descLengthEl.value === "short" ? `IMPORTANT: Keep each section SHORT. No more than 1 paragraph per section. YOUR RESPONSE MUST BE **SHORT**.` : ""]
+    [""]
+    [getOptionalSeedWordsTip()]
+    [""]
+    Use this template:
+    ---
+    Name: <full name>
+    Age: <number or estimate>
+    Race/Species: <one word or phrase describing race/species>
+    Background: <[lengthSpecifiers[descLengthEl.value]] describing the charater's story/background>
+    Physical Appearance: <[lengthSpecifiers[descLengthEl.value]] describing physical appearance> // NOTE: if you change this line, you need to change the `physicalAppearanceText` code below where we use it to extract the physical appearance for the image prompt.
+    Personality: <[lengthSpecifiers[descLengthEl.value]] describing personality/idiosyncrasies/quirks>
+    ---
+    [""]
+    # Design notes:
+    IMPORTANT: [customFeaturesEl.value.trim() || "The character's race should be "+race.selectOne] // if they don't specify any custom features, then we just give the AI a random race to go with (otherwise it *really* like choosing elves for some reason)
+    [descLengthEl.value === "short" ? `IMPORTANT: Keep each section SHORT. No more than 1 paragraph per section. YOUR RESPONSE MUST BE **SHORT**.` : ""]
+    // leave the below line unedited (it joins the above lines into one block of text)
+    $output = [this.joinItems("\n")]
+  
+  startWith = Name: // force it to start with "Name:", so the AI doesn't start with "Sure, I can help with that" or whatever.
+  
+  render(data) =>
+    // bold the 'Name:', 'Age:', etc.
+    let text = data.text.replace(/(^|\n)([#a-zA-Z/ _\-0-9]{1,50})(:\s)/g, (m, p1, p2, p3) => p1+`<b style="color:#13a000">${p2.replaceAll("#", "").trim()}</b>`+p3);
+    text = text.replace(/(^|\n)(#+[a-zA-Z/ _\-0-9]{1,50})(\n)/g, (m, p1, p2, p3) => p1+`<b style="color:#13a000">${p2.replaceAll("#", "").trim()}</b>`+p3);
+    text = text.replace(/(^|\n)\*\*([a-zA-Z/ _\-0-9#]{1,50})\*\*(:\s?)/g, (m, p1, p2, p3) => p1 + `<b style="color:#13a000">${p2.replaceAll("#","").trim()}</b>` + p3);
+    return text;
+  onStart(data) => // <-- runs when the 'regenerate' button is pressed
+    clearOldImageStuff();
+  async onFinish(data) => 
+    if(data.stopReason === "user") return; // we don't continue to the image generation step because text generation was stopped prematurely (e.g. due to 'regenerate' clicked while existing generation was in progress)
+    
+    let generatedText = data.text;
+    
+    imagesAreaEl.style.display = "block";
+    regenImagesBtn.disabled = true;
+
+    // We summarize the character description into a list of keywords that can be used for the image generation:
+    let textToBeSummarized = generatedText.replace(/\n+/, " "); // replace newlines with spaces.
+    
+    let captionObj;
+    let captionPrompt = {
+      instruction: `Below is a description of a character. Please turn it into a comma-separated list of descriptive keywords and phrases which visually capture this character, including their *gender* (if relevant), race, and **visual appearance**. Be creative and descriptive. Don't be repetitive.\n---\n${textToBeSummarized}\n---\nReply with a comma-separated list of keywords and keyphrases which *visually* capture the above character, including their gender if relevant. Imagine you're giving a list of keywords to an artist who will use them to draw the character. Describe the character's appearance with keywords/keyphrases, including their race, class, age, gender, etc. Respond with only the comma-separated visually descriptive keyphrases - nothing more, nothing less. Don't be repetitive.`, // I basically repeat the instruction a few times for good measure.
+      onChunk: (data) => {
+        if(data.fullTextSoFar.length > 500) {
+          let terms = data.fullTextSoFar.split(", ");
+          let uniqueTerms = [...new Set(terms)];
+          // sometimes the AI gets caught in a loop for some reason, so we stop it if it has duplicated terms a lot:
+          if(terms.length > 2*uniqueTerms.length) captionObj.stop();
+        }
+      },
+    };
+    
+    captionObj = ai(captionPrompt);
+    window.lastImageCaptionPromptStreamObj = captionObj;
+    imagePromptEl.innerHTML += "<b>Generating images...</b> " + captionObj.loadingIndicatorHtml; // <-- the plugin gives us handy way to add the loading indicator to the page in situations like this
+    let responseData = await captionObj; // <-- this "waits" at this line until the AI is finished, and then gives us the same data that we'd get via the onFinish handler. we are "awaiting" a JavaScript "Promise" (you can ask ChatGPT to explain it to you)
+    if(responseData.stopReason === "user") return; // they clicked 'stop' - we can discard this
+    let visualKeyphrasesText = responseData.text.replace(/\n+/g, " ");
+    
+    // Now we actually generate the images:
+    let physicalAppearanceText = ((generatedText.match(/Physical Appearance:(.+?)\n\n/s) || [])[1] || "").trim();
+    if(!physicalAppearanceText) physicalAppearanceText = ((generatedText.match(/Physical Appearance:(.+?)\n/s) || [])[1] || "").trim();
+    
+    window.lastCharacterTextData = {
+      generatedText,
+      physicalAppearanceText,
+      visualKeyphrasesText,
+    };
+    
+    regenImagesBtn.disabled = false;
+    
+    generateImages();
+    
+
+getOptionalSeedWordsTip() =>
+  if(window.massiveWordList) {
+    let seedWords = (new Array(20).fill(0)).map(_ => window.massiveWordList[Math.floor(Math.random()*window.massiveWordList.length)].replace(/,/g, ' '));
+    return `Creativity Booster: If the design notes don't give much detail to go by, then try to be loosely inspired by *one* of the following seed words to improve your creativity. You should ignore rare/weird words, and completely ignore all of them if they're all utterly irrelevant. You don't need to use a seed word exactly as written - just try to let your creativity be inspired by it. And ensure you always *stay faithful to the design notes*. See if you can use a concept from one or more of these seeds:\n<creativity_seeds>${seedWords.join(", ")}</creativity_seeds>\nCan you see a seed word that might be interesting to riff off? Then use it!\n`;
+  } else {
+    return "";
+  }
+    
+generateImages() =>
+  let { generatedText, physicalAppearanceText, visualKeyphrasesText } = window.lastCharacterTextData;
+  
+  let imageHtml = "";
+  for(let i = 0; i < 6; i++) {
+    let basePrompt = window.overwrittenVisualKeyphrasesText || visualKeyphrasesText;
+
+    // for every second image, we also attache the physical appearance paragraph:
+    if(i%2 === 0) basePrompt += " - "+physicalAppearanceText;
+
+    let promptData = {
+      prompt: addStyleToPrompt(basePrompt),
+      negativePrompt: addStyleToNegative(""),
+      resolution: "512x768",
+      style: "margin:0.25rem",
+    };
+    imageHtml += `<div class="imageWrapper" style="display:inline-flex; flex-direction:column; justify-content:center; align-items:center; width:min-content; height:max-content; margin-bottom:1rem;">
+      ${image(promptData).evaluateItem}
+      <button onclick="chatWithCharacterButtonClickHandler(this.closest('.imageWrapper').querySelector('iframe').textToImagePluginOutput, this)" style="width:max-content;">💬 chat with this character</button>
+    </div>`;
+  }
+  imagePromptEl.innerHTML = `<div style="text-align:left;"><b>Image Prompt <span style="opacity:0.6;">(editable)</span>:</b> <textarea oninput="window.overwrittenVisualKeyphrasesText=this.value" style="display:block; width:100%; min-height:7rem;">${window.overwrittenVisualKeyphrasesText || visualKeyphrasesText}</textarea></div>`;
+  imagesEl.innerHTML = imageHtml;
+
+clearOldImageStuff() =>
+  window.overwrittenVisualKeyphrasesText = null;
+  imagesEl.innerHTML = "";
+  imagePromptEl.innerHTML = "";
+  
+generateVisualStyleOptionsHtml() =>
+  function styleScore(style) {
+    let fantasy = style["meta:tags"]?.fantasyPortrait || 0;
+    let anime = style["meta:tags"]?.basicAnime || 0;
+    let anthro = style["meta:tags"]?.furryOil || 0;
+    let digital = style["meta:tags"]?.digitalPainting || 0;
+    let cinematic = style["meta:tags"]?.cinematic || 0;
+    return anime*1.0 + cinematic*0.9 + anthro*0.8 + fantasy*0.7 + digital*0.7;
+  }
+  return visualStyles.selectAll.sort((a,b) => styleScore(b)-styleScore(a)).map(s => `<option>${s.getName}</option>`).join("");
+
+addStyleToPrompt(prompt) =>
+  // bit weird, but we use a global to 'communicate' with the t2i-styles generator's scope.
+  let originalWindowInput = window.input;
+  window.input = {description:prompt};
+  let result = visualStyles[visualStyleEl.value].prompt.evaluateItem;
+  window.input = originalWindowInput;
+  return result;
+
+addStyleToNegative(negative) =>
+  // bit weird, but we use a global to 'communicate' with the t2i-styles generator's scope.
+  let originalWindowInput = window.input;
+  window.input = {negative};
+  let result = visualStyles[visualStyleEl.value].negative.evaluateItem;
+  window.input = originalWindowInput;
+  return result;
+  
+race
+  Human
+  Druid
+  Centaar
+  Centaur
+  Ork
+  Cyclops
+  Demigod
+  Demon
+  Dryad
+  Dwarf
+  Elf
+  Faun
+  Fiend
+  Ghoul
+  Giant
+  Gnoll
+  Gnome
+  Goblin
+  Gog
+  Gremlin
+  Half-Giant
+  Halfling
+  Hobogoblin
+  Impling
+  Imp
+  Kappa
+  Kobold
+  Lizardmen
+  Magi
+  Magogs
+  Mermen
+  Minotaur
+  Minotaar
+  Naga
+  Ogre
+  Orcling
+  Orc
+  Satyr
+  Triton
+  Troll
+  Trow
+  Vampire
+  Troglodyte
+  Wizard
+  Snotling
+  Liche
+  Dire Beast
+  Tengu
+  Pixie
+  Satyr
+  Jinn
+  Storm Giant
+  Dryad
+  Kitsune
+  Kappa
+  Apsaras
+  Deep One
+  Golem
+  Gargoyle
+  Gorgon
+  Lamia
+  Merrow
+  Adaro
+  Nephilim
+  Hobbit
+  Dragon
+  Dragonborn
+  Undead
+  Halfling
+  Half-orc
+  Tiefling
+  Half-elf
+  Bugbear
+  Changeling
+  Air Genasi
+  Arakocra
+  Deep Gnome
+  Duergar
+  Earth Genasi
+  Eladrin
+  Firbolg
+  Fairy
+  Goliath
+  Harengon
+  Fire Genasi
+  Kenku
+  Kobold
+  Lizardfolk
+  Sea Elf
+  Shadar-kai
+  Shifter
+  Water Genasi
+  Yuan-ti
+  Triton
+  Kender
+  Autognome
+  Astral Elf
+  Forest Elf
+  Plasmoid
+  Hadozee
+  Thri-kreen
+  Giff
+  Owlin
+  Leonin
+  Kalashtar
+  Feral Tiefling
+  Locathah
+  Grung
+  Treant
+  Nature Spirit
+
+  
+
+
+
+
+////////////////////////////////
+//    Character Chat Stuff    //
+////////////////////////////////
+
+
+async chatWithCharacterButtonClickHandler(textToImagePluginOutput, buttonEl) =>
+  let description = window.lastCharacterPromptStreamObj.liveResponseText;
+  let name = (description.match(/Name: (.+)/) || [])[1] || "???";
+  let firstName = name.split(/[ ,]/)[0];
+  let characterImagePrompt = textToImagePluginOutput.inputs.prompt.replace(/\n/g, " ");
+  let characterImageDataUrl = textToImagePluginOutput.dataUrl;
+  
+  let roleInstruction = `
+  ${description}
+  
+  Creatively improvise the roleplay between {{char}} and {{user}} to create an interesting and engaging experience/story/chat, no matter where {{user}} decides to lead it. The overall goal is to create a genuinely fascinating and engaging roleplay/story. So good that you can't stop reading.
+  For roleplays, messages should be detailed and descriptive, including dialogue, actions (enclosed in asterisks), and thoughts. Utilize all five senses for character experiences.
+  `.trim();
+  
+  let json = {
+    addCharacter: {
+      name,
+      roleInstruction,
+      reminderMessage: "",
+      imagePromptPrefix: "",
+      imagePromptSuffix: `${addStyleToPrompt("")} (negativePrompt:::${addStyleToNegative("")}) (resolution:::512x768)`,
+      imagePromptTriggers: `${firstName}: ${characterImagePrompt}`,
+      messageWrapperStyle: "",
+      customCode: "",
+      metaTitle: "",
+      metaDescription: "",
+      metaImage: "",
+      initialMessages: [
+        {author:"system", content:`*Introduce yourself to ${name}, or perhaps <b style="color:#00af00;">tap the Narrator button</b> and tell it to generate an initial roleplay scenario based on some keywords/themes. You can change your name using the 'options' button.*`, hiddenFrom:["ai"]},
+      ],
+      loreBookUrls: [],
+      avatar: {url:characterImageDataUrl, size:1, shape:"square"},
+      scene: {background:{url:""}, music:{url:""}},
+      userCharacter: {avatar: {}},
+      systemCharacter: {avatar:{}},
+    },
+    quickAdd: true,
+  };
+  buttonEl.disabled = true;
+  await generateShareLinkForCharacter(json);
+  buttonEl.disabled = false;
+  
+  
+
+async generateShareLinkForCharacter(json) => 
+  if(!window.CompressionStream) {
+    alert("Character chat links use a feature that's only available in modern browsers. Please upgrade your browser to the latest version to use this feature. If you're using Safari, switch to Chrome instead.");
+    return;
+  }
+  
+  let loadingModal = createLoadingModal("⌛ Generating chat link...");
+  
+  let jsonString = JSON.stringify(json); 
+  
+  let urlHashData = encodeURIComponent(JSON.stringify(json)).replace(/[!'()*]/g, function(c) {
+    return '%' + c.charCodeAt(0).toString(16); // since encodeURIComponent doesn't encode some characters (like parentheses) and they mess up markdown links
+  });
+  console.log("shareUrl (hash version):", `https://perchance.org/ai-character-chat#${urlHashData}`);
+  
+  // convert json text to blob:
+  let dataUrlJsonString = jsonString.replace(/#/g, "%23"); // since hash is a special character in dataurls (like normal URLs)
+  let blob = await fetch("data:text/plain;charset=utf-8,"+dataUrlJsonString).then(res => res.blob());
+  
+  // compress blob:
+  let compressedBlob = await compressBlobWithGzip(blob);
+  
+  let { url, size, error } = await uploadPlugin(compressedBlob);
+  if(error) {
+    loadingModal.delete();
+    alert(`error: ${error}`);
+  } else {
+    loadingModal.delete(); 
+    let fileName = url.replace("https://user-uploads.perchance.org/file/", "");
+    let characterName = encodeURIComponent(json.addCharacter.name.replace(/\s+/g, "_").replaceAll("~", "").replaceAll('"', "")); // this is just so URL is more readable - doesn't affect stored data at all
+    let shareUrl = `https://perchance.org/ai-character-chat?data=${characterName}~${fileName}`;
+    console.log("shareUrl:", shareUrl);
+
+    let colorScheme = localStorage.forceColorScheme !== undefined ? localStorage.forceColorScheme : window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? "dark" : "light";
+    let result = await prompt2({
+      content: {type:"none", html:`<div style="margin-bottom:0.5rem; opacity:0.7; font-size:90%;">Your character has been created. Here's the link:</div><div style="display:flex; gap:0.5rem;"><input value="${shareUrl}" style="flex-grow:1; color-scheme:${colorScheme}; min-width:0; font-size:80%;"> <button onclick="navigator.clipboard.writeText(this.parentElement.querySelector('input').value); this.textContent='copied ✅'; setTimeout(() => { this.textContent='📋 copy'; }, 2000);" style="min-width:max-content;">📋 copy</button> <button onclick="window.open(this.parentElement.querySelector('input').value)" style="min-width:max-content;">↗️ visit</button> </div>`},
+    }, {cancelButtonText:null, submitButtonText:"finished", verticallyCenter:true});
+  }
+
+async compressBlobWithGzip(blob) =>
+  const cs = new CompressionStream('gzip');
+  const compressedStream = blob.stream().pipeThrough(cs);
+  let outputBlob = await new Response(compressedStream).blob();
+  return new Blob([outputBlob], { type: "application/gzip" }); // <-- to add the correct mime type
+
+createLoadingModal(initialContent, parentElement) =>
+  if(!parentElement) parentElement = document.body;
+  let loadingModalCtn = document.createElement("div");
+  loadingModalCtn.innerHTML = `<style>
+    .loadingModalCtn-856246272937 {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.7);
+      color-scheme: dark;
+      color: #e7e7e7;
+      z-index: 100;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 1rem;
+      z-index: 99999999;
+    }
+    .loadingModalContent-856246272937 {
+      background-color: #151515;
+      border-radius: 3px;
+      padding: 1rem;
+      text-align: center;
+      box-shadow: 0px 1px 10px 3px rgb(130 130 130 / 24%);
+    }
+  </style>`;
+  let contentEl = document.createElement("div");
+  contentEl.classList.add("loadingModalContent-856246272937");
+  contentEl.innerHTML = initialContent || "";
+  loadingModalCtn.appendChild(contentEl);
+  loadingModalCtn.classList.add("loadingModalCtn-856246272937");
+  parentElement.appendChild(loadingModalCtn);
+  return {
+    updateContent: function(content) {
+      contentEl.innerHTML = content;
+    },
+    delete: function() {
+      loadingModalCtn.remove();
+    },
+  }

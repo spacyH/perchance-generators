@@ -1,0 +1,134 @@
+<h1>AI Character Description Generator</h1>
+<p style="font-size:85%; opacity:0.8; margin:1rem auto; margin-bottom:1.5rem; max-width:650px;">Generates a character description/profile and their image, optionally including a user outline/prompt. If you just want to generate character <i>images</i>, use <b><a href="https://perchance.org/ai-character-generator" target="_blank">this image generator</a></b> instead.</p>
+
+<script>
+  (async function() {
+    window.massiveWordList = await fetch("https://user.uploads.dev/file/fdd83a6f7348fec983cb2583936beaf5.txt").then(r => r.text()).then(t => t.split("\n")).catch(e => null);
+  })();
+</script>
+
+<div style="text-align:left; display:flex; flex-direction:column; width:95%; max-width:700px; margin:0 auto; justify-content:center; align-items:center;"> 
+  <textarea id="customFeaturesEl" oninput="localStorage.customFeatures=this.value" placeholder="(optional) Keywords, design notes, features, age, etc." style="display:block; width:100%; min-height:4rem;"></textarea>
+  <script>customFeaturesEl.value = localStorage.customFeatures || "";</script>
+  <div id="descSettingsEl" style="margin-top:0.25rem; font-size:80%; display:flex; justify-content:center;"> 
+    <div style="display:flex; align-items:center; justify-content:center; border:1px solid #444; border-radius:2px; padding:0.25rem;">
+      <div style="margin-right:0.25rem;">Length:</div>
+      <select id="descLengthEl" onchange="localStorage.descLength=this.value">
+        <option value="short">Short</option>
+        <option value="medium">Medium</option>
+        <option value="long">Long</option>
+      </select>
+      <script>setTimeout(() => descLengthEl.value=localStorage.descLength||descLengthEl.value, 10);</script>
+    </div>
+  </div>
+  
+  <div style="display:flex; justify-content:center; align-items:center; margin-bottom:0.5rem; margin-top:1rem;">
+    <button id="generateBtn" onclick="regenerate()" style="font-size:120%;">✨ generate</button>
+    <div style="width:0; height:max-content; position:relative;">
+      <button id="stopBtn" onclick="window.lastCharacterPromptStreamObj?.stop(); window.lastImageCaptionPromptStreamObj?.stop();" style="width:max-content; font-size:80%; margin-left:0.5rem; display:none;">❌ stop</button>
+    </div>
+  </div>
+  <p id="outputEl" style="width:100%;"></p>
+</div>
+
+<div id="imagesAreaEl" style="display:none;">
+  <p id="imagePromptEl" style="text-align:center; max-width:1050px; margin:0 auto; padding:1rem;"></p>
+  <div id="imageSettingsEl" style="margin-top:0.25rem; font-size:80%; display:flex; justify-content:center;"> 
+    <div style="display:flex; align-items:center; justify-content:center; border:1px solid #444; border-radius:2px; padding:0.25rem;">
+      <div style="margin-right:0.25rem;">Style:</div>
+      <select id="visualStyleEl" onchange="localStorage.visualStyle=this.value" style="max-width:100px;">
+        [generateVisualStyleOptionsHtml()]
+      </select>
+      <script>setTimeout(() => visualStyleEl.value=localStorage.visualStyle||visualStyleEl.value, 10);</script>
+    </div>
+    <button id="regenImagesBtn" onclick="generateImages()" style="margin-left:0.5rem;">🎲 regenerate images</button>
+  </div>
+  <div id="imagesEl" style="text-align:center; max-width:1050px; margin:0 auto; padding:1rem;"></div>
+</div>
+
+<br><br>
+<div id="commentsCtn"></div>
+
+<p style="font-size:80%; margin-top:1rem;">This generator uses a combination of the <a href="https://perchance.org/ai-text-plugin" target="_blank">ai-text-plugin</a> and the <a href="https://perchance.org/text-to-image-plugin" target="_blank">text-to-image-plugin</a>.</p>
+
+<br><br>
+
+<!-- COMMENTS STUFF -->
+<script>
+  function createCommentsSectionHtml() {
+    let commentsPluginHtml = comments({width:"min(750px, 100%)", height:"min(70vh, 600px)", forceColorScheme:localStorage.forceColorScheme || null});
+    commentsCtn.innerHTML = `
+      <p><button onclick="if(commentsEl.style.display == 'none') { commentsEl.style.display=''; this.textContent='hide comments'; } else { commentsEl.style.display='none'; this.textContent='💬 show comments'; }">💬 show comments</button></p>
+      <p id="commentsEl" style="display:none;">
+        ${commentsPluginHtml}
+      </p>
+    `;
+  }
+  createCommentsSectionHtml();
+</script>
+
+<!-- DARK MODE STUFF -->
+<div style="position:fixed; bottom:0.5rem; left:0.5rem; z-index:10;">
+  <button id="darkModeBtn" style="cursor:pointer;" onclick="window.toggleManualDarkMode(); createCommentsSectionHtml();">🌃</button>
+</div>
+<script>
+  function toggleManualDarkMode() {
+    let newColorScheme = (getCurrentColorScheme() === "dark" ? "light" : "dark");
+    localStorage.forceColorScheme = newColorScheme;
+    setColorScheme(newColorScheme);
+    // if chosen mode matches current OS default, we remove manual "forced" mode:
+    let systemColorScheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? "dark" : "light";
+    if(systemColorScheme === newColorScheme) {
+      localStorage.removeItem("forceColorScheme");
+    }
+  }
+  function getCurrentColorScheme() {
+    if(localStorage.forceColorScheme !== undefined) {
+      return localStorage.forceColorScheme;
+    } else {
+      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? "dark" : "light";
+    }
+  }
+  function setColorScheme(scheme) {
+    if(scheme !== "dark" && scheme !== "light") throw new Error("scheme should be 'light' or 'dark'");
+    document.querySelector("#darkModeBtn").textContent = (scheme === "dark" ? "🌄" : "🌃");
+    if(scheme === "dark") {
+      document.documentElement.style.colorScheme = "dark";
+      document.body.style.color = "#d8d4cf";
+      document.body.style.backgroundColor = "#131516";
+      document.documentElement.style.setProperty('--box-color', '#2a2a2a');
+    } else {
+      document.documentElement.style.colorScheme = "light";
+      document.body.style.color = "black";
+      document.body.style.backgroundColor = "white";
+      document.documentElement.style.setProperty('--box-color', '#ebebeb');
+    }
+  }
+  // during page load, set the chosen mode based on localStorage value if it exists:
+  if(localStorage.forceColorScheme !== undefined) {
+    setColorScheme(localStorage.forceColorScheme);
+  } else {
+    // user has not manually overwritten, so we use OS default:
+    let systemIsInDarkMode = !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    setColorScheme(systemIsInDarkMode ? "dark" : "light");
+  }
+</script>
+ 
+<!-- FEEDBACK STUFF -->
+<div style="position:fixed; bottom:0.5rem; right:0.5rem; text-align:right; z-index:100;">
+  <div id="feedbackCommentsCtn"></div>
+  <button id="feedbackBtn893745ykfuhd" onclick="if(feedbackCommentsCtn.innerHTML.length === 0) { feedbackCommentsCtn.innerHTML=generateFeedbackCommentsHtml(); this.innerHTML='✖ close'; } else {  feedbackCommentsCtn.innerHTML='';  this.innerHTML='🗨️ feedback'; }">🗨️ feedback</button>
+</div>
+<script>
+  function generateFeedbackCommentsHtml() {
+    let options = {channel:"feedback", hideComments:location.hash.includes("#showfeedback") ? false : true, height:location.hash.includes("#showfeedback") ? 500 : 120, commentPlaceholderText: "Share some feedback. Do not share personal info, data is public.", submitButtonText: "submit feedback"};
+    if(localStorage.forceColorScheme) options.forceColorScheme = localStorage.forceColorScheme;
+    return comments(options);
+  }
+</script>
+
+<style>
+  button:disabled {
+    filter: grayscale(1); /* since firefox doesn't seem to change emoji colors to indicate disabledness - only affects text */
+  }
+</style>
