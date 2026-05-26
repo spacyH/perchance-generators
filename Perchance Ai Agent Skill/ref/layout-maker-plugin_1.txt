@@ -1,0 +1,178 @@
+$output(spec) =>
+
+  // enter yolo mode
+  if(!window.__alreadyAddedLayoutMakerPluginStuff) {
+    window.__alreadyAddedLayoutMakerPluginStuff = true;
+    // if people add id=foo to one of their areas, then they expect to be able to write update(foo) and have that specific area be updated like normal.
+    // but this doesn't work because the area has already been rendered/evaluated - i.e. there are no square/curly blocks to update.
+    // so to fix this, we wrap the update function, detect if the input element to the update function is a layout maker plugin 'area', and if so, "manually" update that area using saved original/unevaluated content.
+    let realUpdateFunction = window.update;
+    window.update = function(...args) {
+      if(args[0] && args[0].dataset && args[0].dataset.isLayoutMakerPluginArea === "yes") {
+        let id = args[0].id;
+        let contentWrapper = args[0];
+        if(contentWrapper.querySelector(`[data-layout-maker-actual-content-wrapper='1']`)) {
+          contentWrapper = contentWrapper.querySelector(`[data-layout-maker-actual-content-wrapper='1']`);
+        }
+        contentWrapper.innerHTML = window.__originalLayoutMakerPluginAreaContentById.get(id).evaluateItem;
+      } else {
+        realUpdateFunction.bind(window)(...args); // must pass on all args exactly as recieved - important to ensure forwards-compatibility with future perchance engine updates
+      }
+    };
+    window.__originalLayoutMakerPluginAreaContentById = new Map();
+  }
+  // exit yolo mode
+
+	let rows = spec.grid.selectAll.map(r => r+"");
+	let areas = spec.areas || {};
+	let areaNames = [...new Set(rows.join(" ").split(/\s+/))].filter(n => n !== ".");
+	//let containerCSS = ;
+	let b = spec.debug === "borders";
+	let bg = spec.debug === "colors" || spec.debug === "colours";
+	
+	let html = `<div ${spec.container && spec.container.id ? `id="${spec.container.id}"` : ""} style="box-sizing:border-box; display:grid; grid-template-areas:${rows.map(r => `'${r}'`).join(" ")}; ${spec.rowSizes ? "grid-template-rows:"+spec.rowSizes : ""}; ${spec.columnSizes ? "grid-template-columns:"+spec.columnSizes : ""}; ${spec.container && spec.container.style ? spec.container.style : "min-height:300px;"};">
+		${areaNames.map(n => {
+      let content = "";
+      let id = areas[n] && areas[n].id ? areas[n].id : null;
+      if(areas[n] && areas[n].content) {
+        content = areas[n].content.toString().replace(/([{}\[\]])/g, "\\$1"); // <--need to put escapes back that toString took away
+        if(id) {
+          window.__originalLayoutMakerPluginAreaContentById.set(id, areas[n].content);
+        }
+      }
+      return `<div ${id ? "id='"+id+"'" : ""} data-is-layout-maker-plugin-area="yes" style="box-sizing:border-box; grid-area:${n}; ${areas[n] && areas[n].style || ""}; ${b ? "border:1px dashed grey" : bg ? `background-color:hsl(${360 * Math.random()},${(25 + 70 * Math.random())}%,${(85 + 10 * Math.random())}%);` : ""}"> ${areas[n] && areas[n].centered ? `<div style='display:flex; flex-direction:column; justify-content:center; align-items:center; width:100%; height:100%;'><div data-layout-maker-actual-content-wrapper="1">` : ""}${content}${areas[n] && areas[n].centered ? "</div></div>" : ""}</div>`
+    }).join("")}
+	</div>`;
+	return html;
+
+ 
+ 
+layout0
+  grid
+    a a a a b
+    a a a a b
+    c c c c c
+	container
+		style = height:100%;
+	areas
+		a
+			style = background-color:lightblue;
+		b
+			style = background-color:orange;
+		c
+			style = background-color:pink;
+
+layout1
+	debug = borders     
+  grid
+    a a a a b
+    a a a a b
+    c c c c c
+  areas
+    a
+      content = {hello|hi there} this is the "a" area
+    b
+      content = side bar thing ("b" area)
+    c
+      content = a sort of footer thing ("c" area)
+			
+layout_auto_height
+	debug = colors
+	container
+		style = height:auto;
+  grid
+    a a a a b
+    a a a a b
+    c c c c c
+		e d d d d
+		f f f f f
+  areas
+    a
+      content = {hello|hi there} this is the "a" area
+    b
+      content = side bar thing ("b" area)
+    c
+      content = a sort of footer thing ("c" area)
+		d
+      content = another area
+		e
+			content = hi
+    f
+      content = hello
+			
+layout1_centered
+	debug = colors     
+  grid
+    a a a a b
+    a a a a b
+    c c c c c
+  areas
+    a
+      content = {hello|hi there} this is the "a" area
+			centered = true
+    b
+      content = side bar thing ("b" area)
+			centered = true
+    c
+      content = a sort of footer thing ("c" area)
+			centered = true
+	
+layout2
+	debug = colors
+  grid
+    t a a a b m
+    t a a a b k
+    c c c c c k
+		d d g s s s
+	areas
+		s
+			content = hello
+			centered = true
+		m
+			content = {1|2|3} 
+			centered = true
+			
+layout3
+  grid
+    a b c
+    a b c
+    a b c
+  areas
+    a
+      content = aaa
+			style = background-color:lightblue;
+    b
+      content = bbb
+			style = border:1px solid lightgrey;
+    c
+      content = ccc
+			style = background-color:orange;
+			
+layout4
+	debug = colors
+	container
+		style = height:100px; width:200px;
+  grid
+    a a a
+    b b b
+    c c c
+		
+layout5
+	debug = borders
+	columnSizes = 1fr 0.5fr 1fr
+	rowSizes = 2fr 1fr 1fr
+  grid
+    a b c
+		d e f
+		g h i
+		
+layout6
+	debug = colors
+  grid
+    a a .
+		b . c
+		. . d
+
+	
+			
+			

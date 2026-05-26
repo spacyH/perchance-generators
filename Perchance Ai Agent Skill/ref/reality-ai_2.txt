@@ -1,0 +1,201 @@
+<style>
+  /* --- 1. 强力去广告 --- */
+  #footer, #ad-container, .ad-container, #google_image_div, #top-bar-ad, .bottom-nav, 
+  .perchance-ad-unit, header.perchance-header, #perchance-ad-container, #content-ad, .adsbygoogle { 
+    display: none !important; height: 0 !important; width: 0 !important; opacity: 0 !important; 
+    pointer-events: none !important; position: fixed !important; top: -10000px !important; left: -10000px !important; z-index: -9999 !important;
+  }
+
+  /* --- 2. 奢华黑金风布局 --- */
+  html, body { margin: 0; padding: 0; width: 100%; min-height: 100vh; background: #0a0a0c; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow-x: hidden; }
+  .main-wrapper { width: 100%; min-height: 100vh; background: linear-gradient(135deg, #121214 0%, #050505 100%); display: flex; flex-direction: column; align-items: center; padding-bottom: 50px; }
+
+  /* --- 3. 顶部导航 --- */
+  .top-nav { width: 100%; position: fixed; top: 0; left: 0; z-index: 9000; padding: 15px 20px; box-sizing: border-box; backdrop-filter: blur(25px) saturate(180%); background: rgba(10, 10, 12, 0.4); border-bottom: 1px solid rgba(197, 147, 74, 0.15); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px; }
+  .logo-text { font-family: Didot, serif; font-weight: 700; font-size: 1.4rem; letter-spacing: 5px; text-transform: uppercase; background: linear-gradient(90deg, #C5934A, #E3BA71, #C5934A); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .status-container { display: flex; align-items: center; justify-content: center; gap: 6px; color: #4ade80; font-size: 10px; font-weight: 600; letter-spacing: 1px; }
+
+  /* --- 4. 主内容区域 --- */
+  .container { width: 90%; max-width: 900px; padding-top: 110px; display: flex; flex-direction: column; gap: 20px; z-index: 1; }
+  .input-group { display: flex; flex-direction: column; gap: 8px; }
+  .label-row { font-size: 13px; color: #C5934A; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+  
+  input[type="text"], select, input[type="file"] { 
+    width: 100%; padding: 14px; background: rgba(255,255,255,0.02); border: 2px solid #C5934A !important; 
+    border-radius: 12px; color: white; box-sizing: border-box; outline: none; transition: 0.3s; font-size: 14px;
+  }
+  input[type="file"]::file-selector-button { background: #C5934A; border: none; padding: 6px 12px; border-radius: 6px; color: #0a0a0c; font-weight: bold; cursor: pointer; margin-right: 15px; }
+
+  .gen-button { 
+    width: 100%; padding: 18px; background: linear-gradient(135deg, #C5934A 0%, #8B6D3A 50%, #C5934A 100%); 
+    border: none; border-radius: 12px; color: #0A0A0C; font-weight: 900; font-size: 16px; cursor: pointer; 
+    box-shadow: 0 4px 20px rgba(197, 147, 74, 0.3); transition: 0.2s; letter-spacing: 4px; text-transform: uppercase;
+  }
+  .gen-button:disabled { background: #444; opacity: 0.6; cursor: not-allowed; }
+
+  #gallery-area { margin-top: 30px; width: 100%; display: flex; flex-wrap: wrap; gap: 15px; }
+  #gallery-area iframe, #gallery-area img { 
+    width: calc(25% - 11.25px) !important; height: auto !important; border-radius: 12px; 
+    border: 2px solid #C5934A !important; background: #050505;
+  }
+
+  #process-status { text-align: center; font-size: 13px; color: #C5934A; font-style: italic; min-height: 20px; }
+
+  @keyframes pulseDot { 0% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.4); } 70% { box-shadow: 0 0 0 6px rgba(74, 222, 128, 0); } 100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); } }
+  @media (max-width: 768px) { #gallery-area iframe, #gallery-area img { width: calc(50% - 7.5px) !important; } }
+</style>
+
+<div class="main-wrapper">
+  <header class="top-nav">
+    <div class="logo-text">REALITY·AI</div>
+    <div class="status-container">
+      <span style="width: 6px; height: 6px; background: #4ade80; border-radius: 50%; display: inline-block; animation: pulseDot 2s infinite;"></span>
+      VISUAL CLONE MODE ACTIVE
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="input-group">
+      <div class="label-row">第一步：上传人物源图 (可选，不传即为文生图)</div>
+      <input type="file" id="img-file" accept="image/*">
+    </div>
+
+    <div class="input-group">
+      <div class="label-row">第二步：输入修改指令 (如: 红色乳胶衣, 雨夜)</div>
+      <input type="text" id="user-query" placeholder="Enter instructions...">
+    </div>
+
+    <div id="process-status"></div>
+
+    <button class="gen-button" id="gen-btn" onclick="runRealityFlow()">🚀 启动视觉克隆序列</button>
+    
+    <div id="gallery-area">[batchOutput]</div>
+  </div>
+</div>
+
+<script>
+  // ================= 核心修复：声明纯 JS 全局变量 =================
+  var finalPrompt_JS = "(masterpiece:1.2), (best quality:1.2), (8k resolution:1.1).";
+
+  // ================= 配置区 =================
+  const DIFY_KEY = "app-0Nzs538btupJWHvFVCpHZFqP";
+  const DIFY_URL = "https://aichat.zerone.us.kg/v1";
+  // ==========================================
+
+  async function runRealityFlow() {
+    const fileNode = document.getElementById('img-file');
+    const queryNode = document.getElementById('user-query');
+    const statusNode = document.getElementById('process-status');
+    const btn = document.getElementById('gen-btn');
+
+    const hasImage = !!fileNode.files[0];
+    const userText = queryNode.value.trim();
+
+    // 最小化拦截校验：图和文不能同时为空
+    if (!hasImage && !userText) {
+      return alert("请至少上传参考图，或者输入提示词！");
+    }
+
+    try {
+      btn.disabled = true;
+      let uploadedFilesArray = []; // 用于动态传递给 Dify
+
+      // 最小化分流：如果有图，才执行上传
+      if (hasImage) {
+        statusNode.innerText = "⏳ [图生图] 正在上传图片基因...";
+
+        const formData = new FormData();
+        formData.append('file', fileNode.files[0]);
+        formData.append('user', 'reality_web_user');
+
+        const upRes = await fetch(`${DIFY_URL}/files/upload`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${DIFY_KEY}` },
+          body: formData
+        });
+        
+        const upData = await upRes.json();
+        if (!upRes.ok) throw new Error(upData.message || "图片上传失败");
+
+        uploadedFilesArray.push({
+          "type": "image",
+          "transfer_method": "local_file",
+          "upload_file_id": upData.id
+        });
+        
+        statusNode.innerText = "🧬 [图生图] 正在执行视觉解构与缝合...";
+      } else {
+        statusNode.innerText = "✍️ [文生图] 正在呼叫增强大师裂变提示词...";
+      }
+
+      const wfRes = await fetch(`${DIFY_URL}/chat-messages`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${DIFY_KEY}`,
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify({
+          inputs: { 
+            "query": userText || "highly detailed",
+            "files": uploadedFilesArray // 动态数组，空则触发 Dify 文生图逻辑
+          },
+          query: userText || "Run visual analysis",
+          user: "reality_web_user",
+          response_mode: "blocking"
+        })
+      });
+      
+      const resultData = await wfRes.json();
+      
+      if (!wfRes.ok) {
+        throw new Error(resultData.message || "工作流执行失败");
+      }
+
+      let rawAnswer = resultData.answer;
+      if (!rawAnswer) {
+        throw new Error("未能获取到缝合提示词");
+      }
+
+      // ==========================================
+      // 🚀 原封不动保留的核心逻辑：数据清洗与自动画幅推断
+      // ==========================================
+      let cleanPrompt = rawAnswer.replace(/```[a-z]*\n?/gi, ''); 
+      cleanPrompt = cleanPrompt.replace(/`/g, '');
+
+      // 捕获大模型传回的智能比例暗号
+      let arMatch = cleanPrompt.match(/\[AR:([pls])\]/i);
+      if (arMatch) {
+        let arType = arMatch[1].toLowerCase();
+        // 动态覆盖左侧的 Perchance 变量
+        if (arType === 'p') { window.imgWidth = 512; window.imgHeight = 768; }
+        else if (arType === 'l') { window.imgWidth = 768; window.imgHeight = 512; }
+        else { window.imgWidth = 512; window.imgHeight = 512; }
+        
+        console.log("📐 智能大脑已自动调整画布比例为:", arType);
+        
+        // 擦除暗号，避免污染提示词
+        cleanPrompt = cleanPrompt.replace(/\[AR:[pls]\]/i, '');
+      } else {
+        // 兜底默认值：横图
+        window.imgWidth = 768; window.imgHeight = 512;
+      }
+
+      cleanPrompt = cleanPrompt.replace(/^(Here is the prompt:|Generated Prompt:|最终缝合提示词：?)\s*/i, '');
+      cleanPrompt = cleanPrompt.replace(/\n+/g, ' ');
+      cleanPrompt = cleanPrompt.trim();
+
+      statusNode.innerText = "✨ 洗净完成！召唤 FLUX 引擎中...";
+      console.log("【洗净后的最终纯粹提示词】:", cleanPrompt);
+
+      // --- 终极注入并更新视图 ---
+      finalPrompt_JS = cleanPrompt;
+      window.update();
+
+    } catch (err) {
+      console.error(err);
+      statusNode.innerHTML = `<span style="color:#ff6b6b">❌ 链路中断: ${err.message}</span>`;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+</script>

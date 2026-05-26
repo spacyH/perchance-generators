@@ -1,0 +1,111 @@
+<h1>✍️ tldraw plugin 🖌️</h1> 
+
+<div style="margin:0 auto;width:100%;max-width:800px;background:white;border-radius:2px;padding:1em; box-sizing:border-box;">
+<!--   <p style="background: #ffda89;padding:0.5rem;margin-top: 0;border-radius: 3px; text-align:left;"><b>Oops!</b> It looks like <a href="https://lemmy.world/post/5087169" target="_blank">using the official tldraw.com servers might not be allowed</a> 😬 I'll probably have to run a Perchance-specific tldraw server. That's not hard to do, I just haven't gotten around to it yet.</p> -->
+  
+	<p style="text-align:justify; margin-top:0;">This plugin allows you to add a live, collaborative drawing canvas to your generator's page. It uses an embedded page of the excellent <a href="https://tldraw.com" target="_blank">tldraw.com</a> canvas app. Just paste this in your Perchance code panel:</p>
+	 
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+tldraw = \{import:tldraw-plugin\} 
+</pre>
+	
+  <p>and then write this in your HTML (bottom-right) panel:</p>
+	
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+\[tldraw()\]
+</pre>
+
+	<p>and it'll output this:</p>
+	
+	<p>[$output()]</p> 
+	
+	<p>Feel free to test it out by adding some scribbles above! If there are other people on this page right now you'll see them drawing stuff too. Note that <b>anyone can delete anything</b>, so it's moderated via... anarchy. I don't think tldraw has any moderation tools yet.</p>
+	
+	<p>You can specify some options by writing this in your Perchance code panel:</p>
+	
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+tldrawOptions
+	width = 600
+	height = 600
+</pre>
+	
+  <p>and then write this in your HTML panel:</p>
+	
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+\[tldraw(tldrawOptions)\]
+</pre>
+  
+  <p><a href="https://perchance.org/tldraw-plugin-example-1#edit" target="_blank">Here's a simple example generator</a> that uses this plugin.</p>
+	
+  <h2 style="margin-top:3rem;">Multiple "Channels"</h2>
+<p>If you want multiple different canvases in a single generator, use the <code>channel</code> option:</p>
+
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+generalOptions
+	channel = general
+  ...
+  
+brainstormOptions
+	channel = brainstorm
+  ...
+</pre>
+  <p>Then you'd write <code>\[tldraw(generalOptions)\]</code> and <code>\[tldraw(brainstormOptions)\]</code> wherever you want to place them.</p>
+  
+  <p>Channel names can only contain lower-case letters, numbers and hyphens.</p>
+	
+	<p>If you know <a href="https://www.khanacademy.org/computing/computer-programming/html-css" target="_blank">CSS</a>, you can set a custom style on the container:</p>
+	
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+tldrawOptions
+	containerStyle = width:50%; height:800px; border:1px solid blue; opacity:0.5;   <span style="opacity:0.5;">// etc.</span>
+	...
+</pre>
+  <p><a href="https://perchance.org/tldraw-plugin-fullscreen-example#edit" target="_blank">Here's an example</a> that uses the <code>containerStyle</code> to make it take up the whole screen.</p>
+  
+	<br><br>
+	<p><b>Notes:</b></p>
+	<ul class="dot-list">
+		<li><a href="https://perchance.org/tldraw-plugin-example-1#edit">Here's a simple example</a> of a generator that uses this plugin.</li>
+		<li>You probably shouldn't rely on the canvas for storing important stuff - it might be best treated as a "scratch pad". And remember, if you share your generator link with anyone, or someone guesses the URL, then they'll be able to see and edit your canvas.</li>
+    <li>By default canvases aren't "updated"/randomized when the user clicks the "randomize" button. Instead the canvas will "stay there". If you actually want to e.g. display a random channel each time the user clicks a button, or you e.g. want to put a different canvas in each "room" within your <a href="https://perchance.org/goto-plugin" target="_blank">goto-plugin</a> adventure (which would require <i>replacement</i> during an update), then you need to add <code>replacedDuringUpdate=true</code> like in <a href="https://perchance.org/randomized-tldraw-canvas-channel-using-replacedduringupdate#edit" target="_blank">this example generator</a>. That ensures that the old canvas is "deleted" and replaced by a fresh one every time the page is updated/randomized.</li>
+		<li>Check out more plugins at <a href="/plugins">perchance.org/plugins</a></li>
+	</ul>
+</div>
+<br><br><br>
+
+<style>
+	body {
+			background:#eee;
+	}
+	code {
+		background-color:#eee;
+		padding: 0 0.2em;
+	}
+	ul.dot-list li {
+	  margin-top:0.5em;	
+	} 
+	pre.custom {
+		text-align:left;
+		background: #333;
+    color: white;
+    padding: 1em;
+    border-radius: 2px;
+		tab-size: 2;
+		-moz-tab-size: 2;
+		-o-tab-size: 2;
+		-webkit-tab-size: 2;
+	}
+  kbd {
+    background-color: #eee;
+    border-radius: 3px;
+    border: 1px solid #b4b4b4;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, .2), 0 2px 0 0 rgba(255, 255, 255, .7) inset;
+    color: #333;
+    display: inline-block;
+    font-size: .85em;
+    font-weight: 700;
+    line-height: 1;
+    padding: 2px 4px;
+    white-space: nowrap;
+  }
+</style>

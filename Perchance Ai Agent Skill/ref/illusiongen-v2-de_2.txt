@@ -1,0 +1,2543 @@
+
+<!--
+STATUS: Vollständige Überarbeitung mit neuen Features abgeschlossen. SeedBatchQueue implementiert. Gallery Export als ZIP hinzugefügt. Touch-Gesten für PreviewArea hinzugefügt. Zufällige Artstyles und Effekte implementiert. Standardauflösung auf 768x768 geändert. Yin-Yang-Ladeanimation mit Beschleunigung und 79% Circular Crop Mask hinzugefügt.
+
+ÄNDERUNGSPROTOKOLL (Changelog):
+- [ADD] Status- und Changelog-Kommentare oben im Code hinzugefügt.
+- [ADD] Gallery Export als ZIP-Button mit JSZip-Integration hinzugefügt.
+- [ADD] Clear-Button für Galerie hinzugefügt.
+- [ADD] Checkbox für zufällige Artstyles pro Generation hinzugefügt.
+- [ADD] Checkbox für zufällige Effekte (1-8) pro Generation hinzugefügt.
+- [ADD] SeedBatchQueue-Klasse implementiert:
+  - Seed-Verwaltung (hinzufügen/entfernen/duplizieren)
+  - Loop-Modus für kontinuierliche Generierung
+  - Art-Style-Auswahl und -Zyklisierung
+  - UI-Toggles für Sichtbarkeitskontrolle
+- [ADD] PreviewArea mit Slider skalierbar gemacht.
+- [ADD] Image Grid mit numerischem Eingabefeld (+/-) skalierbar gemacht.
+- [ADD] Mobile Touch-Gesten (Swipe, Pinch) für PreviewArea hinzugefügt.
+- [UPD] Artstyles aus Dropdown-Menü mit SeedBatchQueue verknüpft.
+- [UPD] Standardauflösung auf 768x768px geändert.
+- [UPD] "schleifenmodus" zu "Looping" und "Stile zylisch" zu "ArtStyle loop" umbenannt.
+- [UPD] Spezielles Yin-Yang-Ladeanimation mit Beschleunigung und Richtungswechsel hinzugefügt.
+- [UPD] Yin-Yang-Cropping-Mask implementiert: Container ist 79% der Größe des Loaders (100px), zentriert und mit border-radius: 50% & overflow: hidden.
+- [FIX] Aspect-Ratios für Nicht-1:1-Formate korrigiert.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Illusion😵‍💫Gen v2 - Rebirth from Seed </title>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Rye (Western/Fantasy style similar to BBH Bartle) and Monoton (Neon tube style) -->
+    <link href="https://fonts.googleapis.com/css2?family=Rye&family=Monoton&display=swap" rel="stylesheet">
+    <!-- JSZip for ZIP export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        :root {
+            --neon-pink: #ff00ff;
+            --neon-cyan: #00ffff;
+            --bg-dark: #121212;
+            --bg-panel: #1e1e1e;
+            --bg-input: #2d2d2d;
+            --accent: #00bcd4;
+            --border: #444;
+            --text-main: #e0e0e0;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            touch-action: pan-y;
+        }
+
+        /* --- Responsive Layout --- */
+        @media (min-width: 901px) {
+            body {
+                display: grid;
+                grid-template-columns: 400px 1fr;
+                grid-template-rows: 1fr auto;
+            }
+            #controlPanelEl { border-right: 1px solid #333; border-bottom: none; }
+            #previewPanelEl { border-left: none; }
+        }
+
+        @media (max-width: 900px) {
+            body { display: flex; flex-direction: column; }
+            #controlPanelEl { max-height: 50vh; border-right: none; border-bottom: 1px solid #333; flex-shrink: 0; transition: transform 0.3s ease; }
+            #controlPanelEl.collapsed { display: none; }
+            #previewPanelEl { flex: 1; min-height: 0; }
+            button, select, input, textarea { min-height: 44px; font-size: 16px; margin-bottom: 8px; }
+            
+            /* Mobile Specific: Effects Field Fix */
+            #effects-list-ctn { height: 250px !important; min-height: 250px; border: 2px solid var(--accent); background-color: #1a1a1a; }
+            #effectsGroup button { padding: 4px 8px; font-size: 0.75em; margin-bottom: 2px; }
+        }
+
+        @media (max-width: 600px) {
+            #controlPanelEl { max-height: 55vh; padding: 6px; }
+            #previewPanelEl { flex: 1; }
+            .settings-row { grid-template-columns: 1fr; gap: 5px; }
+        }
+        
+        #controlPanelEl {
+            background-color: var(--bg-panel);
+            padding: 8px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        #previewPanelEl {
+            background-color: var(--bg-dark);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Title with Fancy Font - IllusionGen */
+        #mainTitleEl {
+            font-family: 'Rye', cursive;
+            font-size: 2em;
+            margin: 0 0 0 0;
+            text-align: center;
+            color: var(--accent);
+            text-shadow: 0 0 10px rgba(0, 188, 212, 0.7), 0 0 20px rgba(0, 188, 212, 0.5);
+            letter-spacing: 2px;
+            display: block;
+            width: 100%;
+        }
+
+        /* Subtitle Styling */
+        .subtitleEl {
+            text-align: center;
+            font-family: sans-serif;
+            font-weight: 800;
+            font-size: 0.5em;
+            color: #ccc;
+            margin-top: 5px;
+            margin-bottom: 10px;
+            display: block;
+            width: 100%;
+            letter-spacing: 1px;
+        }
+
+        /* Mobile Header */
+        #mobileHeaderEl {
+            display: none;
+            background-color: var(--bg-panel);
+            padding: 6px;
+            border-bottom: 1px solid #333;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+        }
+        @media (max-width: 900px) { #mobileHeaderEl { display: flex; } }
+        #mobileHeaderEl h3 { margin: 0; font-family: 'Rye', cursive; color: var(--accent); font-size: 1.2em; }
+        
+        /* Language Toggle */
+        .lang-toggle-btn {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 3px 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1.2em;
+        }
+
+        /* Common Inputs */
+        textarea, select, input {
+            width: 100%;
+            background-color: var(--bg-input);
+            color: #e0e0e0;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 6px;
+            margin-bottom: 5px;
+            font-family: inherit;
+            touch-action: manipulation;
+            transition: border-color 0.2s;
+        }
+        textarea:focus, select:focus, input:focus { outline: none; border-color: var(--accent); }
+        textarea { resize: vertical; min-height: 70px; }
+        
+        button {
+            width: 100%;
+            padding: 6px;
+            margin-bottom: 5px;
+            background-color: #3a3a3a;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            touch-action: manipulation;
+        }
+        button:hover { background-color: #4a4a4a; }
+        button:active { background-color: #555; transform: scale(0.98); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        /* Toggle Buttons for Groups */
+        .group-toggle-btn {
+            width: auto;
+            padding: 5px 10px;
+            margin: 0;
+            font-size: 0.85em;
+            background: var(--bg-input);
+            border: 1px solid #555;
+        }
+
+        /* Collapsible Groups */
+        .control-group {
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: #1a1a1a;
+        }
+        .group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            cursor: pointer;
+            user-select: none;
+            padding: 5px 0;
+        }
+        .group-header h3 { margin: 0; font-size: 0.95em; color: #aaa; display: flex; align-items: center; gap: 8px; }
+        .group-content {
+            transition: max-height 0.3s ease, opacity 0.3s ease;
+            overflow: hidden;
+            max-height: 2000px;
+            opacity: 1;
+        }
+        .group-content.collapsed { max-height: 0; opacity: 0; margin: 0; padding-top: 0; padding-bottom: 0; }
+
+        /* Batch Controls */
+        .batch-control-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--bg-input);
+            padding: 6px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+        }
+        .batch-stepper-btn { width: 40px; padding: 0; height: 40px; flex-shrink: 0; }
+        #batchSizeDisplay { font-weight: bold; font-size: 1.2em; min-width: 30px; text-align: center; color: var(--accent); }
+
+        /* Floating Action Button for Mobile Generate */
+        #fabGenerateBtn {
+            position: absolute; bottom: 20px; right: 20px; width: 64px; height: 64px;
+            border-radius: 50%; background: linear-gradient(135deg, var(--accent), #008ba3);
+            color: #fff; font-size: 24px; box-shadow: 0 4px 20px rgba(0,188,212,0.5);
+            z-index: 100; display: none; border: none; touch-action: manipulation;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0%, 100% { box-shadow: 0 4px 20px rgba(0,188,212,0.5); } 50% { box-shadow: 0 4px 30px rgba(0,188,212,0.8); } }
+        @media (max-width: 900px) { #fabGenerateBtn { display: flex; } }
+        
+        #image-display-ctn {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: var(--bg-dark);
+            overflow: hidden;
+            position: relative;
+            width: 100%;
+            cursor: zoom-in;
+            touch-action: none; /* Important for gesture handling */
+        }
+        
+        #previewImgEl {
+            max-width: 95%;
+            max-height: 95%;
+            object-fit: contain;
+            border: 1px solid #333;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+            transition: opacity 0.3s, transform 0.3s;
+            transform-origin: center center;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            font-size: 0.85em;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        /* Effect List */
+        #effects-list-ctn {
+            height: 150px;
+            min-height: 120px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            margin-bottom: 10px;
+            background-color: var(--bg-input);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 6px;
+            align-content: flex-start;
+        }
+        #effects-list-ctn::-webkit-scrollbar { width: 8px; }
+        #effects-list-ctn::-webkit-scrollbar-track { background: #1a1a1a; }
+        #effects-list-ctn::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+        
+        .effect-item {
+            padding: 2px 6px;
+            border: 1px solid #555;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.8em;
+            background: #3a3a3a;
+            user-select: none;
+            transition: all 0.2s;
+            touch-action: manipulation;
+            white-space: nowrap;
+        }
+        .effect-item:hover { background-color: #4a4a4a; border-color: #666; transform: translateY(-1px); }
+        .effect-item.selected {
+            background-color: var(--accent);
+            color: var(--bg-dark);
+            border-color: var(--accent);
+            font-weight: bold;
+            box-shadow: 0 2px 8px rgba(0,188,212,0.4);
+        }
+        #clearEffectsBtn { padding: 6px; font-size: 0.75em; background-color: #3a3a3a; width: auto; align-self: flex-start; }
+        
+        /* Status Bar & Loading */
+        #statusBarEl {
+            padding: 5px 10px;
+            background-color: var(--bg-input);
+            border-top: 1px solid #333;
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Loading Overlay */
+        #loadingOverlayEl {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 50; opacity: 0; pointer-events: none; transition: opacity 0.3s; backdrop-filter: blur(5px);
+        }
+        #loadingOverlayEl.active { opacity: 1; pointer-events: all; }
+        
+        /* New Yin-Yang Loading Animation */
+        .yin-yang-container {
+            position: relative;
+            width: 79px; /* 79% of the 100px loader size */
+            height: 79px;
+            border-radius: 50%; /* Creates the circular crop mask */
+            overflow: hidden; /* Enforces the crop */
+            box-shadow: 0 0 20px rgba(0, 188, 212, 0.6); /* Enhanced glow for the mask */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .yin-yang-loader {
+            position: relative;
+            width: 100px; /* The "Emoji" / Symbol size */
+            height: 100px;
+            border-radius: 50%;
+            background: linear-gradient(to bottom, #fff 50%, #000 50%);
+            box-shadow: 0 0 15px var(--neon-cyan), inset 0 0 10px rgba(0,0,0,0.3);
+            overflow: hidden;
+            animation: rotateYinYang var(--duration, 2s) linear infinite;
+        }
+
+        .yin-yang-loader::before, .yin-yang-loader::after {
+            content: '';
+            position: absolute;
+            width: 50%;
+            height: 100%;
+            left: 0;
+            border-radius: 50%;
+        }
+
+        .yin-yang-loader::before {
+            top: 0;
+            background: #fff;
+            background-image: radial-gradient(circle at 50% 100%, #000 20%, transparent 20%);
+            transform-origin: 100% 50%;
+            transform: translateX(-50%);
+        }
+
+        .yin-yang-loader::after {
+            bottom: 0;
+            background: #000;
+            background-image: radial-gradient(circle at 50% 0%, #fff 20%, transparent 20%);
+            transform-origin: 100% 50%;
+            transform: translateX(-50%);
+        }
+
+        @keyframes rotateYinYang {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .spinner { width: 50px; height: 50px; border: 4px solid #333; border-top: 4px solid var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Modals */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+            padding: 20px;
+            box-sizing: border-box;
+            backdrop-filter: blur(10px);
+        }
+        .modal-overlay.open { display: flex; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #333; }
+        .modal-header h2 { margin: 0; color: var(--accent); font-family: 'Rye', cursive; }
+        .modal-content { overflow-y: auto; flex-grow: 1; line-height: 1.6; }
+
+        /* Grid Layouts */
+        #galleryGridEl { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; }
+        .gallery-item { position: relative; border-radius: 8px; overflow: hidden; border: 1px solid #333; aspect-ratio: 1; background: #000; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+        .gallery-item:hover { transform: scale(1.02); box-shadow: 0 4px 15px rgba(0,188,212,0.3); }
+        .gallery-item img { width: 100%; height: 100%; object-fit: cover; }
+        .delete-btn { position: absolute; top: 5px; right: 5px; background: rgba(255,0,0,0.7); color: white; border: none; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 2; transition: background 0.2s; }
+        .delete-btn:hover { background: rgba(255,0,0,0.9); }
+        
+        /* History Styles */
+        .history-item { background: var(--bg-input); padding: 12px; margin-bottom: 10px; border-radius: 6px; border: 1px solid #444; cursor: pointer; transition: background 0.2s; }
+        .history-item:hover { background: #3a3a3a; border-color: #555; }
+        .history-item .prompt-text { font-size: 0.95em; margin-bottom: 8px; color: #fff; line-height: 1.4; }
+        .history-item .timestamp { font-size: 0.75em; color: #888; }
+        .history-actions { display: flex; gap: 10px; margin-top: 10px; }
+        .history-actions button { padding: 6px 12px; font-size: 0.8em; width: auto; }
+        
+        /* Prompt Assistant Styles */
+        #assistantResponseEl { background-color: var(--bg-input); padding: 12px; border-radius: 4px; min-height: 60px; margin-top: 10px; font-size: 0.9em; white-space: pre-wrap; border: 1px solid #444; max-height: 200px; overflow-y: auto; }
+
+        /* Settings Specific */
+        .settings-group { background: var(--bg-input); padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #444; }
+        .settings-group h3 { margin-top: 0; color: var(--accent); border-bottom: 1px solid #555; padding-bottom: 8px; }
+        .settings-row { display: grid; grid-template-columns: 120px 1fr; gap: 10px; align-items: center; margin-bottom: 12px; }
+
+        /* Image Format Selection */
+        .format-selector { display: flex; gap: 5px; flex-wrap: wrap; }
+        .format-btn { flex: 1; min-width: 60px; padding: 10px; font-size: 0.8em; background: #3a3a3a; border: 1px solid #555; transition: all 0.2s; }
+        .format-btn:hover { background: #4a4a4a; }
+        .format-btn.selected { background: var(--accent); color: var(--bg-dark); border-color: var(--accent); font-weight: bold; }
+
+        /* Progress Bar for Batch Generation */
+        #batchProgressBar { height: 6px; background: #333; border-radius: 3px; margin-top: 5px; overflow: hidden; display: none; }
+        #batchProgressBar.active { display: block; }
+        #batchProgressFill { height: 100%; background: linear-gradient(90deg, var(--accent), #00e5ff); width: 0%; transition: width 0.3s ease; box-shadow: 0 0 10px var(--accent); }
+
+        /* Stop Button */
+        #stopBtn { background-color: #d32f2f; color: white; border-color: #b71c1c; display: none; }
+        #stopBtn:hover { background-color: #b71c1c; }
+        #stopBtn.active { display: flex; }
+
+        /* Neon Footer - ☆-WazG-☆ */
+        #footerEl {
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(180deg, var(--bg-dark) 0%, #0a0a0a 100%);
+            font-family: 'Monoton', cursive;
+            font-size: 2.5em;
+            color: #ff00ff;
+            text-shadow: 0 0 5px #ff00ff, 0 0 10px #ff00ff, 0 0 20px #ff00ff, 0 0 40px #ff00ff, 0 0 80px #ff00ff;
+            animation: neonGlow 8s ease-in-out infinite alternate;
+            letter-spacing: 8px;
+            border-top: 1px solid #222;
+            flex-shrink: 0;
+            cursor: pointer;
+            user-select: none;
+            line-height: 1.2;
+            transition: transform 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #footerEl:active { transform: scale(0.98); }
+        @media (max-width: 600px) { #footerEl { font-size: 1.5em; letter-spacing: 4px; } }
+
+        @keyframes neonGlow {
+            0% { text-shadow: 0 0 5px #ff00ff, 0 0 10px #ff00ff, 0 0 20px #ff00ff, 0 0 40px #ff00ff; opacity: 0.9; }
+            50% { text-shadow: 0 0 10px #ff00ff, 0 0 20px #ff00ff, 0 0 40px #ff00ff, 0 0 80px #ff00ff, 0 0 120px #ff00ff; opacity: 1; }
+            100% { text-shadow: 0 0 5px #ff00ff, 0 0 10px #ff00ff, 0 0 20px #ff00ff, 0 0 40px #ff00ff; opacity: 0.9; }
+        }
+
+        /* Manual Hint */
+        #manualHintEl {
+            font-size: 0.25em;
+            color: var(--neon-cyan);
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-top: 5px;
+            letter-spacing: 1px;
+            animation: blink 6s infinite;
+            width: 100%;
+            text-align: center;
+        }
+
+        @keyframes blink { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+
+        /* Action buttons row */
+        .action-buttons { display: flex; gap: 8px; margin-top: 5px; }
+        .action-buttons button { flex: 1; }
+
+        /* Manual Modal Specifics */
+        .manual-section { margin-bottom: 25px; border-left: 2px solid var(--accent); padding-left: 15px; }
+        .manual-section h3 { color: var(--neon-pink); margin-top: 0; font-family: 'Rye', cursive; }
+        .manual-section ul { padding-left: 20px; }
+        .manual-section li { margin-bottom: 8px; }
+        .manual-section dt { font-weight: bold; color: var(--accent); margin-top: 10px; }
+        .manual-section dd { margin-left: 15px; color: #ccc; font-size: 0.9em; margin-bottom: 5px; }
+
+        /* Lightbox Overlay */
+        #lightboxEl {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 2000;
+            display: none; justify-content: center; align-items: center;
+            flex-direction: column;
+        }
+        #lightboxEl.open { display: flex; }
+        #lightboxImg { max-width: 95%; max-height: 90vh; object-fit: contain; box-shadow: 0 0 50px rgba(0,0,0,0.8); border: 1px solid #333; }
+        #lightboxClose { position: absolute; top: 20px; right: 20px; color: #fff; font-size: 2em; cursor: pointer; background: none; border: none; padding: 10px; }
+
+        /* SeedBatchQueue UI */
+        .seed-queue-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px;
+            margin-bottom: 5px;
+            background: var(--bg-input);
+            border-radius: 4px;
+            border: 1px solid #444;
+        }
+        .seed-queue-item.active { border-color: var(--accent); box-shadow: 0 0 5px rgba(0, 188, 212, 0.3); }
+        .seed-queue-actions { display: flex; gap: 5px; }
+        .seed-queue-actions button { padding: 4px 8px; font-size: 0.8em; width: auto; margin: 0; }
+
+        /* Style Checkboxes */
+        .style-checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 10px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+        .style-checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 8px;
+            background: #3a3a3a;
+            border-radius: 15px;
+            font-size: 0.75em;
+            cursor: pointer;
+            user-select: none;
+        }
+        .style-checkbox-item input { width: auto; margin: 0; }
+        .style-checkbox-item label { margin: 0; cursor: pointer; }
+
+        /* Preview Scale Slider */
+        .preview-scale-container {
+            position: absolute;
+            bottom: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            padding: 10px 20px;
+            border-radius: 20px;
+            border: 1px solid #333;
+            z-index: 50;
+            display: none;
+            align-items: center;
+            gap: 10px;
+        }
+        #previewPanelEl:hover .preview-scale-container,
+        .preview-scale-container:hover { display: flex; }
+        .preview-scale-container input[type="range"] { width: 150px; margin: 0; }
+
+        /* Grid Scaling */
+        .grid-scale-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .grid-scale-control input[type="number"] {
+            width: 60px;
+            margin: 0;
+            text-align: center;
+        }
+
+        /* Checkbox Styles */
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+        }
+        .checkbox-container input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+            accent-color: var(--accent);
+        }
+        .checkbox-container label {
+            margin: 0;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+
+        /* Touch Hints */
+        .touch-hint {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.7);
+            color: var(--accent);
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-size: 0.9em;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 60;
+            text-align: center;
+        }
+        .touch-hint.visible { opacity: 1; }
+
+        /* Clear Gallery Button */
+        #clearGalleryBtn {
+            background-color: #e53935;
+            border-color: #c62828;
+            width: auto;
+            padding: 6px 12px;
+            font-size: 0.8em;
+        }
+        #clearGalleryBtn:hover { background-color: #c62828; }
+
+        /* Export ZIP Button */
+        #exportZipBtn {
+            background-color: var(--accent);
+            color: var(--bg-dark);
+            border-color: var(--accent);
+            width: auto;
+            padding: 6px 12px;
+            font-size: 0.8em;
+        }
+        #exportZipBtn:hover { background-color: #00acc1; }
+        #exportZipBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+    <!-- Mobile Header -->
+    <div id="mobileHeaderEl">
+        <h3>Illusion😵‍💫Gen v2</h3>
+        <div style="display:flex; gap:10px;">
+             <button id="langBtnMobile" class="lang-toggle-btn">🇩🇪</button>
+             <button id="toggleControlsBtn" style="width:auto; padding:8px 15px; margin:0; background:none; border:1px solid #555;">
+                <i class="fa-solid fa-sliders"></i>
+            </button>
+        </div>
+    </div>
+
+    <div id="controlPanelEl">
+        <h2 id="mainTitleEl">Illusion😵‍💫Gen v2</h2>
+        <div class="subtitleEl">-Foetidus Ex Ore²-</div>
+        
+        <!-- Desktop Language Toggle -->
+        <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
+            <button id="langBtnDesktop" class="lang-toggle-btn">🇩🇪</button>
+        </div>
+
+        <!-- Prompt Assistant Section -->
+        <div class="control-group">
+            <div class="group-header" onclick="toggleGroup('assistantGroup')">
+                <h3><i class="fa-solid fa-robot"></i> <span data-i18n="smartAssist">SmartAssist</span></h3>
+                <button class="group-toggle-btn"><i class="fa-solid fa-chevron-down"></i></button>
+            </div>
+            <div id="assistantGroup" class="group-content">
+                <button id="randomPromptBtn" style="background-color: #555; margin-bottom: 8px;"><i class="fa-solid fa-dice"></i> <span data-i18n="randomPrompt">Random Prompt Idea</span></button>
+                <textarea id="assistantCommandInput" rows="2" data-i18n-placeholder="assistPlaceholder" placeholder="e.g. 'Make it 16:9, cyberpunk style...'"></textarea>
+                <div style="display:flex; gap:8px; margin-top:8px;">
+                    <button id="smartConfigBtn" style="flex:1; background-color: var(--accent); color:var(--bg-dark); padding: 10px;"><i class="fa-solid fa-wand-magic-sparkles"></i> <span data-i18n="autoConfig">Auto-Configure</span></button>
+                    <button id="openSettingsBtn" style="width: auto;" title="Assistant & Gen Settings"><i class="fa-solid fa-gear"></i></button>
+                </div>
+                <div id="assistantResponseEl"></div>
+            </div>
+        </div>
+
+        <!-- Main Prompt Group -->
+        <div class="control-group">
+            <div class="group-header" onclick="toggleGroup('promptGroup')">
+                <h3><i class="fa-solid fa-pen"></i> <span data-i18n="prompts">Prompts</span></h3>
+                <button class="group-toggle-btn"><i class="fa-solid fa-chevron-down"></i></button>
+            </div>
+            <div id="promptGroup" class="group-content">
+                <label for="promptInput" data-i18n="mainPrompt">Main Prompt:</label>
+                <textarea id="promptInput" rows="2" data-i18n-placeholder="promptPlaceholder" placeholder="e.g. vortex of colors, spiraling patterns">\{vortex of colors, spiraling patterns|Kaleidoscope fractured| Abstract geometry| Fractal patterns| Psychedelic art\}</textarea>
+                
+                <label for="negativePromptInput" data-i18n="negPrompt">Negative Prompt:</label>
+                <textarea id="negativePromptInput" rows="1" data-i18n-placeholder="negPlaceholder" placeholder="e.g. blurry, low quality">blurry, low quality</textarea>
+                
+                <label for="flagsInput">Flags:</label>
+                <input type="text" id="flagsInput" value="--chaos 50 --stylize 70 --ar 1:1">
+
+                <!-- Randomization Options -->
+                <div style="margin-top: 10px; border-top: 1px solid #444; padding-top: 10px;">
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="randomizeStyleCheck">
+                        <label for="randomizeStyleCheck" data-i18n="randomizeStyle">🎲 Randomize Artstyle</label>
+                    </div>
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="randomizeEffectsCheck">
+                        <label for="randomizeEffectsCheck" data-i18n="randomizeEffects">🎲 Randomize Effects (1-8)</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Effects Group -->
+        <div class="control-group">
+            <div class="group-header" onclick="toggleGroup('effectsGroup')">
+                <h3><i class="fa-solid fa-wand-magic"></i> <span data-i18n="effects">Effects</span></h3>
+                <button class="group-toggle-btn"><i class="fa-solid fa-chevron-down"></i></button>
+            </div>
+            <div id="effectsGroup" class="group-content">
+                <div id="effects-list-ctn">
+                    <!-- Populated by JS -->
+                </div>
+                <button id="clearEffectsBtn"><i class="fa-solid fa-eraser"></i> <span data-i18n="clearEffects">Clear Effects</span></button>
+            </div>
+        </div>
+
+        <!-- Style & Format Group -->
+        <div class="control-group">
+            <div class="group-header" onclick="toggleGroup('styleGroup')">
+                <h3><i class="fa-solid fa-palette"></i> <span data-i18n="styleFormat">Style & Format</span></h3>
+                <button class="group-toggle-btn"><i class="fa-solid fa-chevron-down"></i></button>
+            </div>
+            <div id="styleGroup" class="group-content">
+                <label for="styleSelect"><span data-i18n="style">Style</span>:</label>
+                <select id="styleSelect">
+                    <!-- Populated by JS -->
+                </select>
+
+                <label data-i18n="orientation">Orientation / Format:</label>
+                <div class="format-selector" id="formatSelector">
+                    <button class="format-btn selected" data-format="1:1" data-resolution="768x768">Square</button>
+                    <button class="format-btn" data-format="4:3" data-resolution="768x576">4:3</button>
+                    <button class="format-btn" data-format="3:2" data-resolution="768x512">3:2</button>
+                    <button class="format-btn" data-format="16:9" data-resolution="768x432">16:9</button>
+                    <button class="format-btn" data-format="9:16" data-resolution="432x768">9:16</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SeedBatchQueue Group -->
+        <div class="control-group">
+            <div class="group-header" onclick="toggleGroup('seedQueueGroup')">
+                <h3><i class="fa-solid fa-list-ol"></i> <span data-i18n="seedQueue">Seed Queue</span></h3>
+                <button class="group-toggle-btn"><i class="fa-solid fa-chevron-down"></i></button>
+            </div>
+            <div id="seedQueueGroup" class="group-content">
+                <div style="display:flex; gap:10px; margin-bottom:10px;">
+                    <input type="number" id="newSeedInput" placeholder="Seed number" style="flex:1;">
+                    <button id="addSeedBtn" style="width:auto;"><i class="fa-solid fa-plus"></i></button>
+                </div>
+                
+                <div id="seedQueueList" style="max-height:150px; overflow-y:auto; margin-bottom:10px;">
+                    <!-- Seeds populated here -->
+                </div>
+                
+                <div style="display:flex; gap:10px; margin-bottom:10px;">
+                    <button id="clearSeedQueueBtn" style="background-color:#e53935; width:auto; font-size:0.8em; padding:6px 12px;">
+                        <i class="fa-solid fa-trash"></i> <span data-i18n="clearQueue">Clear Queue</span>
+                    </button>
+                </div>
+                
+                <div class="checkbox-container">
+                    <input type="checkbox" id="loopModeCheck">
+                    <label for="loopModeCheck" data-i18n="loopMode">Looping</label>
+                </div>
+                
+                <div class="checkbox-container">
+                    <input type="checkbox" id="styleLoopCheck">
+                    <label for="styleLoopCheck" data-i18n="styleLoop">ArtStyle loop</label>
+                </div>
+                
+                <div id="selectedStylesCtn" style="margin-top:10px;">
+                    <label data-i18n="selectedStyles">Selected Styles:</label>
+                    <div class="style-checkbox-group" id="styleCheckboxes">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Batch Controls -->
+        <div class="batch-control-group">
+            <i class="fa-solid fa-layer-group" style="color:#888;"></i>
+            <label style="margin:0; flex:1; font-size:0.9em;" data-i18n="batchSize">Batch Size:</label>
+            <button class="batch-stepper-btn" onclick="adjustBatchSize(-1)"><i class="fa-solid fa-minus"></i></button>
+            <span id="batchSizeDisplay">1</span>
+            <button class="batch-stepper-btn" onclick="adjustBatchSize(1)"><i class="fa-solid fa-plus"></i></button>
+        </div>
+        
+        <!-- Batch Progress Bar -->
+        <div id="batchProgressBar">
+            <div id="batchProgressFill"></div>
+        </div>
+        
+        <button id="generateBtn" style="background: linear-gradient(135deg, var(--accent), #008ba3); font-size: 1.1em; padding: 12px;"><i class="fa-solid fa-wand-magic-sparkles"></i> <span data-i18n="generate">Generate</span></button>
+        <button id="stopBtn"><i class="fa-solid fa-stop"></i> <span data-i18n="stop">Stop Generation</span></button>
+        
+        <div class="action-buttons">
+            <button id="saveBtn"><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="save">Save</span></button>
+            <button id="galleryBtn"><i class="fa-solid fa-images"></i> <span data-i18n="gallery">Gallery</span></button>
+            <button id="historyBtn"><i class="fa-solid fa-clock-rotate-left"></i> <span data-i18n="history">History</span></button>
+        </div>
+        <button id="exportHistoryBtn" style="margin-top:5px; background-color: #2a2a2a; font-size: 0.9em;"><i class="fa-solid fa-download"></i> <span data-i18n="exportHistory">Export History</span></button>
+    </div>
+    
+    <div id="previewPanelEl">
+        <div id="image-display-ctn">
+            <!-- Loading Overlay -->
+            <div id="loadingOverlayEl">
+                <!-- New Yin-Yang Loading Animation -->
+                <div class="yin-yang-container">
+                    <div class="yin-yang-loader" id="yinYangLoader"></div>
+                </div>
+                <div id="loadingTextEl" style="margin-top:15px; font-size:1.1em;" data-i18n="generatingIllusion">Generating Illusion...</div>
+                <div id="batchStatusText" style="margin-top:8px; font-size:0.9em; color:#aaa;"></div>
+            </div>
+            <!-- Touch hints -->
+            <div id="touchHintEl" class="touch-hint">
+                <i class="fa-solid fa-hand-pointer"></i><br>
+                <span data-i18n="touchHint">Swipe to browse • Pinch to zoom</span>
+            </div>
+            <!-- Default placeholder -->
+            <img id="previewImgEl" src="https://placehold.co/800x600/121212/333?text=Generate+to+Start" alt="Generated Illusion">
+            
+            <!-- Preview Scale Slider -->
+            <div class="preview-scale-container">
+                <i class="fa-solid fa-magnifying-glass-minus" style="color:var(--accent);"></i>
+                <input type="range" id="previewScaleSlider" min="10" max="200" value="100">
+                <i class="fa-solid fa-magnifying-glass-plus" style="color:var(--accent);"></i>
+            </div>
+        </div>
+        
+        <!-- Mobile FAB -->
+        <button id="fabGenerateBtn"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+
+        <div id="statusBarEl"><span id="statusText" data-i18n="ready">Ready</span><span id="versionInfo" style="color:#666;">v2.3</span></div>
+    </div>
+
+    <!-- Neon Footer - ☆-WazG-☆ -->
+    <footer id="footerEl">
+        ☆-WazG-☆
+        <div id="manualHintEl" data-i18n="tapForManual"><i class="fa-regular fa-hand-pointer"></i> Tap for Manual</div>
+    </footer>
+
+    <!-- Lightbox Modal -->
+    <div id="lightboxEl">
+        <button id="lightboxClose"><i class="fa-solid fa-xmark"></i></button>
+        <img id="lightboxImg" src="" alt="Full View">
+    </div>
+
+    <!-- Gallery Modal -->
+    <div id="galleryModalEl" class="modal-overlay">
+        <div class="modal-header">
+            <h2><i class="fa-solid fa-images"></i> <span data-i18n="yourGallery">Your Gallery</span></h2>
+            <div style="display:flex; gap:10px;">
+                <button id="exportZipBtn"><i class="fa-solid fa-file-zipper"></i> <span data-i18n="exportZip">Export ZIP</span></button>
+                <button id="clearGalleryBtn"><i class="fa-solid fa-trash"></i> <span data-i18n="clearGallery">Clear All</span></button>
+                <button id="closeGalleryBtn" style="width:auto; padding:8px 15px;"><i class="fa-solid fa-xmark"></i> <span data-i18n="close">Close</span></button>
+            </div>
+        </div>
+        
+        <!-- Grid Scaling Control -->
+        <div class="grid-scale-control">
+            <label data-i18n="gridColumns">Grid Columns:</label>
+            <button onclick="adjustGridColumns(-1)"><i class="fa-solid fa-minus"></i></button>
+            <input type="number" id="gridColumnsInput" min="1" max="10" value="4" readonly>
+            <button onclick="adjustGridColumns(1)"><i class="fa-solid fa-plus"></i></button>
+        </div>
+        
+        <div id="galleryGridEl" class="modal-content">
+            <!-- Gallery items injected here -->
+        </div>
+    </div>
+
+    <!-- History Modal -->
+    <div id="historyModalEl" class="modal-overlay">
+        <div class="modal-header">
+            <h2><i class="fa-solid fa-clock-rotate-left"></i> <span data-i18n="promptHistory">Prompt History</span></h2>
+            <button id="closeHistoryBtn" style="width:auto; padding:8px 15px;"><i class="fa-solid fa-xmark"></i> <span data-i18n="close">Close</span></button>
+        </div>
+        <div id="historyListCtn" class="modal-content">
+            <!-- History items injected here -->
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModalEl" class="modal-overlay">
+        <div class="modal-header">
+            <h2><i class="fa-solid fa-gear"></i> <span data-i18n="settings">Settings</span></h2>
+            <button id="closeSettingsBtn" style="width:auto; padding:8px 15px;"><i class="fa-solid fa-xmark"></i> <span data-i18n="saveClose">Save & Close</span></button>
+        </div>
+        <div class="modal-content">
+            <!-- AI Assistant Settings -->
+            <div class="settings-group">
+                <h3><i class="fa-solid fa-robot"></i> <span data-i18n="aiConfig">AI Assistant Configuration</span></h3>
+                <label data-i18n="sysRules">System Rules (Personality):</label>
+                <textarea id="assistantRulesInput" rows="4" data-i18n-placeholder="rulesPlaceholder" placeholder="Define how the AI behaves...">You are an expert optical illusion prompt engineer. Your goal is to expand on user ideas with vivid, visual descriptions that enhance depth, texture, and lighting. Be creative but stay focused on optical illusion effects.</textarea>
+                
+                <label style="margin-top:15px;" data-i18n="lore">Lore / Context:</label>
+                <textarea id="assistantLoreInput" rows="3" data-i18n-placeholder="lorePlaceholder" placeholder="Additional context to inject into prompts..."></textarea>
+            </div>
+            
+            <!-- Generation Settings -->
+            <div class="settings-group">
+                <h3><i class="fa-solid fa-microchip"></i> <span data-i18n="genSettings">Generation Model Settings</span></h3>
+                <div class="settings-row">
+                    <label data-i18n="model">Model:</label>
+                    <select id="modelSelect">
+                        <option value="default">Default (Auto)</option>
+                        <option value="flux-dev">Flux Dev</option>
+                        <option value="flux-schnell">Flux Schnell</option>
+                        <option value="flux-pro">Flux Pro</option>
+                        <option value="sdxl-turbo">SDXL Turbo</option>
+                        <option value="sd-1.5">Stable Diffusion 1.5</option>
+                        <option value="sd-2.1">Stable Diffusion 2.1</option>
+                        <option value="sdxl-base">SDXL Base 1.0</option>
+                        <option value="sdxl-refiner">SDXL Refiner</option>
+                        <option value="sd-3">Stable Diffusion 3</option>
+                        <option value="sdxl-lightning">SDXL Lightning</option>
+                        <option value="svd">Stable Video Diffusion</option>
+                        <option value="cascade">Stable Cascade</option>
+                        <option value="playground-v2">Playground v2</option>
+                        <option value="playground-v2.5">Playground v2.5</option>
+                        <option value="dreamshaper">DreamShaper</option>
+                        <option value="realistic-vision">Realistic Vision</option>
+                        <option value="deliberate">Deliberate</option>
+                        <option value="counterfeit">Counterfeit</option>
+                        <option value="anything-v5">Anything v5</option>
+                        <option value="dreamlike">Dreamlike</option>
+                        <option value="openjourney">OpenJourney</option>
+                        <option value="midjourney-v4">MidJourney v4</option>
+                        <option value="protogen">Protogen</option>
+                        <option value="elldreth">Elldreth's Mix</option>
+                        <option value="analoganime">Analog Anime</option>
+                        <option value="waifu-diffusion">Waifu Diffusion</option>
+                        <option value="novelai">NovelAI</option>
+                        <option value="f222">F222</option>
+                        <option value="guofeng">GuoFeng</option>
+                        <option value="pastel-mix">Pastel Mix</option>
+                        <option value="counterfeit-v3">Counterfeit v3</option>
+                        <option value="mechamix">MechaMix</option>
+                        <option value="toonyou">ToonYou</option>
+                    </select>
+                </div>
+                <div class="settings-row">
+                    <label data-i18n="sampler">Sampler:</label>
+                    <select id="samplerSelect">
+                        <option value="euler">Euler</option>
+                        <option value="euler_a">Euler Ancestral</option>
+                        <option value="dpmpp_2m">DPM++ 2M</option>
+                        <option value="dpmpp_2m_sde">DPM++ 2M SDE</option>
+                        <option value="dpmpp_sde">DPM++ SDE</option>
+                        <option value="dpmpp_2m_v2">DPM++ 2M v2</option>
+                        <option value="dpm_fast">DPM Fast</option>
+                        <option value="dpm_adaptive">DPM Adaptive</option>
+                        <option value="lms">LMS</option>
+                        <option value="heun">Heun</option>
+                        <option value="dpm2">DPM2</option>
+                        <option value="dpm2_a">DPM2 Ancestral</option>
+                        <option value="ddim">DDIM</option>
+                        <option value="plms">PLMS</option>
+                        <option value="uni_pc">UniPC</option>
+                        <option value="ddpm">DDPM</option>
+                        <option value="k_euler">k_Euler</option>
+                        <option value="k_euler_a">k_Euler Ancestral</option>
+                        <option value="k_dpmpp_2m">k_DPM++ 2M</option>
+                        <option value="k_dpmpp_2m_sde">k_DPM++ 2M SDE</option>
+                        <option value="k_dpmpp_sde">k_DPM++ SDE</option>
+                        <option value="k_lms">k_LMS</option>
+                        <option value="k_heun">k_Heun</option>
+                        <option value="k_dpm2">k_DPM2</option>
+                        <option value="k_dpm2_a">k_DPM2 Ancestral</option>
+                    </select>
+                </div>
+                <div class="settings-row">
+                    <label>Seed:</label>
+                    <input type="number" id="seedInput" placeholder="-1 for Random" value="-1">
+                </div>
+                <div class="settings-row">
+                    <label>Steps:</label>
+                    <input type="number" id="stepsInput" placeholder="20-50" value="30" min="10" max="150">
+                </div>
+                <div class="settings-row">
+                    <label>CFG Scale:</label>
+                    <input type="number" id="cfgInput" placeholder="7.0" value="7.0" step="0.5" min="1" max="20">
+                </div>
+            </div>
+            
+            <button id="saveSettingsBtn" style="background-color:var(--accent); color:var(--bg-dark);"><i class="fa-solid fa-save"></i> <span data-i18n="saveConfig">Save Configuration</span></button>
+        </div>
+    </div>
+
+    <!-- Manual Modal -->
+    <div id="manualModalEl" class="modal-overlay">
+        <div class="modal-header">
+            <h2><i class="fa-solid fa-book-open"></i> <span data-i18n="manualTitle">IllusionGen Manual</span></h2>
+            <button id="closeManualBtn" style="width:auto; padding:8px 15px;"><i class="fa-solid fa-xmark"></i> <span data-i18n="close">Close</span></button>
+        </div>
+        <div class="modal-content" id="manualContentCtn">
+            <!-- Populated via JS based on language -->
+        </div>
+    </div>
+
+    <!-- Main Logic -->
+    <script type="module">
+        // Import Tippy.js for tooltips
+        import tippy from 'https://esm.sh/tippy.js@6.3.7';
+
+        // --- SeedBatchQueue Class (Converted from Python) ---
+        class SeedBatchQueue {
+            constructor(artStylesList) {
+                this.batchList = [];
+                this.current_index = 0;
+                this.loop_mode = false;
+                this.art_styles = [...artStylesList];
+                this.selected_styles = [...artStylesList];
+                this.style_loop = false;
+                this.hide_styles = false;
+                this.current_style_index = 0;
+            }
+
+            add_seed(seed_number) {
+                this.batchList.push(seed_number);
+            }
+
+            remove_seed(index) {
+                if (index >= 0 && index < this.batchList.length) {
+                    this.batchList.splice(index, 1);
+                    if (this.current_index >= index && this.current_index > 0) {
+                        this.current_index--;
+                    }
+                }
+            }
+
+            duplicate_seed(index) {
+                if (index >= 0 && index < this.batchList.length) {
+                    this.batchList.splice(index + 1, 0, this.batchList[index]);
+                }
+            }
+
+            get_next_seed() {
+                if (this.batchList.length === 0) return null;
+
+                const seed = this.batchList[this.current_index];
+                this.current_index++;
+
+                if (this.loop_mode) {
+                    if (this.current_index >= this.batchList.length) {
+                        this.current_index = 0;
+                    }
+                } else if (this.current_index >= this.batchList.length) {
+                    return null;
+                }
+
+                return seed;
+            }
+
+            toggle_art_style(style_name) {
+                const index = this.selected_styles.indexOf(style_name);
+                if (index > -1) {
+                    this.selected_styles.splice(index, 1);
+                } else {
+                    this.selected_styles.push(style_name);
+                }
+            }
+
+            get_next_style() {
+                if (this.selected_styles.length === 0) return null;
+
+                if (!this.style_loop) {
+                    return this.selected_styles[0];
+                }
+
+                const style = this.selected_styles[this.current_style_index % this.selected_styles.length];
+                this.current_style_index++;
+                return style;
+            }
+
+            toggle_hide_styles() {
+                this.hide_styles = !this.hide_styles;
+            }
+
+            reset() {
+                this.current_index = 0;
+                this.current_style_index = 0;
+            }
+
+            clear() {
+                this.batchList = [];
+                this.current_index = 0;
+                this.current_style_index = 0;
+            }
+        }
+
+        // --- Translations ---
+        const i18n = {
+            en: {
+                smartAssist: "SmartAssist (Access to all parameters)",
+                assistPlaceholder: "e.g. 'Make it 16:9, cyberpunk style, batch of 4...'",
+                randomPrompt: "Random Prompt Idea",
+                autoConfig: "Auto-Configure",
+                prompts: "Prompts",
+                mainPrompt: "Main Prompt:",
+                promptPlaceholder: "e.g. vortex of colors, spiraling patterns",
+                negPrompt: "Negative Prompt:",
+                negPlaceholder: "e.g. blurry, low quality",
+                randomizeStyle: "🎲 Randomize Artstyle",
+                randomizeEffects: "🎲 Randomize Effects (1-8)",
+                effects: "Effects",
+                clearEffects: "Clear Effects",
+                styleFormat: "Style & Format",
+                style: "Style",
+                orientation: "Orientation / Format",
+                seedQueue: "Seed Queue",
+                clearQueue: "Clear Queue",
+                loopMode: "Looping",
+                styleLoop: "ArtStyle loop",
+                selectedStyles: "Selected Styles:",
+                batchSize: "Batch Size:",
+                generate: "Generate",
+                stop: "Stop Generation",
+                save: "Save",
+                gallery: "Gallery",
+                history: "History",
+                exportHistory: "Export History",
+                exportZip: "Export ZIP",
+                clearGallery: "Clear All",
+                gridColumns: "Grid Columns:",
+                touchHint: "Swipe to browse • Pinch to zoom",
+                generatingIllusion: "Generating Illusion...",
+                ready: "Ready",
+                yourGallery: "Your Gallery",
+                close: "Close",
+                promptHistory: "Prompt History",
+                settings: "Settings",
+                saveClose: "Save & Close",
+                aiConfig: "AI Assistant Configuration",
+                sysRules: "System Rules (Personality):",
+                rulesPlaceholder: "Define how the AI behaves...",
+                lore: "Lore / Context:",
+                lorePlaceholder: "Additional context to inject into prompts...",
+                genSettings: "Generation Model Settings",
+                model: "Model:",
+                sampler: "Sampler:",
+                saveConfig: "Save Configuration",
+                manualTitle: "IllusionGen Manual",
+                tapForManual: "<i class='fa-regular fa-hand-pointer'></i> Tap for Manual",
+                loading: "Loading...",
+                manualContent: `
+                    <div class="manual-section">
+                        <h3>Welcome to IllusionGen</h3>
+                        <p>Generate stunning optical illusions and artistic visuals using AI. This tool combines advanced text-to-image models with specific illusion parameters.</p>
+                    </div>
+                    <div class="manual-section">
+                        <h3>AI Assistant Capabilities</h3>
+                        <p>The AI Assistant acts as your prompt engineer. You can give it natural language commands, and it will configure the settings for you.</p>
+                        <p><strong>Try commands like:</strong></p>
+                        <ul>
+                            <li>"Make a batch of 4 cyberpunk portraits."</li>
+                            <li>"Set the aspect ratio to 16:9 and make it look like an oil painting."</li>
+                            <li>"Add spiral and moiré effects, set seed to 12345."</li>
+                            <li>"Use the Flux Dev model with 50 steps."</li>
+                        </ul>
+                    </div>
+                    <div class="manual-section">
+                        <h3>Seed Queue System</h3>
+                        <p>The Seed Queue allows you to pre-define a list of seeds for sequential generation. Features include:</p>
+                        <ul>
+                            <li><strong>Add Seeds:</strong> Enter a seed number and click + to add it to the queue.</li>
+                            <li><strong>Looping:</strong> When enabled, the queue will loop back to the beginning after reaching the end.</li>
+                            <li><strong>ArtStyle loop:</strong> Each seed in the queue can use a different art style from your selected styles list.</li>
+                            <li><strong>Duplicate/Remove:</strong> Manage individual seeds in the queue.</li>
+                        </ul>
+                    </div>
+                    <div class="manual-section">
+                        <h3>Touch Gestures</h3>
+                        <p>On mobile devices, you can use gestures in the preview area:</p>
+                        <ul>
+                            <li><strong>Swipe Left/Right:</strong> Browse through generated images in the gallery.</li>
+                            <li><strong>Pinch:</strong> Zoom in and out of the current image.</li>
+                            <li><strong>Tap:</strong> Open the image in full-screen lightbox.</li>
+                        </ul>
+                    </div>
+                    <div class="manual-section">
+                        <h3>Gallery Export</h3>
+                        <p>Export your entire gallery as a ZIP file containing:</p>
+                        <ul>
+                            <li>All generated images in PNG format</li>
+                            <li>Corresponding JSON files with complete metadata for each image</li>
+                            <li>Recreation prompts that allow you to regenerate any image exactly</li>
+                        </ul>
+                        <p>To recreate an image from the ZIP export:</p>
+                        <ol>
+                            <li>Extract the ZIP file</li>
+                            <li>Find the JSON file corresponding to your desired image</li>
+                            <li>Copy the 'recreationPrompt' value</li>
+                            <li>Paste it into IllusionGen's prompt field</li>
+                            <li>Set the seed to the value specified in the JSON</li>
+                            <li>Generate to recreate the exact same image</li>
+                        </ol>
+                    </div>
+                `
+            },
+            de: {
+                smartAssist: "SmartAssist (Zugriff auf alle Parameter)",
+                assistPlaceholder: "z.B. 'Mache es 16:9, Cyberpunk-Stil, Stapel von 4...'",
+                randomPrompt: "Zufällige Prompt-Idee",
+                autoConfig: "Auto-Konfiguration",
+                prompts: "Prompts",
+                mainPrompt: "Hauptprompt:",
+                promptPlaceholder: "z.B. Farbenwirbel, spiralförmige Muster",
+                negPrompt: "Negativer Prompt:",
+                negPlaceholder: "z.B. unscharf, niedrige Qualität",
+                randomizeStyle: "🎲 Zufällige Artstyles",
+                randomizeEffects: "🎲 Zufällige Effekte (1-8)",
+                effects: "Effekte",
+                clearEffects: "Effekte löschen",
+                styleFormat: "Stil & Format",
+                style: "Stil",
+                orientation: "Ausrichtung / Format",
+                seedQueue: "Seed-Warteschlange",
+                clearQueue: "Warteschlange löschen",
+                loopMode: "Looping",
+                styleLoop: "ArtStyle loop",
+                selectedStyles: "Ausgewählte Stile:",
+                batchSize: "Stapelgröße:",
+                generate: "Generieren",
+                stop: "Generierung stoppen",
+                save: "Speichern",
+                gallery: "Galerie",
+                history: "Verlauf",
+                exportHistory: "Verlauf exportieren",
+                exportZip: "ZIP exportieren",
+                clearGallery: "Alle löschen",
+                gridColumns: "Raster-Spalten:",
+                touchHint: "Wischen zum Blättern • Pinch zum Zoomen",
+                generatingIllusion: "Generiere Illusion...",
+                ready: "Bereit",
+                yourGallery: "Deine Galerie",
+                close: "Schließen",
+                promptHistory: "Prompt-Verlauf",
+                settings: "Einstellungen",
+                saveClose: "Speichern & Schließen",
+                aiConfig: "KI-Assistent Konfiguration",
+                sysRules: "Systemregeln (Persönlichkeit):",
+                rulesPlaceholder: "Definieren Sie, wie sich die KI verhält...",
+                lore: "Lore / Kontext:",
+                lorePlaceholder: "Zusätzlicher Kontext für Prompts...",
+                genSettings: "Generierungsmodell-Einstellungen",
+                model: "Modell:",
+                sampler: "Sampler:",
+                saveConfig: "Konfiguration speichern",
+                manualTitle: "IllusionGen Handbuch",
+                tapForManual: "<i class='fa-regular fa-hand-pointer'></i> Tippen für Handbuch",
+                loading: "Laden...",
+                manualContent: `
+                    <div class="manual-section">
+                        <h3>Willkommen bei IllusionGen</h3>
+                        <p>Erstellen Sie atemberaubende optische Täuschungen und künstlerische Bilder mit KI. Dieses Tool kombiniert fortschrittliche Text-zu-Bild-Modelle mit spezifischen Illusionsparametern.</p>
+                    </div>
+                    <div class="manual-section">
+                        <h3>Seed-Warteschlangen-System</h3>
+                        <p>Die Seed-Warteschlange ermöglicht es Ihnen, eine Liste von Seeds für die sequenzielle Generierung vorzudefinieren. Funktionen umfassen:</p>
+                        <ul>
+                            <li><strong>Seeds hinzufügen:</strong> Geben Sie eine Seed-Nummer ein und klicken Sie auf +, um sie zur Warteschlange hinzuzufügen.</li>
+                            <li><strong>Looping:</strong> Wenn aktiviert, kehrt die Warteschlange nach Erreichen des Endes zum Anfang zurück.</li>
+                            <li><strong>ArtStyle loop:</strong> Jeder Seed in der Warteschlange kann einen anderen Artstyle aus Ihrer Liste verwenden.</li>
+                            <li><strong>Duplizieren/Entfernen:</strong> Verwalten Sie einzelne Seeds in der Warteschlange.</li>
+                        </ul>
+                    </div>
+                    <div class="manual-section">
+                        <h3>Touch-Gesten</h3>
+                        <p>Auf mobilen Geräten können Sie Gesten im Vorschaubereich verwenden:</p>
+                        <ul>
+                            <li><strong>Wischen links/rechts:</strong> Blättern Sie durch generierte Bilder in der Galerie.</li>
+                            <li><strong>Pinch:</strong> Zoomen Sie das aktuelle Bild ein und aus.</li>
+                            <li><strong>Tippen:</strong> Öffnen Sie das Bild im Vollbild-Lightbox.</li>
+                        </ul>
+                    </div>
+                    <div class="manual-section">
+                        <h3>Galerie-Export</h3>
+                        <p>Exportieren Sie Ihre gesamte Galerie als ZIP-Datei mit:</p>
+                        <ul>
+                            <li>Alle generierten Bilder im PNG-Format</li>
+                            <li>Zugehörige JSON-Dateien mit vollständigen Metadaten für jedes Bild</li>
+                            <li>Recreation-Prompts, die es ermöglichen, jedes Bild exakt neu zu erstellen</li>
+                        </ul>
+                        <p>So erstellen Sie ein Bild aus dem ZIP-Export neu:</p>
+                        <ol>
+                            <li>Extrahieren Sie die ZIP-Datei</li>
+                            <li>Finden Sie die JSON-Datei, die zum gewünschten Bild gehört</li>
+                            <li>Kopieren Sie den Wert 'recreationPrompt'</li>
+                            <li>Fügen Sie ihn in das Prompt-Feld von IllusionGen ein</li>
+                            <li>Setzen Sie den Seed auf den in der JSON-Datei angegebenen Wert</li>
+                            <li>Generieren Sie, um das exakt gleiche Bild neu zu erstellen</li>
+                        </ol>
+                    </div>
+                `
+            }
+        };
+
+        let currentLang = 'de';
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (i18n[lang][key]) {
+                    el.innerHTML = i18n[lang][key];
+                }
+            });
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                const key = el.getAttribute('data-i18n-placeholder');
+                if (i18n[lang][key]) {
+                    el.placeholder = i18n[lang][key];
+                }
+            });
+            document.getElementById('langBtnDesktop').textContent = lang === 'en' ? '🇬🇧' : '🇩🇪';
+            document.getElementById('langBtnMobile').textContent = lang === 'en' ? '🇬🇧' : '🇩🇪';
+            document.getElementById('manualContentCtn').innerHTML = i18n[lang].manualContent;
+        }
+
+        document.getElementById('langBtnDesktop').addEventListener('click', () => setLanguage(currentLang === 'en' ? 'de' : 'en'));
+        document.getElementById('langBtnMobile').addEventListener('click', () => setLanguage(currentLang === 'en' ? 'de' : 'en'));
+
+
+        // --- Data Arrays ---
+        const artStyles = [
+            "hyperrealistic", "psychedelic_watercolor", "cyberpunk_hologram", "vintage_photograph", "oil_painting", "digital_art", "3d_render", "neon_glow", "pastel_dreams", "ink_wash", "comic_book", "graffiti", "glitch_art", "minimalist", "abstract_expressionism", "surrealism", "pop_art", "impressionist", "bioluminescent", "crystalline", "vaporwave", "steampunk", "watercolor", "pencil_sketch", "charcoal", "pixel_art", "low_poly", "isometric", "anime", "fantasy_art", "sci_fi_concept", "texture_focus", "double_exposure", "ukiyo_e", "art_nouveau", "gothic", "synthwave", "ethereal_fantasy", "dark_fantasy", "cyber_renaissance", "vibrant_pop", "mystical_gothic", "futuristic_minimal", "psychedelic_neon", "vintage_cyberpunk", "abstract_geometric", "organic_fluid", "retro_futurism", "baroque", "rococo", "romanticism", "art_deco", "bauhaus", "cubism", "dadaism", "fauvism", "pointillism", "futurism_art", "post_impressionism", "symbolism", "pre_raphaelite", "renaissance", "medieval", "ancient_greek", "egyptian", "aztec", "mayan", "african_tribal", "nordic_mythology", "celtic", "hindu", "buddhist", "islamic_geometric", "japanese_woodblock", "chinese_ink", "korean_folk", "tibetan_thangka", "aboriginal", "native_american", "inuit", "maori", "polynesian", "tribal_primal", "primitivism", "naive_art", "folk_art", "outsider_art", "visionary_art", "psychedelic_60s", "acid_art", "trippy", "kaleidoscopic", "fractal", "generative", "algorithmic", "datamosh", "vhs_glitch", "crt_effect", "scanlines", "pixelated", "lofi", "vintage_filter", "sepia", "black_and_white", "monochrome", "duotone", "split_tone", "color_grading", "cinematic", "anamorphic_lens", "bokeh", "tilt_shift", "macro", "wide_angle", "fisheye", "long_exposure", "high_speed", "high_dynamic_range", "low_key", "high_key", "chiaroscuro", "rembrandt_lighting", "golden_hour", "blue_hour", "backlit", "rim_lighting", "volumetric_lighting", "god_rays", "lens_flare", "caustics", "subsurface_scattering", "ambient_occlusion", "global_illumination", "ray_tracing", "path_tracing", "photorealistic", "hyper_detailed", "sharp_focus", "shallow_depth", "deep_depth", "motion_blur", "freeze_frame", "double_exposure_photo", "multiple_exposure", "light_painting", "long_light_trails", "light_leaks", "lens_dirt", "film_grain", "dust_scratches", "vignette", "barrel_distortion", "pincushion_distortion", "chromatic_aberration", "color_fringing", "mosaic", "stained_glass", "mosaic_tiles", "tessellation", "parquet", "herringbone", "chevron", "diamond_pattern", "hexagonal", "triangular", "circular", "radial", "spiral_pattern", "wave_pattern", "zigzag", "checkered", "plaid", "tartan", "paisley", "floral", "botanical", "organic", "inorganic", "geometric_abstraction", "lyrical_abstraction", "color_field", "hard_edge", "post_painterly", "shaped_canvas", "minimalism", "conceptual_art", "performance_art", "installation_art", "land_art", "video_art", "digital_collage", "mixed_media", "assemblage", "ready_made", "pop_surrealism", "lowbrow", "kustom_kulture", "street_art", "urban_art", "graffiti_art", "stencil_art", "wheatpaste", "sticker_art", "yarn_bombing", "light_graffiti", "projection_mapping", "led_art", "neon_art", "laser_art", "fire_performance", "body_painting", "face_painting", "henna", "tattoo_art", "scarification", "piercing", "body_modification", "cosplay", "fashion_design", "costume_design", "textile_design", "fabric_design", "pattern_design", "surface_design", "graphic_design", "illustration", "concept_art", "character_design", "creature_design", "environment_design", "vehicle_design", "prop_design", "matte_painting", "storyboard", "comic_art", "manga", "manhwa", "webtoon", "graphic_novel", "cartoon", "animation", "traditional_animation", "digital_animation", "stop_motion", "clay_animation", "cutout_animation", "silhouette_animation", "pixilation", "pixel_animation", "motion_graphics", "motion_capture", "vfx", "cgi", "3d_modeling", "3d_sculpting", "3d_texturing", "3d_rigging", "3d_animation", "3d_rendering", "vr", "ar", "mr", "xr", "metaverse", "nft_art", "crypto_art", "generative_nft", "aesthetic", "cottagecore", "vaporwave_aesthetic", "cybercore", "y2k", "retrowave", "outrun", "synthpop", "darkwave", "coldwave", "witchhouse", "seapunk", "slimepunk", "moodboard", "dreamcore", "weirdcore", "liminal_space", "nostalgia", "retro", "antique", "classic", "timeless", "ethereal", "mystical", "magical", "enchanted", "mythological", "legendary", "epic", "heroic", "dramatic", "intense", "powerful", "bold", "subtle", "delicate", "elegant", "sophisticated", "refined", "polished", "raw", "gritty", "grungy", "distressed", "weathered", "aged", "decayed", "ruined", "overgrown", "lush", "barren", "desolate", "peaceful", "serene", "tranquil", "calm", "chaotic", "turbulent", "stormy", "violent", "aggressive", "menacing", "ominous", "foreboding", "haunting", "spooky", "creepy", "terrifying", "horrifying", "nightmarish", "uncanny", "surreal_horror", "cosmic_horror", "body_horror", "psychological_horror", "gothic_horror", "slasher", "monster", "creature_feature", "zombie", "vampire", "werewolf", "ghost", "demon", "angel", "deity", "divine", "sacred", "holy", "profane", "blasphemous", "taboo", "forbidden", "secret", "mysterious", "enigmatic", "puzzling", "confusing", "disorienting", "hypnotic", "mesmerizing", "entrancing", "captivating", "fascinating", "intriguing", "compelling", "engaging", "immersive", "absorbing", "addictive", "irresistible", "seductive", "alluring", "tempting", "enticing", "beguiling", "charming", "enchanting", "bewitching", "spellbinding"
+        ];
+
+        const effectsList = [
+            "moiré", "afterburn", "phantom_motion", "depth_hybrid", "café_wall", "zöllner", "pulfrich", "hollow_face", "troxler", "hermann_grid", "ebbinghaus", "kanizsa", "scintillating", "fraser", "op_art", "spiral", "anamorphic", "impossible_object", "kinetic_depth", "motion_blur_illusion", "chromostereopsis", "motion_aftereffect", "size_weight", "penrose_triangle", "escher_stairs", "rubin_vase", "mcgurk_effect", "cafe_wall_illusion", "hering_illusion", "wundt_illusion", "poggendorff_illusion", "muller_lyer", "ponzo_illusion", "orbison_illusion", "delboeuf_illusion", "einstellung_illusion", "autokinetic_effect", "benham_top", "lilac_chaser", "motion_induced_blindness", "change_blindness", "inattentional_blindness", "choice_blindness", "blind_spot", "filling_in", "phi_phenomenon", "beta_movement", "apparent_motion", "stroboscopic_effect", "wagon_wheel_effect", "temporal_aliasing"
+        ];
+
+        const promptStarters = [
+            "A hypnotic vortex of", "Fractal patterns resembling", "An abstract representation of", 
+            "Kaleidoscopic view of", "Neon lights reflecting on", "Ancient ruins of", 
+            "Cybernetic organisms merging with", "Surreal dreamscapes featuring", 
+            "Infinite geometric shapes of", "A swirling portal to"
+        ];
+
+        // --- SeedBatchQueue Instance ---
+        const seedBatchQueue = new SeedBatchQueue(artStyles);
+
+        // --- DOM Elements ---
+        const styleSelectEl = document.getElementById('styleSelect');
+        const effectsCtnEl = document.getElementById('effects-list-ctn');
+        let selectedEffects = [];
+        let currentImageUrl = '';
+        let batchSize = 1;
+        let selectedFormat = "1:1";
+        let selectedResolution = "768x768"; // Default size changed to 768x768
+        let isGenerating = false;
+        let stopRequested = false;
+
+        // Gallery browsing state
+        let galleryImages = [];
+        let currentGalleryIndex = 0;
+
+        // Touch gesture state
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let initialPinchDistance = 0;
+        let currentScale = 1;
+
+        // Yin-Yang animation state
+        let yinYangDirection = 1; // 1 for clockwise, -1 for counter-clockwise
+        let yinYangSpeed = 0.12; // Base animation speed
+        let yinYangTargetSpeed = 500; // Target speed in RPM
+        let yinYangAccelerating = true;
+        let yinYangAnimationId = null;
+
+        function updateYinYangAnimation() {
+            if (!document.getElementById('loadingOverlayEl').classList.contains('active')) {
+                yinYangAnimationId = null;
+                return;
+            }
+            
+            const loader = document.getElementById('yinYangLoader');
+            
+            // Update speed (accelerate until target, then decelerate and reverse)
+            if (yinYangAccelerating) {
+                yinYangSpeed = Math.min(yinYangSpeed + 0.01, yinYangTargetSpeed / 1000);
+                if (yinYangSpeed >= yinYangTargetSpeed / 1000) {
+                    yinYangAccelerating = false;
+                }
+            } else {
+                yinYangSpeed = Math.max(yinYangSpeed - 0.01, -yinYangTargetSpeed / 1000);
+                if (yinYangSpeed <= -yinYangTargetSpeed / 1000) {
+                    yinYangAccelerating = true;
+                    yinYangDirection = -yinYangDirection; // Reverse direction
+                }
+            }
+            
+            // Apply animation
+            const duration = Math.abs(1 / yinYangSpeed);
+            loader.style.setProperty('--duration', `${duration}s`);
+            loader.style.animationDirection = yinYangSpeed > 0 ? 'normal' : 'reverse';
+            
+            yinYangAnimationId = requestAnimationFrame(updateYinYangAnimation);
+        }
+
+        function startYinYangAnimation() {
+            if (!yinYangAnimationId) {
+                yinYangSpeed = 0.12;
+                yinYangAccelerating = true;
+                yinYangDirection = 1;
+                updateYinYangAnimation();
+            }
+        }
+
+        function stopYinYangAnimation() {
+            if (yinYangAnimationId) {
+                cancelAnimationFrame(yinYangAnimationId);
+                yinYangAnimationId = null;
+            }
+        }
+
+        // Default Settings
+        let appSettings = {
+            assistantRules: document.getElementById('assistantRulesInput').value,
+            assistantLore: document.getElementById('assistantLoreInput').value,
+            model: 'default',
+            sampler: 'euler',
+            seed: -1,
+            steps: 30,
+            cfg: 7.0
+        };
+
+        // --- Initialization ---
+        
+        function populateUI() {
+            // Populate Styles
+            artStyles.forEach(style => {
+                let opt = document.createElement('option');
+                opt.value = style;
+                opt.textContent = style.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                styleSelectEl.appendChild(opt);
+            });
+
+            // Populate Effects
+            effectsList.forEach(effect => {
+                let div = document.createElement('div');
+                div.className = 'effect-item';
+                div.textContent = effect;
+                div.dataset.effect = effect;
+                div.onclick = function() {
+                    if (this.classList.contains('selected')) {
+                        this.classList.remove('selected');
+                        selectedEffects = selectedEffects.filter(e => e !== effect);
+                    } else {
+                        this.classList.add('selected');
+                        selectedEffects.push(effect);
+                    }
+                };
+                effectsCtnEl.appendChild(div);
+            });
+
+            // Populate Style Checkboxes for SeedBatchQueue
+            const styleCheckboxesCtn = document.getElementById('styleCheckboxes');
+            artStyles.forEach(style => {
+                const item = document.createElement('div');
+                item.className = 'style-checkbox-item';
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `style_${style}`;
+                checkbox.value = style;
+                checkbox.checked = true; // All styles selected by default
+                checkbox.onchange = function() {
+                    seedBatchQueue.toggle_art_style(style);
+                };
+                const label = document.createElement('label');
+                label.htmlFor = `style_${style}`;
+                label.textContent = style.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()).substring(0, 15);
+                item.appendChild(checkbox);
+                item.appendChild(label);
+                styleCheckboxesCtn.appendChild(item);
+            });
+        }
+        populateUI();
+
+        // --- SeedBatchQueue UI Functions ---
+        
+        function renderSeedQueue() {
+            const queueList = document.getElementById('seedQueueList');
+            queueList.innerHTML = '';
+            
+            if (seedBatchQueue.batchList.length === 0) {
+                queueList.innerHTML = '<div style="text-align:center; color:#666; padding:10px;">No seeds in queue</div>';
+                return;
+            }
+            
+            seedBatchQueue.batchList.forEach((seed, index) => {
+                const item = document.createElement('div');
+                item.className = `seed-queue-item ${index === seedBatchQueue.current_index && seedBatchQueue.batchList.length > 0 ? 'active' : ''}`;
+                item.innerHTML = `
+                    <span style="font-family:monospace; color:var(--accent);">#${seed}</span>
+                    <div class="seed-queue-actions">
+                        <button onclick="window.duplicateSeedInQueue(${index})" title="Duplicate"><i class="fa-solid fa-copy"></i></button>
+                        <button onclick="window.removeSeedFromQueue(${index})" title="Remove" style="background:#e53935;"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                `;
+                queueList.appendChild(item);
+            });
+        }
+
+        window.addSeedToQueue = function() {
+            const input = document.getElementById('newSeedInput');
+            const seed = parseInt(input.value);
+            if (!isNaN(seed)) {
+                seedBatchQueue.add_seed(seed);
+                input.value = '';
+                renderSeedQueue();
+            }
+        };
+
+        window.removeSeedFromQueue = function(index) {
+            seedBatchQueue.remove_seed(index);
+            renderSeedQueue();
+        };
+
+        window.duplicateSeedInQueue = function(index) {
+            seedBatchQueue.duplicate_seed(index);
+            renderSeedQueue();
+        };
+
+        window.clearSeedQueue = function() {
+            seedBatchQueue.clear();
+            renderSeedQueue();
+        };
+
+        document.getElementById('addSeedBtn').addEventListener('click', window.addSeedToQueue);
+        document.getElementById('clearSeedQueueBtn').addEventListener('click', window.clearSeedQueue);
+        document.getElementById('newSeedInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') window.addSeedToQueue();
+        });
+
+        document.getElementById('loopModeCheck').addEventListener('change', function() {
+            seedBatchQueue.loop_mode = this.checked;
+        });
+
+        document.getElementById('styleLoopCheck').addEventListener('change', function() {
+            seedBatchQueue.style_loop = this.checked;
+        });
+
+        // Load Settings from KV
+        async function loadAppSettings() {
+            try {
+                const saved = await root.kv.settings.get("config");
+                if (saved) {
+                    appSettings = { ...appSettings, ...saved };
+                    // Populate UI
+                    document.getElementById('assistantRulesInput').value = appSettings.assistantRules;
+                    document.getElementById('assistantLoreInput').value = appSettings.assistantLore;
+                    document.getElementById('modelSelect').value = appSettings.model;
+                    document.getElementById('samplerSelect').value = appSettings.sampler;
+                    document.getElementById('seedInput').value = appSettings.seed;
+                    document.getElementById('stepsInput').value = appSettings.steps || 30;
+                    document.getElementById('cfgInput').value = appSettings.cfg || 7.0;
+                }
+            } catch (e) {
+                console.log("No saved settings found, using defaults.");
+            }
+        }
+
+        // Initialize Tippy Tooltips
+        tippy('[data-tippy-content]', {
+            touch: true, 
+            theme: 'translucent',
+        });
+
+        // --- Event Listeners ---
+
+        // Clear Effects
+        document.getElementById('clearEffectsBtn').addEventListener('click', function() {
+            selectedEffects = [];
+            document.querySelectorAll('.effect-item').forEach(item => item.classList.remove('selected'));
+        });
+
+        // Mobile Controls Toggle
+        document.getElementById('toggleControlsBtn').addEventListener('click', () => {
+            document.getElementById('controlPanelEl').classList.toggle('collapsed');
+        });
+
+        // Random Prompt Generator
+        document.getElementById('randomPromptBtn').addEventListener('click', () => {
+            const randomStyle = artStyles[Math.floor(Math.random() * artStyles.length)];
+            const randomStarter = promptStarters[Math.floor(Math.random() * promptStarters.length)];
+            const prompt = `${randomStarter} ${randomStyle.replace(/_/g, ' ')}`;
+            document.getElementById('assistantCommandInput').value = prompt;
+            // Simple flash effect
+            const input = document.getElementById('assistantCommandInput');
+            input.style.borderColor = 'var(--neon-cyan)';
+            setTimeout(() => input.style.borderColor = '', 300);
+        });
+
+        // Format Selection
+        document.querySelectorAll('.format-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('selected'));
+                this.classList.add('selected');
+                selectedFormat = this.getAttribute('data-format');
+                selectedResolution = this.getAttribute('data-resolution');
+                
+                // Update flags to reflect format
+                const flags = document.getElementById('flagsInput');
+                const currentFlags = flags.value;
+                
+                // Remove existing --ar flag
+                let newFlags = currentFlags.replace(/--ar\s+[\d:]+/g, '').trim();
+                
+                // Add new --ar flag
+                newFlags = `--ar ${selectedFormat} ${newFlags}`.trim();
+                flags.value = newFlags;
+            });
+        });
+
+        // Group Toggle Functions
+        window.toggleGroup = function(groupId) {
+            const group = document.getElementById(groupId);
+            const header = group.previousElementSibling;
+            const icon = header.querySelector('.group-toggle-btn i');
+            
+            group.classList.toggle('collapsed');
+            
+            if (group.classList.contains('collapsed')) {
+                icon.classList.remove('fa-chevron-down');
+                icon.classList.add('fa-chevron-up');
+            } else {
+                icon.classList.remove('fa-chevron-up');
+                icon.classList.add('fa-chevron-down');
+            }
+        }
+
+        // Settings Management
+        document.getElementById('openSettingsBtn').addEventListener('click', () => document.getElementById('settingsModalEl').classList.add('open'));
+        document.getElementById('closeSettingsBtn').addEventListener('click', () => {
+            saveAppSettings(); 
+            document.getElementById('settingsModalEl').classList.remove('open');
+        });
+        document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+            saveAppSettings();
+            document.getElementById('statusText').textContent = "Settings saved!";
+            setTimeout(() => document.getElementById('statusText').textContent = i18n[currentLang].ready, 2000);
+        });
+
+        async function saveAppSettings() {
+            appSettings.assistantRules = document.getElementById('assistantRulesInput').value;
+            appSettings.assistantLore = document.getElementById('assistantLoreInput').value;
+            appSettings.model = document.getElementById('modelSelect').value;
+            appSettings.sampler = document.getElementById('samplerSelect').value;
+            appSettings.seed = parseInt(document.getElementById('seedInput').value) || -1;
+            appSettings.steps = parseInt(document.getElementById('stepsInput').value) || 30;
+            appSettings.cfg = parseFloat(document.getElementById('cfgInput').value) || 7.0;
+            await root.kv.settings.set("config", appSettings);
+        }
+
+        // Manual Modal
+        document.getElementById('footerEl').addEventListener('click', () => {
+            setLanguage(currentLang); // Refresh content
+            document.getElementById('manualModalEl').classList.add('open');
+        });
+        document.getElementById('closeManualBtn').addEventListener('click', () => document.getElementById('manualModalEl').classList.remove('open'));
+
+        // Preview Scale Slider
+        const previewScaleSlider = document.getElementById('previewScaleSlider');
+        const previewImgEl = document.getElementById('previewImgEl');
+        
+        previewScaleSlider.addEventListener('input', function() {
+            const scale = this.value / 100;
+            previewImgEl.style.transform = `scale(${scale})`;
+        });
+
+        // --- Touch Gesture Handling ---
+        const imageDisplayCtn = document.getElementById('image-display-ctn');
+        const touchHintEl = document.getElementById('touchHintEl');
+        let touchHintTimeout;
+
+        function showTouchHint() {
+            touchHintEl.classList.add('visible');
+            clearTimeout(touchHintTimeout);
+            touchHintTimeout = setTimeout(() => {
+                touchHintEl.classList.remove('visible');
+            }, 3000);
+        }
+
+        imageDisplayCtn.addEventListener('touchstart', function(e) {
+            if (e.touches.length === 1) {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            } else if (e.touches.length === 2) {
+                // Pinch start
+                initialPinchDistance = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        imageDisplayCtn.addEventListener('touchmove', function(e) {
+            if (e.touches.length === 2) {
+                // Pinch zoom
+                const currentPinchDistance = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                const scaleChange = currentPinchDistance / initialPinchDistance;
+                currentScale = Math.min(Math.max(currentScale * scaleChange, 0.5), 3);
+                previewImgEl.style.transform = `scale(${currentScale})`;
+                previewScaleSlider.value = currentScale * 100;
+                initialPinchDistance = currentPinchDistance;
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        imageDisplayCtn.addEventListener('touchend', function(e) {
+            if (e.changedTouches.length === 1 && Math.abs(currentScale - 1) < 0.1) {
+                const touchEndX = e.changedTouches[0].clientX;
+                const touchEndY = e.changedTouches[0].clientY;
+                
+                const diffX = touchEndX - touchStartX;
+                const diffY = touchEndY - touchStartY;
+                
+                // Detect swipe (horizontal movement greater than vertical)
+                if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY)) {
+                    if (diffX > 0) {
+                        // Swipe right - previous image
+                        navigateGallery(-1);
+                    } else {
+                        // Swipe left - next image
+                        navigateGallery(1);
+                    }
+                    showTouchHint();
+                }
+            }
+        });
+
+        function navigateGallery(direction) {
+            if (galleryImages.length === 0) return;
+            
+            currentGalleryIndex += direction;
+            if (currentGalleryIndex < 0) currentGalleryIndex = galleryImages.length - 1;
+            if (currentGalleryIndex >= galleryImages.length) currentGalleryIndex = 0;
+            
+            loadToPreview(galleryImages[currentGalleryIndex].url);
+        }
+
+        // Show touch hint on first touch
+        let firstTouch = true;
+        imageDisplayCtn.addEventListener('touchstart', function(e) {
+            if (firstTouch) {
+                showTouchHint();
+                firstTouch = false;
+            }
+        }, { once: true });
+
+        // --- Smart Assistant Logic ---
+        document.getElementById('smartConfigBtn').addEventListener('click', async function() {
+            const command = document.getElementById('assistantCommandInput').value;
+            const currentPrompt = document.getElementById('promptInput').value;
+            const currentNegative = document.getElementById('negativePromptInput').value;
+            const currentFlags = document.getElementById('flagsInput').value;
+            const currentStyle = document.getElementById('styleSelect').value;
+            const currentBatchSize = batchSize;
+            const currentEffects = [...selectedEffects];
+            
+            if (!command.trim()) {
+                document.getElementById('assistantResponseEl').textContent = currentLang === 'en' ? "Please enter a command first." : "Bitte geben Sie zuerst einen Befehl ein.";
+                return;
+            }
+            
+            document.getElementById('statusText').textContent = currentLang === 'en' ? "AI is configuring settings..." : "KI konfiguriert Einstellungen...";
+            this.disabled = true;
+            this.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
+            
+            try {
+                const systemPrompt = `${appSettings.assistantRules}\n\nContext/Lore: ${appSettings.assistantLore}`;
+                
+                const allStyles = artStyles.join(', ');
+                const allEffects = effectsList.join(', ');
+                const allFormats = ['1:1', '4:3', '3:2', '16:9', '9:16'];
+                const allModels = Array.from(document.getElementById('modelSelect').options).map(o=>o.value).filter(v=>v!=='default').join(', ');
+                const allSamplers = Array.from(document.getElementById('samplerSelect').options).map(o=>o.value).join(', ');
+                
+                const instruction = `${systemPrompt}\n\nTask: The user wants to configure the image generator. User Command: "${command}".\n\nCurrent State:\n- Prompt: "${currentPrompt}"\n- Negative: "${currentNegative}"\n- Flags: "${currentFlags}"\n- Style: ${currentStyle}\n- Batch Size: ${currentBatchSize}\n- Effects: ${currentEffects.join(', ') || 'none'}\n\nAvailable Options:\n- Styles: ${allStyles}\n- Effects: ${allEffects}\n- Formats (for --ar flag): ${allFormats.join(', ')}\n- Models: ${allModels}\n- Samplers: ${allSamplers}\n\nResponse Requirements:\n1. Analyze the user's command and determine what fields need updating.\n2. ONLY update the fields explicitly mentioned or implied by the command.\n3. Output ONLY a valid JSON object with these optional keys:\n   - "prompt": new main prompt string\n   - "negative": new negative prompt string\n   - "flags": new flags string (include --ar for format)\n   - "style": style value from the available list\n   - "batchSize": number (1-10)\n   - "effects": array of effect strings from available list\n   - "model": model from available list\n   - "sampler": sampler from available list\n   - "seed": number (or -1 for random)\n   - "steps": number (10-150)\n   - "cfg": number (1-20)\n4. If the command doesn't mention something, don't include it in the JSON.\n5. Be smart: "4 images" means batchSize=4, "portrait" means --ar 9:16, etc.\n\nOutput JSON Example: {"prompt": "New detailed prompt", "negative": "ugly, blurry", "flags": "--ar 16:9 --stylize 750", "style": "cyberpunk_hologram", "batchSize": 2, "effects": ["spiral", "moiré"], "model": "flux-dev"}`;
+
+                const responseText = await root.generateText(instruction);
+                
+                let cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+                let config = JSON.parse(cleanJson);
+                
+                // Apply Configuration
+                let changes = [];
+                
+                if(config.prompt !== undefined && config.prompt !== currentPrompt) {
+                    document.getElementById('promptInput').value = config.prompt;
+                    changes.push(`Prompt: "${config.prompt.substring(0, 30)}..."`);
+                }
+                
+                if(config.negative !== undefined && config.negative !== currentNegative) {
+                    document.getElementById('negativePromptInput').value = config.negative;
+                    changes.push(`Negative: "${config.negative.substring(0, 30)}..."`);
+                }
+                
+                if(config.flags !== undefined && config.flags !== currentFlags) {
+                    document.getElementById('flagsInput').value = config.flags;
+                    changes.push(`Flags: ${config.flags}`);
+                }
+                
+                if(config.style !== undefined && config.style !== currentStyle) {
+                    document.getElementById('styleSelect').value = config.style;
+                    changes.push(`Style: ${config.style}`);
+                }
+                
+                if(config.batchSize !== undefined && config.batchSize !== currentBatchSize) {
+                    batchSize = Math.max(1, Math.min(10, parseInt(config.batchSize)));
+                    document.getElementById('batchSizeDisplay').textContent = batchSize;
+                    changes.push(`Batch Size: ${batchSize}`);
+                }
+                
+                if(config.effects !== undefined && Array.isArray(config.effects)) {
+                    selectedEffects = config.effects;
+                    document.querySelectorAll('.effect-item').forEach(ei => {
+                        const effect = ei.getAttribute('data-effect');
+                        ei.classList.toggle('selected', selectedEffects.includes(effect));
+                    });
+                    changes.push(`Effects: ${selectedEffects.join(', ')}`);
+                }
+                
+                const arMatch = config.flags && config.flags.match(/--ar\s+([\d:]+)/);
+                if(arMatch) {
+                    const format = arMatch[1];
+                    document.querySelectorAll('.format-btn').forEach(btn => {
+                        if(btn.getAttribute('data-format') === format) {
+                            btn.click();
+                        }
+                    });
+                }
+                
+                if(config.model !== undefined) {
+                    document.getElementById('modelSelect').value = config.model;
+                    appSettings.model = config.model;
+                    changes.push(`Model: ${config.model}`);
+                }
+                
+                if(config.sampler !== undefined) {
+                    document.getElementById('samplerSelect').value = config.sampler;
+                    appSettings.sampler = config.sampler;
+                    changes.push(`Sampler: ${config.sampler}`);
+                }
+                
+                if(config.seed !== undefined) {
+                    document.getElementById('seedInput').value = config.seed;
+                    appSettings.seed = config.seed;
+                    changes.push(`Seed: ${config.seed}`);
+                }
+                
+                if(config.steps !== undefined) {
+                    document.getElementById('stepsInput').value = config.steps;
+                    appSettings.steps = config.steps;
+                    changes.push(`Steps: ${config.steps}`);
+                }
+                
+                if(config.cfg !== undefined) {
+                    document.getElementById('cfgInput').value = config.cfg;
+                    appSettings.cfg = config.cfg;
+                    changes.push(`CFG: ${config.cfg}`);
+                }
+                
+                if(changes.length > 0) {
+                    document.getElementById('assistantResponseEl').innerHTML = `<span style="color:#00bcd4">✓ Settings Applied:</span><br>${changes.map(c => `• ${c}`).join('<br>')}`;
+                } else {
+                    document.getElementById('assistantResponseEl').innerHTML = `<span style="color:#ffa500">No changes needed based on your command.</span>`;
+                }
+                
+            } catch (err) {
+                console.error(err);
+                document.getElementById('assistantResponseEl').textContent = "Could not parse AI response. Please try a simpler command.";
+            } finally {
+                document.getElementById('statusText').textContent = i18n[currentLang].ready;
+                this.disabled = false;
+                this.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> ${i18n[currentLang].autoConfig}`;
+            }
+        });
+
+        // Batch Size Controls
+        window.adjustBatchSize = function(delta) {
+            batchSize += delta;
+            if(batchSize < 1) batchSize = 1;
+            if(batchSize > 10) batchSize = 10; 
+            document.getElementById('batchSizeDisplay').textContent = batchSize;
+        }
+
+        // Grid Columns Controls
+        window.adjustGridColumns = function(delta) {
+            const input = document.getElementById('gridColumnsInput');
+            let value = parseInt(input.value) || 4;
+            value = Math.max(1, Math.min(10, value + delta));
+            input.value = value;
+            updateGalleryGrid(value);
+        };
+
+        function updateGalleryGrid(columns) {
+            const galleryGrid = document.getElementById('galleryGridEl');
+            galleryGrid.style.gridTemplateColumns = `repeat(auto-fill, minmax(${Math.floor(600 / columns)}px, 1fr))`;
+        }
+
+        document.getElementById('gridColumnsInput').addEventListener('change', function() {
+            updateGalleryGrid(parseInt(this.value));
+        });
+
+        // Stop Generation Logic
+        document.getElementById('stopBtn').addEventListener('click', () => {
+            if (isGenerating) {
+                stopRequested = true;
+                document.getElementById('statusText').textContent = currentLang === 'en' ? "Stopping..." : "Wird gestoppt...";
+                document.getElementById('loadingTextEl').textContent = currentLang === 'en' ? "Stopping..." : "Wird gestoppt...";
+            }
+        });
+
+        // Generate Image Logic (Batch Support - Properly Sequential with Unique Seeds)
+        window.triggerGenerate = async function() {
+            if (isGenerating) return;
+            if (document.getElementById('generateBtn').disabled) return;
+            
+            isGenerating = true;
+            stopRequested = false;
+            
+            const batchSizeVal = parseInt(document.getElementById('batchSizeDisplay').textContent);
+            
+            // Reset queue index if starting fresh
+            if (seedBatchQueue.current_index === 0 || seedBatchQueue.current_index >= seedBatchQueue.batchList.length) {
+                seedBatchQueue.reset();
+            }
+            
+            document.getElementById('generateBtn').disabled = true;
+            document.getElementById('fabGenerateBtn').disabled = true;
+            document.getElementById('stopBtn').classList.add('active');
+            
+            const total = batchSizeVal;
+            const progressBar = document.getElementById('batchProgressBar');
+            const progressFill = document.getElementById('batchProgressFill');
+            
+            if (total > 1) {
+                progressBar.classList.add('active');
+            }
+            
+            // Start Yin-Yang animation
+            startYinYangAnimation();
+            
+            let currentIndex = 1;
+            
+            while (currentIndex <= total && !stopRequested) {
+                progressFill.style.width = `${((currentIndex - 1) / total) * 100}%`;
+                
+                await new Promise(r => setTimeout(r, 50)); // UI Breath
+                
+                await generateSingleImage(currentIndex, total);
+                
+                if (stopRequested) break;
+                
+                progressFill.style.width = `${(currentIndex / total) * 100}%`;
+                
+                if (currentIndex < total) {
+                    document.getElementById('statusText').textContent = currentLang === 'en' ? "Pausing before next image..." : "Pause vor dem nächsten Bild...";
+                    await new Promise(r => setTimeout(r, 800));
+                }
+                currentIndex++;
+            }
+            
+            isGenerating = false;
+            document.getElementById('generateBtn').disabled = false;
+            document.getElementById('fabGenerateBtn').disabled = false;
+            document.getElementById('stopBtn').classList.remove('active');
+            progressBar.classList.remove('active');
+            progressFill.style.width = '0%';
+            document.getElementById('loadingOverlayEl').classList.remove('active');
+            stopYinYangAnimation();
+            
+            if (!stopRequested) {
+                document.getElementById('statusText').textContent = currentLang === 'en' 
+                    ? `Batch complete! Generated ${currentIndex - 1} image${(currentIndex - 1) > 1 ? 's' : ''}.`
+                    : `Stapel komplett! ${currentIndex - 1} Bild${(currentIndex - 1) > 1 ? 'er' : ''} generiert.`;
+            }
+        }
+
+        async function generateSingleImage(currentIndex, total) {
+            const isBatch = total > 1;
+            const statusText = isBatch 
+                ? (currentLang === 'en' ? `Generating ${currentIndex}/${total}...` : `Generiere ${currentIndex}/${total}...`) 
+                : i18n[currentLang].generatingIllusion;
+            
+            document.getElementById('statusText').textContent = statusText;
+            document.getElementById('loadingOverlayEl').classList.add('active');
+            document.getElementById('loadingTextEl').textContent = isBatch 
+                ? (currentLang === 'en' ? `Image ${currentIndex} of ${total}` : `Bild ${currentIndex} von ${total}`) 
+                : i18n[currentLang].generatingIllusion;
+            document.getElementById('batchStatusText').textContent = isBatch ? (currentLang === 'en' ? "Processing sequentially..." : "Verarbeite sequenziell...") : "";
+
+            try {
+                let prompt = document.getElementById('promptInput').value;
+                const negative = document.getElementById('negativePromptInput').value;
+                let style = document.getElementById('styleSelect').value;
+                const flags = document.getElementById('flagsInput').value;
+
+                // Check for randomize style
+                const randomizeStyle = document.getElementById('randomizeStyleCheck').checked;
+                if (randomizeStyle) {
+                    style = artStyles[Math.floor(Math.random() * artStyles.length)];
+                }
+
+                // Check for seed queue
+                let uniqueSeed = seedBatchQueue.get_next_seed();
+                if (uniqueSeed === null) {
+                    // No more seeds in queue, use default logic
+                    uniqueSeed = appSettings.seed > -1 ? appSettings.seed + currentIndex - 1 : Math.floor(Math.random() * 999999999);
+                }
+
+                // Check for style cycling with seed queue
+                if (seedBatchQueue.style_loop && seedBatchQueue.batchList.length > 0) {
+                    const nextStyle = seedBatchQueue.get_next_style();
+                    if (nextStyle) {
+                        style = nextStyle;
+                    }
+                }
+
+                // Check for randomize effects
+                const randomizeEffects = document.getElementById('randomizeEffectsCheck').checked;
+                let currentEffects = [...selectedEffects];
+                if (randomizeEffects) {
+                    const numEffects = Math.floor(Math.random() * 8) + 1; // 1-8 effects
+                    currentEffects = [];
+                    const shuffled = [...effectsList].sort(() => 0.5 - Math.random());
+                    for (let i = 0; i < numEffects && i < shuffled.length; i++) {
+                        currentEffects.push(shuffled[i]);
+                    }
+                }
+
+                // Construct full prompt
+                let fullPrompt = `Optical illusion, ${style}, ${prompt}`;
+                if (currentEffects.length > 0) {
+                    fullPrompt += `, effects: ${currentEffects.join(', ')}`;
+                }
+                // Add unique seed marker to prompt
+                fullPrompt += ` --seed ${uniqueSeed}`;
+
+                let resolution = selectedResolution;
+                const flagsLower = flags.toLowerCase();
+                
+                if (flagsLower.includes("--ar 3:2") || flagsLower.includes("--ar 1.5")) resolution = "768x512";
+                else if (flagsLower.includes("--ar 2:3")) resolution = "512x768";
+                else if (flagsLower.includes("--ar 16:9") || flagsLower.includes("--ar 1.77")) resolution = "768x432";
+                else if (flagsLower.includes("--ar 9:16") || flagsLower.includes("--ar 0.56")) resolution = "432x768";
+
+                // Build generation options object
+                let genOptions = {
+                    prompt: fullPrompt,
+                    resolution: resolution,
+                    count: 1
+                };
+                
+                if(appSettings.model && appSettings.model !== 'default') genOptions.model = appSettings.model;
+                if(appSettings.sampler) genOptions.sampler = appSettings.sampler;
+                if(appSettings.steps) genOptions.steps = appSettings.steps;
+                if(appSettings.cfg) genOptions.cfg_scale = appSettings.cfg;
+
+                // GENERATE IMAGE using object-based API
+                let dataUrl = await root.generateImage(genOptions);
+                
+                if (!dataUrl) throw new Error("No image data returned");
+                
+                currentImageUrl = dataUrl;
+                document.getElementById('previewImgEl').src = dataUrl;
+                currentScale = 1; // Reset zoom
+                previewScaleSlider.value = 100;
+                
+                // Store metadata for export
+                const imageMetadata = {
+                    id: Date.now() + currentIndex,
+                    url: dataUrl,
+                    prompt: prompt,
+                    negative: negative,
+                    style: style,
+                    effects: [...currentEffects],
+                    flags: flags,
+                    resolution: resolution,
+                    seed: uniqueSeed,
+                    model: appSettings.model,
+                    sampler: appSettings.sampler,
+                    steps: appSettings.steps,
+                    cfg: appSettings.cfg,
+                    batchIndex: `${currentIndex}/${total}`,
+                    timestamp: new Date().toISOString()
+                };
+                
+                await saveToHistory(prompt, negative, style, currentEffects, flags, resolution);
+                
+                if (isBatch) {
+                    try {
+                        let gallery = await root.kv.gallery.get("images") || [];
+                        gallery.unshift(imageMetadata);
+                        await root.kv.gallery.set("images", gallery);
+                        galleryImages = gallery; // Update for touch navigation
+                    } catch (err) {
+                        console.error("Gallery Save Error:", err);
+                    }
+                }
+                
+                renderSeedQueue(); // Update queue UI
+                
+                document.getElementById('statusText').textContent = isBatch 
+                    ? (currentLang === 'en' ? `Completed ${currentIndex}/${total}` : `Fertig ${currentIndex}/${total}`) 
+                    : (currentLang === 'en' ? 'Generated successfully.' : 'Erfolgreich generiert.');
+
+            } catch (err) {
+                console.error(err);
+                document.getElementById('statusText').textContent = currentLang === 'en' ? 'Error generating image.' : 'Fehler bei der Generierung.';
+                document.getElementById('loadingOverlayEl').classList.remove('active');
+            }
+        }
+
+        document.getElementById('generateBtn').addEventListener('click', triggerGenerate);
+        document.getElementById('fabGenerateBtn').addEventListener('click', triggerGenerate);
+
+        // Save to Gallery
+        document.getElementById('saveBtn').addEventListener('click', async function() {
+            if (!currentImageUrl) {
+                document.getElementById('statusText').textContent = currentLang === 'en' ? 'Generate an image first!' : 'Erstellen Sie zuerst ein Bild!';
+                return;
+            }
+            try {
+                let gallery = await root.kv.gallery.get("images") || [];
+                gallery.unshift({
+                    id: Date.now(),
+                    url: currentImageUrl,
+                    prompt: document.getElementById('promptInput').value,
+                    effects: [...selectedEffects],
+                    style: document.getElementById('styleSelect').value
+                });
+                await root.kv.gallery.set("images", gallery);
+                galleryImages = gallery;
+                document.getElementById('statusText').textContent = currentLang === 'en' ? 'Saved to gallery!' : 'In Galerie gespeichert!';
+                this.innerHTML = `<i class="fa-solid fa-check"></i> ${i18n[currentLang].save}!`;
+                setTimeout(() => this.innerHTML = `<i class="fa-solid fa-floppy-disk"></i> ${i18n[currentLang].save}`, 2000);
+            } catch (err) {
+                console.error("KV Save Error:", err);
+            }
+        });
+
+        // Gallery Logic
+        document.getElementById('galleryBtn').addEventListener('click', async function() {
+            document.getElementById('galleryModalEl').classList.add('open');
+            const grid = document.getElementById('galleryGridEl');
+            grid.innerHTML = '<div style="text-align:center; width:100%; padding:50px;">Loading...</div>';
+            try {
+                let gallery = await root.kv.gallery.get("images") || [];
+                galleryImages = gallery;
+                renderGallery(gallery);
+            } catch (err) {
+                grid.innerHTML = 'Error loading gallery.';
+            }
+        });
+
+        document.getElementById('closeGalleryBtn').addEventListener('click', () => document.getElementById('galleryModalEl').classList.remove('open'));
+
+        // Clear Gallery
+        document.getElementById('clearGalleryBtn').addEventListener('click', async function() {
+            if (!confirm(currentLang === 'en' ? 'Delete all images from gallery?' : 'Alle Bilder aus der Galerie löschen?')) return;
+            try {
+                await root.kv.gallery.set("images", []);
+                galleryImages = [];
+                renderGallery([]);
+                document.getElementById('statusText').textContent = currentLang === 'en' ? 'Gallery cleared!' : 'Galerie geleert!';
+            } catch (err) {
+                console.error("Clear Gallery Error:", err);
+            }
+        });
+
+        // Export Gallery as ZIP
+        document.getElementById('exportZipBtn').addEventListener('click', async function() {
+            const gallery = await root.kv.gallery.get("images") || [];
+            if (gallery.length === 0) {
+                document.getElementById('statusText').textContent = currentLang === 'en' ? 'No images to export.' : 'Keine Bilder zum Exportieren.';
+                return;
+            }
+
+            this.disabled = true;
+            this.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating ZIP...';
+            document.getElementById('statusText').textContent = currentLang === 'en' ? 'Creating ZIP archive...' : 'Erstelle ZIP-Archiv...';
+
+            try {
+                const zip = new JSZip();
+                const metadataFolder = zip.folder("metadata");
+
+                for (let i = 0; i < gallery.length; i++) {
+                    const item = gallery[i];
+                    const imageIndex = i + 1;
+                    
+                    // Convert data URL to blob
+                    const response = await fetch(item.url);
+                    const blob = await response.blob();
+                    
+                    // Add image to ZIP
+                    const filename = `image_${String(imageIndex).padStart(4, '0')}_${item.id}.png`;
+                    zip.file(filename, blob);
+                    
+                    // Add metadata file
+                    const metadata = {
+                        filename: filename,
+                        id: item.id,
+                        prompt: item.prompt,
+                        negative: item.negative || '',
+                        style: item.style,
+                        effects: item.effects || [],
+                        flags: item.flags || '',
+                        resolution: item.resolution,
+                        seed: item.seed,
+                        model: item.model,
+                        sampler: item.sampler,
+                        steps: item.steps,
+                        cfg: item.cfg,
+                        batchIndex: item.batchIndex,
+                        timestamp: item.timestamp,
+                        recreationPrompt: `Optical illusion, ${item.style}, ${item.prompt}${item.effects && item.effects.length > 0 ? ', effects: ' + item.effects.join(', ') : ''} --seed ${item.seed} --ar ${item.resolution.split('x')[0]/item.resolution.split('x')[1]}`
+                    };
+                    metadataFolder.file(`${filename.replace('.png', '.json')}`, JSON.stringify(metadata, null, 2));
+                }
+
+                // Add README
+                const readme = `IllusionGen Gallery Export
+Generated: ${new Date().toISOString()}
+Total Images: ${gallery.length}
+
+This ZIP contains all images from your gallery along with their complete metadata.
+
+Each image has a corresponding JSON file in the 'metadata/' folder containing:
+- All generation parameters (prompt, negative, style, effects, etc.)
+- Model settings (model, sampler, steps, CFG scale)
+- Seed value for reproduction
+- A pre-formatted 'recreationPrompt' that can be used to regenerate the exact same image
+
+To recreate an image:
+1. Extract the ZIP
+2. Open the corresponding JSON file for the desired image
+3. Copy the 'recreationPrompt' value
+4. Paste it into IllusionGen's prompt field
+5. Set the seed to the value in the JSON file
+6. Generate the image
+`;
+                zip.file("README.txt", readme);
+
+                // Generate ZIP
+                const content = await zip.generateAsync({ type: "blob" });
+                const downloadUrl = URL.createObjectURL(content);
+                
+                const downloadAnchor = document.createElement('a');
+                downloadAnchor.href = downloadUrl;
+                downloadAnchor.download = `illusion-gen-gallery-${Date.now()}.zip`;
+                document.body.appendChild(downloadAnchor);
+                downloadAnchor.click();
+                downloadAnchor.remove();
+                URL.revokeObjectURL(downloadUrl);
+
+                document.getElementById('statusText').textContent = currentLang === 'en' ? 'ZIP exported successfully!' : 'ZIP erfolgreich exportiert!';
+            } catch (err) {
+                console.error("ZIP Export Error:", err);
+                document.getElementById('statusText').textContent = currentLang === 'en' ? 'Error creating ZIP.' : 'Fehler beim Erstellen des ZIP.';
+            } finally {
+                this.disabled = false;
+                this.innerHTML = '<i class="fa-solid fa-file-zipper"></i> ' + (currentLang === 'en' ? 'Export ZIP' : 'ZIP exportieren');
+            }
+        });
+
+        function renderGallery(items) {
+            const grid = document.getElementById('galleryGridEl');
+            grid.innerHTML = '';
+            if (items.length === 0) {
+                grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:50px;">${currentLang === 'en' ? 'No images saved yet.' : 'Noch keine Bilder gespeichert.'}</div>`;
+                return;
+            }
+            items.forEach((item, index) => {
+                let div = document.createElement('div');
+                div.className = 'gallery-item';
+                div.dataset.index = index; // Store index for navigation
+                
+                let batchIndicator = item.batchIndex ? `<span style="position:absolute; bottom:8px; left:8px; background:rgba(0,0,0,0.8); color:#fff; padding:3px 8px; border-radius:4px; font-size:0.75em; border:1px solid #444;">${item.batchIndex}</span>` : '';
+                
+                div.innerHTML = `
+                    <img src="${item.url}" loading="lazy">
+                    ${batchIndicator}
+                    <button class="delete-btn" data-id="${item.id}"><i class="fa-solid fa-trash"></i></button>
+                `;
+                div.onclick = (e) => {
+                    if(!e.target.closest('.delete-btn')) {
+                        currentGalleryIndex = index;
+                        loadToPreview(item.url);
+                    }
+                };
+                grid.appendChild(div);
+            });
+            
+            // Update grid based on current columns setting
+            const columns = parseInt(document.getElementById('gridColumnsInput').value);
+            updateGalleryGrid(columns);
+            
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    if(!confirm(currentLang === 'en' ? 'Delete this image?' : 'Dieses Bild löschen?')) return;
+                    let id = parseInt(btn.getAttribute('data-id'));
+                    let gallery = await root.kv.gallery.get("images") || [];
+                    gallery = gallery.filter(i => i.id !== id);
+                    await root.kv.gallery.set("images", gallery);
+                    galleryImages = gallery;
+                    renderGallery(gallery);
+                });
+            });
+        }
+
+        function loadToPreview(url) {
+            currentImageUrl = url;
+            document.getElementById('previewImgEl').src = url;
+            currentScale = 1;
+            previewScaleSlider.value = 100;
+            document.getElementById('previewImgEl').style.transform = 'scale(1)';
+            document.getElementById('galleryModalEl').classList.remove('open');
+            document.getElementById('statusText').textContent = currentLang === 'en' ? 'Loaded from gallery.' : 'Aus Galerie geladen.';
+        }
+
+        // History Logic
+        async function saveToHistory(prompt, negative, style, effects, flags, resolution) {
+            try {
+                let history = await root.kv.history.get("prompts") || [];
+                const newEntry = {
+                    id: Date.now(),
+                    prompt: prompt,
+                    negative: negative,
+                    style: style,
+                    effects: [...effects],
+                    flags: flags,
+                    resolution: resolution,
+                    timestamp: new Date().toLocaleString()
+                };
+                
+                if (history.length > 0 && history[0].prompt === prompt && history[0].style === style && history[0].resolution === resolution) return;
+                
+                history.unshift(newEntry);
+                if (history.length > 100) history = history.slice(0, 100);
+                await root.kv.history.set("prompts", history);
+            } catch (err) {
+                console.error("History Save Error:", err);
+            }
+        }
+        
+        document.getElementById('historyBtn').addEventListener('click', async function() {
+            document.getElementById('historyModalEl').classList.add('open');
+            const list = document.getElementById('historyListCtn');
+            list.innerHTML = '<div style="text-align:center; padding:50px;">Loading...</div>';
+            try {
+                let history = await root.kv.history.get("prompts") || [];
+                renderHistory(history);
+            } catch (err) {
+                list.innerHTML = 'Error loading history.';
+            }
+        });
+
+        document.getElementById('closeHistoryBtn').addEventListener('click', () => document.getElementById('historyModalEl').classList.remove('open'));
+
+        function renderHistory(items) {
+            const list = document.getElementById('historyListCtn');
+            list.innerHTML = '';
+            if (items.length === 0) {
+                list.innerHTML = `<div style="text-align:center; padding:50px;">${currentLang === 'en' ? 'No prompt history yet.' : 'Noch keine Prompt-Historie.'}</div>`;
+                return;
+            }
+            items.forEach(item => {
+                let div = document.createElement('div');
+                div.className = 'history-item';
+                
+                let effectsDisplay = item.effects && item.effects.length > 0 
+                    ? `<div style="font-size:0.8em; color:#888; margin-top:6px;"><i class="fa-solid fa-wand-magic"></i> Effects: ${item.effects.join(', ')}</div>` 
+                    : '';
+                
+                let resolutionDisplay = item.resolution 
+                    ? `<span style="color:var(--accent); font-size:0.8em;">[${item.resolution}]</span>` 
+                    : '';
+                
+                div.innerHTML = `
+                    <div class="prompt-text">${resolutionDisplay} ${item.prompt}</div>
+                    <div class="timestamp"><i class="fa-solid fa-clock"></i> ${item.timestamp} | <i class="fa-solid fa-palette"></i> ${item.style}</div>
+                    ${effectsDisplay}
+                    <div class="history-actions">
+                        <button onclick="window.loadFromHistory(${item.id})" style="background:var(--accent); color:var(--bg-dark);"><i class="fa-solid fa-upload"></i> ${currentLang === 'en' ? 'Load' : 'Laden'}</button>
+                        <button onclick="window.deleteFromHistory(${item.id})" style="background:#e53935;"><i class="fa-solid fa-trash"></i> ${currentLang === 'en' ? 'Delete' : 'Löschen'}</button>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        }
+        
+        window.loadFromHistory = async function(id) {
+            let history = await root.kv.history.get("prompts") || [];
+            let item = history.find(h => h.id === id);
+            if (item) {
+                document.getElementById('promptInput').value = item.prompt;
+                document.getElementById('negativePromptInput').value = item.negative;
+                document.getElementById('styleSelect').value = item.style;
+                selectedEffects = [...item.effects];
+                document.querySelectorAll('.effect-item').forEach(ei => {
+                    ei.classList.toggle('selected', selectedEffects.includes(ei.getAttribute('data-effect')));
+                });
+                document.getElementById('flagsInput').value = item.flags;
+                
+                if (item.resolution) {
+                    document.querySelectorAll('.format-btn').forEach(btn => {
+                        const btnRes = btn.getAttribute('data-resolution');
+                        if (btnRes === item.resolution) {
+                            btn.click();
+                        }
+                    });
+                }
+                
+                document.getElementById('historyModalEl').classList.remove('open');
+                document.getElementById('statusText').textContent = currentLang === 'en' ? 'Loaded prompt from history.' : 'Prompt aus Verlauf geladen.';
+            }
+        };
+        
+        window.deleteFromHistory = async function(id) {
+            if(!confirm(currentLang === 'en' ? 'Delete this history item?' : 'Diesen Eintrag löschen?')) return;
+            let history = await root.kv.history.get("prompts") || [];
+            history = history.filter(item => item.id !== id);
+            await root.kv.history.set("prompts", history);
+            renderHistory(history);
+        };
+        
+        // Export History Logic
+        document.getElementById('exportHistoryBtn').addEventListener('click', async function() {
+            try {
+                let history = await root.kv.history.get("prompts") || [];
+                if (history.length === 0) return document.getElementById('statusText').textContent = currentLang === 'en' ? 'No history to export.' : 'Kein Verlauf zum Exportieren.';
+                
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(history, null, 2));
+                const downloadAnchor = document.createElement('a');
+                downloadAnchor.setAttribute("href", dataStr);
+                downloadAnchor.setAttribute("download", `illusion-history-${Date.now()}.json`);
+                document.body.appendChild(downloadAnchor);
+                downloadAnchor.click();
+                downloadAnchor.remove();
+                document.getElementById('statusText').textContent = currentLang === 'en' ? 'History exported successfully!' : 'Verlauf erfolgreich exportiert!';
+            } catch (err) {
+                console.error("Export Error:", err);
+            }
+        });
+
+        // Lightbox Logic
+        document.getElementById('image-display-ctn').addEventListener('click', () => {
+            if(currentImageUrl) {
+                document.getElementById('lightboxImg').src = currentImageUrl;
+                document.getElementById('lightboxEl').classList.add('open');
+            }
+        });
+        document.getElementById('lightboxClose').addEventListener('click', () => {
+            document.getElementById('lightboxEl').classList.remove('open');
+        });
+
+        // Close modals when clicking outside
+        document.querySelectorAll('.modal-overlay').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('open');
+                }
+            });
+        });
+
+        // Initial Load
+        loadAppSettings();
+        setLanguage('de'); // Default language set to German
+        renderSeedQueue(); // Initialize seed queue UI
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

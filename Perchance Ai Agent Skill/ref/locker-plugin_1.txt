@@ -1,0 +1,44 @@
+// lockable(value)
+// It will use the current value in the locker named "lockerName" if that locker is locked,
+// otherwise it will use `value`
+$output(lockerName, value) =>
+  // they can pass the option object in as the first parameter to "initialise" the plugin:
+  if(lockerName.lockedIcon || lockerName.unlockedIcon) {
+    root.lockerPluginOpts = lockerName;
+    return "";
+  }
+	if(!window.__63456lockablePluginIdMap) window.__63456lockablePluginIdMap = new Map();
+	let map = window.__63456lockablePluginIdMap;
+	if(lockerName.endsWith("_button")) {
+    // debugger;
+		let lockedIcon = typeof lockerPluginOpts !== "undefined" && typeof lockerPluginOpts.lockedIcon !== "undefined" ? lockerPluginOpts.lockedIcon.toString() : '🔐'; // &#xFE0E;
+		let unlockedIcon = typeof lockerPluginOpts !== "undefined" && typeof lockerPluginOpts.unlockedIcon !== "undefined" ? lockerPluginOpts.unlockedIcon.toString() : '🔓';
+	  lockerName = lockerName.split("_").slice(0, -1).join("_");
+		if(!map.get(lockerName)) return `(error: can't find locker called '${lockerName}' - have you put a value in that locker yet? or maybe you misspelled the name?)`;
+		return `<span style="cursor:pointer;" onclick="let obj = window.__63456lockablePluginIdMap.get('${lockerName}'); obj.locked = !obj.locked; this.innerHTML = obj.locked ? '${lockedIcon.replace(/"/g, "&quot;").replace(/</, "&lt;").replace(/>/g, "&gt;")}' : '${unlockedIcon.replace(/"/g, "&quot;").replace(/</, "&lt;").replace(/>/g, "&gt;")}';">${map.get(lockerName).locked ? lockedIcon : unlockedIcon}</span>`;
+	} else if(value === undefined) {
+		return map.get(lockerName).value;
+	} else {
+		if(!map.get(lockerName)) map.set(lockerName, {locked:false, value:value});
+		
+		if(map.get(lockerName).locked) { 
+		  // return the locked value if the locker is locked:
+			return map.get(lockerName).value;
+		} else {
+			map.get(lockerName).value = value;
+			return value;
+		}
+	}
+	 
+	
+animal
+	frog
+	mouse
+	cow
+	rabbit
+	moose
+	deer
+	chicken
+	
+letterPair
+  {A-Z}{A-Z}

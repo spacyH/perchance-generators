@@ -1,0 +1,103 @@
+<h1>👆&#xFE0E; Tap Plugin 🖱️&#xFE0E;</h1>
+
+<div style="margin:0 auto;width:100%;max-width:650px;background:white;border-radius:2px;padding:1em; box-sizing:border-box; text-align:left;">
+	<p style="margin-top:0">Perchance allows you to create <a href="https://perchance.org/multiple-independent-outputs-example#edit" target="_blank">multiple independent outputs</a>, each with their own button, but sometimes you want something more simple.</p>
+  <p>Imagine you had a generator like this:</p>
+<pre>
+output
+  The \[animal\] is \[adjective\].
+</pre>
+  <p>But you want to make it so the user can <b>click/tap</b> the animal or the adjective, and it'll re-generate it with a new random choice. That's what this plugin does! Here's how to use it:</p>
+<pre>
+tap = \{import:tap-plugin\}
+
+output
+  The \[tap(animal)\] is \[tap(adjective)\].
+</pre>
+	<br>
+	<p>Here's what that looks like (try tapping):</p>
+	<p style="background:#eee; padding:1rem;">The [$output(animal)] is [$output(adjective)].</p>
+	<br>
+	<p>You can write <code>\[tap(list, "button")\]</code> to get a button:</p>
+	<p style="background:#eee; padding:1rem;">The [$output(animal, "button")] is [$output(adjective, "button")].</p>
+	<br>
+	<p>Or you can replace "button" with <a href="https://www.khanacademy.org/computing/computer-programming/html-css" target="_blank">CSS</a>:</p>
+<pre>
+\[tap(list, "color:red; border:2px solid blue; padding:3px")\]
+</pre>
+	<p style="background:#eee; padding:1rem;">The [$output(animal, "color:red; border:2px solid blue; padding:3px;")] is [$output(adjective, "color:red; border:2px solid blue; padding:3px;")].</p>
+	<br>
+  	<p>If you don't want any style applied to the clickable text, you can write it like this:</p>
+<pre>
+\[tap(list, "")\]
+</pre>
+	<p style="background:#eee; padding:1rem;">The [$output(animal, "")] is [$output(adjective, "")].</p>
+	<br>
+  <p>If you want to put the same tappable text in multiple locations, you can do it like this:</p>
+<pre>
+output
+  It's \{a\} \[a = tap(animal)\]. And what \{a\} \[a\] it is.
+</pre>
+	<p style="background:#eee; padding:1rem;">It's a [a = $output(animal)]. And what {a} [a] it is.</p>
+  <br>
+  <p>And if you don't want the second one to be able to be tapped:</p>
+<pre>
+output
+  It's \{a\} \[a = tap(animal)\]. And what \{a\} \[a.noTap\] it is.
+</pre>
+	<p style="background:#eee; padding:1rem;">It's a [a = $output(animal)]. And what {a} [a.noTap] it is.</p>
+  <br>
+  <p>And if you don't want the second one to be able to be tapped <i>or to be updated when the first one is tapped</i>:</p>
+<pre>
+output
+  It's \{a\} \[a = tap(animal)\]. And what \{a\} \[a.noTapNoUpdate\] it is.
+</pre>
+	<p style="background:#eee; padding:1rem;">It's a [a = $output(animal)]. And what {a} [a.noTapNoUpdate] it is.</p>
+  <p>So, in other words, <code>a.noTapNoUpdate</code> just gives you the "raw" item text that was selected from the <code>animal</code> list.</p>
+  <p><b style="color:red;">Important:</b> Have you noticed a problem with the above examples? When you tap the animal to update it, the <code>\{a\}</code>s don't update. The tap plugin only updates the thing that is tapped - not the stuff around it. To fix this, we can use the <a href="" target="_blank">a-an-plugin</a>, which dynamically "adapts" to the changes around it. Just import the a-an-plugin, and then use it in place of all your <code>\{a\}</code>s that are next to tappable lists, like so:</p>
+<pre>
+an = \{import:a-an-plugin\}
+
+output
+  It's \[an()\] \[a = tap(animal)\]. And what \[an()\] \[a.noTapNoUpdate\] it is.
+</pre>
+  <p>Check out the <a href="a-an-plugin" target="_blank">a-an-plugin</a> page for more details, and have a look at <a href="https://perchance.org/tap-plugin-example-a-an#edit" target="_blank">this example</a>.</p>
+	<br>
+	<p><b>Notes:</b></p>
+	<ul>
+		<li><a href="https://perchance.org/tap-plugin-example" target="_blank">Here's</a> a simple example of how to use this plugin.</li>
+		<li><a href="https://perchance.org/tap-plugin-example-no-tap#edit" target="_blank">Here's</a> a simple example using <code>noTap</code>.</li>
+		<li>Check out the <a href="https://perchance.org/locker-plugin" target="_blank">locker-plugin</a> which is related in terms of allowing you to only randomise subsets of your lists.</li>
+		<li>The <a href="https://perchance.org/nestable-tap-plugin" target="_blank">nestable-tap-plugin</a> by <a href="https://perchance.org/vionet20-gens" target="_blank">VioneT20</a> allows you to "group" buttons inside one another.</li>
+		<li>Thanks to <a href="https://www.reddit.com/user/motorhorst/" target="_blank">u/motorhorst</a> for this plugin idea!</li>
+		<li>Check out more plugins at <a href="/plugins">perchance.org/plugins</a></li>
+	</ul>
+</div>
+<p style="text-align:center; font-size:200%; opacity:0.2; margin-top:0.5em;"><span>⚄&#xFE0E;</span></p>
+<br><br><br>
+
+<style>
+	body {
+			background:#eee;
+	}
+	code {
+		background-color:#eee;
+		padding:0.13em 0.2em
+	}
+	ul li { margin-top:0.4em; }
+  	code {
+		background-color:#eee;
+		padding: 0 0.2em;
+	}
+	pre {
+		text-align:left;
+		background: #333;
+    color: white;
+    padding: 1em;
+    border-radius: 2px;
+		tab-size: 2;
+		-moz-tab-size: 2;
+		-o-tab-size: 2;
+		-webkit-tab-size: 2;
+	}
+</style>

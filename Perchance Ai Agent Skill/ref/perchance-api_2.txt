@@ -1,0 +1,353 @@
+<div style="max-width:800px; margin:0 auto; padding:20px; font-family:Arial,sans-serif;">
+  <h1 style="text-align:center; margin-bottom:30px;">Perchance API Toolkit</h1>
+  
+  <!-- getGeneratorScreenshot Section -->
+  <div style="margin-bottom:30px; padding:15px; border:1px solid #ddd; border-radius:8px;">
+    <h2>getGeneratorScreenshot</h2>
+    <p style="color:#666; margin-bottom:10px;">Get a screenshot of a generator</p>
+    <input id="screenshotNameInput" type="text" placeholder="Generator name" style="width:70%; padding:8px; margin-right:10px;">
+    <button id="screenshotBtn" onclick="getGeneratorScreenshot()" style="padding:8px 15px; background:#4CAF50; color:white; border:none; border-radius:4px; cursor:pointer;">Get Screenshot</button>
+    <div id="screenshotOutput" style="margin-top:15px; min-height:100px; border:1px dashed #ccc; border-radius:4px; display:flex; align-items:center; justify-content:center;"></div>
+  </div>
+  
+  <!-- getGeneratorList Section -->
+  <div style="margin-bottom:30px; padding:15px; border:1px solid #ddd; border-radius:8px;">
+    <h2>getGeneratorList</h2>
+    <p style="color:#666; margin-bottom:10px;">Get recently edited generators</p>
+    <div style="margin-bottom:10px;">
+      <label style="display:block; margin-bottom:5px;">Max results (optional):</label>
+      <input id="listMaxInput" type="number" placeholder="123" style="width:100%; padding:8px;">
+    </div>
+    <div style="margin-bottom:10px;">
+      <label style="display:block; margin-bottom:5px;">Tags (comma separated):</label>
+      <input id="listTagsInput" type="text" placeholder="cool,nice" style="width:100%; padding:8px;">
+    </div>
+    <button id="listBtn" onclick="getGeneratorList()" style="padding:8px 15px; background:#2196F3; color:white; border:none; border-radius:4px; cursor:pointer;">Get List</button>
+    <div id="listOutput" style="margin-top:15px; max-height:300px; overflow:auto;"></div>
+  </div>
+  
+  <!-- getGeneratorStats Section -->
+  <div style="margin-bottom:30px; padding:15px; border:1px solid #ddd; border-radius:8px;">
+    <h2>getGeneratorStats</h2>
+    <p style="color:#666; margin-bottom:10px;">Get views, edit time, metadata, and public ID</p>
+    <div style="margin-bottom:10px;">
+      <label style="display:block; margin-bottom:5px;">Single generator name:</label>
+      <input id="statsNameInput" type="text" placeholder="animal" style="width:100%; padding:8px;">
+    </div>
+    <div style="margin-bottom:10px;">
+      <label style="display:block; margin-bottom:5px;">Multiple names (comma separated):</label>
+      <input id="statsNamesInput" type="text" placeholder="animal,noun,adjective" style="width:100%; padding:8px;">
+    </div>
+    <button id="statsBtn" onclick="getGeneratorStats()" style="padding:8px 15px; background:#FF9800; color:white; border:none; border-radius:4px; cursor:pointer;">Get Stats</button>
+    <div id="statsOutput" style="margin-top:15px; padding:10px; background:#f5f5f5; border-radius:4px; max-height:300px; overflow:auto;"></div>
+  </div>
+  
+  <!-- downloadGenerator Section -->
+  <div style="margin-bottom:30px; padding:15px; border:1px solid #ddd; border-radius:8px;">
+    <h2>downloadGenerator</h2>
+    <p style="color:#666; margin-bottom:10px;">Download generator as HTML file</p>
+    <div style="margin-bottom:10px;">
+      <label style="display:block; margin-bottom:5px;">Generator name:</label>
+      <input id="downloadNameInput" type="text" placeholder="animal" style="width:100%; padding:8px;">
+    </div>
+    <div style="margin-bottom:15px;">
+      <label style="display:flex; align-items:center;">
+        <input id="listsOnlyCheck" type="checkbox" style="margin-right:8px;">
+        <span>Lists only (no HTML wrapper)</span>
+      </label>
+    </div>
+    <button id="downloadBtn" onclick="downloadGenerator()" style="padding:8px 15px; background:#9C27B0; color:white; border:none; border-radius:4px; cursor:pointer;">Download</button>
+    <div id="downloadOutput" style="margin-top:15px; padding:10px; background:#f5f5f5; border-radius:4px; display:none;"></div>
+  </div>
+  
+  <!-- getGeneratorsAndDependencies Section -->
+  <div style="margin-bottom:30px; padding:15px; border:1px solid #ddd; border-radius:8px;">
+    <h2>getGeneratorsAndDependencies</h2>
+    <p style="color:#666; margin-bottom:10px;">Get generators and all their dependencies</p>
+    <div style="margin-bottom:10px;">
+      <label style="display:block; margin-bottom:5px;">Generator names (comma separated):</label>
+      <input id="depsNamesInput" type="text" placeholder="animal,adjective" style="width:100%; padding:8px;">
+    </div>
+    <button id="depsBtn" onclick="getGeneratorsAndDependencies()" style="padding:8px 15px; background:#F44336; color:white; border:none; border-radius:4px; cursor:pointer;">Get Dependencies</button>
+    <div id="depsOutput" style="margin-top:15px;"></div>
+  </div>
+
+  <style>
+    pre { font-family:monospace; }
+    button:hover { opacity:0.9; }
+    button:disabled { opacity:0.6; cursor:not-allowed; }
+    .generator-card {
+      border:1px solid #ddd; border-radius:8px; padding:15px; margin-bottom:10px; background:white;
+    }
+    .generator-deps-card {
+      border:1px solid #ddd; border-radius:8px; padding:15px; margin-bottom:10px; background:white;
+    }
+    .generator-deps-card h4 {
+      margin-top:0; margin-bottom:10px; color:#333;
+    }
+    .generator-deps-card ul {
+      margin:0; padding-left:20px;
+    }
+    .generator-deps-card li {
+      margin-bottom:5px;
+    }
+    .unfound-generators {
+      border:1px solid #ff9800; border-radius:8px; padding:15px; margin-top:20px; background:#fff3e0;
+    }
+    .unfound-generators h4 {
+      margin-top:0; color:#e65100;
+    }
+  </style>
+
+  <script>
+    // Helper function to show loading state
+    function setLoading(buttonEl, isLoading) {
+      buttonEl.disabled = isLoading;
+      buttonEl.textContent = isLoading ? "Loading..." : buttonEl.dataset.originalText;
+    }
+
+    // Initialize button original text
+    document.querySelectorAll('button').forEach(btn => {
+      btn.dataset.originalText = btn.textContent;
+    });
+
+    // Create generator card HTML
+    function createGeneratorCard(generator) {
+      return `<div class="generator-card">
+        <h3>${generator.metaData.title || generator.name}</h3>
+        <p><strong>Generator Name:</strong> ${generator.name}</p>
+        <p><strong>Views:</strong> ${generator.views.toLocaleString()}</p>
+        <p><strong>Last Edit Time:</strong> ${new Date(generator.lastEditTime).toLocaleString()}</p>
+        <p><strong>Public ID:</strong> ${generator.publicId}</p>
+        ${generator.metaData.description ? `<p><strong>Description:</strong> ${generator.metaData.description}</p>` : ''}
+        ${generator.metaData.image ? `<img src="${generator.metaData.image}" style="max-width:100%; border-radius:4px; margin-top:10px;" />` : ''}
+      </div>`;
+    }
+
+    // getGeneratorScreenshot
+    async function getGeneratorScreenshot() {
+      const btn = screenshotBtn;
+      const output = screenshotOutput;
+      const name = screenshotNameInput.value.trim();
+      
+      if (!name) {
+        output.innerHTML = '<p style="color:red;">Please enter a generator name</p>';
+        return;
+      }
+      
+      setLoading(btn, true);
+      output.innerHTML = '<p>Loading screenshot...</p>';
+      
+      try {
+        const url = `https://perchance.org/api/getGeneratorScreenshot?generatorName=${encodeURIComponent(name)}`;
+        const response = await superFetch(url);
+        const blob = await response.blob();
+        const imgUrl = URL.createObjectURL(blob);
+        
+        output.innerHTML = `<img src="${imgUrl}" style="max-width:100%; border-radius:4px;">`;
+      } catch (error) {
+        output.innerHTML = `<p style="color:red;">Error: ${error.message}</p>`;
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    // getGeneratorList
+    async function getGeneratorList() {
+      const btn = listBtn;
+      const output = listOutput;
+      const max = listMaxInput.value.trim();
+      const tags = listTagsInput.value.trim();
+      
+      setLoading(btn, true);
+      output.innerHTML = '<p>Loading generator list...</p>';
+      
+      try {
+        let url = 'https://perchance.org/api/getGeneratorList';
+        const params = new URLSearchParams();
+        
+        if (max) params.append('max', max);
+        if (tags) params.append('tags', tags);
+        
+        if (params.toString()) url += '?' + params.toString();
+        
+        const response = await superFetch(url);
+        const data = await response.json();
+        
+        // Display generators as graphical cards
+        if (data.generators && data.generators.length > 0) {
+          let htmlContent = '';
+          data.generators.forEach(generator => {
+            htmlContent += createGeneratorCard(generator);
+          });
+          output.innerHTML = htmlContent;
+        } else {
+          output.innerHTML = '<p>No generators found</p>';
+        }
+      } catch (error) {
+        output.innerHTML = `<p style="color:red;">Error: ${error.message}</p>`;
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    // getGeneratorStats
+    async function getGeneratorStats() {
+      const btn = statsBtn;
+      const output = statsOutput;
+      const name = statsNameInput.value.trim();
+      const names = statsNamesInput.value.trim();
+      
+      if (!name && !names) {
+        output.innerHTML = '<p style="color:red;">Please enter at least one generator name</p>';
+        return;
+      }
+      
+      setLoading(btn, true);
+      output.innerHTML = '<p>Loading generator stats...</p>';
+      
+      try {
+        let url = 'https://perchance.org/api/getGeneratorStats?';
+        
+        if (names) {
+          url += `names=${encodeURIComponent(names)}`;
+        } else {
+          url += `name=${encodeURIComponent(name)}`;
+        }
+        
+        const response = await superFetch(url);
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+          let htmlContent = '';
+          if (Array.isArray(data.data)) {
+            // Display multiple generators as a list
+            data.data.forEach(generator => {
+              htmlContent += createGeneratorCard(generator);
+            });
+          } else {
+            // Display single generator without list container
+            htmlContent = createGeneratorCard(data.data);
+          }
+          output.innerHTML = htmlContent;
+        } else {
+          output.innerHTML = `<p style="color:red;">Error: ${JSON.stringify(data)}</p>`;
+        }
+      } catch (error) {
+        output.innerHTML = `<p style="color:red;">Error: ${error.message}</p>`;
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    // downloadGenerator
+    async function downloadGenerator() {
+      const btn = downloadBtn;
+      const output = downloadOutput;
+      const name = downloadNameInput.value.trim();
+      const listsOnly = listsOnlyCheck.checked;
+      
+      if (!name) {
+        output.textContent = 'Please enter a generator name';
+        output.style.display = 'block';
+        return;
+      }
+      
+      setLoading(btn, true);
+      output.style.display = 'block';
+      output.textContent = 'Preparing download...';
+      
+      try {
+        let url = `https://perchance.org/api/downloadGenerator?generatorName=${encodeURIComponent(name)}`;
+        if (listsOnly) url += '&listsOnly=true';
+        
+        const response = await superFetch(url);
+        const blob = await response.blob();
+        const downloadUrl = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = `${name}${listsOnly ? '-lists' : ''}.html`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(downloadUrl);
+        
+        output.textContent = 'Download started!';
+        setTimeout(() => { output.style.display = 'none'; }, 3000);
+      } catch (error) {
+        output.textContent = `Error: ${error.message}`;
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    // getGeneratorsAndDependencies
+    async function getGeneratorsAndDependencies() {
+      const btn = depsBtn;
+      const output = depsOutput;
+      const names = depsNamesInput.value.trim();
+      
+      if (!names) {
+        output.innerHTML = '<p style="color:red;">Please enter generator names</p>';
+        return;
+      }
+      
+      setLoading(btn, true);
+      output.innerHTML = '<p>Loading generators and dependencies...</p>';
+      
+      try {
+        const url = `https://perchance.org/api/getGeneratorsAndDependencies?generatorNames=${encodeURIComponent(names)}`;
+        const response = await superFetch(url);
+        const data = await response.json();
+        
+        // Always show graphical view
+        buildDependencyGraph(data);
+      } catch (error) {
+        output.innerHTML = `<p style="color:red;">Error: ${error.message}</p>`;
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    // Build graphical dependency view
+    function buildDependencyGraph(data) {
+      let html = '';
+      
+      // Process found generators
+      if (data.generators) {
+        for (let genName in data.generators) {
+          let gen = data.generators[genName];
+          html += `<div class="generator-deps-card">`;
+          html += `<h4>${genName}</h4>`;
+          
+          if (gen.imports && gen.imports.length > 0) {
+            html += '<ul>';
+            gen.imports.forEach(imp => {
+              html += `<li>${imp}</li>`;
+            });
+            html += '</ul>';
+          } else {
+            html += '<p>No imports</p>';
+          }
+          
+          html += `</div>`;
+        }
+      }
+      
+      // Process unfound generators
+      if (data.unfound && data.unfound.length > 0) {
+        html += `<div class="unfound-generators">`;
+        html += `<h4>Unfound Generators</h4>`;
+        html += '<ul>';
+        data.unfound.forEach(name => {
+          html += `<li>${name}</li>`;
+        });
+        html += '</ul>';
+        html += `</div>`;
+      }
+      
+      depsOutput.innerHTML = html;
+    }
+  </script>
+</div>

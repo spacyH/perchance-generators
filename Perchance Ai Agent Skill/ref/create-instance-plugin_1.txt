@@ -1,0 +1,146 @@
+<h1>Create Instance Plugin</h1>
+
+<div style="margin:0 auto;width:100%;max-width:760px;background:white;border-radius:2px;padding:1em; box-sizing:border-box; text-align:left;">
+	<p style="margin-top:0;">Let's say you've got a list like this:</p>
+<pre>
+character
+  name = \{Molly|Anita|Murphy\}
+	age = \{18-90\}
+	...
+</pre>
+  <p>And what you want is to create a character that uses this as a <i>template</i>, so that when you write <code>character.name</code>, it chooses a random name, but then <u>keeps</u> that same name next time you write <code>character.name</code>.</p>
+  <p>That's what this plugin is for. It lets you write "blueprints" for your characters, worlds, stories, etc. and then create "<i>instances</i>" that use this blueprint.</p>
+  <p>To use it, first you need to put this in your Perchance code panel:</p>
+<pre>createInstance = \{import:create-instance-plugin\}</pre>
+	<p>And now, if we are using the <code>character</code> list (above) as our blueprint, then we can create an "instance" of that list with all the properties (name, age, etc.) "fixed" to randomly chosen values:</p>
+<pre>
+output
+  \[c = createInstance(character), ""\] \[c.name\] is \[c.age\] years old. Her parents called her "\[c.name\]" because ...
+</pre>
+  <p>And that would output something like this:</p>
+<pre>Murphy is 22 years old. Her parents called her "Murphy" because ...</pre>
+	<p>As you can see, <code>c.name</code> was randomly set to "Murphy", and so we always get "Murphy" when we use <code>c.name</code>.</p>
+	<p>So, to reiterate, if we write <code>\[c = createInstance(character)\]</code>, then we've made a new <code>c</code> "variable" and it refers to a <i>specific</i> character so that each time you write <code>\[c.name\]</code> you'll get the <b>same</b> name. It uses your blueprint to randomly create an <b>instance</b> of the <code>character</code> where the properties are no longer random. See <a href="https://perchance.org/create-instance-plugin-example#edit">this generator</a> for an example of how you could use it.</p>
+	<p><b style="color:red;">An important thing to note</b> is that <b>only</b> "properties" (items with an equals sign like <code>thing = \{blah1|blah2\}</code>) will be fixed in place. So in the following example, the "mood" <u>sublist</u> <i>will remain random</i>:</p>
+<pre>character
+  name = \{Molly|Anita\}
+	age = \{18-90\}
+	mood
+	  happy
+		sad
+</pre>
+	<p>So <code>\[c = createInstance(character), c.mood\]\[c.mood\]\[c.mood\]</code> would return strings like "happysadhappy", "sadhappyhappy", etc. whereas <code>\[c.name\]\[c.name\]\[c.name\]</code> would return either "MollyMollyMolly" or "AnitaAnitaAnita".</p>
+  <p>So you need to change it to this:</p>
+<pre>character
+  name = \{Molly|Anita\}
+	age = \{18-90\}
+	mood = \{happy|sad\}
+</pre>
+	<p>If you had a really long list of names, and you wanted your character to have a <i>fixed</i> name, it would be annoying to write:</p>
+<pre>name = \{name1|name2|name3|...|name4942\}</pre>
+	<p>So instead you'd probably want to write something like <code>name = \[characterName\]</code>, and define your character list seperately:</p>
+<pre>character
+  name = \[characterName\]
+	age = \{18-90\}
+	mood
+	  happy
+		sad
+		
+characterName
+	name1
+	name2
+  name3
+	...
+  name4942
+</pre>
+  <p>And now the character instances will get a <i>fixed</i> name instead of it randomizing every time we write <code>\[c.name\]</code>.</p>
+  <p>Note that you don't need to call your character instance <code>c</code>. I'm just using <code>c</code> here as an example. You can call it whatever you want:</p>
+<pre>
+output
+  \[char1 = createInstance(character), char2 = createInstance(character), blah = createInstance(character), ""\] ...
+</pre>
+  <br>
+  <p>The properties are randomly-selected in the order that they appear in your list, so if you've read the <a href="https://perchance.org/examples">perchance.org/examples</a> page, and thus know how to use the special <code>this</code> keyword (and dynamic odds) then you can make the lower properties depend on the previously-selected higher properties like this:</p>
+<pre>
+character
+	age = \{18-60\}
+	height = \{14-20\}0
+	gender = \{female|male|non-binary\}
+	pronoun = \{she^\[this.gender=="female"\]|he^\[this.gender=="male"\]|they^\[this.gender=="non-binary"\]\}
+	name = \[names\[this.gender\]\]   <span style="opacity:0.5;">// this uses "dynamic sublist referencing" to grab the correct gender sub-list of the 'name' list, based on the gender that was selected above - explained at perchance.org/examples</span>
+
+names
+  female
+    Alice
+    Saanvi
+  male
+    Bob
+    Salman
+  non-binary
+    Charlie
+    River
+</pre>
+  <p>So in this case we've made it so the pronoun depends on the previously-selected gender. This only works because the <code>gender</code> property is <i>above</i> the <code>pronoun</code> property. <a href="https://perchance.org/create-instance-plugin-example-3#edit">Here's an example</a> based on the above code.</p>
+	<br>
+  <p>If you want to create a <b>list</b> of instances based on a blueprint (instead of just one instance), check out the <a href="https://perchance.org/create-instances-plugin" target="_blank">create-instances-plugin</a>.</p>
+  <br>
+  <p>One more thing! If your code was like this:</p>
+<pre>
+person
+  name = \{Salman|Manny|Rhian\}
+  age = \{31-49\}
+  child = \[child\]
+  
+child
+  name = \{Anne|Arram|Amelia\}
+  age = \{3-17\}
+  
+output
+  \[p = createInstance(person), p.child.age\] \[p.child.age\] \[p.child.age\]
+</pre>
+  <p>Then you'd notice that the it outputs something like "15 3 9" instead of "5 5 5". In other words, the "child" remains random - only the parent properties are "fixed" in place. To fix this, we could write the output code like this:</p>
+<pre>
+output
+  \[p = createInstance(person), c = createInstance(p.child), c.age\] \[c.age\] \[c.age\]
+</pre>
+  <p>And that would work, but it's messy. This is where the "deep" mode comes in handy. You can write your code like this:</p>
+<pre>
+output
+  \[p = createInstance(person, "deep"), p.child.age\] \[p.child.age\] \[p.child.age\]
+</pre>
+  <p>And that's it!</p>
+  <p>We just replaced <code>createInstance(person)</code> with <code>createInstance(person, "deep")</code>. Now all "nested" properties will be randomly chosen and fixed in place - not just the "top-level" properties. <a href="https://perchance.org/create-instance-plugin-deep-example#edit">Here's an example</a> of that.</p>
+  <br>
+	<p><b>Notes:</b></p>
+	<ul>
+		<li>As mentioned above, the properties will be executed/fixed <b>in the order that you declare them</b>, so if property <code>B</code> references property <code>A</code> (with <code>\[this.A\]</code>), then you should make sure you've written <code>B</code> <i>below</i> <code>A</code>.</li>
+		<li><a href="https://perchance.org/create-instance-plugin-example-simple#edit">Here's a very simple example</a> showing how to use it.</li>
+		<li><a href="https://perchance.org/create-instance-plugin-example#edit">Here's an example</a> showing how to make lower properties depend on higher ones. There's also an explanation on the <a href="examples">examples</a> page.</li>
+		<li><a href="https://perchance.org/create-instance-plugin-deep-example#edit">Here's an example</a> showing how to use "deep" mode.</li>
+		<li>If you want to create a <b>list</b> of instances based on a blueprint (instead of just one instance), check out the <a href="https://perchance.org/create-instances-plugin" target="_blank">create-instances-plugin</a>.</li>
+		<li>Check out more plugins at <a href="/plugins">perchance.org/plugins</a></li>
+	</ul>
+</div>
+<br><br><br>
+
+<style>
+	body {
+			background:#eee;
+	}
+	code {
+		background-color:#eee;
+		padding:0em 0.1em;
+	}
+	pre {
+		text-align:left;
+		background: #333;
+    color: white;
+    padding: 1em;
+    border-radius: 2px;
+		tab-size: 2;
+		-moz-tab-size: 2;
+		-o-tab-size: 2;
+		-webkit-tab-size: 2;
+	}
+	ul li { margin-top:0.4em; }
+</style>

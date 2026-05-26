@@ -1,0 +1,151 @@
+dynamicImport = {import:dynamic-import-plugin}
+
+$output    
+  // Returns a URL with encrypted debug data (browser version, and stuff like that).
+  // The URL expires (i.e. data is deleted) after 6 months.
+  // Custom data can be added to the encrypted debug info via the `opts.customData` property.
+  async createTemporaryDebugInfoUrl(opts) => // opts={publicKey, customData}
+    if(!window.__bugReportPluginMeta_84jfi38thfjUhr74) window.__bugReportPluginMeta_84jfi38thfjUhr74 = {};
+    let meta = window.__bugReportPluginMeta_84jfi38thfjUhr74;
+    
+    if(!opts) opts = {};
+    
+    // Note: If you want to use this function, then for increased user privacy, you need to add a publicKey property to the input object to this function (i.e. as `opts.publicKey`).
+    // You can generate a key with https://perchance.org/public-key-encryption-tool
+    // This is necessary for use with perchance.org/secret-plugin which in this case is used to encrypt debug data (like browser version, error messages, etc.) for feedback submission, so that data is not publicly exposed.
+    if(!opts.publicKey) throw new Error("Must provide publicKey for encrypting debug info. This is necessary to increase user privacy (i.e. prevent leaking the user's browser version, device model, etc.)");
+    
+    let debugInfo = {};
+    
+    try {
+      // Load ua-parser-js if not already loaded
+      if(!meta.UAParser) {
+        let script = document.createElement("script");
+        script.src = "https://user.uploads.dev/file/f2e26ac127c029f401f2a990a4bafbe8.js"; // This URL just ua-parser-js@2.0.0-rc.1, uploaded to perchance for guaranteed immutability: https://cdn.jsdelivr.net/npm/ua-parser-js@2.0.0-rc.1/dist/ua-parser.min.js
+        document.head.append(script);
+        while(!window.UAParser) await new Promise(r => setTimeout(r, 50));
+        meta.UAParser = window.UAParser;
+        delete window.UAParser; // prevent global variable pollution
+      }
+
+      // async preload the plugins that we use below (this does nothing if they're already loaded):
+      dynamicImport("secret-plugin", "preload"); // used to encrypt data (with the dev's public key)
+      dynamicImport("upload-plugin", "preload"); // used to upload the temporary/expiring debug data
+
+      // Add browser info:
+      let uad = new meta.UAParser().getResult();
+      debugInfo.browser = uad.browser.name + " " + uad.browser.major;
+      debugInfo.engine = uad.engine.name;
+      debugInfo.cpu = uad.cpu.architecture;
+      debugInfo.os = uad.os.name + " " + uad.os.version;
+
+      // Add misc stuff:
+      debugInfo.window = {innerWidth:window.innerWidth, innerHeight:window.innerHeight};
+      debugInfo.pointer = {coarse:!!window.matchMedia("(pointer: coarse)").matches, fine:!!window.matchMedia("(pointer: fine)").matches};
+      debugInfo.navigatorStoragePersist = await navigator.storage?.persist?.();
+      debugInfo.navigatorStorageEstimate = await navigator.storage?.estimate?.();
+      debugInfo.memory = {}; // RAM use/limits
+      debugInfo.memory.totalJSHeapSize = performance.memory?.totalJSHeapSize;
+      debugInfo.memory.jsHeapSizeLimit = performance.memory?.jsHeapSizeLimit;
+      debugInfo.memory.usedJSHeapSize = performance.memory?.usedJSHeapSize;
+      
+      // in case initAutoErrorCapture was called:
+      if(meta.autoErrorCaptureData) debugInfo.autoErrorCaptureData = meta.autoErrorCaptureData;
+      
+      // Dev can add custom data:
+      if(opts.customData) debugInfo.customData = opts.customData;
+
+      // Stringify.
+      let debugInfoStr = JSON.stringify(debugInfo, null, 2);
+
+      // Enrypt. Needed because otherwise people can e.g. learn what browser/device a feedback submitter uses, which would not be great for user privacy.
+      let secret = await dynamicImport("secret-plugin", "async");
+      let debugInfoStrEncrypted = secret.encrypt(debugInfoStr, opts.publicKey);
+
+      // Upload encrpyted data as an expiring URL. This is necessary because the debug data could be larger than comments plugin allows (which IIRC is only a few thousand characters - and the above encryption operation alone purposely 'bloats' the data to a minimum of ~1500 characters), so we upload it, but we make it expire (i.e. get deleted) after 6 months, which is surely long enough for all reasonable debugging purposes.
+      let uploadPlugin = await dynamicImport("upload-plugin", "async");
+      let { url, size, error } = await uploadPlugin(debugInfoStrEncrypted, {expires:Date.now()+1000*60*60*24*30*6});
+      if(error) throw new Error(`upload plugin failed: ${error}`);
+
+      return url;
+    } catch(e) { console.error(e); }
+
+    return null; // failed for some reason (e.g. maybe ua-parser didn't load, or upload failed)
+  
+  
+  // getAutoErrorCaptureData() =>
+  //   if(!window.__bugReportPluginMeta_84jfi38thfjUhr74) window.__bugReportPluginMeta_84jfi38thfjUhr74 = {};
+  //   let meta = window.__bugReportPluginMeta_84jfi38thfjUhr74;  
+  //   if(!meta.autoErrorCaptureData) throw new Error("initAutoErrorCapture must be called before getAutoErrorCaptureData");
+  //   return meta.autoErrorCaptureData;
+    
+  initAutoErrorCapture() =>
+    if(!window.__bugReportPluginMeta_84jfi38thfjUhr74) window.__bugReportPluginMeta_84jfi38thfjUhr74 = {};
+    let meta = window.__bugReportPluginMeta_84jfi38thfjUhr74;
+    if(meta.autoErrorCaptureData) return;
+    meta.autoErrorCaptureData = {
+      recentConsoleErrors: [],
+    };
+    let errorData = meta.autoErrorCaptureData;
+    
+    // Not necessary, but will likely help speed up getTemporaryDebugUrl (without hurting page load speed due to timeout/delay)
+    setTimeout(() => {
+      dynamicImport("secret-plugin", "preload");
+      dynamicImport("upload-plugin", "preload");
+    }, 30*1000);
+    
+    window.addEventListener('error', (e) => { // without this, syntax errors in script tags aren't shown in the perchance error box thing
+      let str;
+      try {
+        str = e.error.toString() + (e.lineno !== undefined ? `. The error occurred on line ${e.lineno}.` : "");
+        str = e.error.stack.toString();
+      } catch(e) { console.error(e); } 
+      errorData.lastUncaughtError = str;
+    });
+
+    window.addEventListener('unhandledrejection', function(event) {
+      if(event.reason) {
+        errorData.lastUnhandledRejection = {message:event.reason.message, stack:event.reason.stack, line:event.reason.line, column:event.reason.column};
+      }
+    });
+
+    originalConsoleError = console.error.bind(console);
+    console.error = function(...args) {
+      try {
+        try {
+          let argsClone = structuredClone(args);
+          if(argsClone[0]?.stack) argsClone[0] = argsClone[0].stack.toString();
+          if(argsClone[1]?.stack) argsClone[1] = argsClone[1].stack.toString();
+          if(argsClone[2]?.stack) argsClone[2] = argsClone[2].stack.toString();
+          argsClone = JSON.parse(JSON.stringify(argsClone));
+          
+          errorData.recentConsoleErrors.push(argsClone);
+          if(!errorData.firstConsoleError) errorData.firstConsoleError = argsClone;
+        } catch(e) {
+          errorData.recentConsoleErrors.push("(Failed to stringify console.error args)");
+          originalConsoleError("Failed to stringify console.error args for bug report plugin.");
+        }
+        try {
+          causeFakeErrorToCaptureStackTraceOfConsoleError5738.foo.bar;
+        } catch(e) {
+          errorData.lastConsoleErrorStackTrace = e.stack?.toString?.()
+        };
+        if(errorData.recentConsoleErrors.length > 6) errorData.recentConsoleErrors = errorData.recentConsoleErrors.slice(-6);
+      } catch(e) {
+        originalConsoleError(e);
+      } finally {
+        originalConsoleError(...args);
+      }
+    };
+    
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  

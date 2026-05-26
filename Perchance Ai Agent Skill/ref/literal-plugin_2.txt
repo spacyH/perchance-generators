@@ -1,0 +1,59 @@
+<h1>Literal Plugin</h1>
+
+<div style="margin:0 auto;width:100%;max-width:800px;background:white;border-radius:2px;padding:1em; box-sizing:border-box; text-align:left;">
+  
+  <p style="margin-top:0">This plugin allows you to automatically put backslashes in front of some text that has square/curly brackets in it, so those brackets get interpreted as <i>literal</i> square/curly brackets, rather than special Perchance sytax.</p>
+  <p>For example, let's say you have an input box like <code>&lt;input id="nameBox"&gt;</code> in your HTML where the user can put in their nickname, and then you use that nickname within your output, like this:</p>
+<pre>
+output
+  Your name is \[nameBox.value\] - what a \{cool|interesting\} name!
+</pre>
+
+  <p>But if the user puts some square brackets in the name box like <code>\[C\]ool\[K\]id</code> to make their nickname look fancy or whatever, it'll result in an error because those square brackets will be treated as Perchance square bracket syntax.</p>
+  <p>So to fix that, we can use this plugin, like so:</p>
+<pre>
+literal = \{import:literal-plugin\}
+
+output
+  Your name is \[literal(nameBox.value)\] - what a \{cool|interesting\} name!
+</pre>
+  <p>Now any square/curly brackets in their nickname will be interpreted as <b>literal</b> square/curly brackets, so it won't produce an error if they input square/curly brackets. <a href="https://perchance.org/literal-plugin-example#edit" target="_blank">Here's an example generator</a> using the above code.</p>
+  <p>This plugin can additionally convert HTML into "plain text" - i.e. you can use it to output <code>&lt;b&gt;blah&lt;/b&gt;</code> as those exact characters instead of as <b>blah</b>. To do that, just add <code>"+html"</code> as the second input to the literal function, like this:</p>
+<pre>
+Your name is \[literal(nameBox.value, "+html")\] ...
+</pre>
+	<p><b>Notes:</b></p>
+	<ul>
+    <li>The process of turning 'special' characters into 'literal' characters via a backslash before them (or some other transformation) is often called "escaping" in general programming/coding terminology, but I think that's a confusing term, so I've called it 'literal-plugin' instead of 'escape-plugin'. The term "sanitize" is also used in this context.</li>
+    <li>Check out more plugins at <a href="/plugins">perchance.org/plugins</a></li>
+	</ul>
+</div>
+<p style="text-align:center; font-size:200%; opacity:0.2; margin-top:0.5em;"><span>⚄&#xFE0E;</span></p>
+<br><br><br>
+
+<style>
+	body {
+			background:#eee;
+	}
+	code {
+		background-color:#eee;
+		padding:0.13em 0.2em
+	}
+	ul li { margin-top:0.4em; }
+  	code {
+		background-color:#eee;
+		padding: 0 0.2em;
+	}
+	pre {
+		text-align:left;
+		background: #333;
+    color: white;
+    padding: 1em;
+    border-radius: 2px;
+		tab-size: 2;
+		-moz-tab-size: 2;
+		-o-tab-size: 2;
+		-webkit-tab-size: 2;
+	}
+</style>
+

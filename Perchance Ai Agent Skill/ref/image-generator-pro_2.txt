@@ -1,0 +1,802 @@
+
+[generateHTML(settings)]
+[r(root, "seedHistory")]
+[seedHistory ? (populateSeedHistory(), saveHistory.disabled = false) : (seedHistory = [], saveHistory.disabled = true), '']
+<!-- You can remove this vvv after reading through the notice -->
+<!-- Thanks -->
+<h1>[title]</h1>
+
+<dialog class="dialogs" id="genInfoDialog">
+  [cl(genInfo)]
+</dialog>
+
+
+<div class="overlay" id="popupNewOverlay"></div>
+    <div class="popup" id="popupNew">
+        <h2>What's New</h2>
+      <p><b>Version 1.5.1</b></p>
+        <p>- fixed bug (show generator info! button)<br>
+        - updated number of images<br>
+        - custom emojis in comments</p>
+        <button class="close-btn" onclick="closePopup('popupNew')">Close</button>
+    </div>
+
+
+
+<main>
+  <div id="generatorArea">
+  <section class="outputArea">
+<!--     <div>[botOutput]</div> -->
+    <div id="outputAura">[output]</div>
+    <div style="font-size: 1.1em; line-height: 1.6; text-wrap: balance;" id=outputText>[p]</div>
+  </section>
+  <section class="generatorSettings">
+<!--     <div class="testCons">Test</div> -->
+    <!-- input type="checkbox" id="nsfwMode" name="nsfwMode" value="Bike"-->
+    <label for="vehicle1"><b>NOTE: We didn't add any NSFW keyword.</b></label>
+    <div class="generateButtons">
+    <button id="generatebutton" onclick="addSeed('new'), seeder(perchanceSeed.toString()), console.log(perchanceSeed), update(outputAura), update(outputText)">Randomize!</button><button onclick="addSeed('old'), seeder(perchanceSeed.toString()), console.log(perchanceSeed), update(outputAura), update(outputText)">Randomize Image Only!</button>
+    </div>
+    <fieldset><summary>Prompt</summary>
+        <textarea class="promptInput" id="positivePromptInput" placeholder="Prompts/Tags Here! (Blank for random)"></textarea>
+    </fieldset>
+    <fieldset><summary>Negative Prompt</summary>
+        <textarea class="promptInput" id="negativePromptInput" placeholder="Prompts/Tags Here!"></textarea>
+    </fieldset>
+    <fieldset><summary class="seedInputs" style="justify-content:space-between; margin-bottom: 0;"><span>Guidance Scale</span><label id="gsLabel" style="opacity: 0.5; font-size: 90%;">Value: [guidanceValue]</label></summary>
+      
+      <input class="slider" type="range" data-value="7" style="width: 100%;" oninput="this.dataset.value = this.value, guidanceValue=this.value, update(gsLabel);" min="1" max="30" step="1" value="7" list="markers"/>
+      <datalist id="markers">
+        <option value="5" label="Less Prompt"></option>
+        <option value="10"></option>
+        <option value="15"></option>
+        <option value="20"></option>
+        <option value="25"></option>
+        <option value="30" label="More Prompt"></option>
+      </datalist>
+    </fieldset>
+    <fieldset><summary class="seedInputs" style="justify-content:space-between; margin-bottom: 0;"><span>Resolution</span><label id="rsLabel" style="opacity: 0.5; font-size: 90%;">Value: [resolutions.selectAll[inputRes-1]]</label></summary>
+      <input class="slider" type="range" data-value="512x768" style="width: 100%;" oninput="this.dataset.value = resolutions.selectAll[this.value-1], inputRes=this.value, update(rsLabel)" min="1" max="3" step="1" value="2" list="markers"/>
+      <datalist id="markers">
+        <option value="1" label="512x512"></option>
+        <option value="2" label="512x768"></option>
+        <option value="3" label="768x512"></option>
+      </datalist>
+    </fieldset>
+    <fieldset><summary class="seedInputs" style="justify-content:space-between; margin-bottom: 0;"><div>Seeds</div><div style="opacity: 0.5; font-size: 90%;">Current Seed: [Number(x.seed)]</div></summary>
+      
+      <div class="seedInputs"><label for="imageSeed">Image Seed </label><input id="imageSeed" type="number" placeholder="numbers only!" oninput="inputSeed=Number(this.value)" min="-1"/></div>
+      <div class="seedInputs"><label for="pSeed">Perchance Seed </label><input id="pSeed" type="text" oninput="perchanceInputSeed = String(this.value)" placeholder="numbers and letters!"/></div>
+      <div>Image History <button id="saveHistory" onclick="saveHistoryAsCSV()">Save Image History as CSV</button></div>
+      <div id="imageSeedHistory" style="overflow-x: auto; width: 100%;">
+      </div>
+      
+    </fieldset>
+    <button onclick="genInfoDialog.showModal()">Show Generator Info!</button>
+  </section>
+  </div>
+
+</main>
+<style>
+  .testCons {
+    height: 400px;
+    width: 100%;
+  }
+  
+  html {
+    color: white;
+  }
+  
+  #generatorArea {
+    display: flex;
+    flex-flow: row;
+/*     padding: 1em; */
+    margin: 1em;
+    @media screen and (max-width: 1100px) {
+      flex-flow: column;
+    }
+  }
+  
+  .dialogs > div > summary > div.callout-header {
+    display:flex;
+    align-items: center;
+    width: 100%;
+    & button {
+      align-self: end;
+      margin-left: auto;
+      border: 0px solid;
+      background: none;
+      &:hover {
+        background: rgba(255,255,255,0.1);
+      }
+    }
+  }
+  .callout-title {
+    position: sticky;
+    top: 0;
+
+  }
+  .underline {
+    text-decoration: underline;
+    text-underline-offset: 8px;
+  }
+  
+  .dialogs {
+     border: none; background: none; padding: 0;
+    &::-webkit-scrollbar{
+      display: none;
+    }
+  }
+  
+  .dialogs::backdrop {
+    background: rgba(0,0,0,0.85);
+  }
+  
+  dialog#popupAnnoucement:focus-visible, dialog#genInfoDialog:focus-visible {
+    border: none !important;
+    outline: none !important;
+  }
+  
+  .generatorSettings button {
+    border: none;
+    width: 100%;
+    margin: 0.5em 0;
+    padding: 0.25em 0;
+    border-radius: 0.2em;
+    transition: 0.05s all ease-in-out;
+  }
+  
+  .generatorSettings button:hover {
+     background: #550;
+  }
+  
+  .generatorSettings button:active {
+     background: #666;
+  }
+  
+  .generatorSettings {
+    border-top-right-radius: 15px;
+    border-bottom-right-radius: 15px;
+    flex: 1 1 40%;
+    padding: 1em;
+    @media screen and (max-width: 1100px) {
+      border-top-right-radius: 0;
+      border-bottom-left-radius: 15px;
+    }
+    & button {
+      border: none;
+      width: 100%;
+      margin: 0.5em 0;
+      padding: 0.25em 0;
+      border-radius: 0.2em;
+      transition: 0.05s all ease-in-out;
+      &:hover {
+        background: #555;
+      }
+      &:active {
+        background: #666;
+      }
+    }
+  }
+  
+  
+  .generateButtons {
+    display:flex;
+    justify-content:center;
+    & button {
+      flex: 0 1 auto;
+      margin: 0.2em;
+    }
+    @media screen and (max-width: 1100px) {
+      flex-flow: column;
+      & button {
+      margin: 0.2em 0em;
+      }
+    }
+  }
+  
+  fieldset {
+    border-radius: 0.2em;
+    padding: 0.5em;
+    margin: 0;
+    margin-top: 0.5em;
+    border: 1px #555 solid;
+    & summary {
+      margin-bottom:0.25em;
+      font-size: 1.125em;
+    }
+  }
+  
+  .seedInputs input {
+    border: 0;
+    padding: 0.25em;
+    overflow: hidden;
+    text-align: left;
+    flex: 1 1 auto;
+    margin-left: 0.5em;
+    border-radius: 0.2em;
+  }
+  
+  .seedInputs {
+    display:flex;
+    align-items:center;
+    width: 100%;
+    margin-bottom: 0.5em;
+    & input {
+      border: 0;
+      padding: 0.25em;
+      overflow: hidden;
+      text-align: left;
+      flex: 1 1 auto;
+      margin-left: 0.5em;
+      border-radius: 0.2em;
+    }
+    @media screen and (max-width: 1100px) {
+      flex-flow: column;
+      & input {
+        width: 100%;
+        margin: 0;
+      }
+    }
+  }
+  /* Chrome, Safari, Edge, Opera */
+  input::-webkit-outer-spin-button,
+  input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  /* Firefox */
+  input[type=number] {
+    -moz-appearance: textfield;
+  }
+  
+  .promptInput {
+    padding: 0.25em;
+    border-radius: 0.2em;
+    display: block;
+    width: 100%;
+/*     height: auto; */
+/*     overflow: hidden; */
+    text-align: left;
+    resize: vertical;
+/*     word-break: break-word; */
+  }
+  
+  #imageSeedHistory {
+    border: 1px solid #555;
+    padding: 0.5em;
+    text-align: left;
+    height: 200px;
+    overflow: auto;
+    font-size: 0.9em;
+  }
+  
+  datalist {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    & option {
+      padding: 0;
+      word-break: break-word;
+    }
+    @media screen and (max-width: 320px) {
+      writing-mode: vertical-lr;
+      flex-direction: column;
+
+    }
+  }
+  
+  .slider {
+    -webkit-appearance: none;  /* Override default CSS styles */
+    appearance: none;
+    width: 100%; 
+    height: 25px; /* Specified height */
+    outline: none; /* Remove outline */
+    opacity: 1; 
+    -webkit-transition: .2s; /* 0.2 seconds transition on hover */
+    transition: opacity .2s;
+    @media screen and (max-width: 1100px) {
+      margin-top: 1em;
+    }
+  }
+  .slider::-webkit-slider-thumb {
+    -webkit-appearance: none; /* Override default look */
+    appearance: none;
+    width: 25px; /* Set a specific slider handle width */
+    height: 25px; /* Slider handle height */
+    background: #777; /* Green background */
+    cursor: pointer; /* Cursor on hover */
+
+  }
+
+  .slider::-moz-range-thumb {
+      width: 25px; /* Set a specific slider handle width */
+      height: 25px; /* Slider handle height */
+      background: #777; /* Green background */
+      cursor: pointer; /* Cursor on hover */
+    }
+  
+  .markdown-body * {
+    color: white;
+  }
+  
+  .markdown-body > pre {
+/*     font-family: 'Yusei Magic', sans-serif; */
+/*     color: white; */
+    background: #333;
+  }
+  
+  .outputArea {
+    border-top-left-radius: 15px;
+    border-bottom-left-radius: 15px;
+    flex: 1 1 70%;
+    padding: 1em;
+    display:flex;
+    flex-flow: column;
+    align-items:center;
+/*     height: 100%; */
+    @media screen and (max-width: 1100px) {
+      border-top-right-radius: 15px;
+      border-bottom-left-radius: 0;
+    }
+  }
+  .popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            padding: 20px;
+            z-index: 1000;
+            border-radius: 8px;
+            width: 300px;
+            text-align: center;
+            color: black;
+        }
+
+        .popup.active {
+            display: block; 
+        }
+
+        .overlay {
+            display: none; 
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+
+        .overlay.active {
+            display: block;
+        }
+
+        .close-btn {
+            background-color: #ff5c5c;
+            border: none;
+            padding: 10px 15px;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .close-btn:hover {
+            background-color: #ff1c1c;
+        }
+  /*  CSS FOR THE TABLE FROM https://codepen.io/AllThingsSmitty/pen/MyqmdM  */
+table {
+  border: 1px solid #ccc;
+  border-collapse: collapse;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  table-layout: fixed;
+}
+
+table caption {
+  font-size: 1.5em;
+  margin: .5em 0 .75em;
+}
+
+table tr {
+/*   background-color: #f8f8f8; */
+  border: 1px solid #ddd;
+  padding: .35em;
+}
+
+table th,
+table td {
+  padding: .625em;
+  text-align: center;
+  border-right: 1px solid #ddd;
+  word-break: break-word;
+    &:nth-child(1) {
+      width: 100%;
+      max-width: 20%;
+      @media screen and (max-width: 1100px) {
+        max-width: 100%;
+      }
+    }
+    &:nth-child(2) {
+      width: 100%;
+      max-width: 20%;
+      @media screen and (max-width: 1100px) {
+        max-width: 100%;
+      }
+    }
+    &:nth-child(3) {
+      width: 100%;
+      max-width: 5%;
+      @media screen and (max-width: 1100px) {
+        max-width: 100%;
+      }
+    }
+    &:nth-child(4) {
+      width: 100%;
+      max-width: 8%;
+      @media screen and (max-width: 1100px) {
+        max-width: 100%;
+      }
+    }
+    &:nth-child(5) {
+      width: 100%;
+      max-width: 10%;
+      @media screen and (max-width: 1100px) {
+        max-width: 100%;
+      }
+    }
+      &:nth-child(6) {
+      width: 100%;
+      max-width: 15%;
+      @media screen and (max-width: 1100px) {
+        max-width: 100%;
+      }
+    }
+  }
+
+  
+table th {
+  font-size: .85em;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+@media screen and (max-width: 1100px) {
+  table {
+    border: 0;
+  }
+
+  table caption {
+    font-size: 1.3em;
+  }
+  
+  table thead {
+    border: none;
+    clip: rect(0 0 0 0);
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    width: 1px;
+  }
+  
+  table tr {
+    border-bottom: 3px solid #ddd;
+    display: block;
+    margin-bottom: .625em;
+  }
+  
+  table td {
+    border-bottom: 1px solid #ddd;
+    display: block;
+    font-size: 0.9rem;
+    text-align: right;
+  }
+  
+  table td::before {
+    /*
+    * aria-label has no advantage, it won't be read inside a table
+    content: attr(aria-label);
+    */
+    content: attr(data-label);
+    float: left;
+    font-weight: bold;
+    text-transform: uppercase;
+  }
+  
+  table td:last-child {
+    border-bottom: 0;
+  }
+} 
+
+</style>
+<script>
+  function addSeed(mode) {
+    if (mode == 'new') {
+      saveImageDetails()
+      newSeed = 'false'
+      x.seed = seed.evaluateItem
+    }
+    else {
+      if (inputSeed == 0) {
+        saveImageDetails()
+        x.seed = seed.evaluateItem
+      }
+      else {
+        saveImageDetails()
+        x.seed = inputSeed;
+      }
+      newSeed = 'true'
+    }
+    x.negativePrompt = negativePrompt.evaluateItem
+    x.guidanceScale = guidanceValue.evaluateItem
+    x.resolution = res.evaluateItem
+    x.width = x.resolution == "512x768" ? window.innerWidth < 500 ? window.innerWidth-80 : 500 : window.innerWidth < 750 ? window.innerWidth-80 : 750
+
+    populateSeedHistory();
+  }
+  
+  function saveImageDetails() {
+    iData = {}
+    iData.prompt = a;
+    iData.guidanceScale = x.guidanceScale
+    iData.negativePrompt = x.negativePrompt
+    iData.resolution = x.resolution
+    iData.seed = x.seed
+    iData.pSeed = perchanceSeed.toString()
+    iData.date = new Date().toLocaleTimeString("en-US")
+    if (seedHistory.length < 100) {
+      seedHistory.unshift(iData);
+    }
+    else {
+      seedHistory.pop();
+      seedHistory.unshift(iData);
+    }
+  }
+  function saveHistoryAsCSV() {
+    let csv = '';
+    let header = Object.keys(seedHistory[0]).join(',');
+    let values = seedHistory.map(o => Object.values(o).map(a => `"${a}"`).join(',')).join('\n');
+
+    csv += header + '\n' + values;
+    var encodedUri = encodeURI(csv);
+    var link = document.createElement("a");
+    link.setAttribute("href", "data:text/csv;charset=utf-8,"+encodedUri);
+    link.setAttribute('target', '_blank');
+    link.setAttribute("download", "image_history_details.csv");
+    document.body.appendChild(link); // Required for FF
+    link.click(); // This will download the data file named "my_data.csv".
+    link.remove();
+  }
+  function populateSeedHistory() {
+    let html = `
+<table>
+  <thead>
+    <tr>
+      <th>I.Seed</th>
+      <th>P.Seed</th>
+      <th>G.S</th>
+      <th>Res</th>
+      <th>Time</th>
+      <th>Prompt</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${seedHistory.map(a => `
+<tr>
+  <td data-label="seed">${Number(a.seed)}</td>
+  <td data-label="p.seed">${a.pSeed}</td>
+  <td data-label="G.S">${a.guidanceScale}</td>
+  <td data-label="res">${a.resolution}</td>
+  <td data-label="date">${a.date}</td>
+  <td data-label="prompt">${a.prompt}</td></tr>`).join("")}
+  </tbody>
+</table>`;
+    imageSeedHistory.innerHTML = html;
+  }
+  
+  const input1 = document.querySelector("#positivePromptInput");
+  input1.addEventListener("focusout", handleInput1);
+  function handleInput1(e) {
+    userInput = input1.value ? input1.value : '';
+    // console.log(userInput);
+    input1.value = input1.value;
+  }
+  
+  const input2 = document.querySelector("#negativePromptInput");
+  input2.addEventListener("focusout", handleInput2);
+  function handleInput2(e) {
+    userInputNeg = input2.value ? input2.value : '';
+    // console.log(userInputNeg);
+    input2.value = input2.value;
+  }
+  // Autosizing Textarea!!! from https://stackoverflow.com/a/73226649
+  function autosize(textarea_id, row_limit) {
+  // Set default for row_limit parameter
+  row_limit = parseInt(row_limit ?? '5');
+  if (!row_limit) {
+    row_limit = 5;
+  }
+
+  // Get the element
+  const textarea = document.getElementById(textarea_id);
+
+  // Set required styles for this to function properly.
+  textarea.style.setProperty('resize', 'none');
+  textarea.style.setProperty('min-height', '0');
+  textarea.style.setProperty('max-height', 'none');
+  textarea.style.setProperty('height', 'auto');
+
+  // Set rows attribute to number of lines in content
+  textarea.oninput = function() {
+
+    // Reset rows attribute to get accurate scrollHeight
+    textarea.setAttribute('rows', '1');
+
+    // Get the computed values object reference
+    const cs = getComputedStyle(textarea);
+
+    // Force content-box for size accurate line-height calculation
+    // Remove scrollbars, lock width (subtract inline padding and inline border widths)
+    // and remove inline padding and borders to keep width consistent (for text wrapping accuracy)
+    const inline_padding = parseFloat(cs['padding-left']) + parseFloat(cs['padding-right']);
+    const inline_border_width = parseFloat(cs['border-left-width']) + parseFloat(cs['border-right-width']);
+    textarea.style.setProperty('overflow', 'hidden', 'important');
+    textarea.style.setProperty('width', (parseFloat(cs['width']) - inline_padding - inline_border_width) + 'px');
+    textarea.style.setProperty('box-sizing', 'content-box');
+    textarea.style.setProperty('padding-inline', '0');
+    textarea.style.setProperty('border-width', '0');
+    
+    // Get the base line height, and top / bottom padding.
+    const block_padding = parseFloat(cs['padding-top']) + parseFloat(cs['padding-bottom']);
+    const line_height =
+      // If line-height is not explicitly set, use the computed height value (ignore padding due to content-box)
+      cs['line-height'] === 'normal' ? parseFloat(cs['height'])
+      // Otherwise (line-height is explicitly set), use the computed line-height value.
+      : parseFloat(cs['line-height']);
+
+    // Get the scroll height (rounding to be safe to ensure cross browser consistency)
+    const scroll_height = Math.round(textarea.scrollHeight);
+
+    // Undo overflow, width, border-width, box-sizing & inline padding overrides
+    textarea.style.removeProperty('width');
+    textarea.style.removeProperty('box-sizing');
+    textarea.style.removeProperty('padding-inline');
+  
+    textarea.style.removeProperty('border-width');
+    textarea.style.removeProperty('overflow');
+
+    // Subtract block_padding from scroll_height and divide that by our line_height to get the row count.
+    // Round to nearest integer as it will always be within ~.1 of the correct whole number.
+    const rows = Math.round((scroll_height - block_padding) / line_height);
+
+    // Set the calculated rows attribute (limited by row_limit)
+    textarea.setAttribute("rows", "" + Math.min(rows, row_limit));
+  };
+
+  // Trigger the event to set the initial rows value
+  textarea.dispatchEvent(new Event('input', {
+    bubbles: true
+  }));
+}
+  autosize('positivePromptInput', '6')
+  autosize('negativePromptInput', '6')
+</script>
+<script>
+  function addOpenInNewTab() {
+// Get all <a> elements in the document
+const links = document.querySelectorAll('a');
+// console.log(links);
+// Loop through each <a> element and add the target attribute
+links.forEach(link => {
+  link.setAttribute('target', '_blank');
+});
+  }
+</script>
+<br>
+[addOpenInNewTab(), ""]
+<head>
+	<style>
+		#topBtn {
+			display: none;
+			position: fixed;
+			bottom: 70px;
+			right: 20px;
+			z-index: 99;
+			font-size: 18px;
+			border: none;
+			outline: none;
+			background-color: #555;
+			color: white;
+			cursor: pointer;
+			padding: 15px;
+			border-radius: 4px;
+		}
+
+		#topBtn:hover {
+			background-color: #555;
+		}
+	</style>
+</head>
+
+<body>
+	<button onclick="topFunction()" id="topBtn" title="Go to top">Top</button>
+	<script>
+		window.onscroll = function() {scrollFunction()};
+
+		function scrollFunction() {
+			if (document.body.scrollTop > 1000 || document.documentElement.scrollTop > 1000) {
+				document.getElementById("topBtn").style.display = "block";
+			} else {
+				document.getElementById("topBtn").style.display = "none";
+			}
+		}
+
+		function topFunction() {
+			document.body.scrollTop = 0;
+			document.documentElement.scrollTop = 0;
+		}
+    function showAndHide() {
+      var x = document.getElementById("generatorArea");
+      if (x.style.display === "none") {
+        x.style.display = "block";
+      } else {
+        x.style.display = "none";
+      
+  }
+}
+	</script>
+</body>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        .floating-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #555;
+            color: #FFF;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+<script>
+    function actionBT() {
+    document.getElementById('generateButtonEl').click();
+  }
+</script>
+
+<script>
+    function openPopup(id) {
+            const popup = document.getElementById(id);
+            const overlay = document.getElementById(`${id}Overlay`);
+            popup.style.display = 'block';
+            overlay.style.display = 'block';
+
+            overlay.onclick = () => closePopup(id);
+        }
+        function closePopup(id) {
+            const popup = document.getElementById(id);
+            const overlay = document.getElementById(`${id}Overlay`);
+            popup.style.display = 'none';
+            overlay.style.display = 'none';
+        }
+</script>
+
+</head>
+<body>
+    <div class="floating-button", onclick="actionBT()">Generate</div>
+</body>
+</html>
+
+
+

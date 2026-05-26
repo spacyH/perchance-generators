@@ -1,0 +1,179 @@
+$output(tabList) =>
+  if(!window.aleadyAddedTabsPluginStuff823488) {
+  
+    // add an after-update hook to update a tab if it is passed into update()
+    // we need to do this so that the user can create a button and call update(theTabId) in the onclick handler and it works as expected.
+    let originalUpdate = window.update;
+    window.update = function(...args) {
+      originalUpdate.bind(window)(...args);
+      if(args[0] && args[0].dataset && args[0].dataset.belongsToTabList) {
+        let tabListKey = args[0].dataset.belongsToTabList;
+        let tabListIndex = Number(args[0].dataset.tabListIndex);
+        let tab = window[tabListKey][tabListIndex];
+        args[0].innerHTML = tab.content.evaluateItem;
+      }
+    };
+  
+	  // CSS:
+		var style = document.createElement('style'); 
+		style.type = 'text/css';
+		style.innerHTML = getCSSString({backgroundColor:tabList.backgroundColor, borderColor:tabList.borderColor, textColor:tabList.textColor});
+		document.getElementsByTagName('head')[0].appendChild(style);
+		// JS:
+		// (Vanilla JavaScript Tabs v1.0.0 https://zoltantothcom.github.io/vanilla-tabs-plugin)
+		window.Tabs=function(e){function t(e){u.addEventListener("click",n);for(var t=a(null==e?s:e),l=0;l<v;l++)u.querySelectorAll("."+f)[l].setAttribute("data-index",l),l===t&&c(l)}function n(e){-1!==e.target.className.indexOf(f)&&(e.preventDefault(),c(e.target.getAttribute("data-index")))}function l(){[].forEach.call(u.querySelectorAll("."+y),function(e){e.style.display="none"}),[].forEach.call(u.querySelectorAll("."+f),function(e){e.className=r(e.className,d)})}function r(e,t){var n=new RegExp("( )"+t+"()","g");return e.replace(n,"")}function a(e){return e<0||isNaN(e)||e>v?0:e}function c(e){l();var t=a(e);u.querySelectorAll("."+f)[t].className+=" "+d,u.querySelectorAll("."+y)[t].style.display=""}function o(e){i(),l(),t(e)}function i(){u.removeEventListener("click",n)}var u=document.getElementById(e.elem),s=e.open||0,f="tabs-plugin__title",d="tabs-plugin__title-active",y="tabs-plugin__content",v=u.querySelectorAll("."+f).length;return t(),{open:c,update:o,destroy:i}};
+		window.aleadyAddedTabsPluginStuff823488 = true;
+	}
+	
+	const tabListId = djb2_xor(tabList.getRawListText);
+	const tabListKey = "__"+generatorName.replace(/[^a-zA-Z]/g, "")+"_tabList_"+tabListId;
+	
+	let tabs = tabList.selectAll;
+	
+	window[tabListKey] = tabs;
+	
+	let activeIndex = 0;
+	let activeCount = tabs.reduce((a,v,i) => !v.active ? a : a+(v.active ? (activeIndex=i, 1) : 0), 0);
+	if(activeCount > 1) return "(there's some sort of error with the tabs-plugin - sorry! please report it on lemmy.world/c/perchance)";
+	
+	const useActiveInsteadOfDefault = !!(tabList.rememberActiveTab && activeCount === 1);
+	//console.log("useActiveInsteadOfDefault:", useActiveInsteadOfDefault, activeCount);
+	
+	let defaultIndex = 0;
+	let defaultCount = tabs.reduce((a,v,i) => !v.default ? a : a+(v.default ? (defaultIndex=i, 1) : 0), 0);
+	if(defaultCount > 1) return "(tabs-plugin error: looks like you've got more than one item with <b>default=true</b>? you should only have one)";
+	
+	let titles = tabs.map(t => t.title.evaluateItem).map((t,i) => `<li onclick="window.${tabListKey}.forEach(t => t.active = false); window.${tabListKey}\\[${i}\\].active = true;"><a class="tabs-plugin__title" href="#${t.replace(/\s/g,"_")}">${t}</a></li>`);
+	let contents = tabs.map((t, i) => `<div ${t.id ? `id="${t.id}"` : ""} data-belongs-to-tab-list="${tabListKey}" data-tab-list-index="${i}" class="tabs-plugin__content" style="${useActiveInsteadOfDefault ? (t.active ? "" : "display:none;") : (t.default ? "" : "display:none;") }">${t.content.evaluateItem}</div>`);
+	let id = (Math.random()+"").split(".")[1];
+
+  if(defaultCount === 0 && !useActiveInsteadOfDefault && window.location.hash) {
+    defaultIndex = titles.findIndex(t => t.includes(` href="${decodeURIComponent(window.location.hash)}">`));
+    if(defaultIndex === -1) defaultIndex = 0;
+  }
+
+	return `
+	<img onerror="if(document.getElementById('tabs${id}')) \\{ new Tabs(\\{elem: 'tabs${id}', open: ${useActiveInsteadOfDefault ? activeIndex : defaultIndex}\\}); tabs${id}.style.display=''; \\}" style="display:none;" src=""> <!-- very hacky, but is there a better way? -->
+	<div class="tabs-plugin" id="tabs${id}" style="display:none;">
+		<ul class="tabs-plugin__header">
+			${titles.join("")}
+		</ul>
+		${contents.join("")}
+	</div>`;
+
+// djb2 string hashing function (NOT cryptographic)
+djb2_xor(str) =>
+  let len = str.length;
+  let h = 5381;
+  for (let i = 0; i < len; i++) {
+    h = h * 33 ^ str.charCodeAt(i);
+  }
+  return h >>> 0;
+
+getCSSString(opts) =>
+  if(!opts) opts = {};
+  if(!opts.backgroundColor) opts.backgroundColor = "#ffffff";
+  
+  // So we can work out other defaults based on the background color:
+  let [r, g, b] = opts.backgroundColor.slice(1, 7).split(/(..)/).filter(c=>c).map(c => parseInt(c, 16)); // include end bound in slice in case they passed 8-letter hex (i.e. including alpha)
+  let [h, s, l] = rgbToHsl(r, g, b); // returns 0-1 values
+  
+  if(!opts.borderColor) {
+    if(l > 0.5) opts.borderColor = `hsl(${h*360}deg, ${s*100}%, ${Math.max(0, l-0.25)*100}%)`;
+    else opts.borderColor = `hsl(${h*360}deg, ${s*100}%, ${Math.min(1, l+0.25)*100}%)`;
+  }
+  if(!opts.textColor) {
+    // very crude, but it'll do for now:
+    if(l > 0.5) opts.textColor = `black`;
+    else opts.textColor = `white`;
+  }
+  
+  return `
+	.tabs-plugin {
+		margin: 1em;
+		max-width: 100%;
+		text-align: left;
+    color: ${opts.textColor};
+	}
+	.tabs-plugin__header {
+		margin: 0;
+		padding: 0;
+		overflow: hidden;
+    display: flex;
+    overflow-x: auto;
+    position: relative;
+    -webkit-mask-image: linear-gradient(to right, black calc(100% - 48px), #ffffff00 100%);
+    mask-image: linear-gradient(to right, black calc(100% - 48px), #ffffff00 100%);
+	}
+  /*.tabs-plugin__header:before {
+    content:'';
+    z-index:2;
+    pointer-events: none;
+  }*/
+	.tabs-plugin__header li {
+		display: inline-block;
+		float: left;
+	}
+	.tabs-plugin__title {
+		background: ${opts.backgroundColor};
+    opacity: 0.9;
+		border: 1px solid ${opts.borderColor};
+		cursor: pointer;
+		display: block;
+		margin-right: .5em;
+		padding: 1em 1.5em;
+		text-decoration: none;
+		color: inherit;
+		outline: 0;
+    width: max-content;
+    line-height: 1.2; /* because otherwise certain emojis/characters cause one tab to be taller, which makes the tabs 'float' above the content */
+	}
+	.tabs-plugin__title:hover {
+		text-decoration: underline;
+	}
+	.tabs-plugin__title-active {
+		opacity: 1;
+		border-bottom-color: ${opts.backgroundColor};
+	}
+	.tabs-plugin__content {
+		border: 1px solid ${opts.borderColor};
+		line-height: 1.5;
+		margin-top: -1px;
+		padding: 2em;
+		background:${opts.backgroundColor};
+	}
+	.tabs-plugin__title * {
+    pointer-events: none;
+  }`;
+
+
+rgbToHsl(r, g, b) =>
+  r /= 255, g /= 255, b /= 255;
+  var max = Math.max(r, g, b), min = Math.min(r, g, b);
+  var h, s, l = (max + min) / 2;
+
+  if(max == min) {
+    h = s = 0; // achromatic
+  } else {
+    var d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch(max){
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  return [h, s, l];
+
+
+tabList
+  *
+	  title = Title 1
+		content = My {neat|cool} content 1
+  *
+	  title = Title 2
+		content = My {awesome|great} content 2
+  *
+	  title = Title 3
+		content = My {nice|lovely} content 3

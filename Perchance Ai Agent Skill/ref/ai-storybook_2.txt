@@ -1,0 +1,126 @@
+<h1 style="margin-bottom:0.5rem;">AI Text Adventure</h1>  
+<p style="font-size:80%; margin-top:0.5rem; color:grey;">(Try <a href="/ai-character-chat?char=ai-adventure" target="_blank" style="font-weight:bold; color:#2bbb00;">AI Adventure</a> if you want <u>image</u> generation too! For a more freeform interface, try <a href="/ai-rpg" target="_blank" style="font-weight:bold; color:#2bbb00;">AI RPG</a>.)</p>
+<div style="width:95%; max-width:700px; margin:0 auto;">
+  
+  <div id="startCtn"> 
+    <div>Adventure Description:</div>
+    <textarea oninput="localStorage.adventureDescription = this.value;" style="width:95%; max-width:700px; height:8rem; margin-top:0.25rem; margin-bottom:0.25rem;" id="adventureDescriptionEl" placeholder="(Optional) A short description of the type of text adventure you want to play. For example: &quot;I am a skilled assassin in a city called Ankh-Morpork ...&quot;&#10;&#10;You can add more detail if you want - e.g. world lore, characters, rules, etc. - just try to keep it under 500 words."></textarea>
+    <script>if(localStorage.adventureDescription) { adventureDescriptionEl.value = localStorage.adventureDescription; }</script>
+    <br>
+    <button onclick="generate(); startCtn.style.display='none';">start adventure</button>
+  </div>
+
+  <div id="topButtonsCtn" style="display:none; margin-bottom:0.5rem;">
+    <div id="stopNoticeEl" style="opacity:0.5; font-size:80%; margin-bottom:0.125rem; visibility:hidden;">— stop and —</div>
+    <button id="backBtn" onclick="handleBackButtonClick()">🔙 undo</button>
+    <button id="regenerateBtn" onclick="handleRegenButtonClick()">🔁 regen</button>
+    <div style="margin-top:0.5rem;">
+      <input id="writingInstructionsEl" style="width:100%;" placeholder="(Optional) Provide writing instructions for the AI.">
+    </div>
+  </div>
+
+  <p id="outputEl" style="min-height:200px; text-align:left; white-space:pre-wrap;"></p>
+
+  <p id="loadingEl"></p>
+  
+  <div style="font-size:80%; color:grey; margin-top:2rem;">Try <a href="/ai-rpg" target="_blank" style="font-weight:bold; color:#2bbb00;">AI RPG</a> for a different adventure style if this one isn't giving good results for your tastes.</div>
+
+  <div style="margin-top:6rem;">
+    <button id="startOverBtn" onclick="if(confirm('This will delete your existing story. Continue?')) { storyLogEl.value=localStorage.storyLog=''; renderCurrentSituation(); this.style.display='none'; }" style="display:none;">🗑️ start over</button>
+    <button id="storyLogBtn" style="margin-bottom:0.5rem;" onclick="if(storyLogEl.style.display == 'none') { storyLogEl.style.display=''; this.textContent='hide full story log'; } else { storyLogEl.style.display='none'; this.textContent='📜 show full story log'; }">📜 show full story log</button>
+  </div>
+  <textarea id="storyLogEl" onchange="renderCurrentSituation()" oninput="localStorage.storyLog=this.value;" placeholder="Your story data will appear here. You can edit it manually to change the story - just follow the format that the AI expects." style="display:none; margin:0 auto; margin-top:1rem; width:95%; max-width:600px; height:400px;"></textarea>
+  <div style="color:grey; font-size:80%; width:95%; max-width:650px; margin:0 auto;">You can <b><u>edit</u> the story log text</b> directly, and you can also <b><u>save</u> your story log text</b> somewhere, like a text file, or a Google Doc, and then later you can paste it back in the story log box to load that previous adventure.</div>
+  <script>if(localStorage.storyLog) { startCtn.style.display="none"; storyLogEl.value = localStorage.storyLog; renderCurrentSituation(); storyLogBtn.style.display=""; startOverBtn.style.display=""; }</script>
+
+</div>
+
+<p style="font-size:80%; margin-top:1rem;">This generator uses Perchance's <a href="https://perchance.org/ai-text-plugin" target="_blank">ai-text-plugin</a>.</p>
+<br>
+
+<div id="commentsCtn"></div>
+<br><br>
+
+<!-- COMMENTS STUFF -->
+<script>
+  function createCommentsSectionHtml() {
+    let startVisible = false;
+    if(window.commentsEl && window.commentsEl.style.display !== 'none') startVisible = true;
+    commentsCtn.innerHTML = ""; // must delete existing comments section first because comments plugin has code which cause it to not output any HTML if that comments section already exists on the page
+    let commentsPluginHtml = root.commentsPlugin({width:"min(750px, 100%)", bannedUsers:root.bannedUserIds, height:"min(70vh, 600px)", forceColorScheme:localStorage.forceColorScheme || null});
+    commentsCtn.innerHTML = `
+      <p><button onclick="if(commentsEl.style.display == 'none') { commentsEl.style.display=''; this.textContent='hide comments'; } else { commentsEl.style.display='none'; this.textContent='💬 show comments'; }">${startVisible ? "hide comments" : "💬 show comments"}</button></p>
+      <p id="commentsEl" style="${startVisible ? "" : "display:none;"}">
+        ${commentsPluginHtml}
+      </p>
+    `;
+  }
+  createCommentsSectionHtml();
+</script>
+
+<!-- DARK MODE STUFF -->
+<div style="position:fixed; bottom:0.5rem; left:0.5rem; z-index:10;">
+  <button id="darkModeBtn" style="cursor:pointer;" onclick="window.toggleManualDarkMode(); createCommentsSectionHtml();">🌃</button>
+  <div style="display:inline-block;">[fullscreenButton("⇱", "⇲")]</div>
+</div>
+<script>
+  function toggleManualDarkMode() {
+    let newColorScheme = (getCurrentColorScheme() === "dark" ? "light" : "dark");
+    localStorage.forceColorScheme = newColorScheme;
+    setColorScheme(newColorScheme);
+    // if chosen mode matches current OS default, we remove manual "forced" mode:
+    let systemColorScheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? "dark" : "light";
+    if(systemColorScheme === newColorScheme) {
+      localStorage.removeItem("forceColorScheme");
+    }
+  }
+  function getCurrentColorScheme() {
+    if(localStorage.forceColorScheme !== undefined) {
+      return localStorage.forceColorScheme;
+    } else {
+      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? "dark" : "light";
+    }
+  }
+  function setColorScheme(scheme) {
+    if(scheme !== "dark" && scheme !== "light") throw new Error("scheme should be 'light' or 'dark'");
+    document.querySelector("#darkModeBtn").textContent = (scheme === "dark" ? "🌄" : "🌃");
+    if(scheme === "dark") {
+      document.documentElement.style.colorScheme = "dark";
+      document.body.style.color = "#d8d4cf";
+      document.body.style.backgroundColor = "#131516";
+      document.documentElement.style.setProperty('--box-color', '#2a2a2a');
+    } else {
+      document.documentElement.style.colorScheme = "light";
+      document.body.style.color = "black";
+      document.body.style.backgroundColor = "white";
+      document.documentElement.style.setProperty('--box-color', '#ebebeb');
+    }
+  }
+  // during page load, set the chosen mode based on localStorage value if it exists:
+  if(localStorage.forceColorScheme !== undefined) {
+    setColorScheme(localStorage.forceColorScheme);
+  } else {
+    // user has not manually overwritten, so we use OS default:
+    let systemIsInDarkMode = !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    setColorScheme(systemIsInDarkMode ? "dark" : "light");
+  }
+</script>
+ 
+<!-- FEEDBACK STUFF -->
+<div style="position:fixed; bottom:0.5rem; right:0.5rem; text-align:right; z-index:100;">
+  <div id="feedbackCommentsCtn"></div>
+  <button id="feedbackBtn893745ykfuhd" onclick="if(feedbackCommentsCtn.innerHTML.length === 0) { feedbackCommentsCtn.innerHTML=generateFeedbackCommentsHtml(); this.innerHTML='✖ close'; } else {  feedbackCommentsCtn.innerHTML='';  this.innerHTML='🗨️ feedback'; }">🗨️ feedback</button>
+</div>
+<script>
+  function generateFeedbackCommentsHtml() {
+    let options = {channel:"feedback", hideComments:location.hash.includes("#showfeedback") ? false : true, height:location.hash.includes("#showfeedback") ? 500 : 120, commentPlaceholderText: "Share some feedback. Do not share personal info, data is public.", submitButtonText: "submit feedback"};
+    if(localStorage.forceColorScheme) options.forceColorScheme = localStorage.forceColorScheme;
+    return root.commentsPlugin(options);
+  }
+</script>
+
+<style>
+  button:disabled {
+    filter: grayscale(1); /* since firefox doesn't seem to change emoji colors to indicate disabledness - only affects text */
+  }
+</style>

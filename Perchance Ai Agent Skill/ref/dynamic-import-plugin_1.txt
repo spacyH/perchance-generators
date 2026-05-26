@@ -1,0 +1,75 @@
+$output(generatorName, mode) =>
+  if(generatorName === undefined) throw new Error(`You passed \`undefined\` (as the generator name) to the dynamic import plugin. For example, you wrote something like \`dynamicImport(foo)\`, but you hadn't yet put a generator name inside the 'foo' variable.`);
+  if(window.moduleSpace.hasOwnProperty(generatorName)) { // if we've already got it:
+    let root = window.moduleSpace[generatorName].getSelf;
+    return root.hasOwnProperty("$output") ? root.$output : root;
+  }
+  
+  // TODO: I should allow generatorName to be an array of names so they can be preloaded/loaded with a single request.
+  //       And in that case it'd return an object like {foo:fooRootOr$output, bar:barRootOr$output, ...}
+  
+  if(!mode) mode = "sync";
+  
+  if(mode === "sync") {
+    // *synchronously* download the lists text (and cache it):
+    const request = new XMLHttpRequest();
+    
+    // This is endpoint is public, stable, and has a backwards-compatibility guarantee, so you're free to use it in your own plugins.
+    // You give it a list of comma-separated names like generatorNames=foo,bar and it returns an object like {success:true, generators:{foo:{name:"foo", code:"...", imports:[...]}, bar: ... }
+    request.open("GET", `https://perchance.org/api/getGeneratorsAndDependencies?generatorNames=${generatorName}`, false); // `false` makes the request synchronous
+    request.send(null);
+
+    if(request.status === 200) {
+      let responseJson = JSON.parse(request.responseText);
+      
+      if(!responseJson.generators[generatorName]) throw new Error(`You passed '${generatorName}' to the dynamic import plugin, but the '${generatorName}' generator doesn't seem to exist.`);
+      
+      let root = createPerchanceTree(responseJson.generators[generatorName].code, {name:generatorName}); // since we specify the name, it gets added to window.moduleSpace
+      
+      function compileImports(root) {
+        for(let name of root.$imports) {
+          if(!window.moduleSpace.hasOwnProperty(name)) {
+            if(responseJson.generators[name]) {
+              console.log("compiling sub-import:", name, responseJson.generators[name]);
+              let subImportRoot = createPerchanceTree(responseJson.generators[name].code, {name:name});
+              compileImports(subImportRoot);
+            } else {
+              console.error(`Sub-import of '${generatorName}' named '${name}' doesn't seem to exist.`);
+            }
+          }
+        }
+      }
+      compileImports(root);
+      
+      return root.hasOwnProperty("$output") ? root.$output : root;
+    } else {
+      console.error(`A generator named '${generatorName}' was not found by the dynamic import plugin.`);
+      throw new Error(`A generator named '${generatorName}' was not found by the dynamic import plugin.`);
+    }
+    
+  } else if(mode === "async" || mode === "preload") {
+    return fetch(`https://perchance.org/api/getGeneratorsAndDependencies?generatorNames=${generatorName}`).then(r => r.json()).then(async responseJson => {
+      if(!responseJson.generators[generatorName]) throw new Error(`You passed '${generatorName}' to the dynamic import plugin, but the '${generatorName}' generator doesn't seem to exist.`);
+      
+      let root = createPerchanceTree(responseJson.generators[generatorName].code, {name:generatorName});
+      
+      function compileImports(root) {
+        for(let name of root.$imports) {
+          if(!window.moduleSpace.hasOwnProperty(name)) {
+            if(responseJson.generators[name]) {
+              console.log("compiling sub-import:", name, responseJson.generators[name]);
+              let subImportRoot = createPerchanceTree(responseJson.generators[name].code, {name:name});
+              compileImports(subImportRoot);
+            } else {
+              console.error(`Sub-import of '${generatorName}' named '${name}' doesn't seem to exist.`);
+            }
+          }
+        }
+      }
+      compileImports(root);
+      
+      return root.hasOwnProperty("$output") ? root.$output : root;
+    });
+  } else {
+    throw new Error(`Unknown 'mode' given to dynamic-import-plugin: '${mode}'. The valid modes are 'sync' and 'async' and 'preload'.`);
+  }

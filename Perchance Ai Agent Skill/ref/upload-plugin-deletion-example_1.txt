@@ -1,0 +1,19 @@
+upload = {import:upload-plugin}
+
+async handleClick() =>  // we must add 'async' before the function name because we're using 'await' in this function
+  buttonEl.disabled = true;
+  buttonEl.textContent = "⏳ uploading..."; 
+  
+  let { url, size, deletionUrl } = await upload(inputTextEl.value);
+  urlOutputEl.innerHTML = `<a href="${url}" target="_blank">${url}</a> (${(size/1024).toFixed(2)} kilobytes)`;
+
+  deletionBtn.disabled = false;
+  deletionBtn.textContent = "🗑️ delete";
+  deletionBtn.onclick = async () => {
+    deletionBtn.disabled = true;
+    let { success } = await fetch(deletionUrl).then(r => r.json());
+    deletionBtn.textContent = success ? `✅ deleted` : "⚠️ deletion failed"; 
+  };
+  
+  buttonEl.textContent = "📤 upload text";
+  buttonEl.disabled = false;

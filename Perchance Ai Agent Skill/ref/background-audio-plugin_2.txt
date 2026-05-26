@@ -1,0 +1,88 @@
+<h1>The Background Audio Plugin</h1>
+<div style="position:relative;margin:0 auto;width:100%;max-width:800px;background:white;border-radius:2px;padding:1em; box-sizing:border-box;">
+	<div style="pointer-events:none; background:white; opacity:0.7; position:absolute; top:0; left:0; right:0; bottom:0; display:flex; justify-content:center; align-items:center;">
+		<span style="font-size:30rem; opacity:0.4;">⨯</span>
+	</div>
+	<p>Put this in your Perchance code panel:</p>
+	<p><code>backgroundAudio = \{import:background-audio-plugin\}</code></p>
+	<br>
+	<p>Now you need to find a YouTube URL with the sound that you want. Let's say you chose this URL:</p>
+	<p><code>https://www.youtube.com/watch?v=dQw4w9WgXcQ</code></p>
+	<p>To play this video in the background, you'd put this in your bottom-right (HTML) panel:</p>
+	<p><code>\[backgroundAudio("https://www.youtube.com/watch?v=dQw4w9WgXcQ")\]</code></p>
+	<p>You can change the volume to half of the normal volume like this:</p>
+	<p><code>\[backgroundAudio("https://www.youtube.com/watch?v=dQw4w9WgXcQ", 50)\]</code></p>
+	<p>Change <code>0.5</code> to any value between 0 and 100.</p>
+	<br>
+	<p><b>Tips:</b></p>
+	<ul>
+		<li>In general, unsolicited website background music can be annoying to users, especially when there's no "mute" button. So probably only use this for silly generators or where the audio has some important purpose.</li>
+		<li>In modern browsers, the audio won't start until the user has interacted with the page (e.g. by clicking somewhere).</li>
+		<li>Check out more plugins at <a href="/plugins">perchance.org/plugins</a></li>
+	</ul>
+</div>
+<br>
+
+<div style="text-align:left; margin:0 auto;width:100%;max-width:800px;background:white;border-radius:2px;padding:1em; box-sizing:border-box;">
+	<h2 style="text-align:center;color:red;">Notice:</h2>
+	<p style="margin-top:0;">Unfortunately SoundCloud has shut down its API (which this plugin needs to function properly). Another thing that "killed" this plugin was the fact that browsers no longer let you auto-play sounds without user interaction (otherwise we could still use YouTube). This means that the user needs to "interact" with the SoundCloud embed before the browser will allow it to play.</p>
+	<p>There are two remaining options if you want to play sound on your generator. I'll explain them both below.</p>
+	
+	<h2>Direct-Linking to an MP3 (or other file) that is hosted somewhere</h2>
+	<ul>
+		
+	</ul>
+	<p>If you can manage to host your audio file somewhere on the web, and get a "direct" URL to the file (i.e. one that ends in <code>mp3</code> or <code>wav</code>, etc.), then you can embed it in your generator by pasting this code into your generator's HTML panel (bottom-right box in the Perchance editor):</p>
+<pre>
+&lt;audio id="audioEl" src="<span style="color:#05eb05;">https://link.to/your/file.mp3</span>">&lt;/audio&gt;
+&lt;script>
+  let alreadyStartedAutoPlay = false;
+  window.addEventListener("click", function() \{
+    if(audioEl.paused && navigator.userActivation.isActive && !alreadyStartedAutoPlay) \{
+      alreadyStartedAutoPlay = true;
+      audioEl.volume = 0.7;
+      audioEl.play();
+    \}
+  \});
+&lt;/script&gt;
+</pre>
+	<p>You can adjust the volume by changing <code>audioEl.volume = 0.7</code> to anything between <code>audioEl.volume = 0</code> and <code>audioEl.volume = 1</code> (I've justed used 0.7 as an example - change it to <code>1</code> for normal volume).</p>
+	<p><a href="https://perchance.org/audio-embed-example#edit" target="_blank">Here's an example generator</a> that uses this approach.</p>
+	<p><a href="https://perchance.org/audio-embed-with-controls-example#edit" target="_blank">And here's one</a> that also adds controls so the user can pause it.</p>
+	<br>
+	
+	<h2>Using a SoundCloud embed</h2>
+	<p>If you use this approach, the user will have to actually click the play button on the embed most of the time. It seems that web browsers try to only allow "trusted" embeds to auto-play, so sometimes it will auto-play, but other times the user will have to click the play button.</p>
+	<p>Here's how to embed a SoundCloud player in your page:</p>
+	<p>First open the URL of the track, e.g.</p>
+	<pre>soundcloud.com/fragged-empire/kaltoran-craft-ambient</pre>
+	<p>Now find the "share" button for that track and click it. In the current version of SoundCloud (as of writing), it looks like this, but it may have changed since I wrote this:</p>
+	<img src="https://i.imgur.com/hIcr0aq.jpg" style="width:100%;border:1rem solid lightgrey;"/>
+	<p>That will open up a sharing panel, and then you'll need to find the "Embed" section and open that up:</p>
+	<img src="https://i.imgur.com/7T6JHjN.jpg" style="width:100%;border:1rem solid lightgrey;"/>
+	<p>On the next screen you should click the "enable automatic play" checkbox, and then copy the code "iframe" code and paste it into your HTML panel (the code panel in the bottom-right of the perchance editor screen).</p>
+	<img src="https://i.imgur.com/7Fcsqgs.jpg" style="width:100%;border:1rem solid lightgrey;"/>
+	<p>This will display the SoundCloud embed on your generator's page.</p>
+	<p><a href="https://perchance.org/soundcloud-player-embed-example#edit" target="_blank">Here's an example generator</a> that uses this approach. Unfortunately you can't hide the embed or make it autoplay.</p>
+</div>
+
+<br><br>
+
+<style>
+	body {
+			background:#eee;
+	}
+	code {
+		background-color:#eee;
+		padding:0.2em;
+		white-space:nowrap;
+	}
+	ul li { margin-top:0.4em; }
+	pre {
+		background: #222;
+		color: white;
+		padding: 0.5rem;
+		border-radius: 2px;
+		text-align:left;
+	}
+</style>

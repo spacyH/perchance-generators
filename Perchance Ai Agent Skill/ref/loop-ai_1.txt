@@ -1,0 +1,448 @@
+// 
+// ██╗
+// ██║
+// ██║
+// ██║
+// ███████╗
+// 
+//         ╭────────────╮     ╭────────────╮
+//       ╭─╯  ╔══════╗  ╰─╮ ╭─╯  ╔══════╗  ╰─╮
+//      │   ╔═╝      ╚═╗  │ │  ╔═╝      ╚═╗  │
+//      │  ╔╝   ████   ╚╗ │ │ ╔╝   ████   ╚╗ │
+//      │  ║  ██ 6 ██   ║ │ │ ║  ██ 9 ██   ║ │
+//      │  ║   ██████   ║ │ │ ║   ██████   ║ │
+//      │  ╚╗   ████   ╔╝ │ │ ╚╗   ████   ╔╝ │
+//      │   ╚═╗      ╔═╝  │ │  ╚═╗      ╔═╝  │
+//       ╰─╮  ╚══════╝  ╭─╯ ╰─╮  ╚══════╝  ╭─╯
+//         ╰────────────╯     ╰────────────╯
+// 
+//                                    ██████╗
+//                                    ██╔══██╗
+//                                    ██████╔╝
+//                                    ██╔═══╝
+//                                    ██║
+//                                    ╚═╝
+// 
+//            L O O P   //   O R I G I N A L   M A R K
+//            T W I N   C O R E   S I G I L   //   B Y   L O O P
+//
+
+// ######################################################
+// ## 🔌 PLUGINS (CORE IMPORTS)
+// ######################################################
+
+generateInterfaceHTML = {import:t2i-framework-plugin-v2} 
+kv = {import:kv-plugin}
+ai = {import:ai-text-plugin}
+upload = {import:upload-plugin}
+fullscreenButton = {import:fullscreen-button-plugin}
+generatorStats = {import:generator-stats-plugin}
+literal = {import:literal-plugin}
+bugReport = {import:bug-report-plugin}
+createTextEditor = {import:text-editor-plugin-v1}
+favicon = {import:favicon-plugin}
+
+
+// ######################################################
+// ## 🧠 META (PAGE IDENTITY)
+// ######################################################
+
+$meta
+  title = LOOP — Free AI Image & Story Generator
+  description = Generate images, characters, worlds, and story scenes in one simple AI workspace. No sign-up, free to use, and designed to feel clean and easy.
+  image = https://user.uploads.dev/file/660c24460ee5ee871d8cc406d1829ef1.png
+
+
+// ######################################################
+// ## ⚙️ SETTINGS (GLOBAL GENERATOR CONFIG)
+// ######################################################
+
+settings
+  pageTitle = Loop (free, no sign-up, unlimited)
+  numImages = [input.numImages]
+  socialFeatures = button after 4 clicks
+
+  imageButtons
+    personality = true
+    privateSave = true
+
+  prompt = [""]
+
+// ######################################################
+// ## 🖼 IMAGE ENGINE (RENDER CORE HOOK)
+// ######################################################
+
+image = {import:text-to-image-plugin}
+createMediaGallery = {import:cmgp}
+
+
+// ######################################################
+// ## 🖼 GALLERY SYSTEM (OUTPUT DISPLAY)
+// ######################################################
+
+galleryPlugin = {import:gallery-plugin}
+
+galleryOptions 
+  gallery = true 
+  sort = recent 
+  adaptiveWidth = true 
+  adaptiveHeight = true 
+  style = background-color: var(--bg-main)
+  loadFonts = Inter
+  defaultGalleryNames = characters, public, worldbuilding, story
+  hideIfScoreIsBelow = -1
+
+
+// ─────────────────────────────────────────────
+// ➕ GALLERY ACTION MENU
+// ─────────────────────────────────────────────
+
+  customButton
+    emoji = ➕︎
+    onClick(data) =>
+      window._currentImageData = data
+      if (typeof window.showLoopImageActionModal === "function") {
+        window.showLoopImageActionModal(data)
+      }
+
+// ─────────────────────────────────────────────
+// 💬 IMAGE COMMENTS BUTTON
+// ─────────────────────────────────────────────
+
+  customButton2
+    emoji = 💬
+    onClick(data) =>
+      const loopAccent = (() => {
+        const fromStorage = localStorage.getItem('accent');
+        const fromCss = getComputedStyle(document.documentElement).getPropertyValue('--accent');
+        const val = String(fromStorage || fromCss || '#ffbe0a').trim();
+        return /^#[0-9a-fA-F]{3,8}$/.test(val) ? val : '#ffbe0a';
+      })();
+      const loopAccentTint = `color-mix(in srgb, ${loopAccent} 15%, #18181b)`;
+      const loopAccentBorder = `color-mix(in srgb, ${loopAccent} 34%, rgba(255,255,255,.12))`;
+      let commentsBox = commentsPlugin({
+        channel: "image-" + data.imageId.slice(0,25),
+        width: "100%",
+        height: "100%",
+        loadFonts: "Inter",
+        forceColorScheme: window._isDarkMode ? "dark" : "light",
+        style: "display:block;width:100%;height:100%;max-width:100%;",
+        containerStyle: "width:100%;height:100%;max-width:100%;font-family:Inter,system-ui,sans-serif;border:0;overflow:hidden;",
+        messageFeedStyle: "padding:12px;min-height:0;",
+        messageBubbleStyle: "border:1px solid light-dark(rgba(0,0,0,.13),rgba(255,255,255,.12));border-radius:10px;padding:9px 10px;font-family:Inter,system-ui,sans-serif;",
+        inputAreaStyle: "border:1px solid light-dark(rgba(0,0,0,.16),rgba(255,255,255,.14));border-radius:9px;min-height:54px;padding:10px 11px;font-family:Inter,system-ui,sans-serif;",
+        submitButtonStyle: `background:${loopAccent};color:#111;border:none;border-radius:9px;font-weight:800;font-family:Inter,system-ui,sans-serif;min-height:34px;min-width:96px;opacity:1;box-shadow:none;`,
+        settingsButtonStyle: `background:${loopAccent};color:#111;border:1px solid ${loopAccent};border-radius:9px;min-height:34px;`,
+        fullscreenButtonStyle: `background:${loopAccent};color:#111;border:1px solid ${loopAccent};border-radius:9px;min-height:34px;`,
+        commentPlaceholderText: "Add a friendly comment to this image...",
+        submitButtonText: "send",
+        adminPasswordHash: "6058a8841512176a67c7f2bc39b45fe0fefabe4a1e1d900e7b71f8452c242518",
+        adminFlair: "🫰 LOOP MOD"
+      });
+      showLoopGalleryCommentModal(commentsBox, data, loopAccent);
+
+
+// ─────────────────────────────────────────────
+// 💬 LOOP GALLERY COMMENT MODAL
+// ─────────────────────────────────────────────
+
+showLoopGalleryCommentModal(commentsHtml, data, accentColor) =>
+  const old = document.getElementById('loop-gallery-comment-modal');
+  if (old) old.remove();
+
+  const accent = /^#[0-9a-fA-F]{3,8}$/.test(String(accentColor || '').trim()) ? String(accentColor).trim() : '#ffbe0a';
+
+  const overlay = document.createElement('div');
+  overlay.id = 'loop-gallery-comment-modal';
+  overlay.tabIndex = 0;
+  overlay.style.cssText = `
+    position: fixed;
+    inset: 0;
+    z-index: 100002;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: calc(var(--header-height, 50px) + 18px) 18px 18px;
+    background: rgba(0,0,0,.58);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    box-sizing: border-box;
+    font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  `;
+
+  overlay.innerHTML = `
+    <style>
+      #loop-gallery-comment-modal * { box-sizing: border-box; }
+      #loop-gallery-comment-modal { color-scheme: light dark; }
+      #loop-gallery-comment-modal .loop-gallery-comment-card {
+        width: 520px !important;
+        max-width: calc(100vw - 48px) !important;
+        height: 360px !important;
+        max-height: calc(100dvh - var(--header-height, 50px) - 52px) !important;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border-radius: 16px;
+        border: 1px solid var(--border-subtle);
+        background: var(--bg-panel, var(--bg-sidebar, light-dark(#ffffff, #111114)));
+        color: var(--text-primary, light-dark(#151515, #f5f5f5));
+        box-shadow: 0 18px 64px rgba(0,0,0,.44);
+      }
+      #loop-gallery-comment-modal .loop-gallery-comment-head {
+        min-height: 54px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 11px 14px;
+        border-bottom: 1px solid var(--border-subtle);
+        background: var(--bg-main, light-dark(#f5f5f5, #111114));
+        flex: 0 0 auto;
+        position: relative;
+      }
+      #loop-gallery-comment-modal .loop-gallery-comment-title-wrap {
+        min-width: 0;
+        display: grid;
+        gap: 2px;
+      }
+      #loop-gallery-comment-modal .loop-gallery-comment-title {
+        font-size: 13px;
+        line-height: 1.15;
+        font-weight: 800;
+        color: var(--text-primary, light-dark(#111, #fff));
+      }
+      #loop-gallery-comment-modal .loop-gallery-comment-subtitle {
+        font-size: 10.5px;
+        line-height: 1.25;
+        color: var(--text-secondary, light-dark(rgba(0,0,0,.58), rgba(255,255,255,.62)));
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #loop-gallery-comment-modal .loop-gallery-comment-close {
+        width: 32px;
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--border-subtle);
+        border-radius: 10px;
+        background: var(--bg-hover, light-dark(rgba(0,0,0,.05), rgba(255,255,255,.08)));
+        color: var(--text-primary, light-dark(#111, #fff));
+        font-size: 19px;
+        line-height: 1;
+        cursor: pointer;
+        flex: 0 0 auto;
+        position: static !important;
+        inset: auto !important;
+        top: auto !important;
+        right: auto !important;
+        margin-left: auto;
+        align-self: center;
+      }
+      #loop-gallery-comment-modal .loop-gallery-comment-close:hover {
+        background: ${accent};
+        color: #111;
+      }
+      #loop-gallery-comment-modal .loop-gallery-comment-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow: hidden;
+        background: transparent;
+        padding: 0;
+      }
+      #loop-gallery-comment-modal .loop-gallery-comment-body > * {
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+      #loop-gallery-comment-modal .loop-gallery-comment-body textarea,
+      #loop-gallery-comment-modal .loop-gallery-comment-body input,
+      #loop-gallery-comment-modal .loop-gallery-comment-body button {
+        font-family: Inter, system-ui, sans-serif !important;
+      }
+      #loop-gallery-comment-modal .loop-gallery-comment-body textarea {
+        border-radius: 10px !important;
+        padding: 10px 11px !important;
+      }
+      #loop-gallery-comment-modal .loop-gallery-comment-body button,
+      #loop-gallery-comment-modal .loop-gallery-comment-body input[type="button"],
+      #loop-gallery-comment-modal .loop-gallery-comment-body input[type="submit"] {
+        min-height: 32px !important;
+        border-radius: 9px !important;
+        opacity: 1 !important;
+      }
+      #loop-gallery-comment-modal .loop-gallery-comment-body button[type="submit"],
+      #loop-gallery-comment-modal .loop-gallery-comment-body input[type="submit"] {
+        background: ${accent} !important;
+        color: #111 !important;
+        border: none !important;
+        font-weight: 800 !important;
+      }
+      @media (max-width: 760px) {
+        #loop-gallery-comment-modal {
+          align-items: flex-end;
+          justify-content: center;
+          padding: var(--header-height, 50px) 10px 10px;
+        }
+        #loop-gallery-comment-modal .loop-gallery-comment-card {
+          width: calc(100vw - 20px) !important;
+          height: min(64dvh, calc(100dvh - var(--header-height, 50px) - 18px)) !important;
+          max-height: min(64dvh, calc(100dvh - var(--header-height, 50px) - 18px)) !important;
+          border-radius: 18px;
+        }
+        #loop-gallery-comment-modal .loop-gallery-comment-subtitle { display: none; }
+      }
+    </style>
+    <section class="loop-gallery-comment-card" role="dialog" aria-modal="true" aria-label="Image Gallery Comments" style="width:520px;max-width:calc(100vw - 48px);height:360px;max-height:calc(100dvh - var(--header-height, 50px) - 52px);">
+      <div class="loop-gallery-comment-head">
+        <div class="loop-gallery-comment-title-wrap">
+          <div class="loop-gallery-comment-title">Image Gallery Comments</div>
+          <div class="loop-gallery-comment-subtitle">Comments attached to this image</div>
+        </div>
+        <button class="loop-gallery-comment-close" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="loop-gallery-comment-body">
+        ${commentsHtml || ""}
+      </div>
+    </section>
+  `;
+
+  const close = () => overlay.remove();
+  overlay.addEventListener('mousedown', e => { if (e.target === overlay) close(); });
+  overlay.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  overlay.querySelector('.loop-gallery-comment-close').onclick = close;
+  document.body.appendChild(overlay);
+  setTimeout(() => overlay.focus(), 0);
+
+
+// ─────────────────────────────────────────────
+// 🔍 FULLSCREEN VIEWER
+// ─────────────────────────────────────────────
+
+showImageFullscreen(imageUrl) =>
+  let overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position:fixed;
+    inset:0;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    background:rgba(0,0,0,.88);
+    z-index:9999;
+  `;
+  document.body.appendChild(overlay);
+
+  let frame = document.createElement('div');
+  frame.style.cssText = `
+    width:96vw;
+    height:96vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    position:relative;
+  `;
+
+  let img = new Image();
+  img.src = imageUrl;
+  img.style.cssText = `
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    box-shadow:0 0 20px #000;
+  `;
+
+  let close = document.createElement('div');
+  close.textContent = '✖';
+  close.style.cssText = `
+    position:absolute;
+    top:12px;
+    right:16px;
+    font:32px/1 sans-serif;
+    color:#ffbe0a;
+    cursor:pointer;
+    z-index:2;
+  `;
+
+  let remove = ()=>overlay.remove();
+  overlay.onclick = e => (e.target===overlay) && remove();
+  close.onclick = remove;
+
+  frame.append(img, close);
+  overlay.appendChild(frame);
+
+
+// ######################################################
+// ## 💬 COMMENT SYSTEM
+// ######################################################
+
+commentsPlugin = {import:comments-plugin}
+
+pageCommentOptions
+  channel = loop-main-comments
+  width = 100%
+  height = 430px
+  loadFonts = Inter
+  messageBubbleStyle = background:var(--bg-main); color:var(--text-primary); border:1px solid var(--border-subtle);
+  messageFeedStyle = background:var(--bg-sidebar);
+  inputAreaStyle = background:var(--bg-main); color:var(--text-primary); border:1px solid var(--border-subtle);
+  submitButtonStyle = background:[(()=>{try{let a=localStorage.getItem("accent")||getComputedStyle(document.documentElement).getPropertyValue("--accent")||"#ffbe0a";a=String(a).trim();return /^#[0-9a-fA-F]{3,8}$/.test(a)?a:"#ffbe0a";}catch(e){return "#ffbe0a";}})()]; color:#111; border:none; border-radius:10px; font-weight:800; opacity:1;
+  settingsButtonStyle = background:[(()=>{try{let a=localStorage.getItem("accent")||getComputedStyle(document.documentElement).getPropertyValue("--accent")||"#ffbe0a";a=String(a).trim();return /^#[0-9a-fA-F]{3,8}$/.test(a)?a:"#ffbe0a";}catch(e){return "#ffbe0a";}})()]; color:#111; border:1px solid [(()=>{try{let a=localStorage.getItem("accent")||getComputedStyle(document.documentElement).getPropertyValue("--accent")||"#ffbe0a";a=String(a).trim();return /^#[0-9a-fA-F]{3,8}$/.test(a)?a:"#ffbe0a";}catch(e){return "#ffbe0a";}})()]; border-radius:10px; opacity:1;
+  fullscreenButtonStyle = background:[(()=>{try{let a=localStorage.getItem("accent")||getComputedStyle(document.documentElement).getPropertyValue("--accent")||"#ffbe0a";a=String(a).trim();return /^#[0-9a-fA-F]{3,8}$/.test(a)?a:"#ffbe0a";}catch(e){return "#ffbe0a";}})()]; color:#111; border:1px solid [(()=>{try{let a=localStorage.getItem("accent")||getComputedStyle(document.documentElement).getPropertyValue("--accent")||"#ffbe0a";a=String(a).trim();return /^#[0-9a-fA-F]{3,8}$/.test(a)?a:"#ffbe0a";}catch(e){return "#ffbe0a";}})()]; border-radius:10px; opacity:1;
+
+  adminPasswordHash = 6058a8841512176a67c7f2bc39b45fe0fefabe4a1e1d900e7b71f8452c242518
+  adminFlair = 🫰 LOOP MOD
+
+  commentPlaceholderText = add a friendly comment...
+  submitButtonText = send
+  customEmojis = {import:huge-emoji-list}
+  bannedUsers
+    4dafd569d9ba2925c9e7
+    61fb1f2cdce8b2a45566
+
+
+storyCommentOptions
+  channel = loop-story-comments
+  width = 100%
+  height = 430px 
+  loadFonts = Inter
+  messageBubbleStyle = background:var(--bg-main); color:var(--text-primary); border:1px solid var(--border-subtle);
+  messageFeedStyle = background:var(--bg-sidebar);
+  inputAreaStyle = background:var(--bg-main); color:var(--text-primary); border:1px solid var(--border-subtle);
+  submitButtonStyle = background:[(()=>{try{let a=localStorage.getItem("accent")||getComputedStyle(document.documentElement).getPropertyValue("--accent")||"#ffbe0a";a=String(a).trim();return /^#[0-9a-fA-F]{3,8}$/.test(a)?a:"#ffbe0a";}catch(e){return "#ffbe0a";}})()]; color:#111; border:none; border-radius:10px; font-weight:800; opacity:1;
+  settingsButtonStyle = background:[(()=>{try{let a=localStorage.getItem("accent")||getComputedStyle(document.documentElement).getPropertyValue("--accent")||"#ffbe0a";a=String(a).trim();return /^#[0-9a-fA-F]{3,8}$/.test(a)?a:"#ffbe0a";}catch(e){return "#ffbe0a";}})()]; color:#111; border:1px solid [(()=>{try{let a=localStorage.getItem("accent")||getComputedStyle(document.documentElement).getPropertyValue("--accent")||"#ffbe0a";a=String(a).trim();return /^#[0-9a-fA-F]{3,8}$/.test(a)?a:"#ffbe0a";}catch(e){return "#ffbe0a";}})()]; border-radius:10px; opacity:1;
+  fullscreenButtonStyle = background:[(()=>{try{let a=localStorage.getItem("accent")||getComputedStyle(document.documentElement).getPropertyValue("--accent")||"#ffbe0a";a=String(a).trim();return /^#[0-9a-fA-F]{3,8}$/.test(a)?a:"#ffbe0a";}catch(e){return "#ffbe0a";}})()]; color:#111; border:1px solid [(()=>{try{let a=localStorage.getItem("accent")||getComputedStyle(document.documentElement).getPropertyValue("--accent")||"#ffbe0a";a=String(a).trim();return /^#[0-9a-fA-F]{3,8}$/.test(a)?a:"#ffbe0a";}catch(e){return "#ffbe0a";}})()]; border-radius:10px; opacity:1;
+
+  adminPasswordHash = 6058a8841512176a67c7f2bc39b45fe0fefabe4a1e1d900e7b71f8452c242518
+  adminFlair = 🫰 LOOP MOD
+
+  commentPlaceholderText = add a friendly comment...
+  submitButtonText = send
+  customEmojis = {import:huge-emoji-list}
+  bannedUsers
+    4dafd569d9ba2925c9e7
+    61fb1f2cdce8b2a45566
+
+
+imageCommentOptions
+  channel = loop-image-comments
+  width = 100%
+  height = 400px
+  loadFonts = Inter
+  messageBubbleStyle = background:var(--bg-main); color:var(--text-primary); border:1px solid var(--border-subtle);
+  messageFeedStyle = background:var(--bg-sidebar);
+  inputAreaStyle = background:var(--bg-main); color:var(--text-primary); border:1px solid var(--border-subtle);
+  submitButtonStyle = background:[(()=>{try{let a=localStorage.getItem("accent")||getComputedStyle(document.documentElement).getPropertyValue("--accent")||"#ffbe0a";a=String(a).trim();return /^#[0-9a-fA-F]{3,8}$/.test(a)?a:"#ffbe0a";}catch(e){return "#ffbe0a";}})()]; color:#111; border:none; border-radius:10px; font-weight:800; opacity:1;
+  settingsButtonStyle = background:[(()=>{try{let a=localStorage.getItem("accent")||getComputedStyle(document.documentElement).getPropertyValue("--accent")||"#ffbe0a";a=String(a).trim();return /^#[0-9a-fA-F]{3,8}$/.test(a)?a:"#ffbe0a";}catch(e){return "#ffbe0a";}})()]; color:#111; border:1px solid [(()=>{try{let a=localStorage.getItem("accent")||getComputedStyle(document.documentElement).getPropertyValue("--accent")||"#ffbe0a";a=String(a).trim();return /^#[0-9a-fA-F]{3,8}$/.test(a)?a:"#ffbe0a";}catch(e){return "#ffbe0a";}})()]; border-radius:10px; opacity:1;
+  fullscreenButtonStyle = background:[(()=>{try{let a=localStorage.getItem("accent")||getComputedStyle(document.documentElement).getPropertyValue("--accent")||"#ffbe0a";a=String(a).trim();return /^#[0-9a-fA-F]{3,8}$/.test(a)?a:"#ffbe0a";}catch(e){return "#ffbe0a";}})()]; color:#111; border:1px solid [(()=>{try{let a=localStorage.getItem("accent")||getComputedStyle(document.documentElement).getPropertyValue("--accent")||"#ffbe0a";a=String(a).trim();return /^#[0-9a-fA-F]{3,8}$/.test(a)?a:"#ffbe0a";}catch(e){return "#ffbe0a";}})()]; border-radius:10px; opacity:1;
+
+  adminPasswordHash = 6058a8841512176a67c7f2bc39b45fe0fefabe4a1e1d900e7b71f8452c242518
+  adminFlair = 🫰 LOOP MOD
+
+  commentPlaceholderText = add a friendly comment...
+  submitButtonText = send
+  customEmojis = {import:huge-emoji-list}
+  bannedUsers
+    4dafd569d9ba2925c9e7
+    61fb1f2cdce8b2a45566

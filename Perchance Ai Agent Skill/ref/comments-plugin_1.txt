@@ -1,0 +1,650 @@
+$output(opts) =>
+  if(!opts) opts = {};
+  let width = opts.width;
+  let height = opts.height;
+  if(!width) width = "300px";
+  if(!height) height = "250px"; 
+  if(typeof width === "number") width += "px";    
+  if(typeof height === "number") height += "px";
+  let containerStyle = opts.containerStyle || opts.style || `width:${width}; height:${height};`;
+  
+  let iframeUniqueId = "id"+Math.random().toString().replaceAll(".", "")+ Math.random().toString().replaceAll(".", "");
+  let ctx = {};
+  ctx.currentInputElText = "";
+  ctx.iframeUniqueId = iframeUniqueId;
+
+  function parseChannelRuleSegment(rawRules) {
+    if(rawRules === undefined || rawRules === null || rawRules === "") return {valid:true, rules:{}};
+    if(typeof rawRules !== "string") return {valid:false, error:"rules must be a string"};
+    let items = rawRules.split(",");
+    if(items.length === 0) return {valid:false, error:"rules cannot be empty"};
+    let rules = {};
+    for(let item of items) {
+      if(!item) return {valid:false, error:"rules cannot contain empty items"};
+      let colonIndex = item.indexOf(":");
+      if(colonIndex <= 0 || colonIndex === item.length-1) return {valid:false, error:`invalid rule '${item}'`};
+      let key = item.slice(0, colonIndex);
+      let value = item.slice(colonIndex+1);
+      if(rules[key] !== undefined) return {valid:false, error:`duplicate '${key}:' rule`};
+      if(key === "u") {
+        if(!/^[a-z0-9|]+$/.test(value) || /\|\|/.test(value) || value.startsWith("|") || value.endsWith("|")) {
+          return {valid:false, error:"invalid usernames in 'u:' rule"};
+        }
+      } else if(key === "ids") {
+        if(value !== "channel") return {valid:false, error:"'ids:' rule currently only supports 'channel'"};
+      } else {
+        return {valid:false, error:`unknown rule '${key}:'`};
+      }
+      rules[key] = value;
+    }
+    return {valid:true, rules};
+  }
+
+  function parseRawChannelSpec(rawChannel) {
+    if(rawChannel === undefined || rawChannel === null || rawChannel === "") return {valid:true, rawChannel:"", channelName:"", rules:{}};
+    let channel = rawChannel.toString();
+    let parts = channel.split("+");
+    if(parts.length > 2) return {valid:false, error:"too many '+' segments"};
+    if(!/^[a-z0-9\-]+$/.test(parts[0] || "")) return {valid:false, error:"channel names can only contain lower-case letters, numbers, and hyphens"};
+    let parsedRules = parseChannelRuleSegment(parts[1]);
+    if(!parsedRules.valid) return parsedRules;
+    return {
+      valid:true,
+      rawChannel: channel,
+      channelName: parts[0],
+      rulesSegment: parts[1] || "",
+      rules: parsedRules.rules,
+    };
+  }
+  
+  console.debug("comments-plugin 1");
+  
+  function addMethodsToReturnValue(stringObj) {
+    stringObj.submit = async function(optionalText, opts={}) {
+      // Note: if optionalText is specified, that text will be submitted instead of what's currently in the text box, and the text box will not be cleared after submission.
+      if(optionalText) optionalText = optionalText.toString();
+      
+      let nickname = opts.nickname ? opts.nickname.toString() : null;
+      
+      let resolver, rejecter;
+      let promise = new Promise((resolve, reject) => {
+        resolver = resolve;
+        rejecter = reject;
+      });
+      let requestId = Math.random().toString()+Math.random().toString();
+      let timeoutMs = Number(opts.timeoutMs);
+      if(!Number.isFinite(timeoutMs) || timeoutMs < 1000) timeoutMs = 60000;
+      let timeoutId;
+      function cleanup() {
+        if(timeoutId) clearTimeout(timeoutId);
+        window.removeEventListener("message", messageHandler);
+      }
+      async function messageHandler(e) {
+        if(e.origin !== "https://comments-plugin.perchance.org") return;
+        if(e.data.iframeUniqueId !== ctx.iframeUniqueId) return;
+        if(e.data.requestId !== requestId) return;
+        
+        if(e.data.type === "message_submit_response") {
+          console.debug(`parent frame got message_submit_response:`, e.data.success);
+          cleanup();
+          if(e.data.success) {
+            resolver({success:true});
+          } else {
+            rejecter(new Error(e.data.message || "Failed to submit comment."));
+          }
+        } else {
+          console.warn("Invalid event type for this requestId?");
+        }
+      }
+      window.addEventListener("message", messageHandler);
+      timeoutId = setTimeout(() => {
+        cleanup();
+        rejecter(new Error("Timed out while waiting for the comment to be submitted."));
+      }, timeoutMs);
+      while(!ctx.finishedLoading) { console.debug("Waiting for comments-plugin iframe to load before sending .submit() postMessage"); await new Promise(r => setTimeout(r, 500)); }
+      ctx.iframeContentWindow.postMessage({type:"trigger_programmatic_submit", text:optionalText, nickname, channel:ctx.urlHashData.channel, requestId}, "https://comments-plugin.perchance.org");
+      return promise;
+    };
+    
+    Object.defineProperty(stringObj, 'inputText', {
+      get: function() {
+        return ctx.currentInputElText;
+      },
+      set: function(value) {
+        ctx.currentInputElText = value;
+        ctx.iframeContentWindow.postMessage({type:"set_input_el_text", channel:ctx.urlHashData.channel, text:value}, "https://comments-plugin.perchance.org");
+      },
+    });
+    
+    stringObj.setNicknameForNextComment = async function(nickname) {
+      ctx.iframeContentWindow.postMessage({type:"set_next_submit_nickname", channel:ctx.urlHashData.channel, nickname:nickname}, "https://comments-plugin.perchance.org");
+    };
+    stringObj.setAvatarUrlForNextComment = async function(avatarUrl) {
+      ctx.iframeContentWindow.postMessage({type:"set_next_submit_avatar_url", channel:ctx.urlHashData.channel, nickname:avatarUrl}, "https://comments-plugin.perchance.org");
+    };
+
+    let queuedUserBans = [];
+    let queuedUserUnbans = [];
+    function processQueuedDynamicBans() {
+      for(let userId of queuedUserBans) ctx.iframeContentWindow.postMessage({type:"ban_user", channel:ctx.urlHashData.channel, userId}, "https://comments-plugin.perchance.org");
+      queuedUserBans = [];
+      for(let userId of queuedUserUnbans) ctx.iframeContentWindow.postMessage({type:"unban_user", channel:ctx.urlHashData.channel, userId}, "https://comments-plugin.perchance.org");
+      queuedUserUnbans = [];
+    }
+    ctx.finishedLoadingHandlers.push(processQueuedDynamicBans);
+    
+    stringObj.banUser = async function(userId) {
+      userId = userId.evaluateItem.split("-").pop();
+      if(ctx.finishedLoading) {
+        ctx.iframeContentWindow.postMessage({type:"ban_user", channel:ctx.urlHashData.channel, userId}, "https://comments-plugin.perchance.org");
+      } else {
+        queuedUserBans.push(userId);
+      }
+    };
+    
+    stringObj.unbanUser = async function(userId) {
+      userId = userId.evaluateItem.split("-").pop();
+      if(ctx.finishedLoading) {
+        ctx.iframeContentWindow.postMessage({type:"unban_user", channel:ctx.urlHashData.channel, userId}, "https://comments-plugin.perchance.org");
+      } else {
+        queuedUserUnbans.push(userId);
+      }
+    };
+    
+    Object.defineProperty(stringObj, 'comments', { get: () => ctx.allComments.slice(0) });
+    Object.defineProperty(stringObj, 'channel', { get: () => ctx.urlHashData.channel });
+    
+    return stringObj;
+  }
+  
+  let queryParams = {};
+  if(opts.adminPasswordHash) queryParams.adminPasswordHash = opts.adminPasswordHash.evaluateItem;
+  
+  let urlHashData = {};
+  urlHashData.iframeUniqueId = iframeUniqueId;
+  if(opts.adminPasswordHash) urlHashData.adminPasswordHash = opts.adminPasswordHash;
+  if(opts.bannedWords) {
+    if(typeof opts.bannedWords === "string") {
+      urlHashData.bannedWords = opts.bannedWords.trim().split(",").map(w => w.trim()).filter(w => w);
+    } else if(!opts.bannedWords.getLength && opts.getPropertyNames && opts.getPropertyNames.includes("bannedWords")) {
+      urlHashData.bannedWords = opts.bannedWords.getRawListText.split("=").slice(1).join("=").trim().split(",").map(w => w.trim()).filter(w => w);
+    } else {
+      urlHashData.bannedWords = opts.bannedWords.selectAll.map(item => item.getRawListText.replace("/\\^", "/^"));
+    }
+  }
+
+  if(opts.commentPlaceholderText) urlHashData.commentPlaceholderText = opts.commentPlaceholderText.evaluateItem;
+  if(opts.submitButtonText) urlHashData.submitButtonText = opts.submitButtonText.evaluateItem;
+  if(opts.submitButtonSuccessText) urlHashData.submitButtonSuccessText = opts.submitButtonSuccessText.evaluateItem;
+  if(opts.hideComments) urlHashData.hideComments = opts.hideComments;
+  if(opts.hideDates) urlHashData.hideDates = opts.hideDates;
+  if(opts.hideCommentsBeforeDate) urlHashData.hideCommentsBeforeDate = opts.hideCommentsBeforeDate;
+  
+  if(opts.hideSettingsButton) urlHashData.hideSettingsButton = opts.hideSettingsButton;
+  if(opts.hideFullscreenButton) urlHashData.hideFullscreenButton = opts.hideFullscreenButton;
+  if(opts.submitButtonStyle) urlHashData.submitButtonStyle = opts.submitButtonStyle.evaluateItem;
+  if(opts.settingsButtonStyle) urlHashData.settingsButtonStyle = opts.settingsButtonStyle.evaluateItem;
+  if(opts.fullscreenButtonStyle) urlHashData.fullscreenButtonStyle = opts.fullscreenButtonStyle.evaluateItem;
+  if(opts.messageBubbleStyle) urlHashData.messageBubbleStyle = opts.messageBubbleStyle.evaluateItem;
+  if(opts.messageFeedStyle) urlHashData.messageFeedStyle = opts.messageFeedStyle.evaluateItem;
+  if(opts.inputAreaStyle) urlHashData.inputAreaStyle = opts.inputAreaStyle.evaluateItem;
+  if(opts.loadFonts) urlHashData.loadFonts = opts.loadFonts.evaluateItem;
+  if(opts.forceColorScheme) urlHashData.forceColorScheme = opts.forceColorScheme.evaluateItem;
+  
+  try { urlHashData.transparentBackground = /(^|\s)background(|-color): *(transparent|none transparent)/.test(containerStyle); } catch(e) { console.log(e); }
+  
+  if(opts.channelLabel) urlHashData.channelLabel = opts.channelLabel.evaluateItem;
+  
+  
+  if(opts.adminFlair) urlHashData.adminFlair = opts.adminFlair.evaluateItem;
+  if(opts.deleteButtonIcon) urlHashData.deleteButtonIcon = opts.deleteButtonIcon.evaluateItem;
+  if(opts.bannedUsers) urlHashData.bannedUsers = opts.bannedUsers.selectAll.map(l => l.evaluateItem.split("-").slice(-1)[0]).joinItems(",");
+  if(opts.rateLimits) urlHashData.rateLimits = opts.rateLimits;
+  if(opts.slashCommands) urlHashData.slashCommands = encodeURIComponent(JSON.stringify(opts.slashCommands));
+  if(opts.beforeSubmit) urlHashData.beforeSubmitHandlerEnabled = "true";
+  if(opts.customEmojiSize) urlHashData.customEmojiSize = opts.customEmojiSize;
+  if(opts.loneCustomEmojiSizeMultiplier) urlHashData.loneCustomEmojiSizeMultiplier = opts.loneCustomEmojiSizeMultiplier;
+  if(opts.customEmojis) {  
+    if(typeof opts.customEmojis === "string" && (opts.customEmojis.startsWith("https://user-uploads.perchance.org") || opts.customEmojis.startsWith("https://user.uploads.dev"))) {
+      urlHashData.customEmojis = opts.customEmojis.trim();
+    } else { 
+      let text = opts.customEmojis.getRawListText;
+      text = text.slice(text.indexOf("\n")).trim(); // remove list name
+      // note: no need to remove indentation - parsing code in embed does that performantly
+      
+      // we need to evaluateItem for things like `@import = {import:my-emoji-list-url}
+      urlHashData.customEmojis = /@import\s*=\s*[[{]/.test(text) ? text.replace(/@import\s*=\s*[[{].+/, m=>m.evaluateItem) : text;
+    }
+  }
+  urlHashData.channel = opts.channel ? opts.channel.evaluateItem : "";
+  
+  if(!window.___commentsPluginSlashCommandsByChannel12321) window.___commentsPluginSlashCommandsByChannel12321 = {};
+  window.___commentsPluginSlashCommandsByChannel12321[urlHashData.channel] = opts.slashCommands;    
+  
+  let folderName = window.generatorName; 
+  if(opts.channel) {
+    let channel = opts.channel.evaluateItem.toString();
+    let parsedChannel = parseRawChannelSpec(channel);
+    if(!parsedChannel.valid) return `(ERROR: You gave a channel name of '${channel}' to the comments plugin, but it is invalid: ${parsedChannel.error}. Channel names can only contain lower-case letters, numbers, and hyphens, like 'my-cool-channel-33', and can optionally include raw rules like "+u:username1|username2,ids:channel" at the end.)`;
+    folderName += `+${parsedChannel.rawChannel}`;
+  }
+  
+  // I've deprecated `reverseCommentOrder`, but it won't hurt existing implementations because the "reversed" order (new comments at bottom) is now default.
+  // if(opts.reverseCommentOrder) urlHashData.reverseCommentOrder = opts.reverseCommentOrder;
+  urlHashData.reverseCommentOrder = true;
+  if(opts.newestCommentsAtTop) urlHashData.reverseCommentOrder = false; 
+  
+  let queryString = new URLSearchParams(queryParams).toString();
+  
+  let loadMoreButton = document.createElement("button");
+  let originalLoadMoreButtonTextContent = "load more";
+  let postMessageSource = null;
+  loadMoreButton.innerHTML = originalLoadMoreButtonTextContent;
+  loadMoreButton.style.cssText = "display:none; margin:0.5rem auto;";
+  loadMoreButton.addEventListener("click", function() {
+    originalLoadMoreButtonTextContent = loadMoreButton.textContent;
+    loadMoreButton.textContent = "loading...";
+    loadMoreButton.disabled = true;
+    document.querySelector(`.${iframeUniqueId}`).contentWindow.postMessage({iframeUniqueId, loadMoreButtonClick:true}, "*");
+  });
+  
+  ctx.loadMoreButton = loadMoreButton;
+  ctx.opts = opts;
+  ctx.urlHashData = urlHashData;
+  ctx.allComments = [];
+  ctx.onLoadAlreadyFired = false;
+  ctx.alreadyGotCommentIds = new Set();
+  ctx.finishedLoadingHandlers = [];
+  
+  if(!window.___alreadyAddedCommentsPluginStuff43211234) {
+  
+    window.___commentsPluginIframeUniqueIdToContext = new Map();
+    
+    // the iframe send us a message when it is finished loading (this is to get around Glitch's uncustomizable loading screens)
+    window.addEventListener("message", async function(e) {
+      if(e.origin !== "https://comments-plugin.perchance.org") return;
+      if(!e.data.iframeUniqueId) return;
+      
+      // May need to wait a moment for the replacedDuringUpdate iframes to be 'tracked' since my current code hackily does that with a 'polling' method.
+      while(!window.___commentsPluginIframeUniqueIdToContext.get(e.data.iframeUniqueId)) { console.debug("Waiting for comments-plugin iframe to be tracked."); await new Promise(r => setTimeout(r, 500)); }
+      
+      let ctx = window.___commentsPluginIframeUniqueIdToContext.get(e.data.iframeUniqueId)
+      let opts = ctx.opts
+      let loadMoreButton = ctx.loadMoreButton;
+      
+      // if(e.data.type === "perchance_comments_new_message_added") {
+      //   console.debug("new message:", e.data.messageData);
+      //   console.debug("event:", e);
+      //   console.debug("window.___commentsPluginIframeContentWindowToContext:", window.___commentsPluginIframeUniqueIdToContext);
+      //   console.debug("ctx:", ctx);
+      //   console.debug("opts:", opts);
+      // }
+      
+      if(e.data.type === "perchance_comments_new_message_added") {
+        if(!ctx.alreadyGotCommentIds.has(e.data.messageData.id)) {
+          ctx.allComments.push(e.data.messageData);
+          ctx.alreadyGotCommentIds.add(e.data.messageData.id);
+          ctx.allComments.sort((a,b) => a.time-b.time);
+          
+          if(opts.onComment) {
+            opts.onComment(e.data.messageData);
+          }
+        }
+      } else if(e.data.type === "input_el_text_change") {
+        console.debug(`parent frame got input_el_text_change:`, e.data.text);
+        ctx.currentInputElText = e.data.text;
+        if(opts.onInputTextChange) {
+          opts.onInputTextChange(e.data.text);
+        }
+      } else if(e.data.type === "perchance_comments_on_load_data") {
+        let newComments = e.data.onLoadData.comments.filter(c => !ctx.alreadyGotCommentIds.has(c.id));
+        for(let c of newComments) ctx.alreadyGotCommentIds.add(c.id);
+        ctx.allComments.push(...newComments);
+        ctx.allComments.sort((a,b) => a.time-b.time);
+        
+        if(ctx.onLoadAlreadyFired) {
+          // the comments plugin sometimes self-reloads atm, which is not ideal, but it's fine so long as we don't count it as an actual reload.
+          // instead, we trigger onComment for any new comments, and that's it.
+          for(let comment of newComments) {
+            opts.onComment(comment);
+          }
+          return;
+        }
+        ctx.onLoadAlreadyFired = true;
+        
+        postMessageSource = e.source;
+        if(opts.onLoad) {
+          if(e.data.onLoadData.comments.length > 0) {
+            loadMoreButton.style.display = "block";
+          }
+          if(e.data.noMoreCommentsBeforeThis) {
+            loadMoreButton.style.display = "none";
+          }
+          opts.onLoad(e.data.onLoadData.comments, {loadMoreButton});
+        }
+      } else if(e.data.type === "perchance_comments_on_load_more") {
+        let newComments = e.data.onLoadMoreData.comments.filter(c => !ctx.alreadyGotCommentIds.has(c.id));
+        for(let c of newComments) ctx.alreadyGotCommentIds.add(c.id);
+        ctx.allComments.push(...newComments);
+        ctx.allComments.sort((a,b) => a.time-b.time);
+        
+        if(e.data.onLoadMoreData.comments.length > 0) {
+          loadMoreButton.disabled = false;
+          loadMoreButton.textContent = originalLoadMoreButtonTextContent;
+        } else {
+          loadMoreButton.style.display = "none";
+        }
+        if(e.data.noMoreCommentsBeforeThis) {
+          loadMoreButton.style.display = "none";
+          loadMoreButton.disabled = true;
+        }
+        if(opts.onLoadMore) {
+          opts.onLoadMore(e.data.onLoadMoreData.comments);
+        }
+      } else if(e.data.type === "perchance_comments_load_more_no_more") {
+        loadMoreButton.style.display = "none";
+      } else if(e.data.type === "perchance_comments_finished_loading") {
+        ctx.finishedLoading = true;
+        for(let handler of ctx.finishedLoadingHandlers) {
+          try { handler() } catch(e) { console.error(e); }
+        }
+        // hide the loader of the iframe:
+        let ctn = document.querySelector(`.${e.data.iframeUniqueId}`).closest(".comments-plugin-ctn");
+        // have to check if exists because i think with fullscreen button it's not in the ctn anymore:
+        if(ctn) ctn.querySelector(".__perchance-comments-loading-facade-12345").style.display = "none";
+        // and then tell it its parent origin:
+        e.source.postMessage({parentOrigin:window.origin}, e.origin);
+      } else if(e.data.type === "evaluateText") {
+        // EDIT: This is unused, so I'm commenting it out. It's likely a very bad idea anyway, since it creates a larger XSS type attack surface stuff like send-me-a-secret-message where keys may be stored in localStorage
+        // let result = e.data.text.evaluateItem;
+        // e.source.postMessage({requestId:e.data.requestId, result}, e.origin);
+      } else if(e.data.type === "before_submit_handler_call") {
+        let result;
+        if(opts.beforeSubmit) {
+          try {
+            result = await opts.beforeSubmit({inputText:e.data.inputText});
+            if(result !== undefined) result = JSON.parse(JSON.stringify(result));
+          } catch(e) {
+            result = null; // IMPORTANT: return null if it fails, which cancels the submission. Important for cases like: perchance.org/send-me-a-secret-message where continue-submission-on-error is 'dangerous'
+            alert(`beforeSubmit function failed with error: ${e.message}`);
+            console.error(e);
+          }
+        }
+        await new Promise(r => setTimeout(r, 50)); // important: allow e.g. set_input_el_text to be sent before this submit handler call is considered "done"
+        e.source.postMessage({requestId:e.data.requestId, result}, e.origin);
+      } else if(e.data.type === "slash_command") {
+        let commandName = e.data.commandName;
+        let argText = e.data.argText;
+        let slashCommands = window.___commentsPluginSlashCommandsByChannel12321[e.data.channel];
+        if(slashCommands[commandName] === undefined) {
+          alert("Please refresh the page before testing newly-added commands.");
+          return "";
+        }
+        slashCommands[commandName].input = argText;
+        let resultText = slashCommands[commandName].output.evaluateItem;
+        e.source.postMessage({requestId:e.data.requestId, resultText}, e.origin);
+      } else if(e.data.type === "toggle_fullscreen") {
+        let iframe = document.querySelector(`.${e.data.iframeUniqueId}`);
+        
+        // If iframe is currently fullscreen, then it's not in a `ctn`, so we use the pre-assigned data-comments-ctn-id to find the iframe's ctn so we can put it back in:
+        let ctn = iframe.closest(".comments-plugin-ctn") || document.querySelector(`[data-comments-ctn-id="${iframe.dataset.commentsCtnId}"]`);
+        
+        if(ctn.dataset.isFullscreen === "no") {
+          document.body.appendChild(iframe);
+          iframe.style.position = "fixed";
+          iframe.style.zIndex = "999999999"; // <-- caution: don't lower this
+          iframe.style.top = "0"; iframe.style.left = "0";
+          document.scrollingElement.style.overflow = "hidden";
+          ctn.dataset.isFullscreen = "yes";
+          // link the iframe and ctn with an id so we can get the ctn, given the id from the iframe that sent the "toggle_fullscreen" message:
+          let commentsCtnId = Math.random();
+          ctn.dataset.commentsCtnId = commentsCtnId;
+          iframe.dataset.commentsCtnId = commentsCtnId;
+        } else {
+          ctn.appendChild(iframe);
+          iframe.style.position = "";
+          iframe.style.zIndex = "";
+          iframe.style.top = ""; iframe.style.left = ""; 
+          document.scrollingElement.style.overflow = "";
+          ctn.dataset.isFullscreen = "no";
+        }
+//         if(ctn.dataset.isFullscreen === "no") {
+//           ctn.dataset.originalCssHeight = ctn.style.height;
+//           ctn.dataset.originalCssWidth = ctn.style.width;
+//           ctn.dataset.originalCssPosition = ctn.style.position;
+//           ctn.dataset.originalCssZIndex = ctn.style.zIndex;
+          
+//           // we need to change the ancestor z indices too:
+//           let ancestorEls = [];
+//           let aEl = ctn.parentElement;
+//           while(aEl !== document.body) {
+//             ancestorEls.push(aEl);
+//             aEl = aEl.parentElement;
+//           }
+//           let ancestorZIndices = ancestorEls.map(el => el.style.zIndex);
+//           ctn.dataset.originalAncestorZIndices = JSON.stringify(ancestorZIndices);
+//           ancestorEls.forEach(el => el.style.zIndex="63829472");
+          
+//           ctn.style.height = "";
+//           ctn.style.width = "";
+//           ctn.style.position = "fixed";
+//           ctn.style.zIndex = "63829472";
+//           ctn.style.top = "0"; ctn.style.left = "0"; ctn.style.right = "0"; ctn.style.bottom = "0";
+//           document.scrollingElement.style.overflow = "hidden";
+//           ctn.dataset.isFullscreen = "yes";
+//         } else if(ctn.dataset.isFullscreen === "yes") {
+//           ctn.style.height = ctn.dataset.originalCssHeight;
+//           ctn.style.width = ctn.dataset.originalCssWidth;
+//           ctn.style.position = ctn.dataset.originalCssPosition;
+//           ctn.style.zIndex = ctn.dataset.originalCssZIndex;
+          
+          
+//           let ancestorEls = [];
+//           let aEl = ctn.parentElement;
+//           while(aEl !== document.body) {
+//             ancestorEls.push(aEl);
+//             aEl = aEl.parentElement;
+//           }
+//           let originalAncestorZIndices = JSON.parse(ctn.dataset.originalAncestorZIndices);
+//           ancestorEls.forEach((el, i) => el.style.zIndex=originalAncestorZIndices[i]);
+          
+//           ctn.style.top = ""; ctn.style.left = ""; ctn.style.right = ""; ctn.style.bottom = "";
+//           document.scrollingElement.style.overflow = "";
+//           ctn.dataset.isFullscreen = "no";
+//         }
+      }
+    }, false);
+  
+    let cssText = `
+    .comments-plugin-ctn {
+      position:relative;
+      display:inline-block;
+    }
+    .loading-spinner-434142 { 
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #5d5d5d;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }`;
+    let styleEl = document.createElement('style');
+    styleEl.appendChild(document.createTextNode(cssText));
+    document.head.appendChild(styleEl);
+    
+    // let addCommentsPluginInterval = setInterval(() => {
+    //   document.querySelectorAll(".___perchance-comments-plugin-marker").forEach(markerEl => {
+    //     // detect if a comments section has been injected after it yet (edit: for some reason it's injected before it?):
+    //     if((!markerEl.nextElementSibling || markerEl.nextElementSibling.dataset.isCommentsSection !== "true") && (!markerEl.previousElementSibling || markerEl.previousElementSibling.dataset.isCommentsSection !== "true")) {
+    //       let div = document.createElement("div");
+    //       let containerStyle = markerEl.dataset.containerStyle;
+    //       let queryString = markerEl.dataset.queryString;
+    //       let folderName = markerEl.dataset.folderName;
+    //       div.innerHTML = `<div class="comments-plugin-ctn" data-is-comments-section="true" style="position:relative; display:inline-block; ${containerStyle}">
+    //         <div class="__perchance-comments-loading-facade-12345" style="position:absolute; top:0; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; background:white; border:1px solid rgba(0,0,0,0.25); border-radius:2px;"><div class="loading-spinner-434142"></div></div>
+    //         <iframe class="___perchance-comments-plugin-iframe-12345" src="https://comments-plugin.perchance.org/embed/${folderName}?${queryString}" style="border:0; width:100%; height:100%;"></iframe>
+    //       </div>`;
+    //       let iframeContainer = div.firstElementChild;
+    //       //debugger;
+    //       markerEl.after(iframeContainer);
+    //       clearInterval(addCommentsPluginInterval);
+    //     }
+    //   });
+    // }, 200);
+    
+    window.___alreadyAddedCommentsPluginStuff43211234 = true;
+  }
+
+  let colorScheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? "dark" : "light";
+  if(opts.forceColorScheme) colorScheme = opts.forceColorScheme.evaluateItem;
+  
+  function lazyLoadIframe({urlHashDataEncoded}) {
+    let commentsCtn = document.querySelector(`[data-comments-section-folder-name="${folderName}"]:not(.already-added-intersection-observer-to-this-comments-plugin-ctn)`); // get the first one that we haven't added an intersection observer for yet - this is needed because they could have multiple instances of the same channel on the page, and we don't want to add all the intersection observers to the first one
+    if(!commentsCtn) return; // i think this happens sometimes due to timing/race condition where iframe is deleted in a very small time window
+    commentsCtn.classList.add("already-added-intersection-observer-to-this-comments-plugin-ctn");
+
+    let observer1, observer2;
+    // lazyload the iframe, because some generator pages have literally dozens of different channels.
+    // I'm adding multiple observers because the default `root` is the browser viewport, and margin doesn't make sense for that, since it's not scrollable, but we still want it in case of the comments being in weird non-documentElement scrollable area or something. Note really sure how it works.
+    const observerFn = entries => {
+      if(entries[0].isIntersecting) {
+        observer1.disconnect();
+        observer2.disconnect();
+        console.debug("comments ctn: Visible");
+        let placeholder = commentsCtn.querySelector(".__perchance-comments-iframe-placeholder-el-12345");
+        if(placeholder) {
+          let iframeHtml = `<iframe class="${iframeUniqueId} ___perchance-comments-plugin-iframe-12345" src="https://comments-plugin.perchance.org/embed/${folderName}?${queryString}#${urlHashDataEncoded}" style="border:0; width:100%; height:100%; user-select:none;" ${urlHashData.transparentBackground ? `allowtransparency="true"` : ""}></iframe>`;
+          placeholder.outerHTML = iframeHtml;
+          ctx.iframeContentWindow = document.querySelector("."+iframeUniqueId).contentWindow;
+          window.___commentsPluginIframeUniqueIdToContext.set(iframeUniqueId, ctx);
+        }
+      }
+    };
+    setTimeout(() => { // slight delay in case of e.g. tabs being rendered in such a way that they're all momentarily visible (we don't wnat to load them all at once - only the active tab)
+      observer1 = new IntersectionObserver(observerFn, {
+        rootMargin: "6000px", // we basically want to trigger ~all visible elements anyway - just not stuff hidden within e.g. tabs plugin or whatever.
+      });
+      observer1.observe(commentsCtn);
+      observer2 = new IntersectionObserver(observerFn, {
+        root: document.documentElement,
+        rootMargin: "6000px", // we basically want to trigger ~all visible elements anyway - just not stuff hidden within e.g. tabs plugin or whatever.
+      });
+      observer2.observe(commentsCtn);
+    }, 5);
+  }
+  
+  let containerHtml = `<div data-is-fullscreen="no" data-comments-section-folder-name="${folderName}" class="comments-plugin-ctn" data-is-comments-section="true" style="${containerStyle}">
+    <div class="__perchance-comments-loading-facade-12345" style="position:absolute; top:0; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; background:${colorScheme === "light" ? "white" : "#131516"}; border:1px solid rgba(0,0,0,0.25); border-radius:2px;"><div class="loading-spinner-434142"></div></div>
+    <span class="__perchance-comments-iframe-placeholder-el-12345"></span>
+  </div>`;
+  
+  if(opts.replacedDuringUpdate) {
+    // setTimeout(async () => {
+    //   while(!document.querySelector("."+iframeUniqueId)) {
+    //     console.debug("Waiting for comments-plugin iframe to appear in document.");
+    //     await new Promise(r => setTimeout(r, 500));
+    //   }
+    //   ctx.iframeContentWindow = document.querySelector("."+iframeUniqueId).contentWindow;
+    //   window.___commentsPluginIframeUniqueIdToContext.set(iframeUniqueId, ctx);
+    // }, 10);
+    // return addMethodsToReturnValue(new String(`<div data-is-fullscreen="no" data-comments-section-folder-name="${folderName}" class="comments-plugin-ctn" data-is-comments-section="true" style="${containerStyle}">
+    //   <div class="__perchance-comments-loading-facade-12345" style="position:absolute; top:0; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; background:${colorScheme === "light" ? "white" : "#131516"}; border:1px solid rgba(0,0,0,0.25); border-radius:2px;"><div class="loading-spinner-434142"></div></div>
+    //   <iframe loading="lazy" class="${iframeUniqueId} ___perchance-comments-plugin-iframe-12345" src="https://comments-plugin.perchance.org/embed/${folderName}?${queryString}#${encodeURIComponent(JSON.stringify(urlHashData))}" style="border:0; width:100%; height:100%;"></iframe>
+    // </div>`));
+    setTimeout(async () => {
+      let urlHashDataEncoded = encodeURIComponent(JSON.stringify(urlHashData));
+      lazyLoadIframe({urlHashDataEncoded})
+    }, 10);
+    return addMethodsToReturnValue(new String(containerHtml));
+  }
+    
+  if(!document.querySelector(`[data-comments-section-folder-name="${folderName}"]`)) {
+
+    function swapMarkerElForRealEl() {
+      let markerEl = document.querySelector(`[data-marker-tag="temporaryMarkerElForCommentsPlugin84738932-folderName-${folderName}"]`);
+      if(!markerEl) return;
+      let containerStyle = markerEl.dataset.containerStyle;
+      let queryString = markerEl.dataset.queryString;
+      let urlHashDataEncoded = markerEl.dataset.urlHashDataEncoded;
+      // let folderName = markerEl.dataset.folderName;
+
+      // NOTE: we don't use replaceWith here because that approach would mean that this would get updated during update() calls
+      markerEl.outerHTML = containerHtml;
+      
+      lazyLoadIframe({urlHashDataEncoded});
+    }
+
+    // setTimeout(swapMarkerElForRealEl, 50);
+
+    // the above commented-out setTimeout one-liner was the previous approach. the below MutationObserver-based monstrosity is a bit better because it ensures the swap happens *the moment* that the marker is added to the page, and we can wait a long time without the need for polling
+    let markerEl = document.querySelector(`[data-marker-tag="temporaryMarkerElForCommentsPlugin84738932-folderName-${folderName}"]`);
+    if(markerEl) {
+      swapMarkerElForRealEl();
+    } else {
+      // they generated the comments HTML, but haven't put it in the page yet, so we wait for it using a mutation observer:
+      let foundElement = false;
+      let markerTagValue = `temporaryMarkerElForCommentsPlugin84738932-folderName-${folderName}`;
+      let observer = new MutationObserver((mutations) => {
+        for(let mutation of mutations) {
+          for(let node of mutation.addedNodes) {
+            if(node.dataset && node.dataset.markerTag === markerTagValue) {
+              foundElement = true;
+            } else if(node.querySelector) { // skip #text, #comment, etc.
+              // since mutation observers don't trigger for all subnodes - only the highest-level nodes in a mutation
+              let markerEl = node.querySelector(`[data-marker-tag="temporaryMarkerElForCommentsPlugin84738932-folderName-${folderName}"]`);
+              if(markerEl) {
+                foundElement = true;
+              }
+            }
+            if(foundElement) {
+              observer.disconnect();
+              swapMarkerElForRealEl();
+              return;
+            }
+          }
+        }
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+      setTimeout(() => {
+        if(!foundElement) {
+          console.error("Couldn't find marker element for comments plugin?");
+          observer.disconnect();
+        }
+      }, 10000);
+    }
+
+    return addMethodsToReturnValue(new String(`<span data-marker-tag="temporaryMarkerElForCommentsPlugin84738932-folderName-${folderName}" data-folder-name="${folderName}" data-container-style="${containerStyle}" data-query-string="${queryString}" data-url-hash-data-encoded="${encodeURIComponent(JSON.stringify(urlHashData))}"></span>`));
+  } else {
+    return "";
+  }
+  
+  
+
+
+//   // This is a temporary fix because editing the text next to where the plugin is placed (within the same HTML "node"?) will cause the
+//   // comments section to disappear which causes users to think that they can't edit the positioning of the comments. So we tell them to
+//   // refresh the page. Ideally I'd fix this like I did with the text-to-image-plugin gallery - I just return/create a "fresh" one whenever
+//   // the old one isn't detected with querySelector.
+//   setTimeout(() => {
+//     if(document.querySelectorAll(".___perchance-comments-plugin-marker").length !== document.querySelectorAll(".comments-plugin-ctn").length) {
+//       document.querySelectorAll(".___perchance-comments-plugin-marker").forEach(markerEl => {
+//         markerEl.style.cssText = `display:inline-block; border:1px solid grey; ${markerEl.dataset.containerStyle}`;
+//         markerEl.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center;"><span style="opacity:0.6; padding:1rem;">Please save your generator and refresh the page to reload the comments plugin.</span></div>`;
+//       });
+//     }
+//   }, 600);
+	
+// 	// can't just inject the iframe directly otherwise it gets reloaded every time update() is called. So we need the setInterval monstrosity above.
+// 	return `<span class="___perchance-comments-plugin-marker" data-folder-name="${folderName}" data-container-style="${containerStyle}" data-query-string="${queryString}"></span>`;
+  
+  
+  
+  
+  
+  
+  
+  

@@ -1,0 +1,93 @@
+title
+  Power Timer Plugin
+
+temp = {import:power-plugin-template}
+temps = {import:power-plugin-temps}
+
+comm = {import:comments-plugin}
+ico = {import:icon-plugin}
+
+starticon = stopwatch
+endicon = hourglass-start
+
+timerOptions
+  time = 2025-01-01
+  onTimeUp = passed since
+  onTimeDown = until
+
+timerOptionsDU
+  time = 2025-01-01
+  onTimeUp = passed since
+  onTimeDown = until
+  disableUpdates = true
+
+timerOptions2
+  time = 2023-12-28-22-17-50
+  onTimeUp = [(function() {alertMe("Hi!")})]
+
+timerOptionsTZ
+  time = 2024-04-12-04-32-15
+  onTimeUp = passed since
+  onTimeDown = until
+  timeZone = +4
+
+timerOptionsTZ2
+  time = 2024-04-12-04-32-15
+  onTimeUp = passed since
+  onTimeDown = until
+  timeZone = -3
+
+$output(op, tz) =>
+  let optime = [];
+  let remTime = {};
+  let noUpdate = false;
+  let timeZone = null;
+  //if (window.timerSpanID === undefined) {
+  //  window.timerSpanID = 0;
+  //}
+  if (typeof op == "object") {
+    if (isNaN(op.time)) {
+      optime = op.time.split("-");
+    } else {
+      optime = +op.time;
+    }
+    timeZone = op.timeZone;
+    noUpdate = op.disableUpdates;
+  } else {
+    if (isNaN(op)) {
+      optime = op.split("-");
+    }
+  }
+  remTime.dateObject = new Date(...optime);
+  let rt = `(+(new Date()) - +(new Date("${typeof optime == "number" ? optime : `${optime[0] || 0}/${optime[1] || 1}/${optime[2] || 1} ${optime[3] || 0}:${optime[4] || 0}:${optime[5] || 0}.${optime[6] || 0}${!timeZone ? "" : " GMT" + timeZone}`}")))`;
+  console.log(rt);
+  let updateWrapper = (x) => `<span class="_powertimerupdate${noUpdate ? " _ptnoupdates" : ""}" onload='this.innerHTML = ${x}'>${eval(x)}</span>`;
+  remTime.totalMilliseconds = updateWrapper(rt);
+  remTime.year = updateWrapper(`Math.floor(Math.abs(${rt} / (1000*60*60*24*365.25)))`);
+  remTime.totalMonths = updateWrapper(`Math.floor(Math.abs(${rt} / (1000*60*60*24*(365.25/12))))`);
+  remTime.totalWeeks = updateWrapper(`Math.floor(Math.abs(${rt} / (1000*60*60*24*7)))`);
+  remTime.totalDays = updateWrapper(`Math.floor(Math.abs(${rt} / (1000*60*60*24)))`);
+  remTime.totalHours = updateWrapper(`Math.floor(Math.abs(${rt} / (1000*60*60)))`);
+  remTime.totalMinutes = updateWrapper(`Math.floor(Math.abs(${rt} / (1000*60)))`);
+  remTime.totalSeconds = updateWrapper(`Math.floor(Math.abs(${rt} / (1000)))`);
+  remTime.month = updateWrapper(`Math.floor(Math.abs(${rt} / (1000*60*60*24*(365.25/12)))) % 12`);
+  remTime.week = updateWrapper(`Math.floor(Math.abs(${rt} / (1000*60*60*24*7))) % 52`);
+  remTime.day = updateWrapper(`Math.floor(Math.abs(${rt} / (1000*60*60*24))) % 7`);
+  remTime.date = updateWrapper(`Math.floor(Math.abs(${rt} / (1000*60*60*24))) % 30`);
+  remTime.hour = updateWrapper(`Math.floor(Math.abs(${rt} / (1000*60*60))) % 24`);
+  remTime.minute = updateWrapper(`Math.floor(Math.abs(${rt} / (1000*60))) % 60`);
+  remTime.second = updateWrapper(`Math.floor(Math.abs(${rt} / 1000)) % 60`);
+  remTime.millisecond = updateWrapper(`Math.abs(${rt}) % 1000`);
+  remTime.timeZone = timeZone;
+  
+  remTime.onTimeOutput = function() {return updateWrapper(`${rt} < 0 ? \`${typeof op.onTimeDown == "function" ? "" : (op.onTimeDown || "")}\` : \`${typeof op.onTimeUp == "function" ? "" : (op.onTimeUp || "")}\``)};
+  
+  if (!window._powerpluginupdater) {
+    window._powerpluginupdater = setInterval(function() {
+      for (_ptu of document.querySelectorAll("._powertimerupdate:not(._ptnoupdates)")) {
+        if (!_ptu.classList.contains("_ptnoupdates")) _ptu.onload();
+      }
+    }, 1);
+  }
+  
+  return remTime;

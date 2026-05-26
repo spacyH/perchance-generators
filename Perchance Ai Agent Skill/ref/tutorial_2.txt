@@ -1,0 +1,1051 @@
+<h1>📚 Perchance Tutorial</h1> 
+
+<main>
+
+<p>Perchance is all about lists. You simply create lists of different things and then reference the lists from one another. For example, we could create a list of animals, and a list of sentences, and then use the animals list <i>within</i> the sentences list like so:</p>
+
+<pre>
+animal
+	pig
+	cow
+	zebra
+
+sentence
+	That \[animal\] is very sneaky.
+	I befriended a wild \[animal\] yesterday.
+</pre>
+
+<p>Pretty easy, right? In each sentence, <code>\[animal\]</code> gets replaced by a random item from the animal list. As you can see, list items are indented from the list name. You must use <b>one tab</b> or <b>two spaces</b> to indent your list items. <a href="/3d174opr#edit">Here's a link</a> to a Perchance generator based on the above example. Try adding some items and playing around with it.</p>
+	
+<p>Note that <i>visual</i> aspect of a Perchance generator is <i>completely</i> customisable, and there are many <a href="templates">templates</a> (like <a href="little-story-template">this one</a>, for example) which you can use to make a nice-looking generator, fast.</p>
+
+<p>We could easily add another list to our previous example called "adjective" and then use <code>\[adjective\]</code> within our sentences to make them more random and complex:</p>
+
+<pre>
+...
+
+adjective
+  sneaky
+  happy
+  furry
+  
+sentence
+  That \[animal\] is very \[adjective\].
+	I befriended a very \[adjective\] \[animal\] yesterday.
+</pre>
+
+<p>We could also create another list called "paragraph" like so:</p>
+
+<pre>
+paragraph
+	\[sentence\] \[sentence\] \[sentence\]
+</pre>
+
+<p>Here we've made a list called "paragraph" that has a single item. That item is made of 3 sentences separated by spaces. We could have different sentence types, and arrange them in different ways and thus have multiple items in our paragraph list, but for our simple demonstration we only need one item - and this item will always be chosen when <code>\[paragraph\]</code> is used. Perchance actually has a nice shortcut for single-item lists:</p>
+
+<pre>
+paragraph = \[sentence\] \[sentence\] \[sentence\]
+</pre>
+
+<p>There's no need to use this short-hand method now, but as we build more complex generators you'll see that it can come in handy to neaten up our code. There are also some important differences between these two different ways of creating a "single-item list", and you'll learn about them further along in this tutorial.</p>
+
+<details style="padding:1rem;">
+  <summary style="cursor:pointer;">Side Note <span style="opacity:0.5;">(click me)</span></summary>
+<p>If you want to put a space before or after an item, you need to use a special character pair, <code>\\s</code>, at the start and/or end of your item. For example:</p>
+
+<pre>
+my_list
+	\\s    this item has some space on either side    \\s
+	\\s  this one just has some space at the start
+	this one just has some space on the end         \\s
+</pre>
+
+<p>When the engine outputs this text, the <code>\\s</code> bits will be replaced with a space. If you wanted an item called "My Item Text" with just one space on either side you would write <code>\\sMy Item Text\\s</code>. The reason we need to use <code>\\s</code> for spaces on either side of items is because Perchance "takes indentation seriously". If you put spaces at the start of your item, Perchance will think you're trying to indent the item further. As you'll learn soon, Perchance allows you to use multiple levels/tiers of indentation (you can create a hierarchy of lists within lists), which means we need strict indentation rules. Regarding normal spaces at the <i>end</i> of items, Perchance will trim them off (ignore them) during initialization.</p>
+
+<p>If you'd like to put a "tab" character in your items, you can use <code>\\t</code>. As you can see, backslash is a special character in Perchance. If you want to use an <i>actual</i> backslash, then you need to write a double backslash like this: <code>\\\\</code>. Similarly, if you want to use a literal square bracket or equals sign, then you need to put a backslash before them like this: <code>\\\[</code> and this: <code>\\\=</code>. That way the Perchance engine will just treat it like a normal text character. The backslash is a magical character that you'll use quite often in your random-generator-building career.</p>
+</details>
+
+
+
+<h2 id="probability">Probability</h2>
+<p>So you can see that Perchance is all about lists of items, and random selections of those items. But what if we want certain items in a list to be more likely than others? Let's imagine we're building a "random meal generator". Here's a basic version of how it might look:</p>
+
+<pre>
+description
+	It's a \[adjective\] dish with \[type\] \[main\].
+	The \[adjective\] \[main\] is paired with a \[size\] serving of \[condiment\]-covered \[side\].
+	A \[main\] with a bit of \[condiment\] and some \[adjective\] \[side\] on the side.
+
+adjective
+	vegan
+	Indonesian
+	Italian
+	delicious
+
+main
+	risotto
+	pie
+	stir-fry
+	curry
+
+side
+	bowl of rice
+	salad
+	fries
+	fried mushrooms
+	pumpkin soup
+	
+type
+	a \[size\] serving of
+	well-cooked
+	unusually fresh
+	roasted
+
+size
+	small
+	large
+	tiny
+
+condiment
+	pepper
+	salt
+	chilli flakes
+	oregano
+</pre>
+
+<p>This generator would probably produce nonsense, but that's okay - it's just to demonstrate some concepts. Now, how do we make some items more common than others? For example, what if we wanted "pepper" to be twice as likely as the other condiments? Here's how you'd do that:</p>
+
+<pre>
+condiment
+	pepper ^2
+	salt
+	chilli flakes
+	oregano
+</pre>
+
+<p>This "up arrow" character (above number 6 on your keyboard) allows you to change the likelihood that an item will be selected. <code>^2</code> makes it twice as likely, <code>^100</code> makes it 100 times more likely compared to the others. All items have a default odds of <code>1</code> - you can imagine that each item has <code>^1</code> after it by default. You can also make an item less likely:</p>
+
+<pre>
+condiment
+	pepper ^2
+	salt
+	chilli flakes ^0.1
+	oregano
+</pre>
+
+<p>This makes "chilli flakes" quite unlikely, especially compared to pepper. In this example pepper is 20 times more likely than chilli flakes. And salt is 10 times more likely than chilli flakes. Makes sense? The number after the <code>^</code> is the item's "odds" or "weight" during the random selection process. You can use fractions like <code>^1/10</code> instead of <code>^0.1</code> if that's easier for you.</p>
+
+<p>That's a brief overview of the probability notation in Perchance. There's much more to explore in this area but we'll get to that later in the tutorial.</p>
+
+
+
+
+
+<h2 id="shorthand_lists">Shorthand Lists</h2>
+
+<p>Sometimes you'll just want to randomly choose between a few items, and creating a whole list just for that isn't desirable. In this case we can use some "curly bracket" shorthand notation:</p>
+
+<pre>
+sentence
+	That's a \{very|extremely\} \{tiny|small\} \[animal\]!
+	I \{think|believe\} that you are a \{liar|thief\}.
+	I'd be so \{rich|poor\} if not for that person.
+</pre>
+
+<p>See how that works? Inside the curly brackets, you separate items with a vertical bar (or "pipe") character, which you can find near the curly brackets keys on most keyboards. When the Perchance engine "evaluates" the text it replaces the "curly block" with a randomly selected item from within that block. It's essentially a way to embed "mini lists" within an item.</p>
+	
+<details style="padding:1rem;">
+  <summary style="cursor:pointer;">What does "evaluate" mean? <span style="opacity:0.5;">(click me)</span></summary>
+<p>Throughout this tutorial I use the words "evaluate", "resolve", and "execute" in sentences like these:</p>
+	<ul>
+		<li>Perchance <i>evaluates</i> <code>\{dog|cat\}</code>, replacing it with either 'dog' or 'cat'.</li>
+		<li>The Perchance engine <i>resolves</i> <code>\[plant\]</code>, replacing it with a random item from the <code>plant</code> list.</li>
+		<li>Perchance <i>executes</i> the square block, <code>\[food\]</code>, which outputs a random food item.</li>
+	</ul>
+<p>All three of these words are basically interchangable - they mean the same thing. When I write "evaluate", "resolve" or "execute", I'm referring to Perchance converting text with square and curly brackets into "plain" text (i.e. text <i>without</i> any curly/square brackets) by randomly selecting items from lists and short-hand (within curly brackets) lists according to the odds that you have specified. So whenever you see "evaluate", "resolve" or "execute", just mentally replace that with "convert into plain text by making the appropriate random selections".</p>
+<p>Here are a few more examples of their usage in case it's helpful:</p>
+	<ul>
+		<li><code>\{dog|cat\}</code> <i>resolves</i> into 'dog' or 'cat'.</li>
+		<li>If we <i>evaluate</i> <code>\[flower\]</code>, then we'll get something like "tulip".</li>
+		<li><i>Execution</i> of square blocks happens in the order in which they appear in your text.</li>
+	</ul>
+</details>
+
+<p>Just as we can change the likelihood of normal list items, so we can change the likelihood of shorthand "curly" list items. Given the curly block: <code>\{big|large|massive\}</code>, we can make "large" 3 times as likely by writing: <code>\{big|large^3|massive\}</code>.</p>
+
+<p>You might have guessed already, but we can do stuff like this too:</p>
+<pre>The country is known to contain many species of \{\[animal\]|\[plant\]\}</pre>
+<p>Here we've put square blocks <i>inside</i> a curly block, so half the time it'll choose a random animal, and the other half of the time it'll choose a random plant.</p>
+
+<p>Note that <span style="text-decoration:underline;">spaces matter in curly blocks</span>, so <code>\{hi|hello\}</code> is <b>different</b> to <code>\{ hi | hello \}</code>. In <i>square</i> blocks, spaces are ignored. So <code>\[animal\]</code> is the <b>same</b> as <code>\[ animal \]</code> - they output exactly the same thing, despite the extra spaces inside the brackets.</p>
+
+<p>Curly blocks are used for all sorts of other fancy tricks in Perchance. Take this sentence, for example: <code>I'm a \[animal\]</code>. If the result of <code>\[animal\]</code> happens to start with a vowel, then the grammar won't be right: <code>I'm a antelope</code> - it should be <code>I'm <b>an</b> antelope</code>. We could manually fix this by having two separate lists of animals (ones that need "a" and ones that need "an"), but that'd be a pain. Instead we can just do this: <code>I'm \{a\} \[animal\]</code>. By using the <code>\{a\}</code> curly block, the correct article (a/an) will be chosen based on what is appropriate for the next word.</p>
+
+<p>Here's another curly block: <code>\{s\}</code>. What does it do? Let's see with an example. Take the following sentence: <code>I have \{1|2|3\} bananas</code>. You can see the problem here: "I have 2 bananas." makes sense, but "I have 1 bananas." doesn't. You can see that we need a way to intelligently decide whether a word should be pluralised. Here's how we do it: <code>I have \{1|2|3\} banana\{s\}</code>, and there you have it!</p>
+
+<p>Instead of writing <code>\{1|2|3\}</code>, we can write <code>\{1-3\}</code>. This is especially handy for much larger number ranges like<code>\{1-500\}</code>. You can also choose a random letter with the same notation. <code>\{a-z\}</code> chooses a random lower case letter. <code>\{a-f\}</code> chooses a random lower case letter between "a" and "f". This also works for upper case letters: <code>\{A-Z\}</code>.</p>
+
+
+
+
+
+<h2 id="properties">Properties</h2>
+
+<p>As we've learned, a square bracket "block" like <code>\[animal\]</code> chooses a random item from the "animal" list. But square blocks have more tricks up their sleeves. Consider the following example:</p>
+
+<pre>
+animal
+	pig
+	zebra
+	cow
+
+sentence
+	There are so many \[animal\] here.
+	I've befriended this \[animal\].
+	\[animal\] are very agile.
+</pre>
+
+<p>In this example, <code>\[sentence\]</code> would evaluate to something like: "There are so many cow here." - which obviously isn't correct. It should be "There are so many <b>cows</b> here." So, what do we do? Change our "animal" list so they're all plurals? But then the second sentence wouldn't work - it needs singular words. Luckily we can convert items to plural form easily: <code>\[animal.pluralForm\]</code>. Yep, it's that easy. Just put a period (a dot) and then "pluralForm" after the name of the list. So our new "sentences" list becomes:</p>
+
+<pre>
+sentence
+	There are so many \[animal.pluralForm\] here.
+	I've befriended this \[animal\].
+	\[animal.pluralForm\] are very agile.
+</pre>
+
+<p>So now our pluralisation problem is fixed - but we're not quite done. The last item in our list has the "animal" block at the start and so ideally it'd be capitalised. Here's how we do that: <code>\[animal.pluralForm.titleCase\]</code>. Notice that we can string together multiple "properties" by joining them with a period (dot) character. Here are some more properties to try out:</p>
+
+<ul style="text-align:left;">
+	<li>singularForm</li>
+	<li>pastTense</li>
+	<li>presentTense</li>
+	<li>futureTense</li>
+	<li>upperCase</li>
+	<li>lowerCase</li>
+	<li>sentenceCase</li>
+	<li>titleCase</li>
+</ul>
+
+<p>There are more properties, but these simple ones should suffice for basic generators. We'll learn about more powerful and interesting properties further on in this tutorial. Also, please note that the <code>singularForm</code>, <code>pluralForm</code>, <code>pastTense</code>, <code>presentTense</code> and <code>futureTense</code> properties <b>may not work properly for all words</b> (especially rare ones). In cases where 100% accuracy is required, it's best to create separate lists for the plural/past-tense/etc. variations.</p>
+  
+<details style="padding:1rem;">
+  <summary style="cursor:pointer;">What about infinitive and gerund tenses? <span style="opacity:0.5;">(click me)</span></summary>
+  <p>You can use the <a href="/conjugate-plugin" target="_blank">conjugate-plugin</a> for less common tenses like gerund, actor and infinitive. You might also like the <a href="/plural-plugin" target="_blank">plural-plugin</a>, which allows you to add custom plurals, and the <a href="/be-plugin" target="_blank">be-plugin</a>, which automatically chooses is/are/was/were based on the preceding pronoun.</p>
+</details>
+
+
+
+
+
+
+<h2 id="the_editor">The Editor</h2>
+
+<p>At this point you've got enough knowledge about Perchance to start building basic text generators. There's much more to learn about the language, but let's stop here for a second to learn about the Perchance generator editor. The editor is where you'll be actually be building your generator. It includes 4 panels. The layout of the panels in the editor is as follows:</p>
+
+<table class="editor-layout">
+<tbody>
+	<tr><td>Lists</td><td>Preview</td></tr>
+	<tr><td>Tester</td><td>HTML</td></tr>
+</tbody>
+</table>
+<style>
+	table.editor-layout * {
+			border:1px solid #999;
+	}
+	table.editor-layout {
+		width: 300px;
+    height: 100px;
+    margin: 0 auto;
+	}
+</style>
+
+<p>Let's explain each panel briefly:</p>
+
+<ul style="text-align:left;">
+	<li><b>Lists:</b> You'll spend the majority of your time in this panel writing lists like the examples that you've seen so far. Note that you can also add "comments" in the code panel by writing two forward slashes like this: "// this is a comment" and any text after those two slashes on that line will be ignored by the engine. Comments are just a way for you to leave notes for yourself or others within the code of your generator and they won't affect your generator's output. Pro tip: You can highlight multiple lines and indent (i.e. add two spaces before) all those lines at once by pressing the <code>Tab</code> to indent and <code>Shift+Tab</code> to un-indent.</li>
+	<li><b>Tester:</b> This is a helpful little panel that allows you to test out your lists, and general Perchance expressions. If you've just made a list of animals called "animal" then you can type <code>the silly \[animal\]</code> into the tester and it'll evaluate it to "the silly worm" or "the silly mouse", etc.</li>
+	<li><b>HTML:</b> You'll probably want to share your generator with others, so it needs to have a webpage. Webpages are written in a language called "HTML", but don't worry! You don't need to learn HTML or even worry about the HTML panel at all because there are <a href="/templates">pre-built templates</a> which you can use. If you'd like to learn HTML so you can customize your generator's appearance a bit more, then <a href="https://www.khanacademy.org/computing/computer-programming/html-css/intro-to-html/v/making-webpages-intro">Khan Academy</a> and <a href="https://www.codecademy.com/courses/web-beginner-en-HZA3b/0/1">Code Academy</a> both have great online courses that are free and will get you up and running with HTML in no time at all. You can also use the <a href="https://perchance.org/layout-maker-plugin" target="_blank">layout maker plugin</a> to help you design your generator more intuitively, and there's an AI helper in the editor which can create or adjust the HTML for you.</li>
+	<li><b>Preview:</b> Here's where you get to actually see and test your generator for real. It live-updates as you type so you can test it as you go. You can also disable auto-update and reload your preview manually (there's a checkbox next to the reload button in this panel). There's also a "fullscreen" button in the bottom-left of this panel which will take you to your translator's <i>actual</i> webpage so you can copy the link and share it with your pals.</li>
+</ul>
+
+<p>If you haven't already, have a play around in the editor for a bit and see what you can make. You can edit and play around with generators but if you'd like to save them you'll be promted to signup/login. You'll need a valid email, but you can always use a service like <a href="http://temp-mail.org" rel="nofollow">temp mail</a> if you just want to play around. In any case, Perchance only emails you for verification and password resets (you'll need a real email address to recover your account if you forget the password).</p>
+
+<p>You can save your generator by pressing Ctrl+s (Cmd+s on Mac) or by clicking the "save" button at the top of the screen. When you're logged in you'll see a few extra buttons at the top of the editor: a "settings" button which allows you to change the url of your generator (after you've saved it), and an "account" button which allows you to see a list of all your generators and change your password/email.</p>
+
+<p>Also note the "community" button at the top of the editor - this leads to <a href="https://lemmy.world/c/perchance">lemmy.world/c/perchance</a> which acts as the community forum for Perchance. Feel free to ask questions and share your generator over there (you'll need to login/signup to lemmy.world).</p>
+
+
+
+
+<h2 id="storing_text">Storing Text</h2>
+
+<p>This section is about a fundamental feature of the Perchance engine. It may seem a little strange or confusing, but rest assured that it'll make more sense as we progress. Pay attention for this one! :) Let's start with a very simple example, as usual:</p>
+
+<pre>
+flower
+	rose
+	lily
+	tulip
+	
+sentence
+  Oh you've got me a \[flower\]! Thank you, I love \[flower.pluralForm\].
+</pre>
+
+<p>The problem with the above example is that a different flower would likely be selected each time. It'd output something like "Oh, you've got me a lily! Thank you, I love roses!". We'd like to use the same flower choice twice so that our sentence makes sense. Here's how we'd do that:</p>
+	
+<pre>
+sentence
+  Oh you've got me a \[f = flower.selectOne\]! Thank you, I love \[f.pluralForm\].
+</pre>
+
+<p>What we're doing here is selecting one item from <code>\[flower\]</code> (e.g. "tulip" or "rose" or "lily") and putting it inside "f" which is like a list with just one item. That's what the equals sign does inside square brackets - it allows you to "store things" under a unique identifier. We didn't need to specifically use the letter "f" as our identifier - we can use any name so long as it only has letters and numbers, and doesn't start with a number. Don't worry if this is a little confusing - more examples are coming! And remember that you can always ask questions on the <a href="https://lemmy.world/c/perchance">community</a>.</p>
+
+<p>Notice that we're putting <code>flower.selectOne</code> into the <code>f</code> identifier but we're also outputting the selected item <b>at the same time</b>. First the engine puts one item from <code>\[flower\]</code> into the <code>\[f\]</code> list, then it outputs that selected item into our sentence. In programming lingo we would generally call <code>f</code> a "variable" and we'd say that we "assigned" one item from the flower list to the <code>f</code> variable.</p>
+
+<p><b>Important note:</b> Imagine that the above <code>flower</code> list contained items like <code>\{red|pink\} rose</code> instead of just <code>rose</code>. In that case you should write <code>\[f = flower.selectOne.evaluateItem\]</code>, or simply <code>\[f = flower.evaluateItem\]</code>, since <code>evaluateItem</code> automatically executes <code>selectOne</code> behind-the-scenes. We need to use <code>evaluateItem</code> because we want to store something like <code>pink rose</code> in <code>f</code> rather than an "unevaluated" item like <code>\{red|pink\} rose</code>. So we make sure we "evaluate" all the random parts like <code>\{red|pink\}</code> before storing the selected item in <code>f</code>.</p>
+  
+<p>Here's another example:</p>
+
+<pre>
+name
+  Addison
+  Alex
+  Alexis
+  
+lastName
+	Smith
+	Johnson
+	Williams
+
+sentence
+  Her name was \[n = name.selectOne\]. \[n.titleCase\] \[lastName.titleCase\], if I recall correctly.
+</pre>
+
+<p>Remember, spaces are ignored inside square blocks. So <code>\[ v = verb.selectOne \]</code> is the same as <code>\[v=verb.selectOne\]</code> and <code>\[v\]</code> is the same as <code>\[  v  \]</code>.</p>
+
+<p>You might be wondering why we can't simply write <code>\[f=flower\]</code>. This is because that would cause <code>f</code> to be a reference to the actual <i>list</i> called "flower", rather than to one randomly selected item of <code>\[flower\]</code>. Just remember: we want to store <i>an item</i> of the list, not the list itself. If you actually did write <code>\[f=flower\]</code>, then <code>\[f\]</code> would just be an alias (another name for) <code>\[flower\]</code>, and so <code>\[f\]</code> would return a new random flower each time (this may be a handy thing to know in case you want to shorten a list name that you're using lots).</p>
+  
+<p>You can change the thing that's stored inside a variable by just assigning it a different value:</p>
+  
+<pre>
+sentence
+  I think her name was \[n = name.selectOne.titleCase\]? \[n\] \[l = lastName.titleCase\]? Wait, no, it was \[n = name.selectOne\]. Yeah, that's right, \[n\] \[l\].
+</pre>
+
+<p><b>Caution:</b> Square brackets should <span style="text-decoration:underline;">not</span> be used inside square brackets:</p>
+
+<ul>
+	<li>This is <b style="color:green">correct</b>: <code>\[n = name.selectOne\]</code></li>
+	<li>This is <b style="color:red">incorrect</b>: <code>\[n = \[name\].selectOne\]</code></li>
+</ul>
+	
+<p>Both are actually "legal" Perchance code, but the latter isn't doing what you intended, because square brackets have a <b>different meaning</b> when they're used <i>within</i> other square brackets. So for now, just remember: when you're inside square brackets, refer to list names directly - don't wrap them in square brackets.</p>
+
+	
+
+<h2 id="repeating_things">Repeating Things</h2>
+
+<p>In the last section you learned about the <code>selectOne</code> property. That might have got you thinking: Can I select <i>more than one</i> item? Yes! You can select as many as you like.</p>
+
+<pre>
+character = \{\{a-z\}|\{A-Z\}|\{0-9\}\}
+tenCharacters = \[character.selectMany(10)\]
+</pre>
+
+<p>What's going on here? Well, first, we've nested a bunch of curly blocks to choose a random alphanumeric character. But now we do something new. The <code>selectMany</code> property is like the others we've seen so far except for one glaring difference: It must always be followed by a pair of parentheses (normal backets) that have a number inside them. That number specifies how many times we want to pull an item from the <code>\[character\]</code> "list". Here we've chosen to make 10 selections. So now if we evaluate <code>\[tenCharacters\]</code>, it'll result in something like: "j63iJY90qm".</p>
+
+<p>Without the <code>selectMany</code> property, we'd need to do something like this:</p>
+
+<pre>
+tenCharacters = \{\{a-z\}|\{A-Z\}|\{0-9\}\}\{\{a-z\}|\{A-Z\}|\{0-9\}\}\{\{a-z\}|\{A-Z\}|\{0-9\}\}.........
+</pre>
+
+<p>And that wouldn't be fun. You can also select a <i>random</i> number of items as follows: <code>\[character.selectMany(3,10)\]</code>. That'll select a random number of characters between 3 and 10 (inclusive). See how that works? Inside the parentheses we put 2 numbers, separated by a comma - the minimum, then the maximum.</p>
+
+<details style="padding:1rem;">
+  <summary style="cursor:pointer;">Side Note <span style="opacity:0.5;">(click me)</span></summary>
+<p>A quick side note: In the above example, if you wanted each alphanumeric character to have an equal likelihood of being selected, then you would need to weight each sub-block according to the number of items it has: <code>\{\{a-z\}^26|\{A-Z\}^26|\{0-9\}^10\}</code>. If that doesn't make sense to you, don't worry - just remember that you can change the odds of each part of the curly block to suit your needs.</p>
+</details>
+
+<p>What if you want to join your selected items with a comma? For example, you might have a <code>\[fruit\]</code> list and you'd like to produce a sentence like: "My favourite fruits are: oranges, mangos, bananas, pears, apples, blueberries and grapes." Here's where we need the <code>joinItems</code> property:</p>
+
+<pre>
+sentence
+  My favourite fruits are: \[fruit.selectMany(5).joinItems(", ")\] and \[fruit\].
+</pre>
+
+<p>The <code>joinItems</code> property also requires an input via the use of parentheses. Unlike number-based inputs, text-based inputs must be wrapped in quotation marks. So all <code>.joinItems(", ")</code> does is put <code>, </code>&nbsp;(comma+space) in between each of the 5 items.</p>
+
+<details style="padding:1rem;">
+  <summary style="cursor:pointer;">Advanced Tip <span style="opacity:0.5;">(click me)</span></summary>
+	<p>We use quotation marks around text that we give to the <code>joinItems</code> property, but what if you'd like to use quotation marks within that text? In that case you need to put a backslash character before them. For example:</p>
+<pre>
+sentence = My favourite fruits are: "\[fruit.selectMany(2).joinItems("<span style="color:#00bbc4">\", \"</span>")\]" and "\[fruit\]".
+</pre>
+	<p>I've colored text inside the quotes to try to make it less visually confusing. All it's doing is putting <code>", "</code> (quotes <i>included</i>) in-between each of our 3 randomly selected fruits, so it'd result in something like: My favourite fruits are: "grapes", "bananas" and "plums".</p>
+<p>Quotes are a special character inside square blocks, and so we need to put a backslash before them whenever we want to use them in their "literal"/textual sense.</p>
+</details>
+
+<p>We could also select a random number of items like this:</p>
+
+<pre>
+num = \{3-6\}
+sentence
+  My favourite fruits are: \[fruit.selectMany(num).joinItems(", ")\] and \[fruit\].
+</pre>
+
+<p>Pretty cool, hey? In case you missed it, we're defining <code>\[num\]</code> as a random number between 3 and 6, and then we're using that random number as the input to the <code>selectMany</code> property. Note that there are <b>not</b> any square brackets around <code>num</code>. That's because <i>we're already inside square brackets</i>, so we can reference lists <i>by their plain old names</i>. Note also that we <b>cannot</b> put curly bracket blocks directly inside square blocks <i>unless they are enclosed in quotation marks</i>. If you stick around for the advanced tutorial you can learn why (hint: curly brackets have a different meaning when they're inside square brackets). Worth repeating yet again: When inside square brackets you should reference lists directly by their name, rather than putting square brackets around their name.</p>
+
+<p>A reminder: You should name your lists only with letters, numbers and underscores. Your list names shouldn't contain spaces, and shouldn't start with a number. Also, list names are case-sensitive. Your list <i>items</i>, on the other hand, can contain any text at all.</p>
+
+<p>Pro tip: If you want to join <i>all</i> the items in your list together (in the order you've defined them), you can just do this: <code>\[fruit.joinItems(", ")\]</code>. This can come in handy sometimes for defining "multi-line items".</p>
+
+<p>This "fruits" example is a good illustration of where we'd really like each selected item to be different to the others. We don't want something like: "My favourite fruits are: grapes, grapes, pears, …" So how do we prevent this sort of thing from occuring? This is where <code>selectUnique</code> comes in handy. <code>selectUnique</code> is just like <code>selectMany</code>, except that it never selects the same item twice:</p>
+
+<pre>
+sentence
+  My favourite fruits are \[fruit.selectUnique(3).joinItems(", ")\].
+</pre>
+
+<p>Simple, right? But notice that <code>\[sentence\]</code> will result in something like "My favourite fruits are grapes, blueberries, watermelon." when ideally we'd like it to be more gramatically correct: "My favourite fruits are grapes, blueberries <b>and</b> watermelon." It's evident that we'll often need a more powerful approach to selecting unique items from a list, and that's exactly what the next section is about.</p>
+
+
+
+
+<h2 id="unique_selections">Unique Selections</h2>
+
+<p>As we saw in the last section, we sometimes want random selections that aren't the same as previous selections. The <code>selectUnique</code> function is just like <code>selectMany</code>, except that it won't choose the same item from the list twice. <code>\[animal.selectUnique(5)\]</code> will select 5 unique items from the list called "animal". <code>\[animal.selectUnique(3,20)\]</code> will select a random number of animals between 3 and 20.</p>
+	
+<p>But sometimes the <code>selectUnique</code> function is a little too simplistic. What if we want to spread our unique selections throughout a paragraph of text, rather than just selecting a big list of them all at once? This is where a "consumable list" comes in handy. When you randomly select an item from a <i>consumable</i> list, that item disappears from the list and cannot be chosen again - the item is "consumed". Creating a consumable list is pretty easy. We just take a normal list that we've made, and add the "consumableList" command: <code>\[cl = animal.consumableList\]</code>. We've now created <code>\[cl\]</code>, which is a <b>consumable</b> list of animals. It's a completely separate (consumable) copy of the original. Whenever <code>\[cl\]</code> is evaluated, it outputs an animal, and removes that animal from the "cl" list so that next time <code>\[cl\]</code> is evaluated it definitely wont output that animal again. Let's look at an example:</p>
+
+<pre>
+topic
+  trans rights
+	animal rights
+	science
+	mathematics
+	...
+
+sentence
+  She mostly writes about \[t = topic.consumableList\] and \[t\].
+</pre>
+
+<p>So far we've seen properties like <code>selectOne</code> (which grabs a random item from the list) and <code>pluralForm</code> (which grabs a random item from the list and pluralizes it). The <code>consumableList</code> property actually creates an exact copy of the whole list, but alters this new list so that when we select items from it, those items are removed and cannot be chosen again. So <code>\[t = topic.consumableList\]</code> copies the whole <code>\[topic\]</code> list, makes it "consumable", and then makes it accessible via <code>\[t\]</code>.</p>
+  
+<p>As well as creating a consumable list called <code>t</code>, the code <code>\[t = topic.consumableList\]</code> also outputs (and consequently "consumes") the first item from that <code>t</code> list. So in the above example <code>\[sentence\]</code> would output something like: "She mostly writes about science and trans rights." What if you want to create a consumable list, but not yet output the first item? That's explained in the "<i>Commas In Square Blocks</i>" section below (spoiler: you'd just write <code>\[t = topic.consumableList, ""\]</code>).</p>
+
+<p>Here's a more complex example for you to think about. We want to select two random non-duplicate things she writes about, and then re-use the second one in a follow-on sentence.</p>
+
+<pre>
+sentence
+  She mostly writes about \[t = topic.consumableList\] and \[a = t.selectOne\]. Her last post was about \[a\].
+</pre>
+
+<p>Can you see what's happening there? We make a consumable list called <code>t</code> and output the first item at the same time, then we get the second item and put it in a 1-item list called <code>a</code>, and output that item at the same time. Then we use <code>a</code> again for the third selection. So we end up with a sentence like "She mostly writes about mathematics and animal rights. Her last post was about animal rights." The last two topics are the same and they're different to the first one.</p>
+  
+<details style="padding:1rem; margin-top: 1rem;">
+  <summary style="cursor:pointer;">Side note <span style="opacity:0.5;">(click me)</span></summary>
+  <p>You might be wondering why we need to write <code>\[a = t.selectOne\]</code> instead of just <code>\[a = t\]</code>? The answer is that <code>\[a = t\]</code> would make <code>a</code> a direct reference to the whole <code>t</code> list, rather than a <i>specific, randomly-chosen item</i> from <code>t</code>. So <code>\[a = t\]</code> would mean that writing <code>\[a\]</code> would then be the same as writing <code>\[t\]</code> - they'd be the same thing. We write <code>\[a = t.selectOne\]</code> to select a random item from <code>t</code> and put it in <code>a</code> so we can use it again later.</p>
+  <p>But then, when you write <code>\[t\]</code>, why doesn't it output the <i>whole</i> list? The answer is that Perchance "sneakily" does a behind-the-scenes <code>selectOne</code> on the output of square blocks so that Perchance code is "neater" to write. I.e. so you can write <code>\[t\]</code> instead of <code>\[t.selectOne\]</code>. This, unfortunately, can lead to the above confusion. But hopefully this explanation clears things up!</p>
+</details>
+
+<p>This is a lot to take in, so don't worry if you don't understand it perfectly. Just keep playing around with generators and looking at the source code of other peoples' text generators and you'll soon start to pick up these more advanced techniques.</p>
+
+
+
+
+
+<h2 id="commas_in_square_blocks">Commas In Square Blocks</h2>
+
+<p>Commas have a special meaning <i>within square blocks</i>. They allow you to execute multiple actions at once:</p>
+<pre>\[a=animal.selectOne, b=a.pastTense, c=a.futureTense\]</pre>
+	<p>Only the <b>last</b> item gets actually displayed, but the first two get executed "behind the scenes".</p>
+
+<p>If you'd like to execute a list of actions and output <i>nothing</i>, then just make the last item in the list a pair of empty quotes:<p>
+<pre>\[a=animal.selectOne, ""\]</pre>
+<p>You can put text inside those quotes if you'd like to output something specific:</p>
+<pre>\[a=animal.selectOne, "blah blah blah"\]</pre>
+<p>and that's just the same as writing this:</p>
+<pre>\[a=animal.selectOne, ""\]blah blah blah</pre>
+
+
+	
+	
+<h2 id="basic_html">Bolding, Underlining, Etc.</h2>
+	
+<p>In the example below, we're making the word "compassion" bold:</p>
+	
+<pre>Kindness and &lt;b&gt;compassion&lt;/b&gt; are underrated.</pre>
+	
+<p>That looks like this:</p>
+	
+<p style="background-color:#efefef; background-color:light-dark(#efefef, #333); padding:1rem; border:1px solid lightgrey; border:1px solid light-dark(lightgrey,#878787);">Kindness and <b>compassion</b> are underrated.</p>
+	
+<p>So to make some text <b>bold</b>, just put <code>&lt;b&gt;</code> at the start, and <code>&lt;/b&gt;</code> at the end of it.</p>
+<p>And to make some text <i>italic</i>, put <code>&lt;i&gt;</code> at the start, and <code>&lt;/i&gt;</code> at the end of it.</p>
+<p>And to <u>underline</u> some text, put <code>&lt;u&gt;</code> at the start, and <code>&lt;/u&gt;</code> at the end of it.</p>
+<p>And to <s>strike through</s> some text, put <code>&lt;s&gt;</code> at the start, and <code>&lt;/s&gt;</code> at the end of it.</p>
+
+<p>By the way, these things (that start with <code>&lt;something&gt;</code> and end with <code>&lt;/something&gt;</code>) are called HTML "tags". So you've just learned some of the basics of the HTML language. All the web pages on the internet are built using HTML. The other two languages used by web pages are CSS and JavaScript.</p>
+	
+<p>If you want to add a new line (break some text into a second line), just add <code>&lt;br&gt;</code> wherever you want to <b>br</b>eak the text, like so:</p>
+
+<pre>Kindness and compassion&lt;br&gt;are underrated.</pre>
+<p style="background-color:#efefef; background-color:light-dark(#efefef, #333); padding:1rem; border:1px solid lightgrey; border:1px solid light-dark(lightgrey,#878787);">Kindness and compassion<br>are underrated.</p>
+	
+<p>You can add multiple <code>&lt;br&gt;</code> tags to break your text up into paragraphs, like so:</p>
+
+<pre>My first paragraph.&lt;br&gt;&lt;br&gt;My second paragraph.</pre>
+<p style="background-color:#efefef; background-color:light-dark(#efefef, #333); padding:1rem; border:1px solid lightgrey; border:1px solid light-dark(lightgrey,#878787);">My first paragraph.<br><br>My second paragraph.</p>
+
+<p>Not too difficult, right? There's lots more to learn about HTML over at the (completely free) <a href="https://www.khanacademy.org/computing/computer-programming/html-css" target="_blank">Khan Academy HTML+CSS course</a>. If you want to learn more about how to customize your generator, I highly recommend it!</p>
+
+<p>Tip: Let's say one your lists has a single item that is really long, like this:</p>
+  
+<pre>
+listWithOneLongItem
+  This is a really long line. This is the second sentence of the really long line. And this is the third sentence. And this is the fourth sentence. And this is the fifth sentence.
+</pre>
+  
+<p>To make it easier to read and edit, you either click the "wrap" button in the top-right of the editor, or you can separate your single item into several items and then add <code>$output = \[this.joinItems(" ")\]</code> as the first item of this list, like this:</p>
+  
+<pre>
+listWithOneLongItem
+  $output = \[this.joinItems(" ")\]
+  This is a really long line.
+  This is the second sentence of the really long line.
+  And this is the third sentence.
+  And this is the fourth sentence.
+  And this is the fifth sentence.
+</pre>
+
+<p>Adding that special <code>$output = ...</code> item to the list causes <code>\[listWithOneLongItem\]</code> to output all the items joined together instead of a random item.</p>
+<p>If you want each sentence to be displayed on its own line, then just change this part: <code>joinItems(" ")</code> to this: <code>joinItems("&lt;br&gt;")</code>. So we join the items together with line <b>br</b>eaks instead of spaces.</p>
+  
+<details style="padding:1rem;">
+  <summary style="cursor:pointer;">Bonus: Adding links to other web pages <span style="opacity:0.5;">(click me)</span></summary>
+<p>You can create a link to another generator, or to a completely different website like this:</p>	
+<pre>Hi there, <span style="opacity:0.6">&lt;a href="https://example.com"&gt;</span>click here<span style="opacity:0.6">&lt;/a&gt;</span> to visit my blog!</pre>
+<p>and that will display like this:</p>
+<p style="background-color:#efefef; background-color:light-dark(#efefef, #333); padding:1rem; border:1px solid lightgrey; border:1px solid light-dark(lightgrey,#878787);">Hi there, <a href="https://example.com">click here</a> to visit my blog!</p>
+<p>If you want to make it so clicking the link opens a new tab, rather than going directly to the new page in the current tab, you just need to add the <code>target="_blank"</code> attribute to your <code>&lt;a&gt;</code> tag, like this:</p>	
+<pre>Hi there, <span style="opacity:0.6">&lt;a href="https://example.com" target="_blank"&gt;</span>click here<span style="opacity:0.6">&lt;/a&gt;</span> to visit my blog!</pre>
+</details>
+	
+<details style="padding:1rem; margin-top: 1rem;">
+  <summary style="cursor:pointer;">Bonus: Adding multiple spaces in a row <span style="opacity:0.5;">(click me)</span></summary>
+<p>HTML is a bit weird in some aspects: If you add multiple spaces between words, it ignores the extra spaces by default. So if you write this:</p>
+	
+<pre>Kindness and compassion         are underrated.</pre>
+<p>then by default it'll come out like this:</p>
+<p style="padding:1rem; border:1px solid lightgrey;">Kindness and compassion         are underrated.</p>
+	
+<p>So what do you do if you want multiple spaces? Well, you need to use this weird bunch of characters: <code>&amp;nbsp;</code> (which stands for "non-breaking space"), like this:</p>
+<pre>Kindness and compassion &amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp; are underrated.</pre>
+<p style="background-color:#efefef; background-color:light-dark(#efefef, #333); padding:1rem; border:1px solid lightgrey; border:1px solid light-dark(lightgrey,#878787);">Kindness and compassion &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; are underrated.</p>
+<p>I know, it's weird. I'm sorry about that! One alternative is to wrap your output (in the HTML panel - the bottom-right editor) in a <code>&lt;p&gt;</code> tag with a special style attribute like this:</p>
+<pre>&lt;p style="white-space:pre-wrap;"&gt;\[output\]&lt;/p&gt;</pre>
+<p>And now you can use multiple spaces like normal - no need for the <code>&amp;nbsp;</code> stuff.</p>
+<p>If your <code>\[output\]</code> is currently wrapped in a <code>&lt;p&gt;</code> tag that has an existing <code>style</code> "attribute", like this, for example:</p>
+<pre>&lt;p style="margin:1em auto; padding:0 1em; max-width:700px;"&gt;\[output\]&lt;/p&gt;</pre>
+<p>Then you can just add the <code>white-space:pre-wrap;</code> at the end of the style attribute like this:</p>
+<pre>&lt;p style="margin:1em auto; padding:0 1em; max-width:700px; white-space:pre-wrap;"&gt;\[output\]&lt;/p&gt;</pre>
+</details>
+	
+<h2 id="hierarchical_lists">Hierarchical Lists</h2>
+
+<p>Perchance allows you to create "lists of lists" by indenting your items appropriately. This may seem unusual at first, but as you explore Perchance's more advanced features you'll see that it can sometimes be useful. Here's an example of a multi-level list called "animal":</p>
+
+<pre>
+animal
+	mammal
+		kangaroo
+		pig
+		human
+	reptile
+		lizard
+		crocodile
+		turtle
+	insect
+		spider
+		beetle
+		ant
+</pre>
+
+<p>The result of <code>\[animal\]</code> will be "mammal", "reptile" or "insect" with equal likelihood (since we haven't added any likelihood indicators on those items). The result of <code>\[animal.mammal\]</code> will be either "kangaroo", "pig" or "human", with equal likelihood.</p>
+	
+<p>What do you think <code>\[animal.selectOne\]</code> will result in? Remember that <code>animal</code> is a list ... <i>of lists</i> - so when we <code>selectOne</code> item from <code>animal</code> we get a random <i>list</i>. So when we write <code>\[animal.selectOne\]</code>, it'll essentially give us either <code>\[animal.mammal\]</code>, <code>\[animal.reptile\]</code> or <code>\[animal.insect\]</code>, all with equal probability.</p>
+	
+<p>Thus, both these lines are equivalent:</p>
+	
+<pre>
+\[animal.selectOne\]
+\{\[animal.mammal\]|\[animal.reptile\]|\[animal.insect\]\}
+</pre>
+	
+<p>That can be a bit confusing since it may initially seem like <code>\[animal.selectOne\]</code> would simply result in "mammal" or "reptile" or "insect" - but that's not the case, since those items are themselves <i>lists</i>, and so <code>selectOne</code> gives us <i>the whole sublist</i>, which then resolves to a single item from that sublist. So the result of <code>\[animal.selectOne\]</code> would be either <i>kangaroo, pig, human, lizard, crocodile, turtle, spider, beetle, or ant</i> - all with equal likelihood, since we haven't altered the odds of the sublists and they all have the have the same number of items.</p>
+	
+<p>Perchance allows you to nest items to an arbitrary depth. You could, for example, have a nested list which has many levels: <code>\[planet.country.town.house.room\]</code>.</p>
+
+<p>You can also use hierarchical lists for stuff like this:</p>
+	
+<pre>
+race
+	dwarf
+		height = \{7-15\}0cm
+		name = Dwarf
+		type
+			Mountain Dwarf
+			Aleithian Dwarf
+	elf
+		height = \{12-20\}0cm
+		name = Elf
+		type
+			High Elf
+			Night Elf
+	...
+
+output
+  Yes, a \[r = race.selectOne, r.name\] of that description passed through here several months ago. \{A\} \[r.type\] if I recall correctly. About \[r.height\] tall.
+</pre>
+	
+<p>And if for some reason we specifically wanted a random dwarf height then we could write <code>\[race.dwarf.height\]</code>.</p>
+	
+<p>If you're a bit confused by all this hierarchical stuff, don't worry about it - for the vast majority of generators top-level lists will be completely fine. It's only if you're building somewhat complicated generators that nesting will start to become useful to help organize and compartmentalize our code. Remember that you can always ask questions in our <a href="https://lemmy.world/c/perchance">friendly community</a>.</p>
+	
+<p>If you'd like to learn more about hierarchical stuff check out the <a href="/advanced-tutorial">advanced tutorial</a> and the <a href="/examples">examples</a> page.</p>
+
+	
+
+	
+
+
+<h2 id="importing_exporting">Importing and Exporting</h2>
+
+<p>I'm glad you've made it this far! In this section we're going to learn how you can use Perchance generators that you or others have made <i>inside</i> your generators. If you use Perchance long enough, you'll probably find that there are certain lists which you use quite often. These lists can be separated into their own generators and "imported" with a simple statement when needed.</p>
+
+<p>Each generator on Perchance has a unique name that you can see in the url: "perchance.org/<b>name</b>" You can import other generators using their name. Let's import the <a href="/noun">perchance.org/noun</a> generator:</p>
+
+<pre>
+sentence = The \{import:noun\} is sitting on my \{import:noun\}.
+</pre>
+
+<p>That'd result in something silly like "The brick is sitting on my cloud." There are pre-existing generators for a huge variety of topics. You can check out the <a href="/useful-generators">useful generators</a> list and also the <a href="https://lemmy.world/c/perchance">Perchance community</a>. If you create any generators that you think would be useful to others, please share them on on the community page! Sharing is caring :)</p>
+
+<p>In the example above, what if you want to get the <code>pluralForm</code> of an imported noun? In that case you can do this:</p>
+
+<pre>
+noun = \{import:noun\}
+sentence = The \[noun.pluralForm\] are sitting on my \[noun\].
+</pre>
+
+<p>We've put the imported noun generator into its own <code>\[noun\]</code> list which we can then treat like any other list. You can use these curly import blocks wherever you use text. Here we've made a list out of a bunch of import statements:</p>
+
+<pre>
+livingThing
+	\{import:animal\}
+	\{import:plant\}
+	\{import:bacteria\}
+</pre>
+
+<p>Often you'll want to import a specific list from <i>within</i> another generator. Let's imagine there's a generator called <code>animal-lists</code> with this code:</p>
+<pre>
+mammal
+	kangaroo
+	pig
+	human
+	
+reptile
+	lizard
+	crocodile
+	turtle
+	
+insect
+	spider
+	beetle
+	ant
+</pre>
+<p>If you write <code>\{import:animal-lists\}</code> then you'll get "mammal" or "reptile" or "insect" as the output. That's probably not what we wanted. We want to be able to grab a random reptile, or a random insect - not a random animal "type". Here's how we do this:</p>
+
+<pre>
+animalLists = \{import:animal-lists\}
+sentence
+  That's definitely not \{a\} \[animalLists.mammal\]. It's \{a\} \[animalLists.reptile\].
+	\{A\} \[animalLists.insect\] is much smaller than a \{a\} \[animalLists.mammal\].
+</pre>
+
+<p>Makes sense? We're just treating <code>\[animalLists\]</code> as if it's a list that we've defined in our code; we can access sub-lists, use <code>pluralForm</code>, <code>consumableList</code>, and any other properties that we desire.</p>
+
+<p>In the above example, what if you were the owner of the <code>animal-lists</code> generator and you wanted to make it so that if people write <code>\{import:animal-lists\}</code>, then they get a random animal instead of a random animal type? To do that, we need to add a special <code>$output</code> list:</p>
+	
+<pre>
+$output
+	\[mammal\]
+	\[reptile\]
+	\[insect\]
+</pre>
+	
+<p>So now when they write <code>\{import:animal-lists\}</code>, the output will be a random item from whatever we've put in this <code>$output</code> list.</p>
+	
+<p>When sharing your generator, it's a good idea to give it a nice name. You can change your generator's name by clicking the "settings" button in the bar at the top of the editor.</p>
+
+<p>Here's another example of how to use the special <code>$output</code> list:</p>
+
+<pre>
+$output = \[description\]
+
+adjective
+	narrow
+	sturdy
+	...
+	
+thing
+	chest
+	cloak
+	...
+
+description
+	It's \{a\} \[adjective\] \[thing\] that looks about \{10-70\} years old.
+	...
+</pre>
+	
+<p>Since we added the <code>$output</code> property, when people import our generator they'll get a random <code>\[description\]</code>. If we don't include an <code>$output</code> property, then the importer would get "adjective", "thing" or "description" - i.e. the name of one of our top-level lists. That's because the list names in your generator are actually themselves <i>items</i> within the "root" list. If that's confusing, don't worry, it's not super important, but the above "Hierarchical Lists" section gives some more info on why this is the case. The main thing to understand is that you should make a top-level <code>$output</code> property that equals the list that you want importers to get when they import your generator. If you want to export <i>all</i> your lists, then you don't need to add a top-level <code>$output</code> property - Perchance assumes that by default.</p>
+
+	
+	
+	
+	
+
+<h2 id="or_operator">The "or" Operator</h2>
+	
+<p>Have a look at this simple generator and see if you can work out what's happening:</p>
+	
+<pre>
+output
+  \{A\} \[a = animal.selectOne\] is covered in \[a.body || "fur"\].
+
+animal
+  bird
+    body = feathers
+  lizard
+    body = scales
+  dog
+	cat
+	moose
+	...
+</pre>
+	
+<p>Notice this new <code>||</code> thing? That means <b>or</b>. So writing <code>a.body || "fur"</code> is like saying "Output <code>a.body</code>, <b>or if it doesn't exist</b>, then <code>"fur"</code>". So if <code>a.body</code> doesn't exist (like it wouldn't if <code>a</code> was <code>dog</code>, <code>cat</code> or <code>moose</code>), then "fur" is returned as a backup. But why do we need quotation marks around "fur"? That's because we're telling Perchance that we're referring to the literal characters "fur" and not a list or variable called <code>fur</code>.</p>
+<p>What's the purpose of all this? Well, if our <code>animal</code> list is quite long, and most of them have fur covering their bodies, then it'd be neater if we could specify a "default" value for the <code>a.body</code> property. The <code>||</code> operator is great for situations like this where we want there to be a default or backup value.</p>
+	
+<p>Instead of using "fur" as a backup, we could use a variable or list:</p>
+	
+<pre>
+defaultBody = fur
+output
+  \{A\} \[a = animal.selectOne\] is covered in \[a.body || defaultBody\].
+...
+</pre>
+	
+<p>And you can chain together multiple defaults like this: <code>\[a || b || c || ...\]</code>, and the first one that exists will be output.</p>
+
+
+	
+<h2 id="equals_sign">The Equals Sign</h2>
+	
+<p>At the start of the tutorial, I said that you can use the "equals" sign as a way to make single-item lists easier to write:</p>
+	
+<pre>
+veg1 = \{celery|spinach\}
+veg2
+  \{celery|spinach\}
+</pre>
+
+<p>It's easier and neater to have things like this in one line, like we've done with <code>veg1</code>. But it's time to talk about some important differences between these two ways of writing a "single-item list".</p>
+	
+<p>Firstly, what happens when we write <code>\[v = veg2.selectOne\]</code>? What gets stored in <code>v</code>? What gets output by the square block? Well, remember that <code>selectOne</code> is just a special command that selects one item from the list. And we can see that <code>veg2</code> only has one item: <code>\{celery|spinach\}</code>, so <code>veg2.selectOne</code> will always result in <code>\{celery|spinach\}</code>. That's what will get stored in <code>v</code>. So whenever we write <code>\[v\]</code>, we'll get either "celery" or "spinach" with a 50% probability each.</p>
+	
+<p>All good so far? This is just the normal behavior of <code>selectOne</code> when we apply it to a list. A common rookie mistake here is to think that either "celery" or "spinach" would be stored in <code>v</code>, but that's not how <code>selectOne</code> works. It just selects a random item from your list - it doesn't "evaluate" that item to produce "plain" text like "celery" or "spinach". That's why <code>\[v\]</code> randomly outputs either "celery" or "spinach" each time, instead of always outputting the same one.</p>
+	
+<p>Now, remember, when we assign a value to a variable in a square block (like so: <code>\[v = veg2.selectOne\]</code>), that value will also be <i>outputted</i> by the block. So the block will output <code>\{celery|spinach\}</code> (the value we stored in <code>v</code>). Before displaying the output of a square block on the page, Perchance <i>always fully evaluates it</i> so that it's just plain text (no square or curly brackets). So the block outputs <code>\{celery|spinach\}</code>, and then Perchance randomly evaluates it into either "celery" or "spinach" before displaying it on the page. So we know that our block, <code>\[v = veg2.selectOne\]</code>, will output either "celery" or "spinach", and that we've stored <code>\{celery|spinach\}</code> in <code>v</code>.</p>
+	
+<p>Okay, now let's look at <code>veg1</code> and how it differs. <code>veg1</code> is actually a <i>direct reference</i> to <code>\{celery|spinach\}</code>. It's not a list. So when we write <code>veg1.selectOne</code>, we're applying <code>selectOne</code> directly to <code>\{celery|spinach\}</code>, which is an inline list. So <code>veg1.selectOne</code> will result in either "celery" or "spinach", each with equal likelihood. So if you write <code>\[v = veg1.selectOne\]</code>, then <code>v</code> contains <i>either</i> "celery" <b>or</b> "spinach".</p>
+	
+<p>So, in the example below, can you predict what <code>output1</code> and <code>output2</code> will look like?</p>
+	
+<pre>
+veg1 = \{celery|spinach\}
+veg2
+  \{celery|spinach\}
+	
+output1
+  \[v = veg1.selectOne\] \[v\] \[v\] \[v\]
+output2
+  \[v = veg2.selectOne\] \[v\] \[v\] \[v\]
+</pre>
+	
+<p>The answer is that <code>output1</code> will be either "celery celery celery celery" or "spinach spinach spinach spinach", whereas <code>output2</code> will be something like "celery spinach spinach celery" or "spinach spinach celery spinach" - i.e. <code>v</code> in <code>output2</code> contains <code>\{celery|spinach\}</code> so it'll be random each time, whereas in <code>output1</code>, <code>v</code> either contains "celery" <b>or</b> "spinach".</p>
+	
+<p>The key understanding here is that <code>veg1</code> <i>isn't actually a list</i> at all. It's a direct reference to <code>\{celery|spinach\}</code>. So in this case <code>veg1</code> is basically equivalent to <code>veg2.selectOne</code> since they both refer to <code>\{celery|spinach\}</code></p>
+	
+<p>You don't need to worry about the difference between these two cases if you're not using <code>selectOne</code> and assigning the result to a variable (like <code>v</code> in the above examples. That's because Perchance will always fully evaluate \[veg1\] and \[veg2\] into either "celery" or "spinach" if you just write them in a square block like that.</p>
+	
+<p>What if you had a list like <code>veg2</code> but you wanted to store either "celery" or "spinach" in <code>v</code> instead of storing <code>\{celery|spinach\}</code>? In that case you can just write <code>\[v = veg2.selectOne.selectOne\]</code>.</p>
+	
+	
+	
+	
+<h2 id="evaluateItem">The <code>evaluateItem</code> Command</h2>
+	
+<p>Let's say you had this code:</p>
+	
+<pre>
+output
+  \[f = fruit.selectOne\]?! \[f\] is way too many!
+
+fruit
+  \{10-20\} apples
+  \{30-70\} pears
+</pre>
+	
+<p>You want it to output a sentence like "<i>50 pears?! 50 pears is way too many!</i>", but instead this generator will output something like "<i>13 apples?! 16 apples is way too many!</i>". That's because <code>fruit.selectOne</code> will result in either <code>\{10-20\} apples</code> or <code>\{30-70\} pears</code> with equal likelihood, so one of those will get stored in <code>f</code>. So let's say <code>\{10-20\} apples</code> was selected and stored in <code>f</code>. When <code>\{10-20\} apples</code> gets "evaluated", we get a specific bit of text like "12 apples" or "15 apples".</p>
+	
+<p>But of course, we want <code>f</code> to always output the same thing - so how do we store a specific <i>evaluated</i> version of the item, instead of the actual item itself? This is where the <code>evaluateItem</code> command comes in handy:</p>
+	
+<pre>
+output
+  \[f = fruit.selectOne.evaluateItem\]?! \[f\] is way too many!
+</pre>
+	
+<p>See what's happening there? First we <i>select one</i> item from the <code>fruit</code> list, then we <i>evaluate</i> the selected item, then we store the result in <code>f</code>. So now the result of <code>\[output\]</code> will be something like "<i>50 pears?! 50 pears is way too many!</i>" - just like we wanted.</p>
+	
+  
+<h2 id="dynamic_odds">A Taste of Dynamic Odds</h2>
+<p>You've seen how to change the probability of items in a list, and you've seen how to store your random selections in a variable (so you can use them again later) - now we're going to see how to combine those two features. This is a fairly deep topic, and it's important for building complex generators, but I'm only giving you a small taste here. Don't worry if you don't fully understand what's going. To get a full explanation, head over to the "Dynamic Odds" section on the <a href="https://perchance.org/examples" target="_blank">examples</a> page.</p>
+<p>Okay, so what if you wanted to change the probability of an item in one list <i>based on</i> an item that we've previously selected from another list? To do that, we need to use "dynamic odds" - they're "dynamic" because these odds can <i>change</i> depending on what we've stored in variables.</p>
+<p>Here's a simple example where we are randomly selecting a score (a number between 1 and 4), and then we're choosing an adjective <i>based on</i> the score that we selected:</p>
+<pre>
+score = \{1-4\}
+
+output
+  Your score is \[s = score.selectOne\] which is \[adjective\]!
+  
+adjective
+  not great ^\[s == 1\]
+  good ^\[s == 2\]
+  great ^\[s > 2\]
+</pre>
+<p>The square brackets around our odds values means that they're dynamic. That is, they're re-computed every time we select an item from the <code>adjective</code> list. The odds of each item is based on the value that's currently stored in <code>s</code>. The <code>==</code> part means "is equal to", so <code>^\[s == 1\]</code> means "only allow this item to be selected if <code>s</code> is equal to 1". The <code>&gt;</code> symbol means "is greater than". There are lots of other symbols that you can learn in the "Dynamic Odds" section on the <a href="https://perchance.org/examples" target="_blank">examples</a> page.</p>
+<p>Here's another example. Let's say we first want to select a color, and then select a more specific version of that original color. We want the output to be something like "The dragon's scales were blue. More specifically, navy blue." Here's how we could do that:</p>
+
+<pre>
+output
+  The dragon's scales were \[c = color.selectOne\]. More specifically, \[shade.selectOne\].
+
+color
+  blue
+  red
+  green
+  yellow
+
+shade
+  blue ^\[c == "blue"\]
+    cyan
+    navy blue
+    teal
+    turquoise
+  red ^\[c == "red"\]
+    maroon
+    cherry
+  ...
+</pre>
+<p>See what's happening there? We're first randomly selecting an item from the <code>color</code> list. Then <code>\[shade.selectOne\]</code> would <i>normally</i> return a random sub-list (e.g. the <code>red</code> sub-list). But now we're using "dynamic odds" to restrict which sub-list gets chosen, and if <code>c</code> is equal to "blue", then the blue sub-list will get chosen (because <code>^\[c == "blue"\]</code> is true and <code>^\[c == "red"\]</code> is false), and so we'll get an output like "teal" or "navy blue".</p>
+  
+<p>Note also that we need quotes around "blue" in <code>^\[c == "blue"\]</code>. The previous example didn't have quotes because we were dealing with numbers rather than text. Text always needs quotes around it when you're writing it inside square brackets. If we wrote <code>^\[c == blue\]</code>, then the Perchance engine would look for a variable or list called <code>blue</code> and check if it is equal to <code>c</code>. The quotes tell Perchance that we're talking about the literal text "blue" rather than a variable or list with that name.</p>
+  
+<p>Again, this is only a small taste to get you curious. If you'd like to learn more, check out the "Dynamic Odds" section on the <a href="https://perchance.org/examples" target="_blank">examples</a> page - and while you're there, check out the "Dynamic Sub-list Selection" for an easier way to write the above example. You might also like to check out the section called "if/else Statements", which are related to dynamic odds.</p>
+
+<h2>Cool!</h2>
+
+<p>That's the end of the basic tutorial, but there's a lot more to learn! If you'd like to learn more, check out the <b><a href="/examples">examples</a></b>, <a href="/templates">templates</a> and the <a href="/advanced-tutorial">advanced tutorial</a>. You'll learn more about multi-level lists, special properties like "$output", changing fonts, using external APIs, procedurally generated images, dynamic random worlds, procedural story generators and tips for building extremely complex generators. You might also like to see what others are currently building on Perchance over at the <a href="/generators">generators</a> page. If you've got any questions or suggestions about how this tutorial could be improved, please post a message on the <a href="http://lemmy.world/c/perchance">Perchance Lemmy community</a> 👍</p>
+
+<h2>P.S.</h2>
+	<p>Here are a couple of things that are worth knowing, but aren't essential to get started using Perchance:</p>
+	<ul>
+		<li>If you share your generator's link with someone, they will be able to click the "edit" button and see your code, but if they save the edits, it won't affect your generator - it'll create a copy of your generator with a new URL.</li>
+		<li>By default your generator is publicly-listed on the <a href="https://perchance.org/generators" target="_blank">perchance.org/generators</a>. You can remove your generator from all public lists by clicking the settings button in the top-right of the page, and clicking "make private".</li>
+    <li>Perchance is a very "sharing-is-caring" community. We encourage you to share your creations with others, knowing they they can click the edit button to check out your code, and maybe create a remixed version. If you do use someone else's code, it's nice to credit them by linking back to the original generator :)</li>
+		<li>You can change the URL of your generator by clicking the settings button in the top-right of the page.</li>
+		<li>There's also a "download" button in the settings menu so you can download your generator and use it offline. Use the <a href="https://perchance.org/download-button-plugin" target="_blank">download-button-plugin</a> to add a button to your generator so others can download it too.</li>
+		<li>There are lots of <a href="/plugins">plugins</a> that you can use to extend the functionality of Perchance.</li>
+		<li>There's also a <a href="/templates">templates</a> page that you can use to find a design that you like.</li>
+		<li>If you want an easier alternative to writing HTML, you might like to check out the <a href="/markdown-plugin" target="_blank">markdown plugin</a>. Markdown isn't anywhere near as customizable as HTML, but it's much easier to get started with. You might also like to check out the <a href="/layout-maker-plugin" target="_blank">layout-maker-plugin</a>, which makes it easy to create complex layouts that would be hard to produce with basic HTML knowledge.</li>
+		<li>The <a href="/examples">examples</a> page teaches you how to create generators that take in user input - e.g. drop-down menus, and stuff like that.</li>
+		<li>There are a bunch of keyboard shortcuts for Perchance listed <a href="https://perchance.org/perchance-keyboard-shortcuts">here</a></li>
+		<li>If you mess up and accidentally delete one of your lists (and you've tried Ctrl+Z to undo but it doesn't go back far enough), then you can click the "revisions" button to download previous versions of your generator.</li>
+		<li>Everything inside square brackets is actually just JavaScript (with some added Perchance magic like selectOne/pluralForm/etc), so if you know some JavaScript you can do all sorts of fancy stuff. Plugins are also coded in JavaScript. If you don't know JavaScript, but would like to learn, <a href="https://www.khanacademy.org/computing/computer-programming">Khan Academy</a> has a great JavaScript course. It also teaches you HTML and CSS so you can design a nice-looking generator.</li>
+    <li>If you have a blog or a website, you can embed your generator in your posts/pages like this (note that the domain is <code>null.perchance.org</code> rather than <code>perchance.org</code>):</li>
+	</ul>
+<pre>
+&lt;iframe src="https://null.perchance.org/my-generator-name"&gt;&lt;/iframe&gt;
+</pre>
+
+	
+</main>
+<p style="text-align:center; font-size:200%; opacity:0.2; margin-top:0.5em;"><span>⚄&#xFE0E;</span></p>
+<br/>
+
+<style>
+	ul li {
+		margin-top:0.5em;	
+	}
+	main {
+		max-width:800px;
+		margin:0 auto;
+		background: #fff;
+		background: light-dark(#fff, #101010);
+		padding:1em;
+		border-radius:3px;
+		box-shadow: 0 0.5px 0 0 #ffffff inset, 0 1px 2px 0 #B3B3B3;
+		box-shadow: 0 0.5px 0 0 light-dark(#fff, #060606) inset, 0 1px 2px 0 light-dark(#B3B3B3, #2c2c2c);
+	}
+	p { text-align:left; line-height: 1.4em; }
+  main p:first-child {
+    margin-top:0;
+  }
+	body {
+		background-color:#f6f6f6;	
+		background-color: light-dark(#f6f6f6, #000);
+    color: black;
+    color: light-dark(black, #d6d6d6);
+	}
+	pre {
+		text-align:left;
+		background: #333;
+    background: light-dark(#333, #212121);
+    color: #e2e2e2;
+    padding: 1em;
+    border-radius: 2px;
+		tab-size: 2;
+		-moz-tab-size: 2;
+		-o-tab-size: 2;
+		-webkit-tab-size: 2;
+	}
+	code {
+		background: #eff0f1;
+    background:  light-dark(#eff0f1, #272727);
+    padding: 1px 5px;	
+		white-space: nowrap;
+	}
+  details {
+    background:#efefef;
+    background:light-dark(#efefef, #212121);
+  }
+	details code {
+	  background: #d9d9d9;
+	  background: light-dark(#d9d9d9, #5a5a5a);
+	}
+	details p:last-child {
+	  margin-bottom:0;	
+	}
+	h2 {
+		margin-top: 1.5em;	
+	}
+	/*body::before {
+		content: ' ';
+    display: block;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    opacity: 0.1;
+		background:url('data:image/jpeg;base64,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')
+		background:#eee;	
+}*/
+	
+</style>
+
+
+<style>
+	#contentsCtn {
+	  position:fixed;
+		top: 50%;
+		transform: translate(0.5rem, -50%);
+		background:white;
+    background: light-dark(white, #222);
+		text-align:left;
+		padding:1rem;
+		border-radius:3px;
+		box-shadow: 0 0.5px 0 0 #ffffff inset, 0 1px 2px 0 #B3B3B3;
+		box-shadow: 0 0.5px 0 0 light-dark(#ffffff, #000000) inset, 0 1px 2px 0 light-dark(#B3B3B3, #000000);
+	}
+	.contents-item {
+		cursor: pointer;
+		padding:0.25rem;
+    font-size: 0.85rem;
+	}
+	.contents-item:hover {
+	  background:#efefef;	
+	  background:light-dark(#efefef, #444);	
+	}
+	@media screen and (max-width: 1200px) {
+		#contentsCtn {
+			display:none;
+		}
+	}
+  html { color-scheme: light dark; }
+</style>
+<div id="contentsCtn">
+  <div style="font-weight:bold; padding:0.25rem;">Contents</div>
+</div>
+<script>
+  var maxtContentsItemTitleLength = 20;
+  if(window.innerWidth > 1300) maxtContentsItemTitleLength = 40;
+  
+  let headerEls = [...document.querySelectorAll("h2")]
+	let contentsItems = [];
+	for(let el of headerEls) {
+	  let item = createContentsItem(el);
+		contentsItems.push(item);
+		contentsCtn.appendChild(item);
+	}
+  
+	function createContentsItem(el) {
+	  let div = document.createElement("div");
+		div.innerHTML = `
+		  <div class="contents-item" data-title="${el.textContent.replace(/"/g, "&quot;")}">${el.textContent.length > maxtContentsItemTitleLength ? el.textContent.slice(0, maxtContentsItemTitleLength-1)+"…" : el.textContent}</div>
+		`;
+		let item = div.firstElementChild;
+		item.onclick = function() {
+		  el.scrollIntoView();
+      window.scrollBy(0, -20);
+      window.location.hash = el.id ? "#"+el.id : "";
+		};
+		return item;
+	}
+	let contentsTitleHighlighterDebounceTimeout = null;
+	window.addEventListener("scroll", function() {
+		clearTimeout(contentsTitleHighlighterDebounceTimeout);
+		contentsTitleHighlighterDebounceTimeout = setTimeout(() => {
+			let h2s = Array.from(document.querySelectorAll("h2"));
+			let closestEl = null;
+			let closestDist = null;
+			for(let h2 of h2s) {
+				let rect = h2.getBoundingClientRect();
+				if(rect.top > window.innerHeight/2) continue;
+				if(closestEl === null || Math.abs(rect.top) < closestDist) {
+					closestDist = Math.abs(rect.top);
+					closestEl = h2;
+				}
+			}
+			contentsCtn.querySelectorAll(`.contents-item`).forEach(el => el.style.background = "");
+      if(closestEl) {
+  			let closestTitle = closestEl.textContent;
+  			contentsCtn.querySelector(`.contents-item[data-title="${closestTitle.replace(/"/g, '\\"')}"]`).style.background = CSS.supports("color", "light-dark(#fff,#000)") ? "light-dark(#efefef,#444)" : "#efefef";
+      }
+		}, 200);
+	});
+</script>

@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Connecting Perchance with an App - Tutorial</title>
+  <!-- The line below makes it so if your device is in dark mode, then the default text color is switched to white, and the default background color is switch to black. -->
+  <style> 
+    html { color-scheme: light dark; } 
+    body { font-family: Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; }
+    .step { border: 1px solid #ddd; padding: 10px; margin: 20px 0; border-radius: 5px; }
+    pre { background-color: #f5f5f5; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    code { font-family: monospace; background-color: #f5f5f5; padding: 2px 4px; border-radius: 3px; }
+    button { padding: 8px 16px; cursor: pointer; margin: 10px 0; }
+    #output { padding: 15px; border: 1px solid #ddd; min-height: 50px; margin: 15px 0; border-radius: 5px; }
+    #demoContainer { border: 2px solid #4CAF50; padding: 20px; margin: 20px 0; border-radius: 5px; }
+    @media (prefers-color-scheme: dark) {
+      pre, code { background-color: #333; }
+      .step { border-color: #444; }
+      #output { border-color: #444; }
+    }
+    .language-selector { 
+      margin: 20px 0; 
+      padding: 10px; 
+      border: 1px solid #ddd; 
+      border-radius: 5px; 
+    }
+    .code-example {
+      display: none;
+    }
+    .code-example.active {
+      display: block;
+    }
+    .language-btn {
+      background-color: #f0f0f0;
+      border: 1px solid #ccc;
+      padding: 5px 10px;
+      margin-right: 5px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .language-btn.active {
+      background-color: #4CAF50;
+      color: white;
+      border-color: #4CAF50;
+    }
+    @media (prefers-color-scheme: dark) {
+      .language-btn {
+        background-color: #444;
+        border-color: #555;
+      }
+      .language-btn.active {
+        background-color: #4CAF50;
+      }
+      .language-selector {
+        border-color: #444;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Connecting Perchance Generator with an App using API</h1>
+  
+  <p>This tutorial will walk you through the process of connecting a Perchance generator to your web app using their API.</p>
+  
+  <div class="language-selector">
+    <h3>Choose Programming Language:</h3>
+    <button id="jsBtn" class="language-btn active" onclick="changeLanguage('javascript')">JavaScript</button>
+    <button id="javaBtn" class="language-btn" onclick="changeLanguage('java')">Java</button>
+    <button id="csharpBtn" class="language-btn" onclick="changeLanguage('csharp')">C#</button>
+    <button id="pythonBtn" class="language-btn" onclick="changeLanguage('python')">Python</button>
+  </div>
+  
+  <div class="step">
+    <h2>Step 1: What is Perchance?</h2>
+    <p>Perchance is a platform for creating random text generators. Users can create generators with various outputs and options, and these generators can be accessed via an API for integration with other applications.</p>
+    <p>Visit <a href="https://perchance.org" target="_blank">perchance.org</a> to explore available generators or create your own.</p>
+  </div>
+  
+  <div class="step">
+    <h2>Step 2: Finding a Generator to Use</h2>
+    <p>Browse Perchance for a generator you'd like to use, or create your own. For this tutorial, we'll use a simple example generator.</p>
+    <p>When you find a generator, note its URL. The format is typically: <code>https://perchance.org/generator-name</code></p>
+  </div>
+  
+  <div class="step">
+    <h2>Step 3: Understanding the Perchance API</h2>
+    <p>Perchance offers a simple API to access generator results. The basic format is:</p>
+    <pre>https://perchance.org/api/generateList.php?generator=GENERATOR_NAME&count=NUMBER_OF_RESULTS</pre>
+    <p>For example, to get 3 results from a generator called "example-generator":</p>
+    <pre>https://perchance.org/api/generateList.php?generator=example-generator&count=3</pre>
+    <p>This returns a JSON array of generated results.</p>
+  </div>
+  
+  <div class="step">
+    <h2>Step 4: Setting Up Your HTML Structure</h2>
+    <p>Create a basic HTML structure for your app:</p>
+    <pre>&lt;h1 id="title"&gt;Perchance Generator&lt;/h1&gt;
+&lt;div id="output"&gt;Results will appear here...&lt;/div&gt;
+&lt;button id="generateBtn" onclick="fetchFromPerchance()"&gt;Generate&lt;/button&gt;</pre>
+  </div>
+  
+  <div class="step">
+    <h2>Step 5: Adding Code to Fetch from Perchance</h2>
+    <p>Now, let's add code to fetch data from the Perchance API:</p>
+    
+    <div class="code-example javascript active">
+      <pre>async function fetchFromPerchance() {
+  const generatorName = "example-generator"; // Replace with your generator name
+  const count = 1; // Number of results to get
+  
+  try {
+    document.getElementById("generateBtn").textContent = "Loading...";
+    const response = await fetch(`https://perchance.org/api/generateList.php?generator=${generatorName}&count=${count}`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    // Display the first result
+    if (data && data.length > 0) {
+      document.getElementById("output").textContent = data[0];
+    } else {
+      document.getElementById("output").textContent = "No results returned.";
+    }
+  } catch (error) {
+    console.error("Error fetching from Perchance:", error);
+    document.getElementById("output").textContent = "Error fetching from Perchance. See console for details.";
+  } finally {
+    document.getElementById("generateBtn").textContent = "Generate";
+  }
+}</pre>
+    </div>
+    
+    <div class="code-example java">
+      <pre>import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import org.json.JSONArray;
+
+public class PerchanceFetcher {
+    public void fetchFromPerchance() {
+        String generatorName = "example-generator"; // Replace with your generator name
+        int count = 1; // Number of results to get
+        
+        try {
+            // Update UI to show loading state
+            updateButtonText("Loading...");
+            
+            URL url = new URL("https://perchance.org/api/generateList.php?generator=" + generatorName + "&count=" + count);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+            
+            int responseCode = connection.getResponseCode();
+            if (responseCode != 200) {
+                throw new Exception("HTTP error! Status: " + responseCode);
+            }
+            
+            BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+            String inputLine;
+            StringBuilder response = new StringBuilder();
+            
+            while ((inputLine = in.readLine()) != null) {
+                response.append(inputLine);
+            }
+            in.close();
+            
+            JSONArray data = new JSONArray(response.toString());
+            
+            // Display the first result
+            if (data.length() > 0) {
+                updateOutputText(data.getString(0));
+            } else {
+                updateOutputText("No results returned.");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            updateOutputText("Error fetching from Perchance. See console for details.");
+        } finally {
+            updateButtonText("Generate");
+        }
+    }
+    
+    private void updateButtonText(String text) {
+        // Update UI button text (implementation depends on your UI framework)
+        // Example for JavaFX:
+        // Platform.runLater(() -> generateButton.setText(text));
+    }
+    
+    private void updateOutputText(String text) {
+        // Update UI output text (implementation depends on your UI framework)
+        // Example for JavaFX:
+        // Platform.runLater(() -> outputLabel.setText(text));
+    }
+}</pre>
+    </div>
+    
+    <div class="code-example csharp">
+      <pre>using System;
+using System.Net.Http;
+using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
+
+public class PerchanceFetcher
+{
+    public async Task FetchFromPerchance()
+    {
+        string generatorName = "example-generator"; // Replace with your generator name
+        int count = 1; // Number of results to get
+        
+        try
+        {
+            UpdateButtonText("Loading...");
+            
+            using (HttpClient client = new HttpClient())
+            {
+                string url = $"https://perchance.org/api/generateList.php?generator={generatorName}&count={count}";
+                HttpResponseMessage response = await client.GetAsync(url);
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new Exception($"HTTP error! Status: {response.StatusCode}");
+                }
+                
+                string responseBody = await response.Content.ReadAsStringAsync();
+                JArray data = JArray.Parse(responseBody);
+                
+                // Display the first result
+                if (data.Count > 0)
+                {
+                    UpdateOutputText(data[0].ToString());
+                }
+                else
+                {
+                    UpdateOutputText("No results returned.");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching from Perchance: {ex.Message}");
+            UpdateOutputText("Error fetching from Perchance. See console for details.");
+        }
+        finally
+        {
+            UpdateButtonText("Generate");
+        }
+    }
+
+    private void UpdateButtonText(string text)
+    {
+        // Update UI button text (implementation depends on your UI framework)
+        // Example for WPF:
+        // Dispatcher.Invoke(() => generateButton.Content = text);
+    }
+
+    private void UpdateOutputText(string text)
+    {
+        // Update UI output text (implementation depends on your UI framework)
+        // Example for WPF:
+        // Dispatcher.Invoke(() => outputTextBlock.Text = text);
+    }
+}</pre>
+    </div>
+    
+    <div class="code-example python">
+      <pre>import requests
+import json
+
+def fetch_from_perchance():
+    generator_name = "example-generator"  # Replace with your generator name
+    count = 1  # Number of results to get
+    
+    try:
+        update_button_text("Loading...")
+        
+        url = f"https://perchance.org/api/generateList.php?generator={generator_name}&count={count}"
+        response = requests.get(url)
+        
+        if response.status_code != 200:
+            raise Exception(f"HTTP error! Status: {response.status_code}")
+        
+        data = response.json()
+        
+        # Display the first result
+        if data and len(data) > 0:
+            update_output_text(data[0])
+        else:
+            update_output_text("No results returned.")
+    except Exception as e:
+        print(f"Error fetching from Perchance: {str(e)}")
+        update_output_text("Error fetching from Perchance. See console for details.")
+    finally:
+        update_button_text("Generate")
+
+def update_button_text(text):
+    # Update UI button text (implementation depends on your UI framework)
+    # Example for Tkinter:
+    # generate_button.config(text=text)
+    pass
+
+def update_output_text(text):
+    # Update UI output text (implementation depends on your UI framework)
+    # Example for Tkinter:
+    # output_label.config(text=text)
+    pass</pre>
+    </div>
+  </div>
+  
+  <div class="step">
+    <h2>Step 6: Handling CORS Issues</h2>
+    <p>You might encounter CORS (Cross-Origin Resource Sharing) issues when fetching directly from Perchance. If this happens, you have a few options:</p>
+    <ol>
+      <li>Use a CORS proxy service</li>
+      <li>Create a simple backend server to make the request for you</li>
+      <li>Contact Perchance to request CORS access for your domain</li>
+    </ol>
+    
+    <div class="code-example javascript active">
+      <p>For a CORS proxy implementation in JavaScript, you can modify your fetch like this:</p>
+      <pre>const corsProxy = "https://cors-anywhere.herokuapp.com/";
+const url = `${corsProxy}https://perchance.org/api/generateList.php?generator=${generatorName}&count=${count}`;</pre>
+    </div>
+    
+    <div class="code-example java">
+      <p>In Java, you might need to use a backend server to avoid CORS issues:</p>
+      <pre>// This would be implemented in your backend server
+@RestController
+public class ProxyController {
+    @GetMapping("/proxy/perchance")
+    public ResponseEntity&lt;String&gt; proxyPerchance(
+            @RequestParam("generator") String generator,
+            @RequestParam("count") int count) {
+        
+        try {
+            URL url = new URL("https://perchance.org/api/generateList.php?generator=" 
+                              + generator + "&count=" + count);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            // Read and return the response...
+            
+            // Your client-side code would then call your backend endpoint
+            // instead of Perchance directly
+        } catch (Exception e) {
+            // Handle errors
+        }
+    }
+}</pre>
+    </div>
+    
+    <div class="code-example csharp">
+      <p>In C#, you might create an API controller to handle CORS:</p>
+      <pre>[ApiController]
+[Route("api/[controller]")]
+public class ProxyController : ControllerBase
+{
+    private readonly HttpClient _httpClient;
+    
+    public ProxyController(HttpClient httpClient)
+    {
+        _httpClient = httpClient;
+    }
+    
+    [HttpGet]
+    public async Task&lt;IActionResult&gt; ProxyPerchance(string generator, int count)
+    {
+        try
+        {
+            string url = $"https://perchance.org/api/generateList.php?generator={generator}&count={count}";
+            HttpResponseMessage response = await _httpClient.GetAsync(url);
+            
+            if (!response.IsSuccessStatusCode)
+                return StatusCode((int)response.StatusCode);
+                
+            var content = await response.Content.ReadAsStringAsync();
+            return Content(content, "application/json");
+        }
+        catch
+        {
+            return StatusCode(500);
+        }
+    }
+}</pre>
+    </div>
+    
+    <div class="code-example python">
+      <p>In Python, you can create a Flask route to proxy the request:</p>
+      <pre>from flask import Flask, request, jsonify
+import requests
+
+app = Flask(__name__)
+
+@app.route('/proxy/perchance')
+def proxy_perchance():
+    generator = request.args.get('generator')
+    count = request.args.get('count', 1)
+    
+    try:
+        url = f"https://perchance.org/api/generateList.php?generator={generator}&count={count}"
+        response = requests.get(url)
+        return jsonify(response.json())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == '__main__':
+    app.run(debug=True)</pre>
+    </div>
+    
+    <p>Note: Many public CORS proxies have usage limitations or require an auth token.</p>
+  </div>
+  
+  <div class="step">
+    <h2>Step 7: Adding Additional Features</h2>
+    <p>You can enhance your implementation with features like:</p>
+    <ul>
+      <li>Dropdown to select different generators</li>
+      <li>Option to specify how many results to fetch</li>
+      <li>Saving favorite results</li>
+      <li>Styling the results</li>
+    </ul>
+  </div>
+  
+  <div id="demoContainer">
+    <h2>Live Demo</h2>
+    <p>Below is a working example using a fantasy character generator (note: you may need to replace with your own generator):</p>
+    
+    <h3 id="demoTitle">Fantasy Character Generator</h3>
+    <div id="demoOutput">Click the button below to generate a character...</div>
+    <button id="demoGenerateBtn" onclick="generateCharacter()">Generate Character</button>
+    
+    <script>
+      async function generateCharacter() {
+        const generatorName = "fantasy-character"; // Replace with an actual generator
+        const demoBtn = document.getElementById("demoGenerateBtn");
+        const outputEl = document.getElementById("demoOutput");
+        
+        try {
+          demoBtn.textContent = "Loading...";
+          demoBtn.disabled = true;
+          
+          // In a real implementation, you'd use fetch directly.
+          // For demo purposes, we'll simulate a response to avoid CORS issues
+          // const response = await fetch(`https://perchance.org/api/generateList.php?generator=${generatorName}&count=1`);
+          // const data = await response.json();
+          
+          // Simulated delay and response
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          const simulatedResult = "Level 7 Elven Wizard who specializes in illusion magic and carries an enchanted staff made from an ancient tree.";
+          
+          outputEl.textContent = simulatedResult;
+        } catch (error) {
+          console.error("Error:", error);
+          outputEl.textContent = "Error generating character. Please try again.";
+        } finally {
+          demoBtn.textContent = "Generate Character";
+          demoBtn.disabled = false;
+        }
+      }
+    </script>
+  </div>
+  
+  <div class="step">
+    <h2>Step 8: Complete Code Example</h2>
+    <p>Here's a complete example you can use as a starting point:</p>
+    
+    <div class="code-example javascript active">
+      <pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+  &lt;title&gt;Perchance Generator Integration&lt;/title&gt;
+  &lt;style&gt;
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+    #output { padding: 15px; border: 1px solid #ddd; min-height: 50px; margin: 15px 0; }
+    button { padding: 8px 16px; cursor: pointer; }
+    html { color-scheme: light dark; }
+  &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;h1&gt;Perchance Generator&lt;/h1&gt;
+  
+  &lt;label for="generatorInput"&gt;Generator Name:&lt;/label&gt;
+  &lt;input type="text" id="generatorInput" value="fantasy-character"&gt;
+  
+  &lt;div id="output"&gt;Results will appear here...&lt;/div&gt;
+  &lt;button onclick="fetchFromPerchance()"&gt;Generate&lt;/button&gt;
+  
+  &lt;script&gt;
+    async function fetchFromPerchance() {
+      const generatorName = document.getElementById("generatorInput").value;
+      const count = 1;
+      
+      try {
+        document.querySelector("button").textContent = "Loading...";
+        const response = await fetch(`https://perchance.org/api/generateList.php?generator=${generatorName}&count=${count}`);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data && data.length > 0) {
+          document.getElementById("output").textContent = data[0];
+        } else {
+          document.getElementById("output").textContent = "No results returned.";
+        }
+      } catch (error) {
+        console.error("Error fetching from Perchance:", error);
+        document.getElementById("output").textContent = "Error fetching from Perchance. Check console for details.";
+      } finally {
+        document.querySelector("button").textContent = "Generate";
+      }
+    }
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+    </div>
+    
+    <div class="code-example java">
+      <pre>&lt;!-- Java Application Example (with JavaFX) --&gt;
+import javafx.application.Application;
+import javafx.geometry.Insets;
+import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
+import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import org.json.JSONArray;
+import javafx.application.Platform;
+
+public class PerchanceGeneratorApp extends Application {
+    private TextField generatorInput;
+    private Label outputLabel;
+    private Button generateButton;
+
+    @Override
+    public void start(Stage primaryStage) {
+        primaryStage.setTitle("Perchance Generator");
+
+        // Create UI elements
+        Label titleLabel = new Label("Perchance Generator");
+        titleLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold;");
+
+        Label generatorLabel = new Label("Generator Name:");
+        generatorInput = new TextField("fantasy-character");
+        
+        outputLabel = new Label("Results will appear here...");
+        outputLabel.setWrapText(true);
+        outputLabel.setPrefHeight(100);
+        outputLabel.setStyle("-fx-border-color: #ddd; -fx-padding: 10px;");
+        
+        generateButton = new Button("Generate");
+        generateButton.setOnAction(e -> fetchFromPerchance());
+
+        // Layout
+        VBox layout = new VBox(10);
+        layout.setPadding(new Insets(20));
+        layout.getChildren().addAll(
+            titleLabel, 
+            generatorLabel, 
+            generatorInput, 
+            outputLabel, 
+            generateButton
+        );
+
+        Scene scene = new Scene(layout, 500, 300);
+        primaryStage.setScene(scene);
+        primaryStage.show();
+    }
+
+    private void fetchFromPerchance() {
+        new Thread(() -> {
+            String generatorName = generatorInput.getText();
+            int count = 1;
+            
+            try {
+                Platform.runLater(() -> {
+                    generateButton.setText("Loading...");
+                    generateButton.setDisable(true);
+                });
+                
+                URL url = new URL("https://perchance.org/api/generateList.php?generator=" 
+                                  + generatorName + "&count=" + count);
+                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("GET");
+                
+                int responseCode = connection.getResponseCode();
+                if (responseCode != 200) {
+                    throw new Exception("HTTP error! Status: " + responseCode);
+                }
+                
+                BufferedReader in = new BufferedReader(
+                    new InputStreamReader(connection.getInputStream()));
+                String inputLine;
+                StringBuilder response = new StringBuilder();
+                
+                while ((inputLine = in.readLine()) != null) {
+                    response.append(inputLine);
+                }
+                in.close();
+                
+                JSONArray data = new JSONArray(response.toString());
+                
+                if (data.length() > 0) {
+                    final String result = data.getString(0);
+                    Platform.runLater(() -> outputLabel.setText(result));
+                } else {
+                    Platform.runLater(() -> outputLabel.setText("No results returned."));
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                Platform.runLater(() -> 
+                    outputLabel.setText("Error fetching from Perchance. Check console for details."));
+            } finally {
+                Platform.runLater(() -> {
+                    generateButton.setText("Generate");
+                    generateButton.setDisable(false);
+                });
+            }
+        }).start();
+    }
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+}</pre>
+    </div>
+    
+    <div class="code-example csharp">
+      <pre>&lt;!-- C# Application Example (WPF) --&gt;
+&lt;Window x:Class="PerchanceApp.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Perchance Generator" Height="350" Width="525"&gt;
+    &lt;Grid Margin="20"&gt;
+        &lt;Grid.RowDefinitions&gt;
+            &lt;RowDefinition Height="Auto"/&gt;
+            &lt;RowDefinition Height="Auto"/&gt;
+            &lt;RowDefinition Height="Auto"/&gt;
+            &lt;RowDefinition Height="*"/&gt;
+            &lt;RowDefinition Height="Auto"/&gt;
+        &lt;/Grid.RowDefinitions&gt;
+        
+        &lt;TextBlock Grid.Row="0" Text="Perchance Generator" 
+                 FontSize="20" FontWeight="Bold" Margin="0,0,0,15"/&gt;
+        
+        &lt;StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,10"&gt;
+            &lt;TextBlock Text="Generator Name:" VerticalAlignment="Center"/&gt;
+            &lt;TextBox x:Name="GeneratorInput" Text="fantasy-character" Width="200" Margin="10,0,0,0"/&gt;
+        &lt;/StackPanel&gt;
+        
+        &lt;Border Grid.Row="3" BorderBrush="#ddd" BorderThickness="1" Margin="0,10"&gt;
+            &lt;TextBlock x:Name="OutputBlock" Text="Results will appear here..." 
+                       Padding="10" TextWrapping="Wrap"/&gt;
+        &lt;/Border&gt;
+        
+        &lt;Button Grid.Row="4" x:Name="GenerateButton" Content="Generate" 
+               Click="GenerateButton_Click" HorizontalAlignment="Left" 
+               Padding="8,4"/&gt;
+    &lt;/Grid&gt;
+&lt;/Window&gt;
+
+// C# code-behind
+using System;
+using System.Net.Http;
+using System.Windows;
+using Newtonsoft.Json.Linq;
+
+namespace PerchanceApp
+{
+    public partial class MainWindow : Window
+    {
+        private readonly HttpClient _httpClient = new HttpClient();
+
+        public MainWindow()
+        {
+            InitializeComponent();
+        }
+
+        private async void GenerateButton_Click(object sender, RoutedEventArgs e)
+        {
+            string generatorName = GeneratorInput.Text;
+            int count = 1;
+            
+            try
+            {
+                GenerateButton.Content = "Loading...";
+                GenerateButton.IsEnabled = false;
+                
+                string url = $"https://perchance.org/api/generateList.php?generator={generatorName}&count={count}";
+                HttpResponseMessage response = await _httpClient.GetAsync(url);
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new Exception($"HTTP error! Status: {response.StatusCode}");
+                }
+                
+                string responseBody = await response.Content.ReadAsStringAsync();
+                JArray data = JArray.Parse(responseBody);
+                
+                if (data.Count > 0)
+                {
+                    OutputBlock.Text = data[0].ToString();
+                }
+                else
+                {
+                    OutputBlock.Text = "No results returned.";
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error: {ex.Message}", "Error");
+                OutputBlock.Text = "Error fetching from Perchance. See error details.";
+            }
+            finally
+            {
+                GenerateButton.Content = "Generate";
+                GenerateButton.IsEnabled = true;
+            }
+        }
+    }
+}</pre>
+    </div>
+    
+    <div class="code-example python">
+      <pre>&lt;!-- Python Application Example (Tkinter) --&gt;
+import tkinter as tk
+from tkinter import messagebox
+import threading
+import requests
+import json
+
+class PerchanceApp:
+    def __init__(self, root):
+        self.root = root
+        root.title("Perchance Generator")
+        root.geometry("500x300")
+        
+        # Create title
+        title_label = tk.Label(root, text="Perchance Generator", font=("Arial", 16, "bold"))
+        title_label.pack(pady=(20, 15))
+        
+        # Create generator input field
+        input_frame = tk.Frame(root)
+        input_frame.pack(fill="x", padx=20)
+        
+        generator_label = tk.Label(input_frame, text="Generator Name:")
+        generator_label.pack(side="left")
+        
+        self.generator_input = tk.Entry(input_frame, width=30)
+        self.generator_input.pack(side="left", padx=(10, 0))
+        self.generator_input.insert(0, "fantasy-character")
+        
+        # Create output area
+        output_frame = tk.Frame(root, padx=20, pady=15)
+        output_frame.pack(fill="both", expand=True)
+        
+        self.output_text = tk.Label(
+            output_frame, 
+            text="Results will appear here...",
+            wraplength=400, 
+            justify="left",
+            bd=1, 
+            relief="solid", 
+            padx=10, 
+            pady=10
+        )
+        self.output_text.pack(fill="both", expand=True)
+        
+        # Create generate button
+        self.generate_button = tk.Button(
+            root, 
+            text="Generate", 
+            command=self.fetch_from_perchance,
+            padx=10, 
+            pady=5
+        )
+        self.generate_button.pack(pady=(0, 20))
+    
+    def fetch_from_perchance(self):
+        def fetch_task():
+            generator_name = self.generator_input.get()
+            count = 1
+            
+            try:
+                self.root.after(0, lambda: self.generate_button.config(
+                    text="Loading...", 
+                    state="disabled"
+                ))
+                
+                url = f"https://perchance.org/api/generateList.php?generator={generator_name}&count={count}"
+                response = requests.get(url)
+                
+                if response.status_code != 200:
+                    raise Exception(f"HTTP error! Status: {response.status_code}")
+                
+                data = response.json()
+                
+                if data and len(data) > 0:
+                    self.root.after(0, lambda: self.output_text.config(text=data[0]))
+                else:
+                    self.root.after(0, lambda: self.output_text.config(text="No results returned."))
+            
+            except Exception as e:
+                print(f"Error fetching from Perchance: {str(e)}")
+                self.root.after(0, lambda: messagebox.showerror("Error", str(e)))
+                self.root.after(0, lambda: self.output_text.config(
+                    text="Error fetching from Perchance. Check console for details."
+                ))
+            
+            finally:
+                self.root.after(0, lambda: self.generate_button.config(
+                    text="Generate", 
+                    state="normal"
+                ))
+        
+        # Start the fetch task in a separate thread to avoid freezing the UI
+        threading.Thread(target=fetch_task).start()
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = PerchanceApp(root)
+    root.mainloop()</pre>
+    </div>
+  </div>
+  
+  <div class="step">
+    <h2>Step 9: Troubleshooting</h2>
+    <p>Common issues you might encounter:</p>
+    <ul>
+      <li><strong>CORS Errors:</strong> As mentioned in Step 6, you might need a proxy or backend solution.</li>
+      <li><strong>Rate Limiting:</strong> Perchance might limit how many API requests you can make.</li>
+      <li><strong>Generator Not Found:</strong> Make sure you're using the correct generator name.</li>
+      <li><strong>Unexpected Data Format:</strong> Some generators might return results in different formats. Check the response structure.</li>
+    </ul>
+  </div>
+  
+  <div class="step">
+    <h2>Step 10: Going Further</h2>
+    <p>Once you have the basic integration working, you can expand your app with:</p>
+    <ul>
+      <li>Caching results to reduce API calls</li>
+      <li>Creating a more advanced UI to display complex generator outputs</li>
+      <li>Building your own generator on Perchance customized for your app's needs</li>
+      <li>Implementing user accounts to save favorite generations</li>
+    </ul>
+  </div>
+  
+  <script>
+    // The update function is used to keep the original functionality
+    function update() {
+      generateCharacter();
+    }
+    
+    // Function to change the programming language
+    function changeLanguage(language) {
+      // Update active button styling
+      document.querySelectorAll('.language-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      document.getElementById(`${language}Btn`).classList.add('active');
+      
+      // Hide all code examples
+      document.querySelectorAll('.code-example').forEach(example => {
+        example.classList.remove('active');
+      });
+      
+      // Show only the selected language's code examples
+      document.querySelectorAll(`.code-example.${language}`).forEach(example => {
+        example.classList.add('active');
+      });
+    }
+    
+    // Initialize with JavaScript selected
+    document.addEventListener('DOMContentLoaded', function() {
+      changeLanguage('javascript');
+    });
+  </script>
+</body>
+</html>

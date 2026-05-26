@@ -1,0 +1,111 @@
+// This is the JavaScript function that powers this plugin:
+$output (list) => 
+  if(!list) return "(error: no list given to consumable-leaf-list-plugin)";
+
+	// get all leaves:
+	// general strategy is to add all first level items to the leaves array, then
+	// go through and replace the ones that aren't actually leaves (i.e. have children)
+	// with their children, and then go through those and do the same thing, etc. until
+	// we've got all the leaves.
+	const isLeaf = (node) => Object.keys(node).length === 0;
+	const leaves = [...list.selectAll];
+	for(let i = 0; i < leaves.length; i++) { // note that `leaves` grows during the loop, so it's important that we don't "cache" leaves.length 
+		if(!isLeaf(leaves[i])) {
+			leaves.splice(i, 1, ...leaves[i].selectAll); // it's not actually a leaf, so we replace it with its children
+			i--;
+		}
+	}
+	if(leaves.length === 0) {
+	  return "(error: no leaves in list given to consumable-leaf-list-plugin?)";
+	}
+
+	const theConsumableLeafList = {
+		list: list,
+		leaves: new Set(leaves),
+		consumedLeaves: new Set(),
+		exhaustedBranches: new Set(), // meaning all its leaves are consumed and all its branches are exhausted. this set includes ancestors of twigs too - not just twigs.
+		isLeaf: function(item) { return this.leaves.has(item); },
+		leafCount: leaves.length,
+		get getLength() {
+			return this.leafCount - this.consumedLeaves.size;
+		},
+		// just a copy of the actual selectMany function:
+	  selectMany(...a) {
+			let num;
+			if(a.length === 1) {
+				if(Array.isArray(a[0])) {
+					num = Number(a[0][Math.floor(Math.random()*a[0].length)]);
+				} else {
+					num = Number(a[0]);
+				}
+			} else if(a.length === 2) {
+				num = Number(a[0]) + Math.round(Math.random()*(a[1]-a[0]));
+			} else if(a.length > 2) {
+				num = Number(a[Math.floor(Math.random()*a.length)]);
+			}
+			if(isNaN(num)) debugger;
+			let arr = [];
+			for(let i = 0; i < num; i++) {
+				arr.push(this.selectOne);
+			}
+			arr.toString = function() { return this.join(""); };
+			return arr;
+		},
+		get selectAll() {
+		  // Note that thanks to using splice when we create the leaves list, top-to-bottom order of the leaves is maintained, just like with the actual `selectAll` getter.
+			let arr = [...this.leaves];
+			arr.toString = function() { return this.join(""); };
+			return arr;
+		},
+		get selectOne() {
+			if(this.getLength === 0) return "(error: no more items left in consumableLeafList)";
+			let i = 0;
+			let done = false;
+			let item = this.list;
+			while(1) {
+				i++;
+				if(i > 10000) return "(error in consumable-leaf-list-plugin: infinite loop encountered?)";
+				
+				if(this.isLeaf(item)) {
+					this.consumedLeaves.add(item);
+					
+					// now we need to apply "cascading exhaustion" to ancestor branches (i.e. mark branches as exhausted if they are exhausted):
+					let branch = item.getParent; // start at parent of the leaf that was just selected
+					while(1) {
+            // check if all its leaves an branches are exhausted:
+					  if( branch.selectAll.filter(i => this.isLeaf(i) && !this.consumedLeaves.has(i)).length === 0 /*<--has no unconsumed leaves left*/ && branch.selectAll.filter(i => !this.isLeaf(i) && !this.exhaustedBranches.has(i)).length === 0 /*<--has no unexhausted branches left*/) {
+							this.exhaustedBranches.add(branch);
+							if(branch === this.list) break;
+							else branch = branch.getParent;
+						} else {
+						  break; // not exhausted, therefore no ancestors are either.
+						}
+					}
+					
+					return item;
+					
+				} else {
+				  // go deeper, but make sure we don't choose leaves that have already been chosen, or go down exhausted branches:
+          // (NOTE: the selectOne actually uses getOdds behind the scenes on the nodes in the array that is returned by selectAll, so all the odds stuff should work correctly even though we're initally grabbing ALL nodes with selectAll)
+				  item = item.selectAll.filter(i => !this.exhaustedBranches.has(i) && !this.consumedLeaves.has(i)).selectOne;
+					// note that it should be impossible for selectOne here to try to pull from an empty list, because we've filtered
+					// out all the exhausted branches. So if it does pull from an empty list, that means there's probably a bug with my
+					// "cascading exhaustion" code.
+				}
+			}
+		},
+		toString: function() {
+		  return this.selectOne+"";
+		},
+		valueOf: function() {
+		  let res = this.selectOne+"";
+			if(Number(res).toString() === res) {
+			  res = Number(res);
+			}
+			return res;
+		},
+	};
+	return theConsumableLeafList;
+	
+// You can learn JavaScript here:
+// https://www.khanacademy.org/computing/computer-programming

@@ -1,0 +1,79 @@
+<h1>Perchance FAQ</h1>
+<main>
+	<p style="margin-top:0;"><b>Can I embed my generator on my website?</b> Yes! Just put your generator's URL in an iframe tag using the <code>null.perchance.org</code> subdomain:</p>
+<pre>
+&lt;iframe src="https://null.perchance.org/my-generator-name"&gt;&lt;/iframe&gt;
+</pre>
+	<p>If you need help changing the size of the embed or any other visual quality of the embedded generator, you can ask for help on the <a href="https://lemmy.world/c/perchance">forum</a>.</p>
+	
+  <p><b>Will there be an open-source Perchance library for programmers?</b> Ideally, yes. The only reason there isn't one already is because Perchance was built in a very "MVP" manner. (Talking to the programmers here,) I've altered the prototypes of inbuilt objects (Array, String, etc.), inadvisably hacked together <code><a href="https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Global_Objects/Proxy">Proxy</a></code>s and <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/with">with</a></code> statements to construct fake scopes and execution chains, simulated operator overloading by playing with <code>valueOf</code> and well-known <code>Symbol</code>s, used <code>eval</code> unreservedly, and, in general, summoned every other JavaScript demon needed in order to get the Perchance DSL's syntax to work nicely (all code inside square brackets is executed as plain JavaScript, for those who missed that). So currently Perchance isn't in a state where it's easy to pull out the engine, throw it into an NPM module and call it a day (until <a href="https://github.com/tc39/proposal-shadowrealm/blob/main/explainer.md" target="_blank">this proposal</a> becomes a reality, that is). If you're okay with the aforementioned mess, then you can pretty much just grab the <code>.js</code> files that are used in the iframe, include them in your project and use them the same way they're used in the iframe html (you just pass createPerchanceTree your a string of perchance code and it returns the "root" of the tree, which you can then use to call the sublists). Feel free to ask for help on <a href="https://lemmy.world/c/perchance">the forum</a>.</p>
+	
+  <p><b>Do I own generators that I create on Perchance?</b> Perchance is an open community where anyone can "fork" or "remix" anyone else's generators. If you create a generator and share its URL with others, you must do so with the understanding that others may play around with your generator's code and publish a remixed version. Other people may also "import" your generator into theirs so that they can use the lists that you've created. We are a "sharing-is-caring" community and encourage everyone to have a positive, open source attitude. If you use someone else's generator, please be nice and credit them for their work. You can remove your generator from publicly visible lists (like <a href="https://perchance.org/generators">perchance.org/generators</a>) by clicking "make private" in the settings menu.</p>
+	
+  <p><b>Will there be Perchance apps? Can I download my generators for offline usage?</b> You can download your generator for offline usage by clicking the "settings" button, and then clicking "download". This saves your generator as a single HTML file that you can easily open on desktop or mobile devices. There's also <a href="https://perchance.org/download-button-plugin" target="_blank">a plugin</a> that allows you to easily add a button to your generator's page so others can download your generator too. Apps aren't off the table, but are currently low-priority.</p>
+	
+  <p><b>What if Perchance shuts down? Where will my generators go?</b> The likelihood of Perchance shutting down is very, very, very low. I would say zero, but things like nuclear apocalypses are technically possible. I would prefer to cut off both my arms than to shut down Perchance. Way too many people would be <i>extremely</i> negatively impacted by this. The cost of hosting and serving text is minimal, and thanks to the backwards compatibility philosophy of the web platform, maintenance is not a problem. I can leave Perchance alone for several months to do other things, and it's fine - I've done this many times before. If, in some apocalypse-level event I am somehow not able to continue hosting Perchance, then the whole Perchance platform will become open source (if it hasn't already by that point - see <a href="https://lemmy.world/comment/11259615" target="_blank">some notes here</a> on this). No need to trust me though, because you can download your generators whenever you want - just open your generator's editing page and click "settings", and then "download it". As shown in <a href="https://www.reddit.com/r/perchance/comments/yi0twl/dev_you_can_now_edit_your_downloaded_generators/" target="_blank">this demonstration video</a>, <i>you can edit your downloaded generators</i> by adding #edit to the end of the URL, then pressing enter, then refreshing the page. Again, I can't conceive of <u>any</u> circumstance which would require that I shut down Perchance, even in the very long-term. I run Perchance as a "public good", not as a "startup" who's going to send you an over-sentimental email with a sunset gif that basically says "all your stuff will stop working in 2 weeks". That would be a <i style="font-weight:bold;">massive</i> betrayal. Edit: I added some more comments on this matter <a href="https://www.reddit.com/r/perchance/comments/rysded/comment/hs9lqlj/" target="_blank">here</a>.</p>
+	
+  <p><b>How are you going to fund Perchance?</b> As I've said, hosting and serving text doesn't cost much. This is the cool thing about the way Perchance works: All the code actually runs in the browser, on your machine - not on servers. The Perchance server is really just a simple database that serves the HTML/JS/CSS to you, which your browser then executes. So it's really cheap, especially with Cloudflare as a cache in front. There are now some AI plugins that do run via servers, but they are completely <u>self-sustained</u> via advertisements on the generators that import them, as noted on their plugin page - e.g. <a href="/ai-text-plugin" target="_blank">ai-text-plugin</a>.</p>
+  
+  <p><b>Will you ever sell Perchance?</b> There's a pattern in the "startup world" of a team being really nice to their community, growing their platform on the back of the trust their users have in them, and then at some point they realize that they could make a lot more money if they could screw over their users a bit, but they don't want to that because then people would hate them, and they care about their reputation on Twitter, or whatever. So instead they get someone else to do it. That is, they get bought out by some other company, and then they think they have some plausible deniability when the acquirer starts rent-seeking. "Oh no, we didn't know that company X would do that! They told us that we'd have complete control still! Woops! I guess we forgot to add that in the contract!" Please use a darkweb cypto market to send assassins after me if I ever do this. I will never sell Perchance. I've already ignored multi-million dollar offers, and will ignore multi-billion dollar offers if they ever appear in my inbox. Perchance is not a startup, it's not for sale, and it never will be.</p>
+	
+  <p><b>What is Perchance's "roadmap"?</b> My current goal is to get Perchance to the point where it's stable and has all the features required to build reasonably complex generators. After that, I'll be moving the majority of my efforts onto a new project, but I'll keep an eye on the community to make sure I'm there to help with any technical problems that come up. The cool thing is, since Perchance allows you to make "plugins", anyone who learns a bit of JavaScript can keep working on the platform and making it better - no need to wait for the developer (me) to add features. Perchance can grow on its own.</p> 
+	
+  <p>Feel free to ask questions on the <a href="https://lemmy.world/c/perchance">forum</a> :)</p>
+</main>
+<p style="text-align:center; font-size:200%; opacity:0.2; margin-top:0.5em;"><span>⚄&#xFE0E;</span></p>
+<br/>
+
+<style>
+  ul li {
+		margin-top:0.5em;	
+	}
+	main {
+		max-width:900px;
+		margin:0 auto;
+		background: #fff;
+		background: light-dark(#fff, #101010);
+		padding:1.5em;
+		border-radius:3px;
+		box-shadow: 0 0.5px 0 0 #ffffff inset, 0 1px 2px 0 #B3B3B3;
+		box-shadow: 0 0.5px 0 0 light-dark(#fff, #060606) inset, 0 1px 2px 0 light-dark(#B3B3B3, #2c2c2c);
+	}
+	p { text-align:left; line-height: 1.4em; }
+  main p:first-child {
+    margin-top:0;
+  }
+	body {
+		background-color:#f6f6f6;	
+		background-color: light-dark(#f6f6f6, #000);
+    color: black;
+    color: light-dark(black, #d6d6d6);
+	}
+	pre {
+		text-align:left;
+		background: #333;
+    background: light-dark(#333, #212121);
+    color: #e2e2e2;
+    padding: 1em;
+    border-radius: 2px;
+		tab-size: 2;
+		-moz-tab-size: 2;
+		-o-tab-size: 2;
+		-webkit-tab-size: 2;
+	}
+	code {
+		background: #eff0f1;
+    background:  light-dark(#eff0f1, #272727);
+    padding: 1px 5px;	
+		white-space: nowrap;
+	}
+	h2 {
+		margin-top: 1.5em;	
+	}
+	@media screen and (max-width: 600px) {
+		#header {
+			font-size:1.6rem !important;
+		} 
+	}
+  html { color-scheme: dark light }
+</style>

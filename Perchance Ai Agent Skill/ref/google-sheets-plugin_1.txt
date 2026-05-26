@@ -1,0 +1,88 @@
+$output(desiredParentNode, v1UrlsV2Settings, version) =>
+  let urls;
+  let onLoad;
+  if(version === "@version1") {
+    if(typeof v1UrlsV2Settings === "string") { // <-- since we allow them to pass a single URL (i.e. just a string) or an array or urls
+      urls = [v1UrlsV2Settings];
+    } else {
+      urls = v1UrlsV2Settings;
+    }
+    onLoad = () => update();
+  } else {
+    // new, stable version - i.e. when `version` is not provided:
+    let settings = v1UrlsV2Settings;
+    urls = settings.urls.selectAll;
+    onLoad = settings.onLoad || (() => update());
+  }
+
+  if(!window.__alreadyLoadedGoogleSheetsUrls4729702) window.__alreadyLoadedGoogleSheetsUrls4729702 = {};
+
+  let promises = [];
+  for(let url of urls) {
+    if(window.__alreadyLoadedGoogleSheetsUrls4729702[url]) continue;
+    window.__alreadyLoadedGoogleSheetsUrls4729702[url] = true;
+    let promise = (async function() {
+      console.log("Loading Google Sheet: ", url);
+      let text = await fetch(url).then(r => r.text());
+      let lines = text.split("\n");
+      let listNames = lines.shift().split("\t").map(n => n.trim());
+      let lists = new Array(listNames.length).fill(0).map(a => []);
+      for(let line of lines) {
+        let items = line.split("\t").map(item => item.trim()); 
+        for(let i = 0; i < items.length; i++) {
+          if(!lists[i]) continue;
+          if(!items[i]) continue; // i.e. if empty string
+          lists[i].push(items[i]);
+        }
+      }
+      for(let i = 0; i < listNames.length; i++) {
+        desiredParentNode[listNames[i]] = lists[i];
+      }
+      console.log("Finished Loading Google Sheet:", url);
+    })();
+    promises.push(promise);
+  }
+  if(promises.length > 0) {
+    Promise.all(promises).then(_ => {
+      onLoad();
+      console.log("Finsihed loading Google Sheets batch: ", urls)
+    });
+  }
+  // } else {
+  //   return "(error: you didn't give a version to the google sheets plugin? the last input should be a version)"
+  // }  
+  return "";
+
+
+// $output(desiredParentNode, url, version) =>
+//   if(version === "@version1") {
+    
+//     if(!window.__alreadyLoadedGoogleSheetsUrls4729702) window.__alreadyLoadedGoogleSheetsUrls4729702 = {};
+    
+//     if(window.__alreadyLoadedGoogleSheetsUrls4729702[url]) return "";
+//     window.__alreadyLoadedGoogleSheetsUrls4729702[url] = true;
+  
+//     (async function() {
+//       console.log("Loading Google Sheet...");
+//       let text = await fetch(url).then(r => r.text());
+//       let lines = text.split("\n");
+//       let listNames = lines.shift().split("\t").map(n => n.trim());
+//       let lists = new Array(listNames.length).fill(0).map(a => []);
+//       for(let line of lines) {
+//         let items = line.split("\t").map(item => item.trim()); 
+//         for(let i = 0; i < items.length; i++) {
+//           if(!lists[i]) continue;
+//           if(!items[i]) continue; // i.e. if empty string
+//           lists[i].push(items[i]);
+//         }
+//       }
+//       for(let i = 0; i < listNames.length; i++) {
+//         desiredParentNode[listNames[i]] = lists[i];
+//       }
+//       console.log("Finished Loading Google Sheet.");
+//       update();
+//     })();
+//   } else {
+//     return "(error: you didn't give a version to the google sheets plugin? the last input should be a version)"
+//   }
+//   return "";

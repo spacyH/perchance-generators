@@ -1,0 +1,1255 @@
+commentsPlugin = {import:comments-plugin}
+generateText = {import:ai-text-plugin}
+defaultCustomEmojis = {import:huge-emoji-list}
+
+// See exampleOptions below for an example of these options:
+//   channels: (A list of channel names, optionally with the comment options under each channel name)
+//   allowBots: true/false (Default is true, except on default channel and 'general' channel. You can also disable/enable bots on a per-channel basis by setting allowBots to true/false under the channel name.)
+//   defaultCommentsOptions: (See perchance.org/comments-plugin for all options)
+//   fillHeight: true/value (By default its height is based on the screen height. set this option to true to make it expand to full height of its container)
+
+exampleOptions
+  defaultCommentsOptions // see perchance.org/comments-plugin for all available options
+    adminFlair = 💎OWNER💎 // this option will get applied to *all* channels below.
+  channels 
+    general
+      label = General
+    chat1 // i've set messageBubbleStyle here to give an example showing that each channel can have any of the channel options that are explained in perchance.org/comments-plugin
+      label = Room 1
+      messageBubbleStyle = background:pink; border:2px dotted red; color:black;
+    chat2
+      label = Room 2
+      allowBots = false // disallows 'speak via character' for this channel
+    test3
+    test4
+
+
+
+
+
+
+
+
+tabbedCommentsPlugin = [$output]
+
+$output(opts) =>
+  let commentsChannels = opts.channels;
+  let defaultChannelOptions = opts.defaultChannelOptions || {};
+  let outerCtn = document.createElement("div");
+  
+  let globalFnsId = "a"+Math.random().toString(16).slice(2);
+  
+  let minHeight = defaultChannelOptions.height;
+  if(!minHeight) minHeight = 300;
+  if(typeof minHeight === "number") minHeight += "px";
+  
+  
+  outerCtn.className = "tabbed-comments-plugin-outer-ctn";
+  outerCtn.style.cssText = `text-align:center; ${opts.fillHeight ? "height:100%;" : ""}; container-type:inline-size;`;
+  outerCtn.innerHTML = `<div style="display:flex; justify-content:center; align-items:center; ${opts.fillHeight ? "height:100%;" : ""}">
+    <div class="tabbed-comments-ctn-left tabbed-comments-plugin-ctn" style="height:min(70vh, 600px); min-height:${minHeight}; justify-content:center; align-items:center; flex-grow:1; min-width: 0; ${opts.fillHeight ? "height:100%;max-height:100%;min-height:100%;" : ""}"></div>
+    <div class="tabbed-comments-ctn-middle tabbed-comments-plugin-ctn" style="height:min(70vh, 600px); min-height:${minHeight}; width:100%; max-width:min(800px, 100vw); flex-grow: 1; min-width: 0; ${opts.fillHeight ? "height:100%;max-height:100%;min-height:100%;" : ""}"></div>
+    <div class="tabbed-comments-ctn-right tabbed-comments-plugin-ctn" style="height:min(70vh, 600px); min-height:${minHeight}; justify-content:center; align-items:center; flex-grow:1; min-width: 0; ${opts.fillHeight ? "height:100%;max-height:100%;min-height:100%;" : ""}"></div>
+  </div>
+  <button onclick="this.closest('.tabbed-comments-plugin-outer-ctn').querySelector('.tabbed-comments-auto-comment-ctn').style.display='flex'; this.style.display='none';" class="tabbed-comments-show-auto-comment-area-btn" style="font-size:80%; margin-top:0.75rem;">🧝 speak via character</button>
+  <div class="tabbed-comments-auto-comment-ctn" style="display:none; flex-direction:column; border:1px solid grey; border-radius:2px; width:400px; max-width:98%; margin:0 auto; margin-top:1.5rem;">
+    <div style="display: flex; align-items: center; justify-content: center; padding:0.25rem; width:100%;">
+      <div style=" display: flex; align-items: center; justify-content: center; flex-direction: column; gap:0.25rem; width:100%;">
+        <div style="display:flex; gap:0.25rem; width:100%;">
+          <button class="tabbed-comments-auto-comment-char-btn" onclick="window.__${globalFnsId}_tabbedCommentsPluginAutoComment({name:this.closest('.tabbed-comments-plugin-outer-ctn').querySelector('.tabbed-comments-auto-comment-char-name').value, description:this.closest('.tabbed-comments-plugin-outer-ctn').querySelector('.tabbed-comments-auto-comment-char-description').value})" style="flex-grow:1; min-width:max-content;">🧝 write as character</button>
+          <select class="tabbed-comments-auto-comment-char-select" onchange="window.__${globalFnsId}_tabbedCommentsPluginSwitchToAutoCommentCharByIndex(this.value)" style="max-width:90px;"></select>
+        </div>
+        <input class="tabbed-comments-auto-comment-char-name" oninput="window.__${globalFnsId}_tabbedCommentsPluginSaveAutoCommentCharInfo()" placeholder="Character name..." style="width:100%;">
+        <textarea class="tabbed-comments-auto-comment-char-description" oninput="window.__${globalFnsId}_tabbedCommentsPluginSaveAutoCommentCharInfo()" placeholder="Character description..." style="width:100%; height:100px; z-index:5;"></textarea>
+      </div>
+    </div>
+    <div style="display:flex; justify-content:center; align-items:center; border-top:1px solid grey; padding:0.25rem;">
+      <input class="tabbed-comments-auto-comment-auto-send-checkbox" onchange="localStorage.__tabbedCommentsAutoCommentAutoSendCheckboxValue=this.checked?'1':''; " style="cursor:pointer;" type="checkbox">
+      <div onclick="this.closest('.tabbed-comments-plugin-outer-ctn').querySelector('.tabbed-comments-auto-comment-auto-send-checkbox').click()" style="margin-left:0.25rem; cursor:pointer; user-select:none;">auto-send?</div>
+    </div>
+  </div>`;
+  
+  let rightCtn = outerCtn.querySelector('.tabbed-comments-ctn-right');
+  let middleCtn = outerCtn.querySelector('.tabbed-comments-ctn-middle');
+  let leftCtn = outerCtn.querySelector('.tabbed-comments-ctn-left');
+  
+  let showAutoCommentAreaBtn = outerCtn.querySelector('.tabbed-comments-show-auto-comment-area-btn');
+  let autoCommentCtn = outerCtn.querySelector('.tabbed-comments-auto-comment-ctn');
+  let autoCommentCharBtn = outerCtn.querySelector('.tabbed-comments-auto-comment-char-btn');
+  let autoCommentCharSelectEl = outerCtn.querySelector('.tabbed-comments-auto-comment-char-select');
+  let autoCommentCharNameEl = outerCtn.querySelector('.tabbed-comments-auto-comment-char-name');
+  let autoCommentCharNameDescriptionEl = outerCtn.querySelector('.tabbed-comments-auto-comment-char-description');
+  let autoCommentAutoSendCheckboxEl = outerCtn.querySelector('.tabbed-comments-auto-comment-auto-send-checkbox');
+  
+  let middleCtnCurrentlyShownCommentsChannelName;
+  
+  let sidePanelObjs = new Set();
+  let middlePanelObj;
+  let middleCtnChannelNameToObj = {};
+  let allPanelObjs = new Set();
+
+  function getConfiguredChannelName(commentOptions) {
+    if(typeof commentOptions === "string") return commentOptions.toString();
+    if(!commentOptions.channel) return (commentOptions.getName==="general" ? "" : commentOptions.getName).toString();
+    return commentOptions.channel.toString();
+  }
+
+  let configuredDefaultChannelNames = new Set(commentsChannels.selectAll.map(getConfiguredChannelName));
+
+  function isConfiguredDefaultChannel(channel) {
+    return configuredDefaultChannelNames.has(channel);
+  }
+
+  function isStoredCustomChannel(channel) {
+    return channel !== "" && !isConfiguredDefaultChannel(channel);
+  }
+
+  function readStoredCustomChannels() {
+    if(!localStorage.__tabbedCommentsPluginCustomChannels) localStorage.__tabbedCommentsPluginCustomChannels = "{}";
+    try {
+      return JSON.parse(localStorage.__tabbedCommentsPluginCustomChannels);
+    } catch(e) {
+      console.error("Failed to parse custom channels from localStorage:", e);
+      return {};
+    }
+  }
+
+  function writeStoredCustomChannels(customChannels) {
+    localStorage.__tabbedCommentsPluginCustomChannels = JSON.stringify(customChannels);
+  }
+
+  function getStoredCustomChannelEntriesInOrder() {
+    return Object.entries(readStoredCustomChannels())
+      .map(([key, commentOptions]) => ({ key, commentOptions, channel: commentOptions?.channel?.toString() }))
+      .filter(({ channel }) => channel && isStoredCustomChannel(channel));
+  }
+
+  function syncOpenPanelsToStoredCustomChannelState() {
+    for(let panelObj of [...allPanelObjs]) {
+      if(!document.body.contains(panelObj.element)) {
+        allPanelObjs.delete(panelObj);
+        continue;
+      }
+      panelObj.syncPanelCustomChannelsFromStorage();
+    }
+  }
+
+  function moveStoredCustomChannel(channel, direction) {
+    let customChannels = readStoredCustomChannels();
+    let channelEntries = Object.entries(customChannels);
+    let currentIndex = channelEntries.findIndex(([, commentOptions]) => commentOptions?.channel?.toString() === channel);
+    let nextIndex = currentIndex + (direction === "left" ? -1 : 1);
+    if(currentIndex < 0 || nextIndex < 0 || nextIndex >= channelEntries.length) return;
+    [channelEntries[currentIndex], channelEntries[nextIndex]] = [channelEntries[nextIndex], channelEntries[currentIndex]];
+    writeStoredCustomChannels(Object.fromEntries(channelEntries));
+    syncOpenPanelsToStoredCustomChannelState();
+  }
+  
+  function updateColorScheme() {
+    let systemColorScheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? "dark" : "light";
+    if(localStorage.forceColorScheme === "dark" || (!localStorage.forceColorScheme && systemColorScheme === "dark")) {
+      outerCtn.style.setProperty('--tabbed-comments-plugin-text-color', '#efefef');
+      outerCtn.style.setProperty('--tabbed-comments-plugin-box-color', '#2a2a2a');
+      outerCtn.style.setProperty('--tabbed-comments-plugin-active-comment-channel-tab-color', '#3f3f3f');
+    } else {
+      outerCtn.style.setProperty('--tabbed-comments-plugin-text-color', '#222');
+      outerCtn.style.setProperty('--tabbed-comments-plugin-box-color', '#ebebeb');
+      outerCtn.style.setProperty('--tabbed-comments-plugin-active-comment-channel-tab-color', '#c6c6c6');
+    }
+    outerCtn.querySelectorAll("[data-tabbed-comments-direct-parent-of-comments-plugin-putput='1']").forEach(el => {
+      let commentOptions = el.__commentOptionsUsed;
+      commentOptions.forceColorScheme = defaultChannelOptions.forceColorScheme ?? localStorage.forceColorScheme ?? null
+      el.innerHTML = commentsPlugin(commentOptions);
+    });
+  }
+  updateColorScheme();
+  
+  let colorSchemeMediaQuery = window.matchMedia("(prefers-color-scheme: dark)"); 
+  colorSchemeMediaQuery.addEventListener("change", updateColorScheme);
+  
+  let localStorageChangeHandler = function(e) { 
+    if(!document.body.contains(outerCtn)) { // prevent memory leak
+      window.removeEventListener("storage", localStorageChangeHandler);
+      colorSchemeMediaQuery.removeEventListener("change", updateColorScheme);
+      return;
+    }
+    if(e.key === "forceColorScheme") {
+      updateColorScheme();
+    } else if(e.key === "__tabbedCommentsPluginCustomChannels") {
+      syncOpenPanelsToStoredCustomChannelState();
+    }
+  };
+  window.addEventListener("storage", localStorageChangeHandler);
+  let storageListenerInterval = setInterval(() => {
+    if(!document.body.contains(outerCtn)) { // prevent memory leak
+      window.removeEventListener("storage", localStorageChangeHandler);
+      colorSchemeMediaQuery.removeEventListener("change", updateColorScheme);
+      clearInterval(storageListenerInterval);
+    }
+  }, 1000*30);
+  
+  function updateMiddleTabModuleWidth() {
+    if(leftCtn.querySelector(".tabbed-comments-plugin-add-tabs-module-button") && rightCtn.querySelector(".tabbed-comments-plugin-add-tabs-module-button")) {
+      // both side modules are closed, so prevent it from getting too big:
+      middleCtn.style.maxWidth = "min(800px, 100vw)";
+      leftCtn.style.width = "";
+      middleCtn.style.width = "100%";
+      rightCtn.style.width = "";
+    } else {
+      // at least one is open, so make them take up thirds
+      middleCtn.style.maxWidth = "";
+      leftCtn.style.width = "33.3%";
+      middleCtn.style.width = "33.3%";
+      rightCtn.style.width = "33.3%";
+    }
+    
+    if(!opts.fillHeight) {
+      if(leftCtn.querySelector(".tabbed-comments-plugin-add-tabs-module-button") || rightCtn.querySelector(".tabbed-comments-plugin-add-tabs-module-button")) {
+        // at least one is closed, so restore normal height
+        middleCtn.style.minHeight = "";
+        leftCtn.style.minHeight = "";
+        rightCtn.style.minHeight = "";
+      } else {
+        // both side panels are open, so make the whole section taller
+        middleCtn.style.minHeight = "90vh";
+        leftCtn.style.minHeight = "90vh";
+        rightCtn.style.minHeight = "90vh";
+      }
+    }
+  }
+  function initSideButton(side) {
+    let buttonHtml = `<button class="tabbed-comments-plugin-add-tabs-module-button" style="margin-${side==="left" ? "right" : "left"}:0.5rem; padding:1px 6px;">+</button>`;
+    let ctn = outerCtn.querySelector(".tabbed-comments-ctn-"+side);
+    ctn.innerHTML = buttonHtml;
+    ctn.querySelector("button").onclick = function() {
+      ctn.innerHTML = "";
+      let obj = createTabbedCommentsPanel({
+        addCloseButton:true,
+        onClose: function() {
+          sidePanelObjs.delete(obj);
+          setTimeout(() => {
+            initSideButton(side);
+            updateMiddleTabModuleWidth();
+          }, 10);
+        }
+      });
+      ctn.appendChild(obj.element);
+      sidePanelObjs.add(obj);
+      updateMiddleTabModuleWidth();
+    };
+  }
+  initSideButton("left");
+  initSideButton("right");
+  
+  
+  
+  
+  
+  
+  /////////////////////////////////////////////////////////
+  //     CHANNEL MENTIONS, SEEN/UNSEEN COUNTING, ETC.    //
+  /////////////////////////////////////////////////////////
+  let unseenCommentCountByChannel = {};
+  function updateUnseenCountHtml(channel) {
+    let count = unseenCommentCountByChannel[channel];
+    for(let tabCtn of [...outerCtn.querySelectorAll(".tabbed-comments-plugin-ctn")]) {
+      let countEl = tabCtn.querySelector(`.tabbed-comments-plugin-tab[data-channel='${channel}'] .tabbed-comments-plugin-unseen-count`);
+      if(countEl) { // since this tabCtn may not have that particular tab
+        countEl.textContent = count;
+        countEl.style.background = (count > 0) ? "#ab0e0e" : "";
+        countEl.style.display = (count > 0) ? "inline" : "none";
+      }
+    }
+  }
+
+  let temporaryMentionedChannels = new Set();
+  let knownMessageIdsByChannel = {};
+  let lastCurrentUserCommentTime = null;
+  function commentsPluginOnLoadHandler(comments) {
+    for(let comment of comments) {
+      processCommentForUnseenCounts(comment);
+      if(comment.byCurrentUser) {
+        lastCurrentUserCommentTime = Date.now();
+      }
+    }
+    if(comments[0]) unseenCommentCountByChannel[comments[0].channel] = 0; // reset unseen count since above `processCommentForUnseenCounts` has incremented it
+    processCommentsForTempChannels(comments.slice(-30));
+  }
+  function commentsPluginOnCommentHandler(comment) {
+    processCommentForUnseenCounts(comment);
+    if(comment.byCurrentUser) {
+      lastCurrentUserCommentTime = Date.now();
+    }
+    processCommentsForTempChannels([comment]);
+  }
+  function processCommentForUnseenCounts(comment) {
+    // console.log("new comment:", comment);
+    let channel = comment.channel;
+    // initialize if we haven't yet:
+    if(!knownMessageIdsByChannel[comment.channel]) knownMessageIdsByChannel[channel] = new Set();
+
+    // increment the unseen count if we haven't seen this comment id before:
+    if(!knownMessageIdsByChannel[channel].has(comment.id)) {
+      knownMessageIdsByChannel[channel].add(comment.id);
+      unseenCommentCountByChannel[channel] = (unseenCommentCountByChannel[channel] || 0) + 1;
+
+      let tabIsVisible = false; // check if it's visible in any of the tabbedCommentsCtn elements
+      for(let tabCtn of [...outerCtn.querySelectorAll(".tabbed-comments-plugin-ctn")]) {
+        let tabContentEl = tabCtn.querySelector(`.tabbed-comments-plugin-content[data-channel='${channel}']`);
+        if(tabContentEl && tabContentEl.offsetHeight !== 0) tabIsVisible = true;
+      }
+      if(tabIsVisible) { // set unseen count to 0 if tab is visible
+        unseenCommentCountByChannel[channel] = 0;
+      }
+      updateUnseenCountHtml(channel);
+    }
+  }
+  function attachEventsToTemporaryMentionedChannelTab(tabEl, channelName) {
+    tabEl.addEventListener("click", function() {
+      temporaryMentionedChannels.delete(channelName);
+      for(let t of [...outerCtn.querySelectorAll(`.tabbed-comments-plugin-ctn .tabbed-comments-plugin-header .tabbed-comments-plugin-tab[data-channel='${channelName}']`)]) {
+        t.dataset.tabbedCommentsPluginIsTemporaryMentionedChannel = "";
+      }
+    });
+    window.addEventListener("beforeunload", function() {
+      if(tabEl.dataset.tabbedCommentsPluginIsTemporaryMentionedChannel) {
+        temporaryMentionedChannels.delete(channelName);
+        for(let obj of [...sidePanelObjs, middlePanelObj]) {
+          obj.deleteCommentsChannel(channelName);
+        }
+      }
+    });
+  }
+  
+  // to rate limit mentions:
+  let userIdToMentionedChannelsInLast2Minutes = {};
+  setInterval(() => {
+    userIdToMentionedChannelsInLast2Minutes = {};
+  }, 1000*60*2);
+
+  function isValidFolderName(folderName) {
+    // examples of valid folder names:
+    // foo
+    // foo+channelname
+    // foo+channelname+u:username1
+    // foo+channelname+u:username1|username2
+
+    let parts = folderName.split("+");
+    if(parts.length > 3) return false;
+    let name = parts[0] + (parts[1] ? `+${parts[1]}` : "");
+    let rules = parts[2];
+    
+    let nameIsValid = name && /^[a-z0-9\-+]+$/.test(name) && name.split("+").length <= 2 && !name.endsWith("+");
+    let rulesIfAnyAreValid = true;
+    if(rules) rulesIfAnyAreValid = /^u:[a-z0-9|]+$/.test(rules) && !/\|\|/.test(rules) && !/:\|/.test(rules) && !rules.endsWith("|");
+    return nameIsValid && rulesIfAnyAreValid;
+  }
+  
+  function processCommentsForTempChannels(comments) {
+    if(commentsChannels.allowCustomChannels === false) return;
+    for(let comment of comments) {
+      let mentionedChannelName = comment.message.match(/(\s|^)#[a-z0-9\-\+\|:]+(\s|$)/g)?.[0];
+      if(mentionedChannelName && !isValidFolderName(window.generatorName+"+"+mentionedChannelName.trim().replace(/^#/, "").trim())) mentionedChannelName = "";
+      if(mentionedChannelName && !/^[0-9]+$/.test(mentionedChannelName)) { // if it's all numbers, ignore
+        mentionedChannelName = mentionedChannelName.trim().replace(/^#/, "").trim(); // remove the hash from the start and whitespace from start/end
+        if(mentionedChannelName === "feedback") continue;
+        if(!userIdToMentionedChannelsInLast2Minutes[comment.user.id]) userIdToMentionedChannelsInLast2Minutes[comment.user.id] = [];
+        if(userIdToMentionedChannelsInLast2Minutes[comment.user.id].length >= 10) continue;
+        // add it as a temporary channel which self-deletes after 2 minutes.
+        // it upgrades to a real one when clicked.
+        if(middlePanelObj) { // <-- just in case somehow hasn't initialized yet, or whatever
+
+          // If they've got the tab *somewhere* (e.g. in side module), then we don't add it as a temporary channel.
+          let alreadyExistsSomewhere = !!outerCtn.querySelector(`.tabbed-comments-plugin-ctn .tabbed-comments-plugin-header .tabbed-comments-plugin-tab[data-channel='${mentionedChannelName}']`);
+
+          let { tab, alreadyExisted } = middlePanelObj.addCommentsChannel(mentionedChannelName);
+          userIdToMentionedChannelsInLast2Minutes[comment.user.id].push(mentionedChannelName);
+          
+          if(!alreadyExisted && !alreadyExistsSomewhere) {
+            temporaryMentionedChannels.add(mentionedChannelName);
+
+            let newTabs = [];
+            newTabs.push(tab);
+
+            try { // because it's new code
+              for(let obj of sidePanelObjs) {
+                let { tab } = obj.addCommentsChannel(mentionedChannelName);
+                newTabs.push(tab);
+              }
+            } catch(e) { console.error(e); }
+
+            for(let newTab of newTabs) {
+              newTab.dataset.tabbedCommentsPluginIsTemporaryMentionedChannel = "1";
+              attachEventsToTemporaryMentionedChannelTab(newTab, mentionedChannelName);
+            }
+            // make its background blink for a couple of seconds:
+            let blinkCount = 0;
+            let blinkInterval = setInterval(() => {
+              tab.style.background = blinkCount%2===0 ? "#043a9b" : "";
+              blinkCount++;
+              if(blinkCount > 5) clearInterval(blinkInterval);
+            }, 300);
+            setTimeout(() => {
+              temporaryMentionedChannels.delete(mentionedChannelName);
+
+              if(document.body.contains(tab) && tab.dataset.tabbedCommentsPluginIsTemporaryMentionedChannel) {
+                for(let obj of [...sidePanelObjs, middlePanelObj]) {
+                  obj.deleteCommentsChannel(mentionedChannelName);
+                }
+              }
+            }, 1000*40);
+          }
+        }
+      }
+    }
+  }
+  
+  
+  
+  
+  
+  
+  /////////////////////////////////////////////
+  //         BOT/AUTO-COMMENT STUFF          //
+  /////////////////////////////////////////////
+  let autoCommentChars = [];
+  if(localStorage.autoCommentChars) {
+    try { autoCommentChars = JSON.parse(localStorage.autoCommentChars); } catch(e) { alert(e); }
+    autoCommentChars = autoCommentChars.filter(c => c && c.name);
+  }
+  function getAutoCommentNameFromNickname(nickname) {
+    let nicknameWithoutNonNameCharacters = nickname.replace(/[\n\-:|()!{}*]/g, "").replace(/(?![*#0-9]+)[\p{Emoji}\p{Emoji_Modifier}\p{Emoji_Component}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}]/gu, '');
+    let words = nicknameWithoutNonNameCharacters.split(/[|/ \-})]/g).map(w => w.trim()).filter(w => w);
+    while(words.slice(0, -1).join("_").length > 25) words.pop(); // we remove the last one for the length check in case it's a name like One Supercalifragilisticexpialidocious - better for userTag to be "OneSupercalif" than "One"
+    if(words.slice(0, -1).join("_").length > 15) words.pop(); // we probably don't need the last word if all the earlier ones are over 15 characters
+    let name = words.join("_").trim().toLowerCase();
+    return name + (nickname.length > 25 ? "…" : "");
+  }
+  window[`__${globalFnsId}_tabbedCommentsPluginAutoComment`] = function(character) {
+    let commentsBox = middleCtnChannelNameToObj[middleCtnCurrentlyShownCommentsChannelName];
+    if(commentsBox.channel === "n/o/-/a/i".replaceAll("/", "")) return;
+
+    let startTime = Date.now();
+    autoCommentCharBtn.disabled = true;
+    autoCommentCharBtn.textContent = "⏳ just a sec...";
+
+    let currentUser = commentsBox.comments.find(c => c.byCurrentUser)?.user;
+    let comments = commentsBox.comments.slice(-500).map(c => {
+      let userTag = c.user.visualId.toUpperCase();
+      if(c.user.nickname) {
+        let name = getAutoCommentNameFromNickname(c.user.nickname);
+        if(name) userTag = `${c.user.visualId.toUpperCase()}(${name})`
+      }
+      return `${userTag}: ${c.message.trim().replace(/\n{3,}/g, "\n\n")}`;
+    });
+    while(comments.join("").length > 10000) comments.shift();
+
+    let nicknameOverride = character.name.replace(/\s+/g, " ").slice(0, 50);
+    let currentUserVisualId = currentUser ? currentUser.visualId.toUpperCase() : "U7OP"; // just use a random/arbitrary tag if we don't have the user's actual one (we'll get it once they've made their first comment)
+    let respondingUserTag = `${currentUserVisualId}(${character.name})`;
+    let characterDescription = character.description.replace(/\n/g, " ").slice(0, 5000);
+
+    let newCommentText = ""; //commentsBox.inputText.trim().replace(/\n/g, " ").split(" ").slice(0, 3);
+    let obj = generateText({ // NOTE: perchance removes all leading spaces from lines, so we don't need to dedent the lines below
+      instruction: `
+      Your task is to write the next 5 messages in the following chat/roleplay. Keep it interesting. Stay in character based on the previous messages. You are **NOT** an AI. You are writing as a regular chat participant, not as an AI. When writing ${respondingUserTag}'s messages, you can ignore the off-topic/OOC/spam/commentary chat messages and focus on the roleplay messages that are actually a part of the story. Predict what the characters in this chat/roleplay are most likely to say next, and then write it **EXACTLY** as the chat participants would, based on what they've previously said.
+      IMPORTANT: Here's a description of ${respondingUserTag}: ${characterDescription}.
+
+      <MESSAGES>
+      ${comments.slice(0, -4).join("\n\n---\n\n").trim() || `(None yet. Start the chat/roleplay with an interesting starter message.)`}
+      </MESSAGES>
+
+      Again, your task is to write the next 5 messages. Make sure your writing is interesting, authentic, descriptive, natural, engaging, and creative. Create a captivating and genuinely fascinating roleplay, and always stay in-character and write responses based on the previous chat context. Don't be boring. Keep the roleplay flowing!
+      As a reminder about the ${respondingUserTag} character: ${characterDescription.slice(0, 500) + (characterDescription.length > 1000 ? "..." : "")}
+      `.trim(),
+      startWith: comments.slice(-4).join("\n\n---\n\n")+"\n\n---\n\n"+respondingUserTag+": "+newCommentText,
+      stopSequences: ["\n\n", "</MESSAGES>"],
+      onChunk: function(data) {
+        if(data.isFromStartWith) return;
+        newCommentText += data.textChunk; 
+        if(newCommentText.includes("</MESSAGES>")) {
+          newCommentText = newCommentText.replace(/<\/MESSAGES>/g, "").trim();
+          obj.stop();
+        }
+        commentsBox.inputText = newCommentText.trim();
+
+        // if really long, or repeating a single character, stop:
+        if(newCommentText.length > 800 || newCommentText.slice(-30) === newCommentText[newCommentText.length-1].repeat(30)) {
+          obj.stop();
+        }
+      },
+      onFinish: async function() {
+        autoCommentCharBtn.disabled = false;
+        autoCommentCharBtn.textContent = "🧝 write as character";
+
+        if(/\n---\s*$/.test(commentsBox.inputText)) {
+          commentsBox.inputText = commentsBox.inputText.replace(/\n---\s*$/g, "");
+          newCommentText = newCommentText.replace(/\n---\s*$/g, "");
+        }
+
+        if(autoCommentAutoSendCheckboxEl.checked) {
+          if(newCommentText.trim()) {
+            if(lastCurrentUserCommentTime && Date.now()-lastCurrentUserCommentTime < 3000) {
+              // too soon to submit again, so just set nickname and let them click submit manually
+              commentsBox.setNicknameForNextComment(nicknameOverride);
+              autoCommentCharBtn.textContent = "submitting too fast";
+              setTimeout(() => {
+                autoCommentCharBtn.textContent = "🧝 write as character";
+              }, 1000);
+            } else {
+              commentsBox.submit(newCommentText.trim(), {nickname:nicknameOverride}).then(r => {
+                if(!r.success) commentsBox.inputText = newCommentText.trim(); // recover comment text if it failed
+              });
+              commentsBox.inputText = "";
+            }
+          }
+        } else {
+          // No auto-submit, but we still set the nickname to their character
+          commentsBox.setNicknameForNextComment(nicknameOverride);
+        }
+      },
+    });
+  }
+  let saveAutoCommentCharInfoDebounceTimeout;
+  window[`__${globalFnsId}_tabbedCommentsPluginSaveAutoCommentCharInfo`] = function() {
+    autoCommentCharSelectEl.selectedOptions[0].textContent = autoCommentCharNameEl.value;
+    autoCommentChars[autoCommentCharSelectEl.value] = {name:autoCommentCharNameEl.value, description:autoCommentCharNameDescriptionEl.value};
+    clearTimeout(saveAutoCommentCharInfoDebounceTimeout);
+    saveAutoCommentCharInfoDebounceTimeout = setTimeout(() => {
+      localStorage.autoCommentChars = JSON.stringify(autoCommentChars);
+    }, 500);
+  }
+  window[`__${globalFnsId}_tabbedCommentsPluginSwitchToAutoCommentCharByIndex`] = function(index) {
+    if(index === "#") {
+      // add a new <option> with an index 1 higher than the current highest:
+      let newIndex = autoCommentChars.length;
+      let selectedOptionEl = autoCommentCharSelectEl.selectedOptions[0];
+      selectedOptionEl.value = newIndex;
+      selectedOptionEl.textContent = "Unnamed";
+      autoCommentCharNameEl.value = "";
+      autoCommentCharNameDescriptionEl.value = "";
+      autoCommentCharSelectEl.innerHTML += `<option value="#">Add char...</option>`;
+      autoCommentCharSelectEl.value = newIndex;
+      localStorage.__tabbedCommentsLastActiveAutoCommentCharIndex = newIndex;
+    } else {
+      autoCommentCharNameEl.value = autoCommentChars[index].name;
+      autoCommentCharNameDescriptionEl.value = autoCommentChars[index].description;
+      autoCommentCharSelectEl.value = index;
+      localStorage.__tabbedCommentsLastActiveAutoCommentCharIndex = index;
+    }
+  }
+  if(autoCommentChars.length === 0) {
+    autoCommentChars.push({name:"Unnamed", description:""});
+    autoCommentCharSelectEl.innerHTML = `<option value="0">Unnamed</option>`;
+  } else {
+    autoCommentCharSelectEl.innerHTML = autoCommentChars.map((o, i) => `<option value="${i}">${o.name}</option>`).join("");
+  }
+  autoCommentCharSelectEl.innerHTML += `<option value="#">Add char...</option>`;
+  try {
+    let charIndex = Number(localStorage.__tabbedCommentsLastActiveAutoCommentCharIndex || 0);
+    if(isNaN(charIndex)) charIndex = 0;
+    if(!autoCommentChars[charIndex]) charIndex = 0;
+    if(!autoCommentChars[charIndex]) {
+      charIndex = 0;
+      autoCommentChars[0] = {name:"Unnamed", description:""};
+    }
+    localStorage.__tabbedCommentsLastActiveAutoCommentCharIndex = charIndex;
+    window[`__${globalFnsId}_tabbedCommentsPluginSwitchToAutoCommentCharByIndex`](charIndex);
+    autoCommentAutoSendCheckboxEl.checked = !!localStorage.__tabbedCommentsAutoCommentAutoSendCheckboxValue;
+  } catch(e) { alert(e); }
+
+  function createTabbedCommentsPanel(panelOpts) { // takes *list* of commentOptions as input
+    if(!panelOpts) panelOpts = {};
+    let panelCtn = document.createElement("div");
+    panelCtn.innerHTML = `
+      <div class="tabbed-comments-plugin-header"></div>
+      <div class="tabbed-comments-plugin-body"></div>
+    `;
+    
+
+    let commentsChannelNameToObj = {};
+    let currentChannelName = null;
+    let panelObj;
+
+    const tabsHeaderEl = panelCtn.querySelector('.tabbed-comments-plugin-header');
+    const tabsContentEl = panelCtn.querySelector('.tabbed-comments-plugin-body');
+
+    function deleteCommentsChannel(channel) {
+      let customChannels = readStoredCustomChannels();
+      delete customChannels[channel];
+      writeStoredCustomChannels(customChannels);
+      syncOpenPanelsToStoredCustomChannelState();
+    }
+
+    function addCommentsChannel(channel) {
+      let customChannels = readStoredCustomChannels();
+      let alreadyExisted = !!customChannels[channel] || !!tabsHeaderEl.querySelector(`.tabbed-comments-plugin-tab[data-channel='${channel}']`);
+      if(channel !== "" && !customChannels[channel]) {
+        customChannels[channel] = {channel:channel};
+        writeStoredCustomChannels(customChannels);
+        syncOpenPanelsToStoredCustomChannelState();
+      }
+
+      let tab = tabsHeaderEl.querySelector(`.tabbed-comments-plugin-tab[data-channel='${channel}']`);
+      let tabContent = tabsContentEl.querySelector(`.tabbed-comments-plugin-content[data-channel='${channel}']`);
+
+      return {tab, tabContent, alreadyExisted};
+    }
+
+    // Function to react to tab clicks
+    async function handleTabClick(event) {
+      let clickedTab = event.target;
+      if(!clickedTab.classList.contains('tabbed-comments-plugin-tab')) return; // they didn't click directly on a tab
+
+      if(event.target.classList.contains('tabbed-comments-plugin-add-custom-channel')) {
+        // They clicked on the "+" icon to add a new channel.
+        // let channel = prompt("Choose a channel name. Note: You can type #channelname in the chat to share your channel.");
+        let userInput = await getUserInput({
+          channel: { type: "input:text", label: "Choose a channel name to add:", placeholder: "You can use letters, numbers and hyphens.", value: window.lastUsedAiSuggestPrompt || "" },
+          tip:         { type: "html",     html: `<div style="opacity:0.8; font-size:75%;">
+          <details>
+            <summary style="cursor:pointer;">Tap here for tips</summary>
+            <ul>
+              <li>You can type <b>#channelname</b> in the chat to share your channel.</li>
+              <li style="margin-top:0.5rem;">If you add <b>+u:alice|bob</b> at the end of a channel name, then only the users with usernames 'alice' and 'bob' will be able to comment on that channel. If your username is 'abc', and you want a personal 'blog' type channel that is publicly known but can't get spammed by others, then you could write <b>blog+u:abc</b> in the above text input, and only you will be able to comment on that channel.</li>
+            </u>
+            </details>
+          </div>`, marginBottom:"0px" },
+        }, { okText:"Add channel", cancelText:"Cancel", cancelOnBackgroundClick:true });
+        let channel = userInput?.channel;
+        if(channel) {
+          let removeChannel = false;
+          if(channel.startsWith("!")) {
+            removeChannel = true;
+            channel = channel.slice(1);
+          }
+          channel = channel.toLowerCase();
+          channel = channel.replace(/[^a-z0-9\-:+|]/g, "");
+
+          if(!channel) {
+            alert("Channel names can only contain lower-case letters, numbers and hyphens.");
+            return;
+          }
+          if(channel === "feedback") return;
+          if(channel === "general") return;
+
+          if(removeChannel) {
+            deleteCommentsChannel(channel);
+            let firstChannelTab = tabsHeaderEl.querySelector('.tabbed-comments-plugin-channel-tab');
+            if(firstChannelTab) showTabByChannelName(firstChannelTab.dataset.channel);
+          } else {
+            addCommentsChannel(channel);
+            showTabByChannelName(channel);
+            alert(`The '${channel}' channel has been added. Type #${channel} in the chat to share it.`)
+          }
+        }
+        return;
+      } else if(event.target.classList.contains('tabbed-comments-plugin-channel-tab')) {
+        showTabByChannelName(clickedTab.dataset.channel);
+      }
+    }
+
+    function ensureActiveCustomChannelControlButtons() {
+      if(!tabsHeaderEl.channelMoveLeftBtn) {
+        let btn = tabsHeaderEl.channelMoveLeftBtn = document.createElement("div");
+        btn.className = "tabbed-comments-plugin-tab tabbed-comments-plugin-channel-control-btn";
+        btn.style.cssText = "min-width:1.4rem; display:none;";
+        btn.innerHTML = "⬅️";
+        btn.title = "Move channel left";
+        btn.onclick = function(event) {
+          event.stopPropagation();
+          moveStoredCustomChannel(this.dataset.channelToMove, "left");
+        };
+      }
+      if(!tabsHeaderEl.channelMoveRightBtn) {
+        let btn = tabsHeaderEl.channelMoveRightBtn = document.createElement("div");
+        btn.className = "tabbed-comments-plugin-tab tabbed-comments-plugin-channel-control-btn";
+        btn.style.cssText = "min-width:1.4rem; display:none;";
+        btn.innerHTML = "➡️";
+        btn.title = "Move channel right";
+        btn.onclick = function(event) {
+          event.stopPropagation();
+          moveStoredCustomChannel(this.dataset.channelToMove, "right");
+        };
+      }
+      if(!tabsHeaderEl.channelDeleteBtn) {
+        let btn = tabsHeaderEl.channelDeleteBtn = document.createElement("div");
+        btn.className = "tabbed-comments-plugin-tab tabbed-comments-plugin-channel-control-btn";
+        btn.style.cssText = "min-width:1.4rem; display:none; outline:light-dark(#ff5858, #a10808) solid 2px;";
+        btn.innerHTML = "🗑️";
+        btn.title = "Hide or unpin this channel";
+        btn.onclick = function(event) {
+          event.stopPropagation();
+          let channel = this.dataset.channelToDelete;
+          if(confirm(`Hide/unpin the '${channel}' channel?`)) {
+            deleteCommentsChannel(channel);
+          }
+        };
+      }
+    }
+
+    function hideActiveCustomChannelControlButtons() {
+      ensureActiveCustomChannelControlButtons();
+      disbandActiveCustomChannelControlCluster();
+      clearActiveCustomChannelJoinStyles();
+      tabsHeaderEl.channelMoveLeftBtn.style.display = "none";
+      tabsHeaderEl.channelMoveRightBtn.style.display = "none";
+      tabsHeaderEl.channelDeleteBtn.style.display = "none";
+    }
+
+    function disbandActiveCustomChannelControlCluster() {
+      let clusterEl = tabsHeaderEl.activeCustomChannelControlClusterEl;
+      if(!clusterEl || !clusterEl.parentNode) return;
+      while(clusterEl.firstChild) {
+        clusterEl.parentNode.insertBefore(clusterEl.firstChild, clusterEl);
+      }
+      clusterEl.remove();
+    }
+
+    function clearActiveCustomChannelJoinStyles() {
+      for(let el of [...tabsHeaderEl.querySelectorAll(`
+        .tabbed-comments-plugin-channel-control-btn,
+        .tabbed-comments-plugin-active-tab-joined-left,
+        .tabbed-comments-plugin-active-tab-joined-right,
+        .tabbed-comments-plugin-active-tab-joined-both,
+        .tabbed-comments-plugin-left-arrow-joined-to-active-tab,
+        .tabbed-comments-plugin-right-arrow-joined-to-active-tab
+      `)]) {
+        el.classList.remove(
+          'tabbed-comments-plugin-active-tab-joined-left',
+          'tabbed-comments-plugin-active-tab-joined-right',
+          'tabbed-comments-plugin-active-tab-joined-both',
+          'tabbed-comments-plugin-left-arrow-joined-to-active-tab',
+          'tabbed-comments-plugin-right-arrow-joined-to-active-tab',
+        );
+      }
+    }
+
+    function ensureActiveCustomChannelControlCluster() {
+      if(!tabsHeaderEl.activeCustomChannelControlClusterEl) {
+        let clusterEl = tabsHeaderEl.activeCustomChannelControlClusterEl = document.createElement("div");
+        clusterEl.className = "tabbed-comments-plugin-active-custom-channel-control-cluster";
+      }
+      return tabsHeaderEl.activeCustomChannelControlClusterEl;
+    }
+
+    function renderControlsAroundActiveCustomChannel(channel) {
+      ensureActiveCustomChannelControlButtons();
+      hideActiveCustomChannelControlButtons();
+      if(!isStoredCustomChannel(channel)) return;
+
+      let activeTab = tabsHeaderEl.querySelector(`.tabbed-comments-plugin-tab[data-channel='${channel}']`);
+      if(!activeTab) return;
+
+      let orderedCustomChannelNames = getStoredCustomChannelEntriesInOrder()
+        .map(({ channel }) => channel)
+        .filter(channelName => !!tabsHeaderEl.querySelector(`.tabbed-comments-plugin-channel-tab[data-channel='${channelName}']`));
+      let channelIndex = orderedCustomChannelNames.indexOf(channel);
+      if(channelIndex < 0) return;
+
+      let moveLeftBtn = tabsHeaderEl.channelMoveLeftBtn;
+      let moveRightBtn = tabsHeaderEl.channelMoveRightBtn;
+      let deleteBtn = tabsHeaderEl.channelDeleteBtn;
+      let clusterEl = ensureActiveCustomChannelControlCluster();
+
+      moveLeftBtn.dataset.channelToMove = channel;
+      moveRightBtn.dataset.channelToMove = channel;
+      deleteBtn.dataset.channelToDelete = channel;
+
+      let hasLeftMove = channelIndex > 0;
+      let hasRightMove = channelIndex < orderedCustomChannelNames.length-1;
+
+      activeTab.before(clusterEl);
+      if(hasLeftMove) {
+        moveLeftBtn.style.display = "flex";
+        moveLeftBtn.classList.add('tabbed-comments-plugin-left-arrow-joined-to-active-tab');
+        clusterEl.append(moveLeftBtn);
+      }
+      if(hasLeftMove && hasRightMove) {
+        activeTab.classList.add('tabbed-comments-plugin-active-tab-joined-both');
+      } else if(hasLeftMove) {
+        activeTab.classList.add('tabbed-comments-plugin-active-tab-joined-left');
+      } else if(hasRightMove) {
+        activeTab.classList.add('tabbed-comments-plugin-active-tab-joined-right');
+      }
+      clusterEl.append(activeTab);
+      if(hasRightMove) {
+        moveRightBtn.style.display = "flex";
+        moveRightBtn.classList.add('tabbed-comments-plugin-right-arrow-joined-to-active-tab');
+        clusterEl.append(moveRightBtn);
+      }
+
+      deleteBtn.style.display = "flex";
+      clusterEl.after(deleteBtn);
+    }
+
+    // Given the channel of a tab, it shows the tab content:
+    function showTabByChannelName(channel) {
+      let activeTab = tabsHeaderEl.querySelector(`.tabbed-comments-plugin-tab[data-channel='${channel}']`);
+      let activeContent = tabsContentEl.querySelector(`.tabbed-comments-plugin-content[data-channel='${channel}']`);
+      if(!activeTab || !activeContent) return;
+
+      currentChannelName = channel;
+      localStorage.__tabbedCommentsPluginLastViewedChannel = channel;
+      tabsHeaderEl.querySelectorAll('.tabbed-comments-plugin-tab').forEach(el => el.classList.remove('tabbed-comments-plugin-active-tab'));
+      activeTab.classList.add('tabbed-comments-plugin-active-tab');
+
+      tabsContentEl.querySelectorAll('.tabbed-comments-plugin-content').forEach(el => el.classList.remove('tabbed-comments-plugin-active-content'));
+      activeContent.classList.add('tabbed-comments-plugin-active-content');
+
+      unseenCommentCountByChannel[channel] = 0;
+
+      updateUnseenCountHtml(channel);
+      renderControlsAroundActiveCustomChannel(channel);
+      if(panelOpts.onShowTab) panelOpts.onShowTab({channel});
+    }
+
+    function syncPanelCustomChannelsFromStorage() {
+      let orderedCustomChannelEntries = getStoredCustomChannelEntriesInOrder();
+      let orderedCustomChannelNames = orderedCustomChannelEntries.map(({ channel }) => channel);
+
+      for(let tab of [...tabsHeaderEl.querySelectorAll('.tabbed-comments-plugin-channel-tab')]) {
+        let channelName = tab.dataset.channel;
+        if(!isStoredCustomChannel(channelName) || orderedCustomChannelNames.includes(channelName)) continue;
+        delete commentsChannelNameToObj[channelName];
+        tab.remove();
+        tabsContentEl.querySelector(`.tabbed-comments-plugin-content[data-channel='${channelName}']`)?.remove();
+      }
+
+      for(let { commentOptions, channel } of orderedCustomChannelEntries) {
+        if(tabsHeaderEl.querySelector(`.tabbed-comments-plugin-channel-tab[data-channel='${channel}']`)) continue;
+        let {tab} = addTab(JSON.parse(JSON.stringify(commentOptions)));
+        if(temporaryMentionedChannels.has(channel)) {
+          tab.dataset.tabbedCommentsPluginIsTemporaryMentionedChannel = "1";
+          attachEventsToTemporaryMentionedChannelTab(tab, channel);
+        }
+      }
+
+      let addCustomChannelBtn = tabsHeaderEl.querySelector(".tabbed-comments-plugin-add-custom-channel");
+      let closePanelBtn = tabsHeaderEl.querySelector(".tabbed-comments-plugin-close-panel-btn");
+      if(closePanelBtn) tabsHeaderEl.prepend(closePanelBtn);
+      for(let channelName of orderedCustomChannelNames) {
+        let tab = tabsHeaderEl.querySelector(`.tabbed-comments-plugin-channel-tab[data-channel='${channelName}']`);
+        if(!tab) continue;
+        if(addCustomChannelBtn) addCustomChannelBtn.before(tab);
+        else tabsHeaderEl.append(tab);
+      }
+      if(addCustomChannelBtn) tabsHeaderEl.append(addCustomChannelBtn);
+
+      if(currentChannelName && tabsHeaderEl.querySelector(`.tabbed-comments-plugin-channel-tab[data-channel='${currentChannelName}']`)) {
+        renderControlsAroundActiveCustomChannel(currentChannelName);
+        return;
+      }
+
+      let firstChannelTab = tabsHeaderEl.querySelector('.tabbed-comments-plugin-channel-tab');
+      if(firstChannelTab) {
+        showTabByChannelName(firstChannelTab.dataset.channel);
+      } else {
+        currentChannelName = null;
+        hideActiveCustomChannelControlButtons();
+      }
+    }
+
+    // Adds a new tab to the module
+    function addTab(commentOptions) {
+    
+      commentOptions.width = "100%";
+      commentOptions.height = "100%"; // only makes sense to set height via defaultChannelOptions, and that controls overall comments container height
+      if(!commentOptions.customEmojis) commentOptions.customEmojis = defaultChannelOptions.customEmojis || defaultCustomEmojis;
+      commentOptions.forceColorScheme = defaultChannelOptions.forceColorScheme ?? localStorage.forceColorScheme ?? null;
+      
+      let originalOnCommentHandler = commentOptions.onComment || defaultChannelOptions.onComment;
+      let originalOnLoadHandler = commentOptions.onLoad || defaultChannelOptions.onLoad
+      commentOptions.onComment = function(...args) {
+        commentsPluginOnCommentHandler(...args); // for counting unseen, channel mentions, etc.
+        try { if(originalOnCommentHandler) originalOnCommentHandler(...args); } catch(e) { console.error(e) } // userland code
+      };
+      commentOptions.onLoad = function(...args) {
+        commentsPluginOnLoadHandler(...args); // for counting unseen, channel mentions, etc.
+        try { if(originalOnLoadHandler) originalOnLoadHandler(...args);  } catch(e) { console.error(e) } // userland code
+      };
+    
+      commentOptions.replacedDuringUpdate = true; // needed to allow multiple instances of the same channel (since we have multiple tabbed-comments-modules)
+      for(let key of defaultChannelOptions.getAllKeys || Object.keys(defaultChannelOptions)) {
+        if(!commentOptions[key] && !commentOptions.hasOwnProperty(key)) {
+          // getter, because the default options could be dynamic (e.g. dark/light mode using localStorage), and this createTabbedCommentsPanel function is (as of writing) called every time the dark/light mode is switched.
+          Object.defineProperty(commentOptions, key, {
+            get: () => defaultChannelOptions[key],
+          });
+        }
+      }
+      
+      let commentsPluginOutput = commentsPlugin(commentOptions);
+      commentsChannelNameToObj[commentOptions.channel] = commentsPluginOutput;
+
+      const tab = document.createElement('div');
+      tab.className = 'tabbed-comments-plugin-tab tabbed-comments-plugin-channel-tab'; // note that non-channel tabs/buttons are possible - e.g. close tab button, close panel button
+      tab.textContent = commentOptions.label || commentOptions.channel || "general";
+      tab.innerHTML += `<span class="tabbed-comments-plugin-unseen-count">?</span>`;
+      tab.dataset.channel = commentOptions.channel;
+
+      const tabContent = document.createElement('div');
+      tabContent.className = 'tabbed-comments-plugin-content';
+      tabContent.innerHTML = commentsPluginOutput;
+      tabContent.dataset.channel = commentOptions.channel;
+      
+      // for refreshing the comments if needed (e.g. when dark/light mode changes - see updateColorScheme function)
+      tabContent.dataset.tabbedCommentsDirectParentOfCommentsPluginOutput = "1";
+      tabContent.__commentOptionsUsed = commentOptions; // this should probably not be 'concrete' ones because we want a reference to the dynamic onces for if/when we need to reload it
+
+      tabsHeaderEl.appendChild(tab);
+      tabsContentEl.appendChild(tabContent);
+      return {tab, tabContent};
+    }
+
+    let existingChannelNames = [];
+    let channelNameToChannelData = {};
+    for(let commentOptions of commentsChannels.selectAll) {
+      if(typeof commentOptions === "string") commentOptions = {channel:commentOptions}; // in case commentsChannels is just an array of strings
+      if(!commentOptions.channel) commentOptions.channel = commentOptions.getName==="general" ? "" : commentOptions.getName; // use name of commentOptions object as channel name by default
+      let channelName = commentOptions.channel.toString();
+      let {tab, tabContent} = addTab(commentOptions);
+      channelNameToChannelData[channelName] = {tab, tabContent, channelName};
+      existingChannelNames.push(channelName);
+    }
+
+    // Add the "+" button:
+    if(commentsChannels.allowCustomChannels !== false) {
+
+      // add user-specified custom channels:
+      for(let commentOptions of Object.values(readStoredCustomChannels())) {
+        if(existingChannelNames.includes(commentOptions.channel)) continue; // already got that channel
+        let channelName = commentOptions.channel.toString();
+        let {tab, tabContent} = addTab(commentOptions);
+        channelNameToChannelData[channelName] = {tab, tabContent, channelName};
+
+        if(temporaryMentionedChannels.has(channelName)) {
+          tab.dataset.tabbedCommentsPluginIsTemporaryMentionedChannel = "1";
+          attachEventsToTemporaryMentionedChannelTab(tab, channelName);
+        }
+      }
+      // add the "+" button:
+      const tab = document.createElement('div');
+      tab.className = 'tabbed-comments-plugin-tab tabbed-comments-plugin-add-custom-channel';
+      tab.textContent = "+";
+      tab.style.cssText = "min-width:1.4rem;";
+      tabsHeaderEl.appendChild(tab);
+    }
+    
+    // add the close-panel button if needed:
+    {
+      const tab = document.createElement('div');
+      tab.className = 'tabbed-comments-plugin-tab tabbed-comments-plugin-close-panel-btn';
+      tab.textContent = "❌";
+      tab.title = "Close this panel";
+      // NOTE: rather than not adding the button, or using display:none; we just remove it's width + opacity + pointer-events, because otherwise the height of the header can change due to emoji font size, which vertically offsets the panels by a pixel or two, which looks bad.
+      tab.style.cssText = panelOpts.addCloseButton ? "min-width:1.4rem;" : "width:0px; max-width:0px; pointer-events:none; margin-left:0; margin-right:0; padding-left:0; padding-right:0; min-width:0px; opacity:0;";
+      tab.onclick = function() {
+        panelCtn.remove();
+        if(panelObj) allPanelObjs.delete(panelObj);
+        if(panelOpts.onClose) panelOpts.onClose();
+      };
+      tabsHeaderEl.prepend(tab);
+    }
+
+    let defaultStartChannelIndex = 0;
+
+    let activeChannelData = channelNameToChannelData[localStorage.__tabbedCommentsPluginLastViewedChannel ?? existingChannelNames[defaultStartChannelIndex]];
+    if(!activeChannelData) {
+      console.error("localstorage had __tabbedCommentsPluginLastViewedChannel, but that channel doesn't exist?");
+      activeChannelData = channelNameToChannelData[existingChannelNames[0]];
+    }
+
+    setTimeout(async () => {
+      while(!document.body.contains(panelCtn)) await new Promise(r => setTimeout(r, 100));
+      showTabByChannelName(activeChannelData.channelName);
+    }, 10);
+
+    tabsHeaderEl.addEventListener('click', handleTabClick);
+
+    panelObj = {element:panelCtn, addCommentsChannel, deleteCommentsChannel, commentsChannelNameToObj, showTabByChannelName, syncPanelCustomChannelsFromStorage};
+    allPanelObjs.add(panelObj);
+
+    let styleEl = document.createElement("style");
+    styleEl.textContent = `
+      .tabbed-comments-plugin-header {
+        display: flex;
+        font-size: 70%;
+        overflow:auto;
+        color:var(--tabbed-comments-plugin-text-color);
+      }
+      .tabbed-comments-plugin-body {
+        flex-grow:1;
+      }
+      .tabbed-comments-plugin-tab {
+        padding: 0.25rem;
+        cursor: pointer;
+        background: var(--tabbed-comments-plugin-box-color, #ebebeb);
+        border-radius: 0.25rem;
+        margin: 0.25rem;
+        user-select: none;
+        min-width: max-content;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .tabbed-comments-plugin-tab[data-tabbed-comments-plugin-is-temporary-mentioned-channel='1'] {
+        opacity:0.6;
+      }
+      .tabbed-comments-plugin-unseen-count {
+        border-radius: 100px;
+        padding: 0.05rem 0.15rem;
+        font-size:80%;
+        background:grey;
+        margin-left: 0.1rem;
+        pointer-events:none;
+        color:white;
+      }
+      .tabbed-comments-plugin-active-tab {
+        background: var(--tabbed-comments-plugin-active-comment-channel-tab-color, #c6c6c6);
+        outline: 2px solid #0086c9;
+      }
+      .tabbed-comments-plugin-active-custom-channel-control-cluster {
+        display:flex;
+        align-items:center;
+        margin: 0.25rem;
+        border-radius: 0.25rem;
+        outline: 2px solid #0086c9;
+        outline-offset: 0;
+      }
+      .tabbed-comments-plugin-active-tab-joined-left,
+      .tabbed-comments-plugin-active-tab-joined-right,
+      .tabbed-comments-plugin-active-tab-joined-both,
+      .tabbed-comments-plugin-left-arrow-joined-to-active-tab,
+      .tabbed-comments-plugin-right-arrow-joined-to-active-tab {
+        outline: none;
+        margin: 0;
+      }
+      .tabbed-comments-plugin-left-arrow-joined-to-active-tab {
+        border-top-right-radius: 0;
+        border-bottom-right-radius: 0;
+      }
+      .tabbed-comments-plugin-right-arrow-joined-to-active-tab {
+        border-top-left-radius: 0;
+        border-bottom-left-radius: 0;
+      }
+      .tabbed-comments-plugin-active-tab-joined-left {
+        border-top-left-radius: 0;
+        border-bottom-left-radius: 0;
+      }
+      .tabbed-comments-plugin-active-tab-joined-right {
+        border-top-right-radius: 0;
+        border-bottom-right-radius: 0;
+      }
+      .tabbed-comments-plugin-active-tab-joined-both {
+        border-radius: 0;
+      }
+      .tabbed-comments-plugin-content {
+        display: none;
+        height:100%;
+      }
+      .tabbed-comments-plugin-active-content {
+        display: block;
+      }
+      @media only screen and (max-width: 650px) {
+        .tabbed-comments-auto-comment-ctn { flex-direction:column; }
+      }
+      .tabbed-comments-ctn-left { display:none; }
+      .tabbed-comments-ctn-right { display:none; }
+      ${CSS.supports("container-type", "inline-size") ? `@container` : `@media only screen and`} (min-width: 1100px) {
+        .tabbed-comments-ctn-left { display:flex; }
+        .tabbed-comments-ctn-right { display:flex; }
+      }
+    `;
+    panelCtn.append(styleEl);
+    panelCtn.style.cssText = "height:100%; width:100%; display:flex; flex-direction:column;"
+    return panelObj;
+  }
+  
+  middlePanelObj = createTabbedCommentsPanel({
+    onShowTab: ({channel}) => {
+      middleCtnCurrentlyShownCommentsChannelName = channel;
+      
+      let channelData = commentsChannels[channel || "general"];
+      if(!channelData) channelData = defaultChannelOptions;
+      let allowBots = channelData.allowBots;
+      if(channel === "" || channel === "general" || opts.allowBots === false) {
+        if(allowBots === undefined) allowBots = false; // by default, don't allow bots on main/general/chat channel
+      }
+      autoCommentCtn.style.display = "none";
+      if(allowBots !== false) {
+        showAutoCommentAreaBtn.style.display = "";
+      } else {
+        showAutoCommentAreaBtn.style.display = "none";
+      }
+    },
+  });
+  middleCtnChannelNameToObj = middlePanelObj.commentsChannelNameToObj;
+  middleCtn.appendChild(middlePanelObj.element);
+  return outerCtn;
+
+async getUserInput(fields, opts) =>
+  fields = fields || {};
+  opts = opts || {};
+  const esc = s => String(s).replace(/[<>&]/g, m => ({"<":"&lt;","&":"&amp;",">":"&gt;"}[m]));
+  const cancelText = esc(opts.cancelText || "Cancel");
+  const okText = esc(opts.okText || "OK");
+
+  return new Promise(resolve => {
+    const overlay = Object.assign(document.createElement("div"), { tabIndex: 0 });
+    overlay.style.cssText = `position:fixed;inset:0;z-index:99999999;display:grid;place-items:center;background-color:rgba(0,0,0,.65);font:16px/1.4 system-ui`;
+
+    const modal = document.createElement("div");
+    modal.style.cssText = `
+      text-align:left !important;
+      width:520px;max-width:97vw;
+      border-radius:8px;padding:15px;
+      background-color:light-dark(#fff,#222);
+      color:light-dark(#000,#fff);
+      box-shadow:0 2px 8px rgba(0,0,0,.2);
+      display:flex;flex-direction:column;gap:12px;
+      max-height:min(92vh, 900px);
+    `;
+
+    // Scrollable content
+    const scrollWrap = document.createElement("div");
+    scrollWrap.style.cssText = "overflow:auto;min-height:0;";
+    const host = document.createElement("div");
+    host.style.cssText = "display:block";
+    scrollWrap.append(host);
+
+    // Footer (Cancel left, OK right)
+    const footer = document.createElement("div");
+    footer.style.cssText = "display:flex;gap:8px;align-items:center;margin-top:4px;";
+    const cancelBtn = document.createElement("button");
+    cancelBtn.textContent = cancelText;
+    cancelBtn.hidden = !!opts.hideCancel;
+    cancelBtn.style.cssText = "padding:6px 16px;border:1px solid light-dark(#ccc,#555);border-radius:6px;background-color:light-dark(#f6f6f6,#333);color:inherit;cursor:pointer;";
+    const okBtn = document.createElement("button");
+    okBtn.textContent = okText;
+    okBtn.autofocus = true;
+    okBtn.style.cssText = "margin-left:auto;padding:6px 16px;border:none;border-radius:6px;background-color:light-dark(#1677ff,#2b87ff);color:#fff;cursor:pointer;";
+
+    footer.append(cancelBtn, okBtn);
+    modal.append(scrollWrap, footer);
+    overlay.append(modal);
+
+    const elMap = new Map();
+    const inputCSS = "width:100%;max-width:100%;box-sizing:border-box;padding:8px;border:1px solid light-dark(#ccc,#555);border-radius:6px;background-color:light-dark(#fff,#333);color:inherit;";
+
+    Object.entries(fields).forEach(([name, cfgRaw]) => {
+      const cfg = cfgRaw || {};
+      const t = (cfg.type || "input:text").toLowerCase();
+      const wrap = document.createElement("div");
+      wrap.style.cssText = `margin:0 0 ${cfg.marginBottom || "12px"}`;
+
+      if (cfg.label) {
+        const lab = document.createElement("div");
+        lab.style.cssText = "margin:0 0 6px;display:flex;align-items:center;gap:6px;";
+        const labText = document.createElement("div");
+        labText.textContent = cfg.label || name;
+        lab.append(labText);
+        if (cfg.help) {
+          const help = document.createElement("span");
+          help.textContent = "i";
+          help.title = cfg.help;
+          help.style.cssText = "margin-left:auto;display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;border:1px solid light-dark(#ccc,#555);font:12px/1 system-ui;opacity:.75;cursor:help;user-select:none";
+          help.onclick = () => alert(cfg.help);
+          lab.append(help);
+        }
+        wrap.append(lab);
+      }
+
+      let el = null, kind = "std";
+      if (t === "textarea") {
+        el = document.createElement("textarea");
+        el.rows = cfg.rows || 4;
+        el.style.cssText = inputCSS;
+        if (cfg.placeholder != null) el.placeholder = cfg.placeholder;
+        if (cfg.value != null) el.value = cfg.value;
+      } else if (t === "select") {
+        el = document.createElement("select");
+        el.style.cssText = inputCSS;
+        if (cfg.multiple) el.multiple = true;
+        (cfg.options || []).forEach(opt => {
+          const o = document.createElement("option");
+          if (typeof opt === "object") { o.value = opt.value; o.textContent = opt.label ?? opt.value; }
+          else { o.value = String(opt); o.textContent = String(opt); }
+          el.append(o);
+        });
+        const v = cfg.value;
+        if (el.multiple && Array.isArray(v)) Array.from(el.options).forEach(o => o.selected = v.includes(o.value));
+        else if (v != null) el.value = v;
+      } else if (t.startsWith("input:")) {
+        el = document.createElement("input");
+        el.type = t.split(":")[1] || "text";
+        el.style.cssText = inputCSS;
+        if (cfg.placeholder != null) el.placeholder = cfg.placeholder;
+        if (cfg.min != null) el.min = cfg.min;
+        if (cfg.max != null) el.max = cfg.max;
+        if (cfg.step != null) el.step = cfg.step;
+        if (el.type === "checkbox") el.checked = !!cfg.value;
+        else if (cfg.value != null) el.value = cfg.value;
+      } else if (t === "html") {
+        const html = document.createElement("div");
+        html.innerHTML = cfg.html || "";
+        wrap.append(html);
+        host.append(wrap);
+        elMap.set(name, { cfg, el: html, wrap, kind: "html" });
+        return;
+      } else {
+        const html = document.createElement("div");
+        html.innerHTML = cfg.html || "";
+        wrap.append(html);
+        host.append(wrap);
+        elMap.set(name, { cfg, el: html, wrap, kind: "html" });
+        return;
+      }
+
+      el.name = name;
+      wrap.append(el);
+      host.append(wrap);
+      elMap.set(name, { cfg, el, wrap, kind: "std" });
+    });
+
+    const finish = v => { overlay.remove(); resolve(v); };
+
+    cancelBtn.onclick = () => finish(null);
+    okBtn.onclick = () => {
+      const out = {};
+      elMap.forEach(({ el, kind, wrap }, name) => {
+        if (kind === "html") {
+          const dv = wrap.querySelector("[data-value]");
+          out[name] = dv ? dv.getAttribute("data-value") : null;
+        } else if (el.tagName === "SELECT") {
+          out[name] = el.multiple ? Array.from(el.selectedOptions).map(o => o.value) : el.value;
+        } else if (el.tagName === "TEXTAREA") {
+          out[name] = el.value;
+        } else if (el.tagName === "INPUT") {
+          if (el.type === "checkbox") out[name] = el.checked;
+          else if (el.type === "number" || el.type === "range") {
+            const n = parseFloat(el.value); out[name] = Number.isFinite(n) ? n : null;
+          } else out[name] = el.value;
+        } else out[name] = null;
+      });
+      finish(out);
+    };
+
+    overlay.onkeydown = e => {
+      if (e.key === "Escape") finish(null);
+      else if (e.key === "Enter" && e.target.tagName !== "TEXTAREA") { e.preventDefault(); okBtn.click(); }
+    };
+
+    // Backdrop mousedown cancel only (not mouseup)
+    if (opts.cancelOnBackgroundClick) {
+      overlay.addEventListener("mousedown", e => {
+        if (e.target === overlay) finish(null);
+      });
+    }
+
+    document.body.append(overlay);
+    overlay.focus({ preventScroll: true });
+
+    const first = host.querySelector("input,textarea,select");
+    if (first) setTimeout(() => first.focus({ preventScroll: true }), 0);
+  });

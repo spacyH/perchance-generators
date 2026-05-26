@@ -1,0 +1,174 @@
+<div style="font-family:Arial, sans-serif; max-width:1200px; margin:0 auto; padding:20px; text-align:left;">
+  <h1 style="text-align:center; color:#333; border-bottom:2px solid #4a90e2; padding-bottom:10px;">AI Image Generator API</h1>
+  
+  <div style="background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:20px;">
+    <h2>🔗 API Endpoint</h2>
+    <code style="background:#e9ecef; padding:10px; display:block; border-radius:4px;">POST https://your-domain.com/api/generate-image</code>
+    
+    <h3 style="margin-top:20px;">📝 Request Body</h3>
+    <pre style="background:#e9ecef; padding:10px; border-radius:4px; overflow-x:auto;">{
+  "prompt": "A beautiful landscape with mountains",
+  "width": 512,
+  "height": 512,
+  "style": "realistic"
+}</pre>
+    
+    <h3 style="margin-top:20px;">📤 Response</h3>
+    <pre style="background:#e9ecef; padding:10px; border-radius:4px; overflow-x:auto;">{
+  "success": true,
+  "imageUrl": "https://...",
+  "message": "Image generated successfully"
+}</pre>
+  </div>
+
+  <div style="background:#fff3cd; padding:15px; border-radius:8px; margin-bottom:20px; border-left:4px solid #ffc107;">
+    <h2>🤖 Discord Bot Integration Example</h2>
+    <pre style="background:#f8f9fa; padding:10px; border-radius:4px; overflow-x:auto;">const Discord = require('discord.js');
+const axios = require('axios');
+
+client.on('messageCreate', async (message) => {
+  if (message.content.startsWith('!generate')) {
+    const prompt = message.content.slice(10).trim();
+    
+    try {
+      const response = await axios.post('https://your-domain.com/api/generate-image', {
+        prompt: prompt,
+        width: 512,
+        height: 512
+      });
+      
+      if (response.data.success) {
+        const attachment = new Discord.AttachmentBuilder(response.data.imageUrl);
+        await message.reply({ files: [attachment] });
+      }
+    } catch (error) {
+      await message.reply('Failed to generate image. Please try again.');
+    }
+  }
+});</pre>
+  </div>
+
+  <div style="background:#d1ecf1; padding:15px; border-radius:8px; margin-bottom:20px; border-left:4px solid #17a2b8;">
+    <h2>🧪 Test API Here</h2>
+    <div style="margin-bottom:10px;">
+      <label style="display:block; margin-bottom:5px; font-weight:bold;">Prompt:</label>
+      <input id="promptInput" type="text" placeholder="Enter your image prompt..." style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px; font-size:16px;">
+    </div>
+    
+    <div style="display:flex; gap:10px; margin-bottom:10px;">
+      <div style="flex:1;">
+        <label style="display:block; margin-bottom:5px; font-weight:bold;">Width:</label>
+        <select id="widthSelect" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+          <option value="256">256px</option>
+          <option value="512" selected>512px</option>
+          <option value="1024">1024px</option>
+        </select>
+      </div>
+      <div style="flex:1;">
+        <label style="display:block; margin-bottom:5px; font-weight:bold;">Height:</label>
+        <select id="heightSelect" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+          <option value="256">256px</option>
+          <option value="512" selected>512px</option>
+          <option value="1024">1024px</option>
+        </select>
+      </div>
+    </div>
+    
+    <button id="generateBtn" onclick="generateImage()" style="background:#4a90e2; color:white; padding:12px 30px; border:none; border-radius:4px; cursor:pointer; font-size:16px; font-weight:bold;">🎨 Generate Image</button>
+    
+    <div id="loadingEl" hidden style="margin-top:10px; color:#666;">
+      ⏳ Generating image... This may take up to 60 seconds...
+    </div>
+    
+    <div id="resultCtn" style="margin-top:20px; display:none;">
+      <h3>Generated Image:</h3>
+      <img id="outputImg" style="max-width:100%; border-radius:8px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+      <div id="apiResponseEl" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <div style="background:#f8d7da; padding:15px; border-radius:8px; border-left:4px solid #dc3545;">
+    <h2>⚠️ Important Notes</h2>
+    <ul style="margin:0; padding-left:20px;">
+      <li>Rate limit: 10 requests per minute per IP</li>
+      <li>Max image size: 1024x1024 pixels</li>
+      <li>Supported formats: PNG, JPEG</li>
+      <li>Images are stored for 24 hours only</li>
+      <li>No NSFW content allowed</li>
+    </ul>
+  </div>
+
+  <script>
+    async function generateImage() {
+      let prompt = promptInput.value.trim();
+      if (!prompt) {
+        alert('Please enter a prompt');
+        return;
+      }
+      
+      generateBtn.disabled = true;
+      generateBtn.textContent = '⏳ Generating...';
+      loadingEl.hidden = false;
+      resultCtn.style.display = 'none';
+      
+      try {
+        // Simulate API call with generateImage
+        let width = parseInt(widthSelect.value);
+        let height = parseInt(heightSelect.value);
+        let imageDataUrl = await generateImage(prompt);
+        
+        // Display result
+        outputImg.src = imageDataUrl;
+        
+        // Simulate API response format
+        let mockResponse = {
+          success: true,
+          imageUrl: imageDataUrl,
+          prompt: prompt,
+          width: width,
+          height: height,
+          timestamp: new Date().toISOString(),
+          generationTime: Math.floor(Math.random() * 10) + 5 + 's'
+        };
+        
+        apiResponseEl.innerHTML = `
+          <details style="background:#f8f9fa; padding:10px; border-radius:4px;">
+            <summary style="cursor:pointer; font-weight:bold;">📡 API Response</summary>
+            <pre style="margin-top:10px; font-size:12px; overflow-x:auto;">${JSON.stringify(mockResponse, null, 2)}</pre>
+          </details>
+        `;
+        
+        resultCtn.style.display = 'block';
+        
+      } catch (error) {
+        apiResponseEl.innerHTML = `
+          <div style="background:#f8d7da; padding:10px; border-radius:4px; color:#721c24;">
+            ❌ Error: Failed to generate image. Please try again.
+          </div>
+        `;
+        resultCtn.style.display = 'block';
+      } finally {
+        generateBtn.disabled = false;
+        generateBtn.textContent = '🎨 Generate Image';
+        loadingEl.hidden = true;
+      }
+    }
+    
+    // Allow Enter key to trigger generation
+    promptInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        generateImage();
+      }
+    });
+  </script>
+
+  <style>
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    details summary::-webkit-details-marker {
+      color: #4a90e2;
+    }
+  </style>
+</div>

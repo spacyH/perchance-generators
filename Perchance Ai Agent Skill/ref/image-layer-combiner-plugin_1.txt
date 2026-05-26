@@ -1,0 +1,102 @@
+$output(data) =>
+  if(!window.__9257934layerCombinerPluginDownloadImageFunction) {
+	  window.__9257934layerCombinerPluginDownloadImageFunction = function(containerEl) {
+		  let imageUrls = Array.from(containerEl.querySelectorAll("img")).map(el => el.src);
+      let imageFilters = Array.from(containerEl.querySelectorAll("img")).map(el => el.style.filter || "none");
+			let script = `
+			  (async function() {
+          let imageFilters = JSON.parse(decodeURIComponent("${encodeURIComponent(JSON.stringify(imageFilters))}"));
+					let imageElPromises = [${imageUrls.map(url => `"${url}"`).join(",")}].map(url => {
+						return new Promise(resolve => {
+							let img = new Image();
+							img.onload = () => resolve(img);
+							img.src = url;
+						});
+					});
+					let imageEls = await Promise.all(imageElPromises);
+
+					let canvas = document.createElement("canvas");
+					canvas.width = imageEls[0].naturalWidth; // can easily add an option called `settings.downloadAtNaturalDimensions` later - and they can set to false if they want to (it defaults to true).
+					canvas.height = imageEls[0].naturalHeight;
+					let ctx = canvas.getContext("2d");
+					imageEls.reverse();
+          imageFilters.reverse();
+          let i = 0;
+					for(let img of imageEls) {
+            ctx.filter = imageFilters[i++];
+						ctx.drawImage(img, 0, 0);
+					}
+					document.body.appendChild(canvas);
+			  })();
+			`;
+			let newWindow = window.open();
+			// hack to easily execite script on page load:
+			newWindow.document.body.innerHTML = `<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" onload="${script.replace(/\n/g, " ").replace(/"/g, "&quot;")}" style="display:none;">`;
+		}
+	}
+  
+  if(!window.__9257934layerCombinerPluginPreloadMap) window.__9257934layerCombinerPluginPreloadMap = {};
+  let urlIsPreloadedMap = window.__9257934layerCombinerPluginPreloadMap;
+  let layers = data.layers.selectAll;
+  let settings = data.settings || {};
+  let layerSelections = [];
+  let layerCssFilters = [];
+  let imagesToPreload = [];
+  for(let layer of layers) {
+    let layerItem = layer.selectOne;
+		let url = layerItem.evaluateItem.toString().trim();
+    if(!url.startsWith("https://") && !url.startsWith("http://") && !url.startsWith("data:")) continue; // don't remove this - in part it's to allow people to have their layer resolve to an empty string which should just exclude that layer, and in part it's because if a layer is empty, it uses the layer name and assumes it's a relative URL i.e. perchance.org/layerName - and so the image doesn't load, but there's no error. So instead we want to just skip those.
+		layerCssFilters.push( layerItem.filter || layer.filter || "none" );
+    layerSelections.push( url );
+	}
+  
+  // NOTE: If you uncomment this, remember that their list items could be wrapped in the locker plugin like this: https://perchance.org/otbgqyfc30#edit So selecting multiple times may have side-effects. I previously constructed the preload HTML *after* making the output HTML which caused the image inside the locker plugin to be different to the displayed image. Should be fine if I have the preloading above (as it currently is), but there can be other side effects that may cause unexpected behavior (e.g. something as simple as a "counter")
+	// collect urls for preloading:
+  // 	for(let layer of layers) {
+  //     for(let imageUrl of layer.selectAll) {
+  //       if(!urlIsPreloadedMap[imageUrl]) {
+  //         imagesToPreload.push(imageUrl);
+  //         urlIsPreloadedMap[imageUrl] = true;
+  //       }
+  //     }
+  //   }
+  // 	if(imagesToPreload.length > 0) {
+  // 	  console.log("Preloading image-layer-combiner-plugin images in a few seconds...");
+  //     let preloadHtml = `<div style="opacity:0; pointer-events:none; position:fixed; top: -10000px; left:-10000px;">${imagesToPreload.map((url) => `<img onload="this.remove();" src="${url}"/>`).join("")}</div>`;
+  // 	  setTimeout(() => {
+  // 		  let div = document.createElement("div");
+  // 			div.innerHTML = preloadHtml;
+  // 		  document.body.appendChild(div);
+  // 		}, 3000);
+  // 	}
+  
+  let imageHtml = layerSelections.map((url, i) => `<img fetchpriority="high" style="z-index:${layerSelections.length-i}; ${i > 0 ? "position:absolute; top:0; left:0;" : "position:relative;"}; width:${settings.width || "auto"}; height:${settings.height || "auto"}; filter:${layerCssFilters[i]};" src="${url}"/>`).join("");
+  
+  // Note that `data-bot-indicator`, `data-image-urls` and `data-image-filters` to make this plugin's output "interpretable" by bots that can't/don't render images by default
+  // For backwards compatibiliy, these attributes shouldn't be removed/changed even slightly.
+  let html = `<div data-bot-indicator="---image-layer-combiner-plugin-output---" data-image-urls="${encodeURIComponent(layerSelections.join("<|||>"))}" data-image-filters="${encodeURIComponent(layerCssFilters.join("<|||>"))}" data-width="${settings.width || ""}" data-height="${settings.height || ""}" ${settings.containerId ? `id="${settings.containerId}"` : ""} ondblclick="window.__9257934layerCombinerPluginDownloadImageFunction(this)" oncontextmenu="event.preventDefault(); window.__9257934layerCombinerPluginDownloadImageFunction(this);" style="display:inline-block; position:relative; width:fit-content;${settings.containerCss ? settings.containerCss : ""}">${imageHtml}</div>`;
+  return html;
+	 
+
+exampleData
+  settings
+    height = 200px
+  layers
+    hat
+      https://i.imgur.com/1spyUp1.png
+      https://i.imgur.com/snpdUvc.png
+    eyes
+      https://i.imgur.com/PShX0T8.png
+      https://i.imgur.com/j6WWWPO.png
+    head
+      https://i.imgur.com/ur3TABt.png
+      https://i.imgur.com/ERbhMDS.png
+    body
+      https://i.imgur.com/iYazR0j.png
+      https://i.imgur.com/TGaOOVX.png
+    legs
+      https://i.imgur.com/Cn1S2Wh.png
+      https://i.imgur.com/SKlERIz.png
+      https://i.imgur.com/BTl5Uf1.png
+
+exampleImagesHtml = [exampleData.layers.selectAll.map((layer, li) => layer.selectAll.map((url, i) => `<img src="${url}" style="height:100px; border:1px black solid; ${i === 0 && li === 0 ? "" : "border-left:none;"}">`).join("")).join("")]

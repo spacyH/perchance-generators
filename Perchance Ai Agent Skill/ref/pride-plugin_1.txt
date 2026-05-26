@@ -1,0 +1,40 @@
+$output(size, forceShow) =>
+  if(size === undefined || typeof size === "number") {
+    // simple mode:
+    if(size === undefined) size = 1; 
+    if(typeof size !== "number") return "You gave this plugin something other than a number?";
+    if(forceShow || new Date().getUTCMonth() === 5) return `<img class="pride-plugin-image" style="height:${size*1.4}rem" src="data:image/png;base64,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"/>`;
+    else return "";
+  } else {
+    // advanced/custom mode:
+    let options = size;
+    let monthNameToMonthIndex = {
+      "january": 0,
+      "february": 1,
+      "march": 2,
+      "april": 3,
+      "may": 4,
+      "june": 5,
+      "july": 6,
+      "august": 7,
+      "september": 8,
+      "october": 9,
+      "november": 10,
+      "december": 11,
+    };
+    let date = new Date();
+    let currentMonthIndex = date.getUTCMonth();
+    let currentDayOfMonth = date.getDate();
+    
+    let names = options.getPropertyNames;
+    for(let name of names) {
+      let monthName = name.split(/\s+/)[0];
+      let dayOfMonthNumber = name.split(/\s+/)[1];
+      if(monthNameToMonthIndex[monthName] !== undefined && monthNameToMonthIndex[monthName] === currentMonthIndex) {
+        if(dayOfMonthNumber === undefined || Number(dayOfMonthNumber) === currentDayOfMonth) {
+          return options[name];
+        }
+      }
+    }
+    return options.default || "";
+  }

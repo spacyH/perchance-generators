@@ -1,0 +1,106 @@
+$output(opts) =>
+  if(!opts) opts = {};
+  let width = opts.width ?? "min(800px, 90vw, 100%)";
+  let height = opts.height ?? "min(650px, 80vh)"; 
+  if(typeof width === "number") width += "px";    
+  if(typeof height === "number") height += "px";
+  let containerStyle = opts.containerStyle || `display:inline-block; border:0; width:${width}; height:${height};`;
+  
+  let channel = opts.channel ?? ""; 
+  
+  if(!window.__alreadyAddedTldrawPluginStuff89435793) {
+    let cssText = `
+    .loading-spinner-893759259 { 
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #5d5d5d;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin45324 0.9s linear infinite;
+    }
+    @keyframes spin45324 {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }`;
+    let styleEl = document.createElement('style');
+    styleEl.appendChild(document.createTextNode(cssText));
+    document.head.appendChild(styleEl);
+    
+    window.__tldrawFullscreenToggleHandler = function(btnEl) {
+      // we need to move the tldraw wrapper out of its container and into the document body so that it can have a z-index that puts it above all other elements:
+      if(btnEl.dataset.mode === "not-fullscreen") {
+        let wrapEl = btnEl.closest('.tldraw-iframe-wrapper');
+        wrapEl.__parentContainerElement = btnEl.closest('.tldraw-container');
+        wrapEl.dataset.originalCssTextBeforeFullscreen = wrapEl.style.cssText;
+        document.body.append(wrapEl);
+        wrapEl.dataset.originalDocumentBodyHiddenValueBeforeFullscreen = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        wrapEl.style.cssText = "position:fixed; top:0; left:0; right:0; bottom:0; z-index:100000000;";
+        btnEl.querySelector(".fullscreen-button-label").textContent = "";
+        btnEl.dataset.mode = "fullscreen";
+      } else {
+        let wrapEl = btnEl.closest('.tldraw-iframe-wrapper');
+        wrapEl.__parentContainerElement.append(wrapEl);
+        wrapEl.style.cssText = wrapEl.dataset.originalCssTextBeforeFullscreen; 
+        document.body.style.overflow = wrapEl.dataset.originalDocumentBodyHiddenValueBeforeFullscreen;
+        btnEl.querySelector(".fullscreen-button-label").textContent = "";
+        btnEl.dataset.mode = "not-fullscreen";
+      }
+    };
+    
+    window.__alreadyAddedTldrawPluginStuff89435793 = true;
+  }
+  
+  if(!/^[a-z0-9\-]*$/.test(channel)) {
+    return `Invalid channel name '${channel}' - must only contain letters, numbers and hyphens.`
+  }
+  
+  // Note that I initially set to display=none so that it doesn't steal focus (not sure why they decided that iframe should steal focus)
+  let html = `<div class="tldraw-container tldraw-channel-${channel}" style="${containerStyle}">
+    <div class="__perchance-tldraw-loading-facade-12345" style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;"><div class="loading-spinner-893759259"></div></div>
+    <div class="tldraw-iframe-wrapper" style="width:100%; height:100%; position:relative;">
+      <span class="__perchance-tldraw-iframe-placeholder-12345"></span>
+    </div>
+  </div>`;
+  
+  if(opts.replacedDuringUpdate) {
+    return html;
+  } else {
+    if(!document.querySelector(`.tldraw-channel-${channel}`)) {  
+      setTimeout(() => {
+        let markerEl = document.querySelector(`[data-marker-tag="temporaryMarkerElForTldrawPlugin947725823-channel-${channel}"]`); 
+        
+        markerEl.outerHTML = html; // NOTE: we can't use replaceWith because that 'maintains' perchance's node template tracking stuff, which means it'd get replaced during `update()`
+        
+        let containerEl = document.querySelector(`.tldraw-channel-${channel}:not(.already-added-tldraw-plugin-intersection-observer)`); 
+        containerEl.classList.add("already-added-tldraw-plugin-intersection-observer"); // needed in case the add the same channel multiple times on the page
+        
+        const observer = new IntersectionObserver(entries => {
+          if(entries[0].isIntersecting) {
+            console.log("tldraw-plugin container became visible");
+            let iframePlaceholderEl = containerEl.querySelector(".__perchance-tldraw-iframe-placeholder-12345");
+            if(iframePlaceholderEl) {
+              // CAUTION: don't use curly brackets in the onload handler without escaping them - breaks replacedDuringUpdate usage. (edit: pretty sure this is not true anymore now that we use this lazyloading placeholder approach, but haven't tested it)
+              iframePlaceholderEl.outerHTML = `
+                <iframe onload="console.log('tldraw loaded - waiting a bit longer to ensure it has fully loaded and finished trying to steal focus'); setTimeout(() => (this.closest('.tldraw-container')?.querySelector?.('.__perchance-tldraw-loading-facade-12345')?.remove?.(), this.style.display=''), 1200);" style="display:none; border:0; height:100%; width:100%;" allow="clipboard-read; clipboard-write" src="https://www.tldraw.com/r/perchance-aUf8Njeo73-${window.generatorName}-${channel}"></iframe>
+                <button data-mode="not-fullscreen" onclick="window.__tldrawFullscreenToggleHandler(this);" style="position:absolute;top:45px;left:5px; color-scheme:dark; display:flex; align-items:center; justify-content:center; color:white;"><svg style="filter:invert(1);" xmlns="http://www.w3.org/2000/svg" height="1em" viewBox="0 0 448 512"><path d="M32 32C14.3 32 0 46.3 0 64v96c0 17.7 14.3 32 32 32s32-14.3 32-32V96h64c17.7 0 32-14.3 32-32s-14.3-32-32-32H32zM64 352c0-17.7-14.3-32-32-32s-32 14.3-32 32v96c0 17.7 14.3 32 32 32h96c17.7 0 32-14.3 32-32s-14.3-32-32-32H64V352zM320 32c-17.7 0-32 14.3-32 32s14.3 32 32 32h64v64c0 17.7 14.3 32 32 32s32-14.3 32-32V64c0-17.7-14.3-32-32-32H320zM448 352c0-17.7-14.3-32-32-32s-32 14.3-32 32v64H320c-17.7 0-32 14.3-32 32s14.3 32 32 32h96c17.7 0 32-14.3 32-32V352z"/></svg><span class="fullscreen-button-label"></span></button>
+              `;
+            }
+            observer.disconnect();
+          }
+        });
+        observer.observe(containerEl);
+        
+      }, 50);
+      return `<span data-marker-tag="temporaryMarkerElForTldrawPlugin947725823-channel-${channel}"></span>`;
+    } else {
+      return "";
+    }
+  }
+  
+  
+  
+  
+  
+  
+  

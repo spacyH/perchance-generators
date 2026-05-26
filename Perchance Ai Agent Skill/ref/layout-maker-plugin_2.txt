@@ -1,0 +1,245 @@
+
+<h1>Layout Maker Plugin</h1> 
+
+<div style="margin:0 auto;width:100%;max-width:800px;background:white;border-radius:2px;padding:1em; box-sizing:border-box;">
+	<p style="text-align:justify; margin-top:0;">This plugin lets you create custom visual layouts for your generators without knowing HTML (the stuff in the bottom-right code editor panel). The general idea of this plugin is that you define they layout with a grid of letters, as you can see below. On the left, we define the text grid, and on the right is the layout that is generated.</p>
+	
+	<div style="display:grid; grid-template-areas:'a b c'; grid-template-columns:1fr 1fr 1fr; grid-template-rows:100px;">
+<div>
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+a a a a b
+a a a a b
+c c c c c
+</pre>
+</div> 
+		
+	<div style="display:flex; justify-content:center; align-items:center; font-size:5rem;">➡</div>
+	
+	<div>[$output(layout0)]</div>
+	
+</div>
+		
+	<p>Once we've defined the grid of letters, we then just define the content that we want in each area.</p>
+	
+	<p>Okay, let's see an actual example of how to use it. This code goes in your perchance code panel:</p>
+
+<pre class="custom">
+layoutMaker = \{import:layout-maker-plugin\}
+
+layout
+  debug = borders
+  grid
+    a a a a b
+    a a a a b
+    c c c c c
+  areas
+    a
+      content = \{hello|hi there\} this is the "a" area
+    b
+      content = side bar thing ("b" area)
+    c
+      content = a sort of footer thing ("c" area)
+</pre>
+	
+	<p>And then put this somewhere in your HTML panel (bottom-right panel):</p>
+	
+<pre class="custom">
+\[layoutMaker(layout)\]
+</pre>
+	 
+	<p>And you'll get this:</p>
+	
+	[$output(layout1)]
+	
+	<p>Here's a version of the above example with <code>debug = colors</code> and with <code>centered = true</code> on each of the areas:</p>
+	[$output(layout1_centered)]
+	
+	<p>You can make the grid as complex as you want - here's another example:</p>
+	
+<pre class="custom">
+layout
+	debug = colors
+  grid
+    t a a a b m
+    t a a a b k
+    c c c c c k
+		d d g s s s
+	areas
+		s
+			content = hello
+			centered = true
+		m
+			content = \{1|2|3\} 
+			centered = true
+</pre>
+	
+	[$output(layout2)]
+	
+	<p>As you can see, you can use the <code>debug = colors</code> or <code>debug = borders</code> lines to easily visualise your layout, but you can take this line away once you're done "debugging" it. Also note the <code>centered = true</code> property that you can use to center the content of an area.</p>
+
+	<p>You can specify a <code>style</code> property for each area where you can put <a href="https://developer.mozilla.org/en-US/docs/Learn/CSS/Introduction_to_CSS" target="_blank">CSS</a> rules that will be applied to that area:</p>
+<pre class="custom">
+layout
+  grid
+    a b c
+    a b c
+    a b c
+  areas
+    a
+      content = aaa
+			style = background-color:lightblue;
+    b
+      content = bbb
+			style = border:1px solid lightgrey;
+    c
+      content = ccc
+			style = background-color:orange;
+</pre>
+	
+		[$output(layout3)]
+	
+	<p>And you can also apply CSS styles to the overall container:</p>
+	
+<pre class="custom">
+layout
+	debug = colors
+	container
+		style = height:100px; width:200px;
+  grid
+    a a a
+    b b b
+    c c c
+</pre>
+	
+	[$output(layout4)]
+	
+	<p>Notice that we've made the layout smaller using <code>style = height:100px; width:200px;</code>? The default height is 300 pixels. If you want the overall height to compress down the the size of the content within, use <code>style = height:auto; ...</code>, like in this example:</p>
+	
+<pre class="custom">
+layout
+	debug = colors
+	container
+		style = height:auto;
+  grid
+    a a a a b
+    a a a a b
+    c c c c c
+		e d d d d
+		f f f f f
+  areas
+    a
+      content = \{hello|hi there\} this is the "a" area
+    b
+      content = side bar thing ("b" area)
+    c
+      content = a sort of footer thing ("c" area)
+		d
+      content = another area
+		e
+			content = hi
+    f
+      content = hello
+</pre>
+	
+	<p>Here's what that looks like:</p>
+	
+	[$output(layout_auto_height)]
+  
+	<p>If you want your layout to take up the full height of the screen, add <code>height:100vh;</code> to the <code>layout.container.style</code> property like so:</p>
+	
+<pre class="custom">
+layout
+	container
+		style = height:100vh;
+	...
+</pre>
+	
+	<p>You can change the relative sizes of each row, and of each column like this:</p>
+	
+<pre class="custom">
+layout
+	debug = borders
+	columnSizes = 1fr 0.5fr 1fr
+	rowSizes = 2fr 1fr 1fr
+  grid
+    a b c
+		d e f
+		g h i
+</pre>
+	
+	[$output(layout5)]
+	
+	<p>So if you want the first column to be triple the width of the other two columns, we'd write <code>columnWidths = 3fr 1fr 1fr</code>, for example. And if your grid had 4 columns, then you'd need to write <code>columnWidths = 3fr 1fr 1fr 1fr</code>. If that's confusing, remember you can always ask for help on the community forum :)</p>
+	
+  <p>You can define "gaps" in your layout like so:</p>
+	
+<pre class="custom">
+layout
+	debug = colors
+  grid
+    a a .
+		b . c
+		. . d
+</pre>
+	
+	[$output(layout6)]
+	
+	<p>If you're feeling adventurous you can define layouts within layouts! This will put layout2 within the "b" area of layout1:</p>
+<pre class="custom">
+layout1
+  grid
+    a a a
+		b b b
+		c c c
+	areas
+		b
+			content = \[layoutMaker(layout2)\]
+			
+layout2
+  grid
+    a b c
+		a b c
+		a b c
+		
+output
+	\[layoutMaker(layout1)\]
+</pre>
+<p>With this type of "nesting" you could probably build random maps, dungeons, random houses (with random room layouts), and so on. If you do create something interesting like that, please share it with the community!</p>
+
+	
+	
+	<br><br>
+	<p><b>Notes:</b></p>
+	<ul class="dot-list">
+		<li>You can use <a href="https://perchance.org/layout-maker-plugin-example#edit" target="_blank">this simple example</a> as a starting point for your creations.</li>
+		<li><a href="https://perchance.org/responsive-layout-maker-plugin-example#edit" target="_blank">Here's an example</a> that has two different layouts depending on the size of your screen (e.g. one for mobile users, and one for desktop users). Also check out the <a href="https://perchance.org/responsive-layout-maker-plugin" target="_blank">responsive-layout-maker-plugin</a> by <a href="https://perchance.org/vionet20-gens" target="_blank">Vionet20</a>.</li>
+		<li>You need to make sure that each "area" that you've defined with letters is "rectangular" - e.g. you can't make an L-shaped area - it won't work.</li>
+		<li>If needed, you can define an <code>id</code> for an area by writing <code>id = yourId</code> in the area options (i.e. under the <code>content = ...</code> property). You can also set <code>layout.container.id</code> to give the container an id. <a href="https://perchance.org/update-specific-boxes-with-the-layout-maker-plugin" target="_blank">Here's an example</a> where we make a button that only updates a specific box in our layout.</li>
+		<li>Check out more plugins at <a href="/plugins">perchance.org/plugins</a></li>
+	</ul>
+</div>
+<br><br><br>
+
+<style>
+	body {
+			background:#eee;
+	}
+	code {
+		background-color:#eee;
+		padding: 0 0.2em;
+	}
+	ul.dot-list li {
+	  margin-top:0.5em;	
+	} 
+	pre.custom {
+		text-align:left;
+		background: #333;
+    color: white;
+    padding: 1em;
+    border-radius: 2px;
+		tab-size: 2;
+		-moz-tab-size: 2;
+		-o-tab-size: 2;
+		-webkit-tab-size: 2;
+	}
+</style>

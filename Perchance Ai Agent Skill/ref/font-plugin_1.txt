@@ -1,0 +1,32 @@
+// This is the JavaScript function that powers this plugin:
+$output (list, font, size, color) =>
+  // `list` may also be a HTML element, or `null` which refers to the document.body element.
+	addFontToPage(font);
+	let outputStr = "";
+	let styleStr = "";
+	if(size) styleStr += `font-size:${size};`;
+	if(color) styleStr += `color:${color};`; 
+	styleStr += `font-family:'${font}';`;
+  if(list === null) {
+		document.body.style.cssText += styleStr;
+		return "";
+	} else if(list instanceof HTMLElement) {
+		list.style.cssText += styleStr;
+		return "";
+	} else {
+		outputStr += `<span style="${styleStr}">${list}</span>`;
+		return outputStr;
+	}
+	
+addFontToPage (font) =>
+  if(!window._89743593_fontsAlreadyAdded) window._89743593_fontsAlreadyAdded = new Set();
+	if(!window._89743593_fontsAlreadyAdded.has(font)) {
+		let link = document.createElement('link');
+		link.href = `https://fonts.googleapis.com/css?family=${font}`;
+		link.rel = 'stylesheet';
+		document.getElementsByTagName('head')[0].appendChild(link);
+		window._89743593_fontsAlreadyAdded.add(font);
+	}
+
+// You can learn JavaScript here:
+// https://www.codecademy.com/learn/javascript

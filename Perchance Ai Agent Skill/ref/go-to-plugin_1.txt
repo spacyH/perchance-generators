@@ -1,0 +1,325 @@
+l = {import:link-plugin}
+md = {import:markdown-plugin}
+goto = {import:go-to-plugin}
+pc = {import:perchance-callouts}
+ci = {import:create-instance-plugin}
+c
+  type = info
+  data = none
+  style
+    header = border: none; align-items: start;
+
+$meta
+  title = Go-to Plugin
+  description = "go-to-plugin" is a modification of "goto-plugin" with additional features.
+
+$output(place, anchor, type, id, style, sep) =>
+  if(!window.alreadyAddedDefaultGotoPluginCSS_94629743) addDefaultPluginCSS();
+  type = type != undefined ? type : 'g'
+  id = id != undefined ? id : 'this.parentNode';
+  sep = sep != undefined ? sep : `<br><br>`; // A separator to give space between the previous item and the new appended item.
+  if (!["a", "g", "r", "m"].includes(type)) {
+    if(!["a", "g", "r", "m"].includes(id)) {
+      return `\\[ go-to-plugin : Error: Specify a type 'a','m','r','g' \\]`;
+    } else {
+      let temp;
+      temp = type
+      type = id
+      id = temp;
+    }
+  }
+  if (id != 'this.parentNode') { 
+    let found = document.querySelector(`#${id}`);
+    if (found == "undefined") {
+      return `go-to-plugin : Error: ID not found`; 
+    } 
+  }
+  let key = "gotoPlugin"+((Math.random()+""+Math.random()).replace(/\./g,""));
+  window[key] = place;
+  if (type == "a") { // appending goto plugin, will append/add to the parentNode.
+    // Might want to add an option to change the separator...
+    return `
+    <div 
+    data-separator="${sep}"
+    class='go-to-plugin'
+    style="${style}"
+    onclick='event.preventDefault(), window.${key}.visited = true; ${id}.innerHTML += this.dataset.separator+window.${key};'>${anchor}</div>`;
+  }
+  if (type == "m") { // moving goto plugin, will append/add to the parentNode but deletes the previous node's content.
+    // Might want to add an option to change the separator...
+    return `
+    <div
+    class='go-to-plugin'
+    data-separator="${sep}"
+    style="${style}"
+    onclick='event.preventDefault(), window.${key}.visited = true; ${[id != 'this.parentNode' ? `this.parentNode.innerHTML = "";` : ""]} ${id}.innerHTML += this.dataset.separator+window.${key};'>${anchor}</div>`;
+  }
+  if (type == "r") { // replacing goto plugin, will replace the target id's content. (normal goto)
+    // Might want to add an option to change the separator...
+    return `
+    <div 
+    class='go-to-plugin'
+    style="${style}"
+    onclick='event.preventDefault(), window.${key}.visited = true; ${id}.innerHTML = window.${key};'>${anchor}</div>`;
+  }
+  if (type == "g") { // go-to goto plugin, will replace thing in the target id's content, and deletes the previous id's content.
+    return `
+    <div 
+    class='go-to-plugin'
+    style="${style}"
+    onclick='event.preventDefault(), window.${key}.visited = true; ${[id != 'this.parentNode' ? `this.parentNode.innerHTML = "";` : ""]} ${id}.innerHTML = window.${key};'>${anchor}</div>`;
+  }
+    
+addDefaultPluginCSS() =>
+  let style = document.createElement('style'); 
+  style.type = 'text/css';
+  style.innerHTML = `.go-to-plugin { display: inline-block; font-weight:bold; cursor:pointer; opacity:0.9; text-decoration:underline; } .go-to-plugin:hover { opacity:1; }`;
+  document.head.appendChild(style);
+  window.alreadyAddedDefaultGotoPluginCSS_94629743 = true;
+
+updateText
+  **UPDATE**: The `elementID` and `function` can now be alternated! Just make sure to specify the `function`. See the **'How to Use'** section below for more info!
+
+text
+  [pc(x = ci(c), x.header = md(updateText), x)]
+  ## <center> *How is this different from the* [`goto-plugin`](/goto-plugin) *?* </center>
+  \s
+  This plugin is very similar to the `goto-plugin` (it has the same code but with some modifications). It also still has the functionality of the normal `goto-plugin` but with other new features.
+  
+  * **Appending 'a'** - allows the user to append/add the 'goto' item into the target id (or self), but it **will not delete** the contents of the *starting* container (container of the `goto` text clicked).
+  
+  * **Moving 'm'** - allows the user to append/add the 'goto' item into the target id (or self), but it **will delete** the contents of the *starting* container (container of the `goto` text clicked).
+  
+  * **Replacing 'r'** - allows the user to replace the contents of the target id (or self) with the the 'goto' item, but it **will not delete** the contents of the *starting* container (container of the `goto` text clicked).
+  
+  * **Going 'g'** - allows the user to replace the contents of the target id (or self) with the the 'goto' item, but it **will delete** the contents of the *starting* container (container of the `goto` text clicked).
+  \s
+  [This post](https://www.reddit.com/r/perchance/comments/13p70fj/generate_further_info_by_clicking_text/)  is the inspiration of this modification of the `goto-plugin` (shout out to u/hillermylife). [Here](/vghbzpr9z2) is the prototype of the plugin before this page.
+
+  
+text2
+  \s
+  [Here is a the demonstration of each method](/go-to-plugin-methods-example).
+  ## <center> *Isn't this similar to [LINK Based Dialog System](/link-based-dialogue-system)?* </center>
+  \s
+  The work of **Dixiklo#7514** (on [Discord](https://discord.gg/43qAQEVV9a)) is a *phenomenal work of art*.
+  \s
+  But the LINK Based Dialog System may be quite daunting for new users to use that system (Even I still don't know how it works... it's like ✨ MAGIC ✨).
+  \s
+  Thus, the purpose of this plugin is to use the existing functionality of the `goto-plugin` and add the option to **not** remove the text when going to another 'location'. 
+  \s
+  It does not aim to **replace** the LINK Based Dialog System, but to *offer* a new tool that may be useful to others.
+  ## <center> How to Use </center>
+  \s
+  Put this in your Perchance code panel:
+  \s
+  ```
+  goto \= \{import:go-to-plugin\}
+  ```
+  \s
+  > Or you can replace your `goto-plugin` import with this URL which will give you the new features but not needing to change all lines of old `goto-plugin`
+  >
+  > You can also replace `goto` with any variable name you want.
+  \s
+  If you want just the normal `goto-plugin`, you can use `\[goto(location, "text")\]` just like the old `goto-plugin`.
+  \s
+  If you are using the `elementID` on the `goto-plugin` and don't want to change the position of the `elementID` on the function, you just need to add the `function` like so:
+  ```
+  \[goto(location, "text", "elementID")\]
+  \s
+  to
+  \s
+  \[go-to(location, "text", "elementID", "function")\]
+  ```
+  If you don't specify the function, it will throw an error. Here is an [Example Generator](https://perchance.org/az9s6slncs#edit) to show this feature.
+  \s
+  The syntax of the plugin is the following:
+  ```
+  \[goto(location, "text", "function", "elementID", style, `sep`)\]
+  ```
+  \s
+  ### Parameters
+  Parameter | Description | Default | Accepted Values
+  -|-|-|-
+  `location` | This is where you will link the lists/variables that contains the text of the 'location'. (*Required*) | `none` | any list or variable
+  `text` | This is the text that will be displayed that the user will click to go to the 'location'. This can be a reference to a list/variable/object to dynamically display the word that will be clicked. (*Required*) | `none` | any list or variable
+  `function` | This is where you specify the function of the plugin, there are four possible values: `'a'` for appending, `'m'` for moving, `'r'` for replacing, `'g'` for going. | `'g'` | `'a'`, `'g'`, `'r'`, `'m'`
+  `elementID` | This is where you specify the target element ID (like `<div id\="this-is-the-id"></div>` the id is `this-is-the-id`). | `none` | any HTML tag ID
+  `style` | This is where you specify CSS Styles for the plugin | `none` | any CSS
+  `sep` | This is where you add the separator for `'a'` and `'m'`. Applied before the text of the item to be appended | `<br><br>` | any Text
+  \s
+  > Both `function` and `elementID` inputs need to be enclosed in `" "` or `' '` or `` ` ` ``. Any paramters you don't want to use you can use `null`.
+  \s
+  Some stylized go-to buttons/texts (specific go-to and not the general, see the notes below for styling ALL of the goto) which allows the user to click on the whole `div` and not just the text.:
+  ```
+  style
+    $output \= \[this.selectAll.joinItems(" ")\]
+    background-color: rgba(0,255,255, 0.25);
+    color: blue;
+    width: fit-content;
+    margin: 0 auto;
+    padding: 1em;
+  \s
+  style2
+    $output \= \[this.selectAll.joinItems(" ")\]
+    background-color: rgba(255,0,255, 0.25);
+    color: blue;
+    width: fit-content;
+    margin: 0 auto;
+    padding: 1em;
+    text-decoration: none;
+    border: 2px solid cyan;
+    border-radius: 10px;
+  \s
+  stylizedButtons
+    \[goto(place, "Go to the Place", 'g', null, style)\]
+    \[goto(place, "Go to the Place", 'g', null, style2)\]
+  \s
+  place
+    You went to the place! \[goto(stylizedButtons, "Back")\]
+
+  ```
+
+sepText
+  You can change the separator before the appending (only works on the `'a'` and `'m'` methods).
+  ```
+  sepButtons
+    $output \= \[this.selectAll.joinItems(`<br><br>`)\]
+    <br>
+    \[goto(place2, "Append 'this'", 'a', null, null, `<br><br>`)\]
+    \[goto(place2, "Append 'this'", 'a', null, null, `<br><br>THIS<br>`)\]
+    \[goto(place2, "Append 'this'", 'a', null, null, `<br><br>-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-<br>`)\]
+  \s
+  place2
+    Appended THIS \[goto(sepButtons, "Reset")\]
+  ```
+
+notesText
+  ## <center> Notes </center>
+  * [Here is a modified example](/simple-go-to-plugin-example#edit) of the given example in `goto-plugin`. (appending)
+  * Want to allow people to save their game so they can close the browser tab and pick up where they left off later? Then check out the [`remember-plugin`](/remember-plugin), and [here's an example](/go-to-plugin-and-remember-plugin-example#edit) of how to use the `remember` and `goto-append` together. (appending)
+  * [Here is a example of a `go-to-plugin` with different `elementID`](/go-to-plugin-go-to-next-element#edit).
+  * You can stylize the clickable text by referencing it in a `<style>` tag in the HTML panel with the selector `.go-to-plugin` like so:
+  ```
+  <style>
+  .go-to-plugin \{
+    \sstyles here... 
+  \}
+  </style>
+  ```
+  * You can checkout [this example](/goto-plugin-example) for a more complex example and also [this example](/goto-plugin-example-with-audio) that uses a grid-style world layout (these examples uses the `goto-plugin` but it has the same principle 😊).
+  * Checkout more plugins at **[perchance.org/plugins](/plugins)**
+  * This is made by **[/u/Vionet20](https://www.reddit.com/user/VioneT20)**, if you have any questions, suggestions, bug reports, here is a [link to my generators](https://perchance.org/vionet20-gens).
+
+  
+output
+  {This|That} [animal] is so [adjective]!
+  I wish I could [verb] that [animal].
+  Aren't [animal.pluralForm] just so [adjective]?
+  There must be at least {1-10} [animal]{s} [location]!
+  THE [animal.upperCase]! It's eating the {import:common-noun}!
+  {A} [animal] is a bit like {a} {import:common-noun}. // {A} and {a} will automatically choose "a" and "an" as appropriate
+
+o1
+  You found {a} [$output(o2, x = animal.evaluateItem, 'a')]!
+
+o2
+  Aren't [x.pluralForm] just so [$output(o3, y = adjective.evaluateItem, 'a')]?
+  
+o3
+  THE [y.upperCase] [x.upperCase]! It's eating the [$output(o4, z = "{import:common-noun}".evaluateItem, 'a')]!
+
+o4
+  There must be at least {1-10} [x]{s} eating the [z], [$output(o5, a = location.evaluateItem, 'a')]!
+
+o5
+  [a.sentenceCase], it is infested with [y] [x] that is eating the [z]! [$output(o1, "Reset")]
+  
+
+  
+o6
+  What is the name of this plugin?<br>[$output(a1, a1.a, 'a')]<br>[$output(a2, a2.a, 'a')]<br>[$output(a3, a3.a, 'a')]
+
+a1
+  a = A. <code>goto-plugin</code>
+  A is the Wrong Answer! [$output(o6, "Try Again?")] <br><br> The answer is <span class\="spoiler">[a3.a]</span>. 
+
+a2
+  a = B. <code>append-plugin</code>
+  B is the Wrong Answer! [$output(o6, "Try Again?")] <br><br> The answer is <span class\="spoiler">[a3.a]</span>.
+
+a3
+  a = C. <code>go-to-plugin</code>
+  C is the Correct Answer! [$output(o6, "Back")] 
+
+style
+  $output = [this.selectAll.joinItems(" ")]
+  background-color: rgba(0,255,255, 0.25);
+  color: blue;
+  width: fit-content;
+  margin: 0 auto;
+  padding: 1em;
+
+style2
+  $output = [this.selectAll.joinItems(" ")]
+  background-color: rgba(255,0,255, 0.25);
+  color: blue;
+  width: fit-content;
+  margin: 0 auto;
+  padding: 1em;
+  text-decoration: none;
+  border: 2px solid cyan;
+  border-radius: 10px;
+
+sepButtons
+  $output = [this.selectAll.joinItems(`<br><br>`)]
+  <br>
+  [goto(place2, "Append 'this'", 'a', null, null, `<br><br>`)]
+  [goto(place2, "Append 'this'", 'a', null, null, `<br><br>THIS<br>`)]
+  [goto(place2, "Append 'this'", 'a', null, null, `<br><br>-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-<br>`)]
+
+place2
+  Appended THIS [goto(sepButtons, "Reset")]
+  
+stylizedButtons
+  [$output(place, "Go to the Place", 'g', null, style)]<br><br>[$output(place, "Go to the Place", 'g', null, style2)]
+
+place
+  You went to the place! [$output(stylizedButtons, "Back")]
+
+newGoto
+  Went to New [$output(oldGoto, "Go to Old", 'g', 'oldPlace')]
+
+oldGoto
+  Went to Old [$output(newGoto, "Go to New", 'g', 'newPlace')]
+  
+animal
+  pig
+  cow
+  chicken
+  zebra
+  crayfish
+  jellyfish^0.5  // this item is HALF as likely as the others
+  worm^2         // this item is TWICE as likely as the others
+  
+adjective
+  small
+  big
+  cute
+  sneaky
+  unusual
+  helpful
+  mean
+  
+verb
+  pat
+  befriend
+  help
+  
+location
+  on {the|this|that} island
+  in {the|this|that} valley
+  {around|in} here
+  over there
+  under this {thing^2|thingie}
+  

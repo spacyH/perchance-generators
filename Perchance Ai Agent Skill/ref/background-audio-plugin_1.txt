@@ -1,0 +1,64 @@
+// This plugin outputs a simple JavaScript function that takes a sinle input: url
+$output (url, options) => 
+	if(url.includes("soundcloud.com")) {
+	  return `<div style="display:none;"><iframe width="100%" height="166" scrolling="no" frameborder="no" src="https://w.soundcloud.com/player/?url=${url}&amp;color=ff5500&amp;auto_play=false&amp;hide_related=false&amp;show_comments=true&amp;show_user=true&amp;show_reposts=false"></iframe></div>`;
+	} else {
+	
+		if(!window.__alreadyAddedBackgroundAudioYoutubeInitStuff5345) {
+			
+      const script = document.createElement('script');
+      script.src = "https://www.youtube.com/iframe_api";
+      document.head.appendChild(script);
+	
+			let players = [];
+			let playerOptions = [];
+			
+			window.addEventListener("click", function() {
+			  for(let player of players) {
+					player.a.setAttribute("allow", "autoplay");
+					player.setVolume(Number(player.___options4321.volume));
+				  if(player.getPlayerState() == YT.PlayerState.UNSTARTED || player.getPlayerState() == YT.PlayerState.PAUSED || player.getPlayerState() == YT.PlayerState.CUED) {
+					  player.playVideo();
+					}
+				}
+			});
+			
+      window.onYouTubeIframeAPIReady = function() {
+				setInterval(function() {
+					document.querySelectorAll(".__youtube-background-audio-plugin-marker").forEach(markerEl => {
+						// detect if a comments section has been injected after it yet (edit: for some reason it's injected before it?):
+						if((!markerEl.nextElementSibling || markerEl.nextElementSibling.tagName.toLowerCase() !== "iframe") && (!markerEl.previousElementSibling || markerEl.previousElementSibling.tagName.toLowerCase() !== "iframe")) {
+							let div = document.createElement("div");
+							div.innerHTML = `<div class="background-audio-plugin-ctn" style="pointer-events:none; opacity:0;"></div>`;
+							let iframeContainer = div.firstElementChild;
+							let options = {volume:markerEl.dataset.volume, loop:markerEl.dataset.loop};
+							markerEl.after(iframeContainer);
+							let player = new YT.Player(iframeContainer, {
+								height: '390',
+								width: '640',
+								videoId: url.split("v=")[1].split("&")[0],
+								events: {
+									onReady: () => {
+										player.___options4321 = options;
+										player.setLoop(Boolean(options.loop));
+									  players.push(player);
+										player.getIframe().style.cssText = "pointer-events:none; opacity:0;";
+									},
+								}
+							});
+						}
+					});
+				}, 1000);
+      }
+
+			
+			window.__alreadyAddedBackgroundAudioYoutubeInitStuff5345 = true;
+		}
+	  
+		if(!options) options = "";
+		options = Object.fromEntries(options.split(";").filter(o => o.trim()).map(o => o.split(":")));
+		if(!options.volume) volume = "1";
+		if(!options.loop) loop = "1";
+		return `<span class="__youtube-background-audio-plugin-marker" data-url="${url}" data-volume="${options.volume}" data-loop="${options.loop}"></span>`;
+		
+	}

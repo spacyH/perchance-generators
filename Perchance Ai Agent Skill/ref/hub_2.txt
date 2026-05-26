@@ -1,0 +1,2170 @@
+<!-- Sheets Imports -->
+[gs(root, sheetsSettings)]
+[r(root, "@inputs")]
+[hash = decodeURI(new URL(window.location.href).hash.slice(1)), '']
+[hash ? url.page = hash : url.page ? '' : url.page='home', url.room ? '' : url.room = '', '']
+<!-- [console.log(calloutsCon) ,''] -->
+<!-- Library Imports -->
+<script src="https://cdn.jsdelivr.net/npm/darkreader@4.9.84/darkreader.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@splidejs/splide@4.1.4/dist/js/splide.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/@splidejs/splide@4.1.4/dist/css/splide.min.css" rel="stylesheet">
+
+
+
+<script src="https://cdn.jsdelivr.net/npm/@splidejs/splide-extension-intersection@0.2.0/dist/js/splide-extension-intersection.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.0/purify.min.js" integrity="sha512-ZCsRHqhdDXrq4iTXVZLkGBsOfDlvhvHhEMQlCosf9Oqy1p6xizF1LSWa6uuISGqeh9PmCzfneGcYZvc9t/hjaQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js" integrity="sha512-pSeTnZAQF/RHxb0ysMoYQI/BRZsa5XuklcrgFfU3YZIdnD3LvkkqzrIeHxzFi6gKtI8Cpq2DEWdZjMTcNVhUYA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+<!-- Main HTML -->
+
+<dialog id="popupAnnoucement" style="border: none; background: none; padding: 0;">
+  [call(announceModal)]
+</dialog>
+
+<script>
+
+</script>
+
+<script>
+  // 12 Hrs min timer after clicking the Close on the Modal
+  // if (Number(localStorage.getItem("lastModalClose")) + 43200000 < Number(Date.now())) {
+  //   popupAnnoucement.showModal()
+  // }
+  
+  // let currentModalHash = simpleHash(Announcement.getRawListText);
+  // console.log("hash:",currentModalHash);
+  // console.log("old hash:",localStorage.getItem('modalHash'));
+  // if (localStorage.getItem('modalHash') != currentModalHash) {
+  //   console.log("popup modal");
+  //   popupAnnoucement.showModal()
+  //   localStorage.setItem('modalHash', currentModalHash);
+  // }
+  // console.log(Number(localStorage.getItem("lastModalClose")) + 600000 < Number(Date.now()), Number(localStorage.getItem("lastModalClose")), Number(Date.now()), new Date(Number(localStorage.getItem("lastModalClose"))))
+  
+</script>
+<!-- Heading -->
+<h1 style="margin-bottom: 0px; font-size: var(--step-3);text-wrap:balance;">[pride()]&nbsp;Perchance Hub&nbsp;[pride()]</h1>
+<p style="padding: 1em; margin: 0em auto 0em; max-width: 1000px; font-size: var(--step-1); text-wrap:balance">A community-run Hub for Perchance Users!</p>
+<!-- [communityIcons()] -->
+
+<!-- Tabs -->
+<div id="hubTabs">[tp(tabs2)]</div>
+
+<!-- comments section -->
+<!-- <div style="position:fixed; bottom:0; right:0; height:max-content; border-top-left-radius:3px; border-top-right-radius:3px; width:min(100%, 500px); z-index:10; max-height:100vh; background:white;">
+  <div class="comments-gradient" style="color:black; font-weight: 600; border-top-left-radius:3px; border-top-right-radius:3px; cursor:pointer; padding:0.25rem; font-family: 'Work Sans', sans-serif;" data-visible="false" onclick="commentsCtnEl.style.display = JSON.parse(this.dataset.visible) ? (commentsCtnEl.innerHTML = '', 'none') : (commentsCtnEl.innerHTML = c(c1TempO), ''); this.dataset.visible = !JSON.parse(this.dataset.visible);">💬 Hub-Related Chat 💬</div>
+  <div id="commentsCtnEl" style="display:none; height:min(600px, 80vh); padding: 0.5em; background: #eee"></div>
+</div> -->
+<!-- comments section end -->
+<!-- logo -->
+  <div class="viewsAndLogo" style="display:flex; justify-content:space-around; align-items:center; text-align:center; opacity:0.5; margin: 1em;">
+    <i>The Hub has been viewed<br><b>[gen("hub", "views")] times</b></i>
+    <span style="font-size:400%; padding: 0; line-height: 0.75;">⚄&#xFE0E;</span>
+    <i>The Hub has been last edited<br><b>[gen("hub", "lastEditTime")]</b></i>
+  </div>
+<br><br>
+<div style="display: flex; position: absolute; top: 0em; width: 100%;">
+  <label id="overrideInput" data-override="false" style="display: block; margin-right: auto; padding: 1em;">
+    <i class="bi-moon" style="font-size: 1.5em;"></i>
+    <input id="themeInput" type="checkbox" oninput="this.checked ? (this.previousElementSibling.classList.remove('bi-moon'), this.previousElementSibling.classList.add('bi-sun')): (this.previousElementSibling.classList.remove('bi-sun'), this.previousElementSibling.classList.add('bi-moon')); darkModeToggle()" style="display: none;">
+  </label>
+</div>
+<div style="position:absolute; z-index: 9999; top: 0.5rem; right: 0.5rem; display: flex; gap: 0.25rem; font-size: 0.8rem; align-items;center;">
+  <span id="usrCount"></span>
+  <span style="display: inline-block; width: 0.5rem; height: 0.5rem; background: lime; border-radius: 50%; align-self: center;"></span>
+  <span>Online</span>
+</div>
+<div id="commentsUserCounterContainer"></div>
+
+<!-- [sheetsSettings.onLoad()] -->
+<!--  
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        ⚠ Scripts below ⚠        ⚠ Scripts below ⚠        ⚠ Scripts below ⚠        ⚠ Scripts below ⚠
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+-->
+<script>
+  // DARK MODE
+  // DarkReader.auto({
+  //   brightness: 100,
+  //   contrast: 85,
+  //   sepia: 1
+  // });
+
+//   DarkReader.enable({
+//     brightness: 100,
+//     contrast: 90,
+//     sepia: 10
+// });
+/////////// MASTODON SCRIPT /////////////
+// let mastodonList = []; 
+//   // took this snippet from https://perchance.org/7hyu3bu6ng#edit
+// const getMastodon = async () => {
+//   const data = await fetch("https://mastodon.social/api/v1/timelines/tag/perchance?limit=12").then(r => r.json());
+//   let response = await data;
+//   return response;
+// }
+// getMastodon().then(result => { mastodonList = result; createMastodonPosts(); }); // CALLING THE API AND STORING THE RESULT TO THE `list`
+
+// function createMastodonPosts() {
+//   let html = "";
+//   mastodonList.forEach((a,i) => {
+//     html += `
+// <div class="mastodonCard" style="margin: 0.25em; max-width: 400px; width: 100%; display:flex; flex-flow: column;">
+//   <div class="comments-gradient" style="width: 100%; height: max-content; padding: 0.2em; display:flex; flex-flow: column">
+//   <div style="text-align: left; background: #ffffff80; padding: 0.5em 0.5em; display: flex; align-items: center; cursor: pointer;" onclick="window.open('${a.url}');">
+//       <div><a href="${a.account.url}"><img style="height: 2em; margin-right: 0.5em;" loading="lazy" src=${a.account.avatar}></img></a></div>
+//       <div>${[t(`<b>${a.account.display_name}</b><br><span style="opacity: 0.5;">(${[a.account.acct.length > 15 ? a.account.acct.slice(0,15) + "..." : a.account.acct]})</span>`, a.account.note, tO)]}</div>
+//       <div style="margin-left: auto"><span style="font-weight: bold; opacity: 0.7;">${x = new Date(a.created_at).toLocaleDateString("en-US", {month: 'short', day: 'numeric', year: 'numeric'})}</span></div>
+//   </div>
+//     <div style="text-align: left; background: #fff; padding: 0em 0.5em 0em 0.5em; display:flex;">
+//       <div style="white-space: pre-wrap; flex: 1 1 auto;">${a.content}</div>
+//     </div>
+//   </div>
+// </div>
+//     `;
+//   })
+//     mastodonTest.innerHTML = html;
+// }
+
+///////// END OF MASTODON SCRIPT //////////////
+  
+//////// CHAT CARDS SCRIPT (modified from collection-template) //////////
+function darkModeToggle() {
+  // console.log('darkmode', themeInput.checked);
+  let input = document.getElementById("themeInput");
+  console.log('input darkmode', input);
+  if (input.checked) {
+    DarkReader.enable({
+      brightness: 100,
+      contrast: 95,
+      sepia: 1
+    });
+  } else {
+    DarkReader.disable();
+  }
+}
+
+function makeCardHTML (item) {
+  return `
+  <div class="cards__item">      
+    <div class="card__image" style="${[item.image ? `background-image:url(${item.image});` : item.color ? `background: ${item.color};`: ""]}">
+      <div class="card__title">${item.title}</div>
+      <div class="card">
+        <div class="card__content">
+          <p class="card__text" style="${item.description ? "" : "margin-bottom:0;"}">${item.description || ""}</p>
+          ${item.channel}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+//////// CHAT CARDS SCRIPT END //////////
+  // Loading Spinner Creation Function
+function loadingSpinner() {
+  let style = `  
+  <div class="lds-default"></div>`;
+  return style;
+  }
+  
+// SEARCH FUNCTION FROM https://www.w3schools.com/howto/howto_js_filter_lists.asp
+function searchFunction(inputID, listID) {
+  // Declare variables
+  var input, filter, ul, li, a, i, txtValue;
+  input = document.getElementById(inputID);
+  filter = input.value.toUpperCase();
+  ul = document.querySelector(listID);
+  li = ul.getElementsByTagName('li');
+
+  // Loop through all list items, and hide those who don't match the search query
+  for (i = 0; i < li.length; i++) {
+    txtValue = li[i].innerText;
+    if (txtValue.toUpperCase().indexOf(filter) > -1) {
+      li[i].style.display = "";
+    } else {
+      li[i].style.display = "none";
+    }
+  }
+}
+  // Create Genhub List (or any Generator from a list of generator urls)
+function createGenHubList(genlist, authors) {
+  let genList = genlist.selectAll
+  let authorList = authors.selectAll
+  
+  for (let i = genList.length - 1; i > 0; i--) {
+    let j = Math.floor(Math.random() * (i + 1));
+    let temp = genList[i];
+    let temp2 = authorList[i];
+    genList[i] = genList[j];
+    authorList[i] = authorList[j];
+    genList[j] = temp;
+    authorList[j] = temp2;
+  }
+
+  let html = ``;
+  genList.forEach((a, i) => {
+    html += `
+      <li>
+      <a href="/${a}">${a}</a> by ${authors[i]}
+      </li>
+      `;
+  })
+  
+  return html;
+}
+  //////// VERT NAV SCRIPT //////////
+function genTabNav(list) {
+  let items = list.selectAll;
+  let navButtons = items.map((a,i) => 
+   `<li data-nav-link="${i}" class="navItem ${a.default ? "active" : ""}" onclick="selectNav(${i}), showContent(${i})">
+${a.title}
+</li>`);
+  let contents = items.map((a,i) => 
+   `<div data-nav-content="${i}" class="navContent" style="display:${a.default ? '\'\'': 'none'}">${a.content}</div>`
+  );
+  // console.log(contents);
+  
+  return `
+<div class="genTabs">
+  <div id="tabNav">
+    <div id="clickDropdown" class="navItem-cat" data-visible="true"
+onclick="tabNavList.style.display = JSON.parse(this.dataset.visible) ? (this.innerHTML = '▼&nbsp;&nbsp;Categories&nbsp;&nbsp;▼', 'none'): (this.innerHTML = '▲&nbsp;&nbsp;Categories&nbsp;&nbsp;▲', 'flex'); this.dataset.visible = !JSON.parse(this.dataset.visible);">▲&nbsp;&nbsp;Categories&nbsp;&nbsp;▲</div>
+    <ul id="tabNavList" class="tabNavList">${navButtons.join("")}</ul></div>
+<main class="tabContentList">${contents.join("")}</main>
+  </div>
+  `;
+}
+
+function selectNav(item) {
+  let items = document.getElementsByClassName("navItem");
+  for (a of items) { a.classList.remove("active"); }
+  items[item].classList.add("active");
+}
+  
+function showContent(item) {
+  let items = document.getElementsByClassName("navContent");
+  for (a of items) { a.style.display = 'none'; }
+  items[item].style.display = '';
+}
+  
+//////// VERT NAV SCRIPT END //////////
+  
+/// LIST SHUFFLER ///
+function shuffleList(genlist, authors) {
+  let genList = genlist.selectAll;
+  let authorList = authors.selectAll;
+  
+  for (let i = genList.length - 1; i > 0; i--) {
+    let j = Math.floor(Math.random() * (i + 1));
+    let temp = genList[i];
+    let temp2 = authorList[i];
+    genList[i] = genList[j];
+    authorList[i] = authorList[j];
+    genList[j] = temp;
+    authorList[j] = temp2;
+  }
+  return [genList,authorList];
+}
+// Object Shuffler
+const shuffle = (array) => {
+    const newArray = [...array];
+
+    newArray.reverse().forEach((item, index) => {
+        const j = Math.floor(Math.random() * (index + 1));
+        [newArray[index], newArray[j]] = [newArray[j], newArray[index]];
+    });
+
+    return newArray;
+};
+
+  
+  
+//// GEN CARD LOAD ////
+ async function loadData(generatorList,authorList,listEl, method) {
+    const nativeLazyLoadIsSupported = ("loading" in document.createElement("img"));
+    let authors = authorList.selectAll.length >= 1 ? authorList.selectAll : "";
+    // let generatorNameArray = generatorList;
+    // console.log(generatorList, authors)
+    let subsets = []
+    let generatorNameArray = generatorList
+    let generatorAuthorArray = authorList
+    while (generatorNameArray.length > 250) {
+      let names = generatorNameArray.slice(0,250)
+      let authors = generatorAuthorArray.slice(0,250)
+      generatorNameArray = generatorNameArray.slice(250);
+      generatorAuthorArray = generatorAuthorArray.slice(250);
+      subsets.push([names, authors])
+    }
+    subsets.push([generatorNameArray, generatorAuthorArray])
+    // console.log(subsets);
+    let generatorDataArray = []
+    if (subsets.length > 0) {
+     for (let i = 0; i < subsets.length; i++) {
+        let response = await fetch("https://perchance.org/api/getGeneratorStats?names="+subsets[i][0].join(","), {cache: "force-cache"}).then(r => r.json())
+        response = response.data
+        generatorDataArray.push(...response)
+     }
+    }
+    // console.log(generatorDataArray)
+    let listHtml = "";
+    if (method == "time_new") {
+      generatorDataArray.sort((a,b) => b.lastEditTime - a.lastEditTime);
+    } else if (method == "time_old") {
+      generatorDataArray.sort((a,b) => a.lastEditTime - b.lastEditTime);
+    } else if (method == "views_low") { 
+      generatorDataArray.sort((a,b) => a.views - b.views);
+    } else {
+      generatorDataArray.sort((a,b) => b.views - a.views);
+    }
+    // generatorDataArray = shuffle(generatorDataArray);
+   // console.log(generatorDataArray);
+    for(let i = 0; i < generatorDataArray.length; i++) {
+      let name = generatorDataArray[i].name;
+      let genIndex = generatorList.selectAll.indexOf(name);
+      let featOrGenHub
+      let catIndex = featgenlist.selectAll.indexOf(name) == -1 ? (featOrGenHub = true, category.selectAll.indexOf(name)) : (featOrGenHub = false, featgenlist.selectAll.indexOf(name));
+      let g = formatData(generatorDataArray[i]);
+      let imageUrl = `https://perchance.org/api/getGeneratorScreenshot?generatorName=${name}`;
+      let imageAttrs = nativeLazyLoadIsSupported ? `loading="lazy" src="${imageUrl}"` : `class="lazy" data-src="${imageUrl}"`;
+      listHtml += 
+`
+<li class="gen-card">
+<div class="gen-item" data-category="${featOrGenHub ? category.selectAll[catIndex] : featcategory.selectAll[catIndex]}" data-display="row">
+  <div class="gen-details">
+    <div class="gen-img-link">  
+      <a href="/${name}" style="position:relative;" target="_blank">
+          <img ${imageAttrs} onmouseenter="this.nextElementSibling.style.display='';" onmouseleave="this.nextElementSibling.style.display='none';"/>
+          ${g.metaData && g.metaData.image ? `<img style="display: none; position:absolute; aspect-ratio: 1.6/1; bottom: 0; left: 0; object-fit: contain; pointer-events: none;" src="${g.metaData.image}"/>` : `<span></span>`}
+      </a>
+      <div class="gen-img-link-text">
+          <a href="/${name}">
+            ${name}
+          </a>
+         ${authors[genIndex] ? `<span>`+authors[genIndex]+`</span>`: ""}
+      </div>
+      <div class="gen-desc-con">
+        ${
+          g.metaData && g.metaData.description
+            ? g.metaData.description.length > 113
+              ? `<div class="gen-desc">${g.metaData.description.slice(0, 113) + "…"}</div>`
+              : `<div class="gen-desc">${g.metaData.description}</div>`
+            : ""
+        }
+      </div>
+    </div>
+  </div>
+  <div class="gen-stats" data-display="row">
+    <div class="gen-stats-views">
+      <span style="font-family: 'Work Sans', sans-serif; font-weight: 600;">${g.views}</span> 
+      <span style="opacity:0.7; font-size:80%;">view${
+        g.views === 1 ? "" : "s"
+      }</span>
+    </div>
+    <div class="gen-stats-edittime">
+      <span style="opacity:0.7;">
+      <span style="font-family: 'Work Sans', sans-serif; font-weight: 600;">${g.lastEditTime.split(" ")[0]}</span> 
+      <span style="font-size:80%;">${g.lastEditTime
+        .split(" ")
+        .slice(1)
+        .join(" ")}</span></span>
+    </div>
+  </div>
+
+</div>
+</li>
+`
+
+    }
+    return listHtml;
+  }
+  
+  async function genJamloadData(generatorList,authorList,listEl, method) {
+    const nativeLazyLoadIsSupported = ("loading" in document.createElement("img"));
+    let authors = authorList.selectAll.length >= 1 ? authorList.selectAll : "";
+    let generatorNameArray = generatorList.selectAll;
+    let generatorDataArray = await fetch("https://perchance.org/api/getGeneratorStats?names="+generatorNameArray.join(","), {cache: "force-cache"}).then(r => r.json());
+    generatorDataArray = generatorDataArray.data; 
+    let listHtml = "";
+    if (method == "time_new") {
+      generatorDataArray.sort((a,b) => b.lastEditTime - a.lastEditTime);
+    } else if (method == "time_old") {
+      generatorDataArray.sort((a,b) => a.lastEditTime - b.lastEditTime);
+    } else if (method == "views_low") { 
+      generatorDataArray.sort((a,b) => a.views - b.views);
+    } else {
+      generatorDataArray.sort((a,b) => b.views - a.views);
+    }
+    // generatorDataArray = shuffle(generatorDataArray);
+    for(let i = 0; i < generatorDataArray.length; i++) {
+      let name = generatorDataArray[i].name;
+      let genIndex = generatorList.selectAll.indexOf(name);
+      let catIndex = genjamcategory.selectAll.indexOf(name);
+      let g = formatData(generatorDataArray[i]);
+      let imageUrl = `https://perchance.org/api/getGeneratorScreenshot?generatorName=${name}`;
+      let imageAttrs = nativeLazyLoadIsSupported ? `loading="lazy" src="${imageUrl}"` : `class="lazy" data-src="${imageUrl}"`;
+      listHtml += 
+`
+<li class="gen-card">
+<div class="gen-item" data-category="${genjamcategory.selectAll[genIndex]}" data-display="row">
+  <div class="gen-details">
+    <div class="gen-img-link">  
+      <a href="/${name}" style="position:relative;" target="_blank">
+          <img ${imageAttrs} onmouseenter="this.nextElementSibling.style.display='';" onmouseleave="this.nextElementSibling.style.display='none';"/>
+          ${g.metaData.image ? `<img style="display: none; position:absolute; aspect-ratio: 1.6/1; bottom: 0; left: 0; object-fit: contain; pointer-events: none;" src="${g.metaData.image}"/>` : `<span></span>`}
+      </a>
+      <div class="gen-img-link-text">
+          <a href="/${name}">
+            ${name}
+          </a>
+         ${authors[genIndex] ? `<span>`+authors[genIndex]+`</span>`: ""}
+      </div>
+      <div class="gen-desc-con">
+        ${
+          g.metaData && g.metaData.description
+            ? g.metaData.description.length > 113
+              ? `<div class="gen-desc">${g.metaData.description.slice(0, 113) + "…"}</div>`
+              : `<div class="gen-desc">${g.metaData.description}</div>`
+            : ""
+        }
+      </div>
+    </div>
+  </div>
+  <div class="gen-stats" data-display="row">
+    <div class="gen-stats-views">
+      <span style="font-family: 'Work Sans', sans-serif; font-weight: 600;">${g.views}</span> 
+      <span style="opacity:0.7; font-size:80%;">view${
+        g.views === 1 ? "" : "s"
+      }</span>
+    </div>
+    <div class="gen-stats-edittime">
+      <span style="opacity:0.7;">
+      <span style="font-family: 'Work Sans', sans-serif; font-weight: 600;">${g.lastEditTime.split(" ")[0]}</span> 
+      <span style="font-size:80%;">${g.lastEditTime
+        .split(" ")
+        .slice(1)
+        .join(" ")}</span></span>
+    </div>
+  </div>
+<div style="background: rgba(255,255,255);padding: .5em;">
+<div style="display:flex; justify-content: space-between; flex-flow: row;">
+   <span style="font-family: 'Work Sans', sans-serif; font-weight: 600; font-size: 80%;">Other Gens: </span>
+   <span class="placements" style="font-family: 'Work Sans', sans-serif; font-weight: 600; font-size: 80%; text-align:right;">${creatorOtherGen.selectAll[genIndex].split("  ").map(a => `<a href="${a}">${a}</a>`).join("<br>")}</span>
+ </div>
+</div>
+
+</div>
+</li>
+`
+
+    }
+    return listHtml;
+  }
+  
+  function formatData(data) {
+    g = JSON.parse(JSON.stringify(data)); // clone
+    if(!g.views) g.views = 0;
+    g.views = g.views > 999 ? (g.views/1000).toFixed(1) + 'k' : g.views;
+
+    g.lastEditTime = Date.now() - g.lastEditTime;
+    g.lastEditTime /= 1000;
+    if(g.lastEditTime > 60*60*24*30*12) {
+      let t = Math.round(g.lastEditTime/(60*60*24*30*12));
+      g.lastEditTime = t + ` year${t==1?"":"s"} ago`;
+    } else if(g.lastEditTime > 60*60*24*30) {
+      let t = Math.round(g.lastEditTime/(60*60*24*30));
+      g.lastEditTime = t + ` month${t==1?"":"s"} ago`;
+    } else if(g.lastEditTime > 60*60*24) {
+      let t = Math.round(g.lastEditTime/(60*60*24));
+      g.lastEditTime = t + ` day${t==1?"":"s"} ago`;
+    } else if(g.lastEditTime > 60*60) {
+      let t = Math.round(g.lastEditTime/(60*60));
+      g.lastEditTime = t + ` hour${t==1?"":"s"} ago`;
+    } else if(g.lastEditTime > 60) {
+      let t = Math.round(g.lastEditTime/(60));
+      g.lastEditTime = t + ` minute${t==1?"":"s"} ago`;
+    } else {
+      let t = Math.round(g.lastEditTime);
+      g.lastEditTime = t + ` second${t==1?"":"s"} ago`;
+    }
+    return g;
+  }
+    
+async function loadCarouselData(generatorList,authorList,listEl) {
+    const nativeLazyLoadIsSupported = ("loading" in document.createElement("img"));
+    let authors = authorList.selectAll.length >= 1 ? authorList.selectAll : "";
+    let generatorNameArray = generatorList.selectAll;
+    let generatorDataArray = await fetch("https://perchance.org/api/getGeneratorStats?names="+generatorNameArray.join(","), {cache: "force-cache"}).then(r => r.json());
+    generatorDataArray = generatorDataArray.data; 
+    let listHtml = "";
+    // console.log(generatorDataArray);
+    generatorDataArray = shuffle(generatorDataArray);
+    generatorDataArray = generatorDataArray.map(a => a);
+    for(let i = 0; i < 10; i++) {
+      let name = generatorDataArray[i].name;
+      let genIndex = generatorList.selectAll.indexOf(name);
+      let catIndex = featgenlist.selectAll.indexOf(name);
+      let g = formatData(generatorDataArray[i]);
+      let imageUrl = `https://perchance.org/api/getGeneratorScreenshot?generatorName=${name}`;
+      let imageAttrs = nativeLazyLoadIsSupported ? `loading="lazy" src="${imageUrl}"` : `class="lazy" data-src="${imageUrl}"`;
+      listHtml += 
+`
+<li class="splide__slide">
+<div class="gen-card">
+<div class="gen-item" data-category="${featcategory.selectAll[catIndex]}" data-display="row">
+  <div class="gen-details">
+    <div class="gen-img-link">  
+      <a href="/${name}" style="position:relative;" target="_blank">
+          <img ${imageAttrs} onmouseenter="this.nextElementSibling.style.display='';" onmouseleave="this.nextElementSibling.style.display='none';"/>
+          ${g.metaData && g.metaData.image ? `<img style="display: none; position:absolute; aspect-ratio: 1.6/1; bottom: 0; left: 0; object-fit: contain; pointer-events: none;" src="${g.metaData.image}"/>` : `<span></span>`}
+      </a>
+      <div class="gen-img-link-text">
+          <a href="/${name}">
+            ${name}
+          </a>
+         ${authors[genIndex] ? `<span>` + authors[genIndex] + `</span>` : ""}
+      </div>
+      <div class="gen-desc-con">
+        ${g.metaData && g.metaData.description ? (g.metaData.description.length > 113 ? `<div class="gen-desc">${g.metaData.description.slice(0, 113) + "…"}</div>` : `<div class="gen-desc">${g.metaData.description}</div>`) : ""}
+      </div>
+    </div>
+  </div>
+  <div class="gen-stats" data-display="row">
+    <div class="gen-stats-views">
+      <span style="font-family: 'Work Sans', sans-serif; font-weight: 600;">${g.views}</span> 
+      <span style="opacity:0.7; font-size:80%;">view${g.views === 1 ? "" : "s"}</span>
+    </div>
+    <div class="gen-stats-edittime">
+      <span style="opacity:0.7;">
+      <span style="font-family: 'Work Sans', sans-serif; font-weight: 600;">${g.lastEditTime.split(" ")[0]}</span> 
+      <span style="font-size:80%;">${g.lastEditTime.split(" ").slice(1).join(" ")}</span></span>
+    </div>
+  </div>
+</div>
+</div>
+</li>
+`;
+
+
+    }
+    return listHtml;
+  }
+async function jamloadCarouselData(generatorList,authorList,listEl) {
+    const nativeLazyLoadIsSupported = ("loading" in document.createElement("img"));
+    let authors = authorList.selectAll.length >= 1 ? authorList.selectAll : "";
+    let generatorNameArray = generatorList.selectAll;
+    let generatorDataArray = await fetch("https://perchance.org/api/getGeneratorStats?names="+generatorNameArray.join(","), {cache: "force-cache"}).then(r => r.json());
+    generatorDataArray = generatorDataArray.data; 
+    let listHtml = "";
+    // console.log(generatorDataArray);
+    generatorDataArray = shuffle(generatorDataArray);
+    generatorDataArray = generatorDataArray.map(a => a);
+    for(let i = 0; i < generatorDataArray.length; i++) {
+      let name = generatorDataArray[i].name;
+      let genIndex = generatorList.selectAll.indexOf(name);
+      let catIndex = genjamlist.selectAll.indexOf(name);
+      let g = formatData(generatorDataArray[i]);
+      let imageUrl = `https://perchance.org/api/getGeneratorScreenshot?generatorName=${name}`;
+      let imageAttrs = nativeLazyLoadIsSupported ? `loading="lazy" src="${imageUrl}"` : `class="lazy" data-src="${imageUrl}"`;
+      listHtml += 
+`
+<li class="splide__slide">
+  <div class="gen-card">
+    <div class="gen-item" data-category="${genjamcategory.selectAll[catIndex]}" data-display="row">
+      <div class="gen-details">
+        <div class="gen-img-link">
+          <a href="/${name}" style="position: relative" target="_blank">
+            <img ${imageAttrs} onmouseenter="this.nextElementSibling.style.display='';" onmouseleave="this.nextElementSibling.style.display='none';" />
+            ${g.metaData && g.metaData.image ? `<img style="display: none; position: absolute; aspect-ratio: 1.6/1; bottom: 0; left: 0; object-fit: contain; pointer-events: none" src="${g.metaData.image}" />` : `<span></span>`}
+          </a>
+          <div class="gen-img-link-text">
+            <a href="/${name}"> ${name} </a>
+            ${authors[genIndex] ? `<span>` + authors[genIndex] + `</span>` : ""}
+          </div>
+          <div class="gen-desc-con">
+            ${g.metaData && g.metaData.description ? (g.metaData.description.length > 113 ? `
+            <div class="gen-desc">${g.metaData.description.slice(0, 113) + "…"}</div>
+            ` : `
+            <div class="gen-desc">${g.metaData.description}</div>
+            `) : ""}
+          </div>
+        </div>
+      </div>
+      <div class="gen-stats" data-display="row">
+        <div class="gen-stats-views">
+          <span style="font-family: &quot;Work Sans&quot;, sans-serif; font-weight: 600">${g.views}</span>
+          <span style="opacity: 0.7; font-size: 80%">view${g.views === 1 ? "" : "s"}</span>
+        </div>
+        <div class="gen-stats-edittime">
+          <span style="opacity: 0.7">
+            <span style="font-family: &quot;Work Sans&quot;, sans-serif; font-weight: 600">${g.lastEditTime.split(" ")[0]}</span>
+            <span style="font-size: 80%">${g.lastEditTime.split(" ").slice(1).join(" ")}</span></span
+          >
+        </div>
+      </div>
+      ${ creatorOtherGen.selectAll.length > 0 ? `
+      <div style="background: rgba(255, 255, 255); padding: 0.5em">
+        <div style="display: flex; justify-content: space-between; flex-flow: row">
+          <span style="font-family: &quot;Work Sans&quot;, sans-serif; font-weight: 600; font-size: 80%">Other Gens: </span>
+          <span class="placements" style="font-family: &quot;Work Sans&quot;, sans-serif; font-weight: 600; font-size: 80%; text-align: right">${creatorOtherGen.selectAll[genIndex].split(" ").map(a => `<a href="${a}">${a}</a>`).join("<br />")}</span>
+        </div>
+      </div>
+      ` : '' }
+    </div>
+  </div>
+</li>
+`;
+
+
+    }
+    return listHtml;
+  }
+  
+ /////////// MASTODON SCRIPT /////////////
+  let mastodonCarouselList = []; 
+  // took this snippet from https://perchance.org/7hyu3bu6ng#edit
+  const getCarouselMastodon = async () => {
+    let mastodonList = []
+    let lastId = 0;
+    let prevNum = 0;
+    let retry = 0;
+    let stopLoop = false;
+    let firstReq = true;
+    while(!stopLoop) {
+      let data
+      if (firstReq) {
+        data = await fetch("https://mastodon.social/api/v1/timelines/tag/perchance").then(r => r.json(), {cache: "force-cache"})
+        firstReq = false
+      } else {
+        data = await fetch("https://mastodon.social/api/v1/timelines/tag/perchance?max_id="+lastId, {cache: "force-cache"}).then(r => r.json())
+      }
+      let response = await data;
+      if (response.length == 0 || mastodonList.length >= 30) {
+        stopLoop = true
+        break
+      }
+      lastId = response.at(-1).id;
+      response.filter(a => /perchance.org/gi.test(a.content)).forEach(a => mastodonList.push(a));
+      if (prevNum == mastodonList.getLength && retry >= 1) stopLoop = true;
+      if (prevNum == mastodonList.getLength) { retry++ } else { retry = 0 };
+      prevNum = mastodonList.getLength;
+      console.log("MAST-retry: ",retry);
+      console.log("MAST-list: ",mastodonList);
+    }
+    return mastodonList;
+  }
+ // CALLING THE API AND STORING THE RESULT TO THE `list`
+getCarouselMastodon().then((result) => { 
+    mastodonCarouselList = result;
+    createMastodonCarousel();})
+  function createMastodonCarousel() {
+    let html = "";
+    mastodonCarouselList.forEach((a,i) => {
+      html += ` <li class="splide__slide">
+    <div class="mastodonCard" style="max-width: 100%; display:flex; flex-flow: column;">
+      <div class="comments-gradient" style="width: 100%; height: max-content; padding: 0.2em; display:flex; flex-flow: column">
+      <div class="mastodonHeader" style="text-align: left; background: #ffffff80; padding: 0.5em 0.5em; display: flex; flex-flow: row; align-items:center;">
+          <div><a href="${a.account.url}"><img style="height: 2em; margin-right: 0.5em;" loading="lazy" src=${a.account.avatar}></img></a></div>
+          <div><b>${a.account.display_name}</b><br><span style="opacity: 0.5;">(${[a.account.acct.length > 15 ? a.account.acct.slice(0, 15) + "..." : a.account.acct]})</span></div>
+<div style="margin-left: auto">
+      <div><span style="font-weight: bold; opacity: 0.7;">${(x = new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }))}</span></div>
+      <div style="cursor: pointer;" onclick="window.open('${a.url}');">Go to Post...</div>
+</div>
+      </div>
+        <div style="text-align: left; background: #fff; padding: 0em 0.5em 0em 0.5em; display:flex;">
+          <div style="white-space: pre-wrap; flex: 1 1 auto; padding: 1em 0;">${md(createPerchanceTree("list\n\t"+a.content))}</div>
+        </div>
+      </div>
+    </div>
+  </li>`;
+
+
+
+    })
+      mastCarouselList.innerHTML = html;
+  }
+  
+  // took this snippet from https://perchance.org/7hyu3bu6ng#edit
+async function getLemmy(url) {
+  console.log("URL", url);
+  const data = await fetch(`https://lemmy.world/api/v3/post/list?community_name=${url.toString()}&limit=30`, {cache: "force-cache"}).then(r => r.json());
+  let response = await data;
+  return response;
+}
+getLemmy(lemmyFeed).then(result => { createLemmyPosts(result); }); // CALLING THE API AND STORING THE RESULT TO THE `list`
+
+function createLemmyPosts(list) {
+  let html = "";
+  let items = list.posts
+  items = items.sort((a,b) => { return new Date(b.post.published) - new Date(a.post.published) });
+  // console.log('LIST', items);
+  items.forEach((a,i) => {
+    html += `
+<li class="splide__slide">
+  <div class="mastodonCard" style="max-width: 100%; display:flex; flex-flow: column;">
+      <div class="comments-gradient" style="width: 100%; height: max-content; padding: 0.2em; display:flex; flex-flow: column">
+      <div class="lemmyHeader" style="text-align: left; background: #ffffff80; padding: 0.5em 0.5em; display: flex; flex-flow: row; align-items:center;" >
+          <div style="cursor: pointer; display:flex; justify-content:left;" onclick="window.open('https://lemmy.world/post/${a.post.id}');"><b>${md(createPerchanceTree("list\n\t"+a.post.name))}</b></div>
+          <div id="lemmyNameDate" style="margin-left: auto; display: flex; text-align:right; align-items:center;">
+            <div style="display:flex; flex-flow:column;">
+              <b>${a.creator.name}</b>
+              <span style="font-weight: bold; opacity: 0.7;">${(x = new Date(a.post.published).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }))}</span>
+            </div>
+        <a href="${a.creator.actor_id}"><img style="height: 2em; margin-left: 0.5em; background: white;" loading="lazy" src=${a.creator.avatar ? a.creator.avatar : 'https://i.imgur.com/MzsaV9M.png'}></img></a>
+        </div>
+      </div>
+        <div class="lemmyBodyCon" style="text-align: left; background: #fff; padding: 0em 0.5em 0em 0.5em; ">
+          ${a.post.body ? `<div class="lemmyBody" style="white-space: pre-wrap;">
+          ${DOMPurify.sanitize(marked.parse(parseSpoilers(a.post.body)))}
+          </div>` : ''}
+          
+        </div>
+      </div>
+    </div>
+</li>
+    `;
+  })
+    lemmyCarouselList.innerHTML = html;
+}
+   // ${md(createPerchanceTree("list\n\t"+a.post.body.split("\n").map(a => a.trim().replaceAll('^', '(caret)').replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('$', '&dollar;').replaceAll('[', '\[').replaceAll(']', '\]').replaceAll('{', '\{').replaceAll('}', '\}')).join("\n")))}
+  setInterval(function () {
+    getCarouselMastodon().then((result) => { mastodonCarouselList = result; createMastodonCarousel(); });
+    getLemmy(lemmyFeed).then(result => { createLemmyPosts(result); }); // CALLING THE API AND STORING THE RESULT TO THE `list`
+    console.log("updated mastodon and lemmy", Date.now());
+  }, 300000)
+</script>
+<script>
+// Set the date we're counting down to
+// var countDownDate = new Date("Apr 22, 2024 12:00:00 UTC").getTime();
+
+// // Update the count down every 1 second
+// var x = setInterval(function() {
+
+//   // Get today's date and time
+//   var now = new Date().getTime();
+
+//   // Find the distance between now and the count down date
+//   var distance = countDownDate - now;
+
+//   // Time calculations for days, hours, minutes and seconds
+//   var days = Math.floor(distance / (1000 * 60 * 60 * 24));
+//   var hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+//   var minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+//   var seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+//   // Display the result in the element with id="demo"
+//   document.getElementById("countdown").innerHTML = days + "d " + hours + "h "
+//   + minutes + "m " + seconds + "s ";
+
+//   // If the count down is finished, write some text
+//   if (distance < 0) {
+//     clearInterval(x);
+//     document.getElementById("countdown").innerHTML = "Generator Jam has Ended!";
+//   }
+// }, 1000);
+
+  
+</script>
+<!-- <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+<script>
+  const socket = io('https://intriguing-luxuriant-atrociraptor.glitch.me/', {
+    autoConnect: true,
+    reconnection: true,
+    reconnectionAttempts: 2,
+    reconnectionDelay: 5000,
+    reconnectionDelayMax: 10000
+  });
+  let instanceId = "hub-id-"+Number(Math.random().toString().slice(2)).toString(16)
+  let id;
+  if (localStorage.getItem("iID") == null) {
+    localStorage.setItem("iID", instanceId);
+    id = localStorage.getItem('iID')
+    console.log(id);
+  } else {
+    id = localStorage.getItem('iID')
+    console.log(id);
+  }
+  socket.emit('hub-userId', id)
+  
+  socket.on('hub-userCount', (count) => {
+    if (socket.active) {
+    // temporary failure, the socket will automatically try to reconnect
+    } else {
+      // the connection was denied by the server
+      // in that case, `socket.connect()` must be manually called in order to reconnect
+      console.log(error.message);
+    }
+    usrCount.innerHTML = count;
+  })
+  
+
+</script> -->
+
+
+<!--  
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        🎨 Styles below 🎨        🎨 Styles below 🎨        🎨 Styles below 🎨        🎨 Styles below 🎨
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+-->
+<!-- page text styles and gradient -->
+<style>
+@import url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css");
+/* @import url('https://fonts.googleapis.com/css2?family=Nunito&family=Work+Sans:wght@400;600&display=swap'); */
+  :root {
+  --main-padding: 1em;
+  /* Step 0: 18.00px → 20.00px */
+  --step-0: clamp(1.13rem, calc(1.08rem + 0.22vw), 1.25rem);
+
+  /* Step 1: 21.60px → 25.00px */
+  --step-1: clamp(1.35rem, calc(1.28rem + 0.37vw), 1.56rem);
+
+  /* Step 2: 25.92px → 31.25px */
+  --step-2: clamp(1.62rem, calc(1.50rem + 0.58vw), 1.95rem);
+
+  /* Step 3: 31.10px → 39.06px */
+  --step-3: clamp(1.94rem, calc(1.77rem + 0.87vw), 2.44rem);
+
+  /* Step 4: 37.32px → 48.83px */
+  --step-4: clamp(2.33rem, calc(2.08rem + 1.25vw), 3.05rem);
+
+  /* Step 5: 44.79px → 61.04px */
+  --step-5: clamp(2.80rem, calc(2.45rem + 1.77vw), 3.82rem);
+
+  /* Step 6: 53.75px → 76.29px */
+  --step-6: clamp(3.36rem, calc(2.87rem + 2.45vw), 4.77rem);
+
+  
+  --gradient: linear-gradient(
+  45deg,
+  #ccc ,
+  #ddd
+  )
+}
+  .markdown-body body,
+  body,
+  .markdown-body p, 
+  p, html, .markdown-body {
+    font-family: system-ui, sans-serif;
+  }
+  h1,h2,h3,h4,h5,h6 {
+    font-family: system-ui, sans-serif;
+    font-weight: 600;
+  }
+  .event-header {
+    font-family: system-ui, sans-serif;
+    font-weight: 600;
+    font-size: var(--step-2);
+  }
+  .event-timer {
+    font-family: system-ui, sans-serif;
+    font-weight: 600;
+    font-size: var(--step-1);
+
+  }
+  
+  .markdown-body h1,
+  .markdown-body h2,
+  .markdown-body h3,
+  .markdown-body h4,
+  .markdown-body h5,
+  .markdown-body h6 {
+    font-family: system-ui, sans-serif;
+    font-weight: 600;
+  }
+  
+  h1 {
+    font-size: var(--step-2);
+  }
+  h2 {
+    font-size: var(--step-1);
+  }
+  #homeCon {
+    display:grid;
+    gap: 1em;
+    grid-template-areas:
+      "a a a a"
+      "b b b b"
+      "c c d d";
+    grid-template-columns: repeat(4, 1fr);
+    width: 100%;
+    padding: 1em;
+    & > div {
+      min-height: 0;
+      min-width: 0;
+    }
+    @media screen and (max-width: 1200px) {
+      grid-template-columns: none;
+      grid-template-rows: none;
+      gap: 0;
+      grid-template-areas:
+      "a"
+      "b"
+      "c"
+      "d";
+    }
+  }
+  #calloutsCon {
+    display: grid; gap: 1em; padding: 1em; border-radius: 0.2em;
+  }
+  .go-to-plugin {
+    text-decoration: none;
+  }
+  .comments-gradient {
+    background: var(--gradient);
+/*       linear-gradient(276deg, #88888880, #e47d2e70, #88888880),
+      linear-gradient(150deg, #00000080, #e47d2eFF, #00000080); */
+/*       linear-gradient(45deg, #35409b30, #ffffffa0, #d3237a80),
+      linear-gradient(135deg, #35409b80, #d3237a30) */
+/*     linear-gradient(45deg, rgba(163,255,246,0.8), rgba(255,255,255,0.8), rgba(118,234,255,0.8)),
+    linear-gradient(225deg, rgba(163,255,246,0.8), rgba(255,255,255,0.8), rgba(118,234,255,0.8)); */
+/*     linear-gradient(45deg, rgba(255,234,163,0.8) 0%, rgba(255,255,255,0.2) 50%, rgba(255,131,118,0.8) 100%),
+    linear-gradient(135deg, rgba(255,234,163,0.8) 0%, rgba(255,255,255,0.2) 50%, rgba(255,131,118,0.8) 100%); */
+
+  }
+  .markdown-body h1,
+  .markdown-body h2 {
+    border-bottom: none;
+  }
+  .navIcons {
+    display:flex;
+    align-items:center;
+    height: 30px;
+    width: 30px;
+    justify-content:center;
+    border-radius: 50%;
+    margin: 0.25em;
+    padding: 1.35em;
+    border: 2px solid;
+  }
+  .communityNav {
+    display:inline-flex; 
+    flex-flow: row;
+    gap: 0.25em; 
+    justify-content:center;
+    align-content:center;
+    margin: .5em auto 1em;
+  }
+  .callout {
+    transition: all 0.2s ease;
+  }
+  .callout:hover {
+    box-shadow: 0 0 2rem rgba(0,0,0,0.25);
+  }
+  .callout > .callout-title {
+    flex-flow: wrap;
+    overflow-wrap; break-word;
+  }
+  .callout-title:after {
+    display:inline-block;
+  }
+  
+  .callout-preview {
+    font-size: 0.65em; margin-top: none; text-transform: none;
+  }
+  
+  .callout[open] .callout-preview {
+    display: none;
+  }
+  .callout-header {
+    line-height: 1;
+    font-weight: 600;
+  }
+  
+  .callout-header > .callout-preview {
+    font-family: system-ui, sans-serif;
+  }
+  
+  .communityNav-content {
+    width: 100%; flex: 1 1 fit-content;
+  }
+  .communityNav-link {
+    text-decoration: none; font-family:system-ui, sans-serif; font-weight: 600; color: black;display: flex; align-items:center; width: fit-content; flex-flow: row;
+  }
+  .communityNav-link span {
+    text-overflow: break-word;
+    overflow: hidden;
+  }
+  .communityNav-img {
+    width: 35px; height: 35px; object-fit:contain;margin: 0.25em
+  }
+  @media screen and (max-width: 1440px) {
+    .communityNav {
+      flex-flow: row wrap !important;
+      gap: 0em !important;
+    }
+    .communityNav-link span {
+      display: none;
+    }
+    :root {
+      --main-padding: 0em;
+    }
+    .viewsAndLogo {
+      flex-flow: column;
+    }
+
+  }
+ @media screen and (max-width: 1200px) {
+    .learnChatAndNav {
+      grid-template-columns: none !important;
+/*       align-items:center !important; */
+    }
+   .learnChatAndNav > div {
+     width: 100% !important;
+
+   }
+    #learnCon {
+      flex-flow: column !important;
+    }
+    #learnCon > section {
+      width: 100% !important;
+   }
+  }
+  
+  #popupAnnoucement::backdrop {
+    background: linear-gradient(45deg, #e4f6b9 33%, #a0ecfb, #5e08f6 95%);
+    opacity: 0.7;
+  }
+  
+  dialog#popupAnnoucement:focus-visible {
+    border: none !important;
+    outline: none !important;
+  }
+  
+  #modalButton:hover {
+    background: linear-gradient(45deg, #e4f6b9 33%, #a0ecfb, #5e08f6 95%);
+  }
+  
+  #chatRules > summary::after {
+    display:block;
+    content:'Click Here to Open';
+    font-size: 0.7rem;
+  }
+  #chatRules[open] > summary::after {
+    display:block;
+    content:'Click Here to Collapse';
+    font-size: 0.7rem;
+  }
+  
+  .otherDetails > summary::after {
+    display:block;
+    content:'Click Here to Open';
+    font-size: 0.7rem;
+  }
+  .otherDetails[open] > summary::after {
+    display:block;
+    content:'Click Here to Collapse';
+    font-size: 0.7rem;
+  }
+  
+/* <!-- 
+ CHAT CARDS AND CHAT ROOM STYLES 
+--> */
+
+.card__item img {
+  height: auto;
+  max-width: 100%;
+  vertical-align: middle;
+}
+.btn {
+  background-color: white;
+  border: 1px solid #cccccc;
+  color: #696969;
+  padding: 0.5rem;
+}
+.btn--block {
+  display: block;
+  width: 100%;
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 1em;
+  list-style: none;
+  margin: 0;
+  padding: 1em;
+}
+.cards__item {
+  display: flex;
+/*   padding: 1rem; */
+
+  width: 100%;
+
+}
+  
+/* @media (min-width: 40rem) {
+  .cards__item {
+    width: 50%;
+  }
+}
+@media (min-width: 60rem) {
+  .cards__item {
+    width: 33.33333333%;
+  }
+}
+  
+@media (min-width: 80rem) {
+  .cards__item {
+    width: 25%;
+  }
+}
+@media (min-width: 100rem) {
+  .cards__item {
+    width: 20%;
+  }
+} */
+.card {
+  width:100%;
+  background-color: rgba(255,255,255,0.85);
+  border-radius: 0.25rem;
+  border-top-left-radius: 0px;
+  border-top-right-radius: 0px;
+  display: flex;
+  flex-flow: column;
+  flex: 1 1 auto;
+  overflow: hidden;
+  margin: 0px;
+  padding: 0px;
+
+}
+.card__image:hover {
+/*   -webkit-filter: contrast(100%); */
+          filter: contrast(100%);
+}
+
+
+/* .card__image:hover .card__content {
+  max-height: 200px;
+} */
+  
+.card__image {
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  border-radius: 0.25rem;
+/*   border-top-right-radius: 0.25rem; */
+  display:flex;
+  flex-flow: column;
+  overflow: hidden;
+  width: 100%;
+    box-shadow: 0 20px 40px -14px rgba(0, 0, 0, 0.25);
+  padding: 1em;
+  text-align: left;
+/*   align-self: end; */
+  position: relative;
+  transition: all 0.5s cubic-bezier(0.43, 0.41, 0.22, 0.91);
+}
+.card__image::before {
+  content: "";
+  display: block;
+  padding-top: 56.25%;
+}
+/* @media (min-width: 40rem) {
+  .card__image::before {
+    padding-top: 66.6%;
+  }
+} */
+.card__title {
+  color: black;
+  padding: 1em;
+  padding-bottom: 0px;
+  background-color: rgba(255,255,255,0.85);
+  font-size: 1.25rem;
+  font-weight: 300;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  transition: all 0.5s ease
+}
+
+  .card__image:hover .card__title {
+    padding-bottom: 0;
+  }
+
+.card__content {
+  display: flex;
+  flex: 1 1 auto;
+  height: 100%;
+  flex-direction: column;
+  margin: 0 1rem 1rem 1rem;
+  transition: all 0.5s ease;
+}
+  
+.card__text {
+/*   -webkit-box-flex: 1;
+      -ms-flex: 1 1 0; */
+  flex: 1 1 auto;
+/*   height: max-content; */
+  font-size: 0.875rem;
+  line-height: 1.5;
+  margin-bottom: 1.25rem;
+  
+}
+  .chat-two-cols {
+    width: 100%; height: min-content; display:grid; grid-template-columns: 1fr 1fr; padding: 1em; gap: 1em;
+  }
+  .chat-two-cols[data-items='1'] {
+    grid-template-columns: 1fr;
+  }
+  .chat-two-cols-item {
+    min-width: 0;
+    min-height: 0;
+  }
+
+@media screen and (max-width: 1440px) {
+  .chat-two-cols {
+    grid-template-columns: none;
+  }
+  .chat-two-cols-item {
+    width: 100%;
+    padding: 0em;
+    margin: 0em;
+  }
+  .chatField {
+    margin: 0px !important;
+    padding: 0px !important;
+  }
+}
+
+/* <!-- 
+ CHAT CARDS AND CHAT ROOM STYLES END 
+-->
+
+<!--  
+TABS PLUGIN STYLES
+--> */
+
+.tabs-plugin {
+  margin: 0px;
+
+  }
+.tabs-plugin__header {
+  width: 100%;
+  display: flex;
+/*   position: sticky;
+  top: 0; */
+  flex-flow: wrap-reverse;
+  -webkit-mask-image: none;
+  }
+.tabs-plugin__header li {
+  margin: 0px;
+/*   padding: 10px; */
+  width: 100%;
+/*   flex: 1 1 0; */
+  flex: 0 0 33.333333333%;
+  }
+  .tabs-plugin__title {
+    border: none;
+    display: block;
+    justify-content:center;
+    position:relative;
+    font-weight: 600;
+    text-align:center;
+    margin: 0px;
+    width: 100%;
+    height: 100%;
+    padding: 15px 0px;
+  }
+  
+  .tabs-plugin__title:hover {
+    text-decoration: none;
+  }
+  
+  .tabs-plugin__title.tabs-plugin__title-active {
+    background: #eee;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+  }
+  
+  .tabs-plugin__content:not([style="display:none"]) {
+    background: #eee;
+  }
+  
+  .tabs-plugin__content {
+    border: none;
+    margin: 0 auto;
+    padding: 0.25em;
+    text-align: center;
+  }
+  
+/*  Colors  */
+/*  HOME  */
+  .tabs-plugin__title[data-index="0"]:hover {
+    background: #eee;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+  }
+  .tabs-plugin__title.tabs-plugin__title-active[data-index="0"]{
+    background: #eee;
+  }
+  .tabs-plugin__content:not([style="display:none"])[data-tab-list-index="0"] {
+    background: #eee;
+  }
+  .tabs-plugin__header:has(.tabs-plugin__title.tabs-plugin__title-active[data-index="0"]) {
+  width: 100%;
+  display: flex;
+  flex-flow: wrap-reverse;
+  }
+
+/*  GENS  */
+  .tabs-plugin__title[data-index="1"]:hover {
+    background: #fee;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+  }
+  .tabs-plugin__title.tabs-plugin__title-active[data-index="1"]{
+    background: #fee;
+  }
+  .tabs-plugin__content:not([style="display:none"])[data-tab-list-index="1"] {
+    background: #fee;
+  }
+  .tabs-plugin__header:has(.tabs-plugin__title.tabs-plugin__title-active[data-index="1"]) {
+  width: 100%;
+  display: flex;
+  flex-flow: wrap-reverse;
+  }
+  
+/* EVENTS */
+  .tabs-plugin__title[data-index="2"]:hover {
+    background: #eef;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+  }
+  .tabs-plugin__title.tabs-plugin__title-active[data-index="2"]{
+    background: #eef;
+  }
+/*   .tabs-plugin__title[data-index="2"]:after {
+    display: block;
+    position: absolute;
+    content: 'New Event!';
+    font-size: 0.7em;
+    margin: 0;
+    padding: 0.25em 0.5em;
+    width: auto;
+    height: auto;
+    border-radius: 100vw;
+    background: #6f4;
+    top: 0%;
+    left: 70%;
+    
+  } */
+  .tabs-plugin__content:not([style="display:none"])[data-tab-list-index="2"] {
+    background: #eef;
+  }
+  .tabs-plugin__header:has(.tabs-plugin__title.tabs-plugin__title-active[data-index="2"]) {
+  width: 100%;
+  display: flex;
+  flex-flow: wrap-reverse;
+  }
+  
+/* CHAT ROOMS */
+  .tabs-plugin__title[data-index="3"]:hover {
+    background: #efe;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+  }
+  .tabs-plugin__title.tabs-plugin__title-active[data-index="3"]{
+    background: #efe;
+  }
+  .tabs-plugin__content:not([style="display:none"])[data-tab-list-index="3"] {
+    background: #efe;
+  }
+  
+  .tabs-plugin__header:has(.tabs-plugin__title.tabs-plugin__title-active[data-index="3"]) {
+  width: 100%;
+  display: flex;
+  flex-flow: wrap;
+  }
+  
+/* LEARN */
+  .tabs-plugin__title[data-index="4"]:hover {
+    background: #eff;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+  }
+  .tabs-plugin__title.tabs-plugin__title-active[data-index="4"]{
+    background: #eff;
+  }
+  .tabs-plugin__content:not([style="display:none"])[data-tab-list-index="4"] {
+    background: #eff;
+  }
+  .tabs-plugin__header:has(.tabs-plugin__title.tabs-plugin__title-active[data-index="4"]){
+    width: 100%;
+    display: flex;
+    flex-flow: wrap;
+  }
+  
+/* ABOUT */
+  .tabs-plugin__title[data-index="5"]:hover {
+    background: #fef;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+  }
+  .tabs-plugin__title.tabs-plugin__title-active[data-index="5"]{
+    background: #fef;
+  }
+  .tabs-plugin__content:not([style="display:none"])[data-tab-list-index="5"] {
+    background: #fef;
+  }
+  .tabs-plugin__header:has(.tabs-plugin__title.tabs-plugin__title-active[data-index="5"]){
+    width: 100%;
+    display: flex;
+    flex-flow: wrap;
+  }
+  
+  @media screen and (max-width: 600) {
+    .tabs-plugin__content{
+      padding: 0em;
+    }
+  }
+  
+/* <!--  
+TABS PLUGIN STYLES END
+-->
+<!-- Loading Spinner --> */
+    .lds-default {
+      width: 54px;
+      height: 54px;
+      position: absolute;
+      top: calc(50% - (54px * 0.5));
+      left: calc(50% - (54px * 0.5));
+    /*   transform: translateX(-50%); */
+      border-radius: 4px;
+      background-color: #eee;
+      background-image:
+        radial-gradient(circle 5px , steelblue 100%, transparent 0),
+        radial-gradient(circle 5px , steelblue 100%, transparent 0),
+        radial-gradient(circle 5px , steelblue 100%, transparent 0),
+        radial-gradient(circle 5px , steelblue 100%, transparent 0),
+        radial-gradient(circle 5px , steelblue 100%, transparent 0),
+        radial-gradient(circle 5px , steelblue 100%, transparent 0);
+        background-repeat: no-repeat;
+      animation: move 1s linear infinite , rotate 1s linear infinite;
+}
+
+@keyframes rotate {
+  0% , 20%{ transform: rotate(0deg)}
+  30% , 40% { transform: rotate(90deg)}
+  50% , 60% { transform: rotate(180deg)}
+  70% , 80% { transform: rotate(270deg)}
+  90%,  100% { transform: rotate(360deg)}
+}
+@keyframes move {
+  0% ,  9%{
+      background-position:
+      -12px -15px,
+      -12px 0px,
+      -12px 15px,
+      12px -15px,
+      12px 0px,
+      12px 15px;
+  }
+  10% , 25%{
+      background-position:
+      0px 0px,
+      -12px -12px,
+      -12px 12px,
+      34px -15px, 
+        12px -12px,
+        12px 12px;
+  }
+  30% , 45%{
+      background-position:
+      0px -34px,
+      -12px -12px,
+      -12px 12px,
+      34px -15px,
+      12px -12px,
+      12px 12px;
+  }
+  50% , 65% {
+      background-position:
+      0px -34px,
+      -12px -34px,
+      -12px 12px,
+      34px -12px,
+      0px -0px,
+      12px -12px;
+  }
+  70% , 85% {
+      background-position:
+      0px -34px,
+      -0px -34px,
+      -12px 12px,
+      34px -12px,
+      0px -34px,
+      12px -12px;
+  }
+ 90% , 100% {
+      background-position:
+      0px -34px,
+        -12px -34px,
+        0px 0px,
+      34px -12px,
+        0px -34px,
+        0px 0px;
+  }
+}
+  
+/* <!-- VERT NAV STYLES --> */
+  
+  .genTabs {
+    padding: 0.5em;
+    display:flex;
+    flex-flow: row;
+    height: 100%;
+    width: 100%;
+    border-radius: 10px;
+
+  }
+  .tabContentList {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    display:flex;
+  }
+  
+ .tabNavList {
+  margin: 0;
+  padding: 0;
+  list-style-type: none;
+  flex-flow: column;
+   display:flex;
+   overflow:auto;
+   min-width: 100%;
+   flex: 1 1 auto;
+
+  }
+  
+  .navContent {
+    padding: 1em;
+    background: #fff;
+    width: 100%;
+    height: 100%;
+  }
+  
+  .navItem {
+    border: none;
+    cursor: pointer;
+  font-weight: 300;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align:center;
+    margin: 0px;
+    width: 100%;
+    flex: 1 1 auto;
+    padding: 1em;
+    background: #fff;
+    
+/*     padding: 15px 0px; */
+  }
+  
+  .navItem-cat {
+    border: none;
+    cursor: pointer;
+  font-weight: 300;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align:center;
+    margin: 0px;
+    width: 100%;
+    flex: 1 1 auto;
+    padding: 1em;
+    background: #fff;
+    
+/*     padding: 15px 0px; */
+  }
+  
+  .navItem:hover, .navItem-cat:hover {
+    background: #eee;
+  }
+
+  .navItem.active {
+    color: blue;
+    background: #fff;
+  }
+  
+  .navItem.active:hover {
+    background: #eee;
+  }
+  
+  @media screen and (max-width: 700px) {
+    .genTabs {
+      flex-flow: column;
+    }
+    #tabNavList {
+      margin-bottom: 1em;
+    }
+    #clickDropdown {
+/*       margin-bottom: 1em; */
+    }
+
+  }
+  
+  .navItem.active {
+    background: #efe;
+    border-bottom: 5px solid blue;
+  }
+  
+  .navContent:not([style="display:none"]) {
+    background: #efe;
+  }
+/* 
+<!-- VERT NAV STYLES END -->
+
+<!-- GEN CARDS STYLE (WIP) --> */
+
+  .gen-list {
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+    gap: 0.5em;
+/*     position: relative; */
+    box-sizing: border-box;
+    list-style-type: none;
+    padding-left: 0px;
+    overflow: hidden;
+
+  }
+  .gen-list li.gen-card {
+    width: 100%;
+    padding: 0.2em;
+    display:flex;
+  }
+  
+  .gen-item {
+    display: grid;
+    width: 100%;
+    height: auto;
+/*     align-self:start; */
+    grid-template-rows: 1fr auto;
+    background: papayawhip;
+
+  }
+/* ["#fd7f6f", "#7eb0d5", "#b2e061", "#bd7ebe", "#ffb55a", "#ffee65", "#beb9db", "#fdcce5", "#8bd3c7"] */
+  .gen-item[data-category="Text"] {
+    background: #fd7f6f;
+  }
+
+  .gen-item[data-category="Image"] {
+    background: #7eb0d5;
+  }
+  
+  .gen-item[data-category="Plugin"] {
+    background: #b2e061;
+  }
+  
+  .gen-item[data-category="Template"] {
+    background: #bd7ebe;
+  }
+  
+  .gen-item[data-category="Preprocessor"] {
+    background: #ffb55a;
+  }
+  
+  .gen-item[data-category="Game"] {
+    background: #ffee65;
+  }
+  
+  .gen-item[data-category="Community/RP"] {
+    background: #beb9db;
+  }
+  
+  .gen-item[data-category="Experiment"] {
+    background: #fdcce5;
+  }
+  
+  .placements[data-placement="1st"] {
+    color: Gold;
+  }
+  .placements[data-placement="2nd"] {
+    color: LightSteelBlue;
+  }
+  .placements[data-placement="3rd"] {
+    color: SandyBrown;
+  }
+  .placements[data-placement="4th"] {
+    color:  SandyBrown;
+  }
+  
+  
+  .gen-details {
+/*     background: red; */
+    display: flex;
+    flex-flow: column;
+    width: 100%;
+    overflow-wrap: anywhere;
+    text-align:center;
+  }
+  .gen-img-link {
+    display: flex;
+    flex-flow: column;
+    flex: 1 1 auto;
+  }
+  .gen-img-link a {
+    display:block;
+    font-weight: 600;
+    font-family: system-ui, sans-serif;
+    color: blue;
+/*     padding-bottom: 0.2rem; */
+    margin: 0;
+    border: none;
+    text-decoration: none;
+  }
+  
+  .gen-img-link-text {
+    display: grid;
+    text-align:left;
+
+    padding: .5em .5em .5em;
+    gap:3px;
+    margin:0px;
+  }
+  .gen-img-link-text a {
+    font-size: 110%;
+  }
+  
+  .gen-img-link-text span {
+    opacity: 0.9;
+    font-weight: 300;
+    
+  }
+  
+  .gen-img-link a img {
+    display: block;
+    margin: 0 auto;
+    overflow: hidden;
+    position: relative;
+/*     border: 1px solid black; */
+    background-position: center center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    width: 100%;
+    aspect-ratio: 1.6 / 1;
+  }
+  
+  .gen-desc {
+    text-align: left;
+    flex: 1 1 auto;
+    font-size: 74%;
+    margin: 0 .5em .5em;
+    padding: .5em;
+    background: rgba(255,255,255,0.75);
+/*     padding-top:0.2rem; */
+
+  }
+   .gen-desc-con {
+     display:flex;
+     height: 100%;
+  }
+
+  /*
+  .gen-item:hover .gen-desc-con {
+    max-height: 200px;
+  } */
+  
+  .gen-stats {
+    display: flex;
+    text-align:center;
+    background: rgba(255,255,255,0.5);
+    padding: .5em;
+    margin: 0;
+    height: fit-content;
+    justify-content: space-around;
+  }
+  
+  .gen-stats-views {
+    height: min-content;
+  }
+  .gen-stats-edittime {
+    height: min-content;
+  }
+
+  .splide__arrows--ttb .splide__arrow--prev {
+    top: 3em;
+  }
+  .splide__arrows--ttb .splide__arrow--next {
+    bottom: 3em;
+  }
+  .splide__list {
+    display:flex;
+  }
+  #genCarouselList > .splide__slide, #jamCarouselList > .splide__slide {
+    display:flex;
+    max-height: 500px;
+  }
+  .splide__slide .gen-card {
+    display:flex;
+    max-height: 450px;
+  }
+
+  .lemmyBody {
+    display:grid;
+    margin: 0;
+    padding: 0.5em 0 0.5em;
+    & ol, ul {
+/*         margin: 0; */
+      display:inline-table;
+      width: 100%;
+      & li {
+        margin: 0;
+        padding: 0 ;
+        height: fit-content ;
+      }
+    }
+    & a, code {
+      overflow-wrap: anywhere;
+    }
+    & h1, h2, h3, h4, h5, h6, hr {
+/*         margin: 0 ; */
+      margin-bottom: 0em ;
+      margin-top: 0.5em;
+    }
+    & blockquote {
+      white-space: wrap;
+      margin-top: 0;
+      margin-bottom: 0;
+      
+    }
+    & details {
+      margin: 0;
+    }
+    & pre {
+      margin: 0;
+      white-space: pre-wrap;
+    }
+    & p {
+      margin-top: 0;
+/*       margin-bottom: 0; */
+      & img {
+        max-height: min(100%, 500px);
+        max-width: min(100%, 700px);
+        object-fit: contain;
+      }
+    }
+  
+  }
+  
+  @media screen and (max-width: 800px) {
+  
+    .lemmyHeader {
+      flex-flow: column !important;
+    }
+    .mastodonHeader, .lemmyHeader #lemmyNameDate {
+      font-size: 0.75em;
+    }
+    .lemmyHeader div:nth-child(1) {
+      width: 100%;
+    }
+    
+  }
+   #mastCarouselList, #lemmyCarouselList {
+    display:flex;
+    flex-flow: row wrap;
+    padding: 0;
+    height: 60dvh;
+    overflow: auto;
+    gap: 1em;
+    margin: 1em auto;
+  }
+  #mastCarouselList > li, #lemmyCarouselList > li{
+    list-style-type: none;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+  }
+  
+
+  
+/*   #perchance-error-indicator {
+    display: none !important;
+  } */
+  #chatRules summary {
+    cursor: pointer;
+  }
+  #eventBanners {
+    height: 100%;
+    min-height: 100px;
+    position: relative;
+    @media screen and (max-width: 1200px) {
+      min-height: 20dvh;
+    }
+  }
+  .event_list {
+    list-style-type: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%,800px), 1fr));
+    gap: 1em;
+    margin: 0;
+    padding-left: 0;
+  
+  }
+  .event_list li {
+      padding: 1em;
+      border-radius: 0.5em;
+      display:grid;
+    }
+  .tags {
+    gap: 0.2em;
+    display: flex;
+    flex-flow: row wrap;
+  }
+  .tag {
+    padding: 0.2em 0.5em;
+    border-radius: 0.2em;
+    width: fit-content;
+    background: #444;
+  }
+  
+  .tag[data-type="Generator Jam"] {
+    background: hsl(300, 33%, 40%);
+  }
+
+  .tag[data-type="Generator Review"] {
+    background: hsl(90, 33%, 40%);
+  }
+  
+  .tag[data-type="Image Challenge"] {
+    background: hsl(223, 64%, 37%);
+  }
+  .tag[data-type="Contribute to a Generator"] {
+    background:  hsl(150, 33%, 40%);
+  }
+  
+  .tag[data-type="Character Jam"] {
+    background: hsl(15, 100%, 60%);
+  }
+  .tag[data-type="Poll"] {
+    background:  hsl(50, 80%, 40%);
+  }
+  .tag[data-status="Ended"] {
+    background: #a00;
+  }
+  
+  .tag[data-status="Ongoing"] {
+    background: #0a0;
+  }
+  
+  .tag[data-status="Upcoming"] {
+    background: #dc2;
+  }
+  
+  
+  .card_bg {
+    border-radius: 0.25em;
+    container-type: inline-size;
+    display:grid;
+  }
+  .card_event {
+    padding: 1em;
+    border-radius: 0.25em;
+    display: flex;
+    align-items:center;
+    gap: 1em;
+    justify-content: space-between;
+    background: rgb(0 0 0 / 0.6);
+    color: white;
+  }
+  .body {
+    height: 100%;
+  }
+  .content {
+    display:flex;
+    flex-flow: column;
+    height: 100%;
+  }
+  .content h1 {
+    margin-top: 0;
+    margin-bottom: 0.2em;
+    font-size: var(--step-2);
+    max-width: 20ch;
+  }
+  .content h2 {
+    margin-top: 0;
+    margin-bottom: 0;
+    font-size: var(--step-1);
+  }
+  .content p {
+    margin-bottom: 0;
+    max-width: 60ch;
+    text-wrap: pretty;
+  }
+  .content.main-p * {
+    max-width: 100%;
+  }
+  
+  .buttons {
+    display: flex;
+    flex-flow: wrap;
+    gap: 0 0.5em;
+    justify-content: end;
+    margin-bottom: auto;
+  }
+  .header {
+    align-self:end;
+    display: flex;
+    height: 100%;
+    flex-flow: column;
+    justify-content: space-between;
+  }
+  .duration p {
+    text-align: right;
+    margin: 0;
+  }
+  .creator {
+    display: flex;
+    align-items: center;
+  }
+  .name_date {
+    display:grid;
+    text-align: right;
+    padding-right: 0.5em;
+  }
+  .avatar {
+    display:flex;
+    align-items:center;
+  }
+  .avatar img {
+    height: 2em;
+  }
+  .event_button {
+    background: none;
+    border: 1px solid;
+    padding: 0.25em 0.5em;
+    font-size: 1.125em;
+    margin-bottom: 0.5em;
+    border-radius: 0.25em;
+    background: rgb(0 0 0 / 0.4);
+    transition: all 0.2s ease;
+  }
+    .event_button:hover {
+      background: rgb(255 255 255 / 0.3);
+    }
+  @container (max-width: 70ch) {
+    .card_event {
+      flex-flow: row wrap;
+      align-items:start;
+    }
+    .header {
+      width: 100%;
+      height: auto;
+      align-self:end;
+      grid-template-columns: 1fr 1fr;
+    }
+    .buttons {
+      justify-content: end;
+    }
+    .header-main {
+      width: 100%;
+    }
+    .creator-main {
+      align-self: start;
+      justify-content:start;
+    }
+    .buttons-main {
+      align-self: center;
+      justify-content:end;
+    }
+  }
+
+</style>
+<script>
+  function addOpenInNewTab() {
+// Get all <a> elements in the document
+const links = document.querySelectorAll('a');
+// console.log(links);
+// Loop through each <a> element and add the target attribute
+links.forEach(link => {
+  link.setAttribute('target', '_blank');
+});
+  }
+
+
+  // enableDarkMode();
+</script>
+<script>
+  commentsUserCounterContainer.innerHTML += `${window.commentsUserCounter = c(cUserCounter)}`
+  window.commentsUserCounter.submit('user-counter')
+  setInterval(() => window.commentsUserCounter.submit('user-counter'), 90 * 1000)
+</script>
+<script>
+/*
+MIT License
+
+Copyright (c) 2019 Jacob Filipp
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
+
+
+// Add this script to the <b>parent page on which your iFrame is embedded</b>
+// This code resizes the iFrame's height in response to a postMessage from the child iFrame
+
+
+
+// event.data - the object that the iframe sent us
+// event.origin - the URL from which the message came
+// event.source - a reference to the 'window' object that sent the message
+function gotResizeMessage(event)
+{
+  if (event.data.type == "resize-hub-events") {
+  	// console.log( "message: " + JSON.stringify(event.data))
+  	var matches = document.querySelectorAll('#eventsIframe'); // iterate through all iFrames on page
+  	for (i=0; i<matches.length; i++)
+  	{
+  		if( matches[i].contentWindow == event.source ) // found the iFrame that sent us a message
+  		{
+  			console.log("found iframe that sent a message: " + matches[i].src)
+  				
+  			//matches[i].width = Number( event.data.width )	 <--- we do not do anything with the page width for now
+  			matches[i].height = Number( event.data.height )
+  			
+  			return 1;
+  		}
+  	}
+  }
+}
+	    
+document.addEventListener("DOMContentLoaded", function(){
+	
+	window.addEventListener("message", gotResizeMessage, false)
+	
+}); //on DOM ready
+</script>
+<br>
+[addOpenInNewTab(), ""]
+
+
+
+
+
+
+
+
+
+
+
+
+

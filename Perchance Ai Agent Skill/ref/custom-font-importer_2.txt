@@ -1,0 +1,45 @@
+<h1 style="font-family:myCustomFont;">Custom Font Importer</h1>
+<p><b>Step 1:</b> Select or drag-and-drop your font file here: <input style="font-size:1.3rem" type="file" oninput="getBase64(this.files[0])"></p>
+<p><b>Step 2:</b> Copy and paste the text that appears here into your HTML panel (bottom-right editor):</p>
+<textarea id="outputTextEl" placeholder="" style="width:700px; height:200px; white-space:pre;"></textarea>
+<p>You can change the "myCustomFont" name in the above text (use a name without spaces).</p>
+<p><b>Step 3:</b> And then you can use it like this:</p>
+<pre style="background:#303030; color:white; padding:0.5rem; width:600px; margin:0 auto; border-radius:2px;">
+&lt;p style="<span style="color:orange;">font-family:myCustomFont;</span>"&gt;Testing&lt;/p&gt;
+</pre>
+
+<p>Or if you want to make all the text on your page have that font, copy this into your HTML panel:</p>
+<pre style="background:#303030; color:white; padding:0.5rem; width:600px; margin:0 auto; text-align:left; border-radius:2px;">
+&lt;style&gt;
+  body \{
+    font-family: myCustomFont;
+  \}
+  body * \{
+    font-family: inherit;
+  \}
+&lt;/style&gt;
+</pre>
+
+<p style="margin:1rem auto; max-width:600px;"><b>Note</b>: If the font file is really big (e.g. several megabytes) it might go over Perchance's character count. You could break up the big base64 string into multiple generators in that case (and import them and join them in your main generator). Bit hacky but might be worth it in some cases.</p>
+
+<br><br><br><br><br>
+
+<script>
+  function getBase64(file) {
+    let reader = new FileReader();
+    reader.onload = function () {
+      outputTextEl.value = `<style>
+  @font-face{
+    font-family: myCustomFont;
+    src: url(${reader.result});
+  }
+</style>`;
+      document.head.insertAdjacentHTML("beforeend", outputTextEl.value);
+      
+    };
+    reader.onerror = function (error) {
+      outputTextEl.value = error;
+    };
+    reader.readAsDataURL(file);
+  }
+</script>

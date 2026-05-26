@@ -1,0 +1,37 @@
+<h1>Generator API Server Interface</h1>
+
+<div id="apiFormCtn">
+  <input id="endpointInput" placeholder="API Endpoint" value="/generate">
+  <textarea id="paramsInput" placeholder="Parameters (JSON format)" rows="4"></textarea>
+  <button id="sendBtn" onclick="sendRequest()">Send Request</button>
+</div>
+
+<div id="responseCtn" style="margin-top:20px;">
+  <h3>Response:</h3>
+  <pre id="responseEl" style="white-space:pre-wrap;background:#f0f0f0;padding:10px;"></pre>
+</div>
+
+<script>
+  async function sendRequest() {
+    sendBtn.disabled = true;
+    sendBtn.textContent = "⏳ Sending...";
+    responseEl.textContent = "Loading...";
+
+    try {
+      let params = JSON.parse(paramsInput.value || "{}");
+      let response = await fetch(endpointInput.value, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(params)
+      });
+      
+      let data = await response.json();
+      responseEl.textContent = JSON.stringify(data, null, 2);
+    } catch (error) {
+      responseEl.textContent = `Error: ${error.message}`;
+    }
+
+    sendBtn.disabled = false;
+    sendBtn.textContent = "Send Request";
+  }
+</script>

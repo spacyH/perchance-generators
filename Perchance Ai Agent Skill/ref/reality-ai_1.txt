@@ -1,0 +1,24 @@
+$meta
+  title = Reality·AI
+  description = Ultimate AI Generator
+  header
+    mode = minimal
+    
+t2i = {import:text-to-image-plugin}
+
+// 隐藏负面词库
+secretNeg = blurry, low resolution, pixelated, deformed, distorted, ugly, bad anatomy, bad proportions, extra limbs, missing limbs, fused fingers, too many fingers, mutation, grain, noise, watermark, logo, text, signature, worst quality, low quality
+
+// 生图基础参数
+imgWidth = 512
+imgHeight = 512
+userScale = 7
+userSeed = -1
+batchCount = 4
+
+// 核心渲染逻辑 (直接读取纯 JS 变量 finalPrompt_JS)
+singleImage
+  [t2i({prompt: finalPrompt_JS, negativePrompt: secretNeg, resolution: imgWidth + "x" + imgHeight, guidance: Number(userScale), seed: Number(userSeed)})]
+
+batchOutput
+  [singleImage.selectMany(Number(batchCount)).joinItems("")]

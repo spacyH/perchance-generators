@@ -1,0 +1,97 @@
+<h1>Google Sheets Plugin</h1>
+
+<div style="margin:0 auto;width:100%;max-width:650px;background:white;border-radius:2px;padding:1em; box-sizing:border-box; text-align:left;">
+	<p style="margin-top:0">This plugin allows you to import Google Sheets columns into your generator as Perchance lists. I generally don't recommend using it "long-term", since Google is known for shutting down their services/APIs when they become unprofitable (Google Sheets itself won't shut down, but they might change/remove the publishing options), and so if you try to use it as a permanent part of your generator, there's a decent chance that your generator will randomly stop working at some point in the future. That said, it may be useful for use during development, especially if you want multiple people to be able to work on your generator at the same time (since you can share edit access to your Google Sheet with others). But I'd recommend that you eventually copy your lists over to Perchance and remove the plugin once your generator is mostly finished. That will ensure that your generator "lives forever" :)</p>
+  <p>To make it so you can use your Google Sheet with this plugin you need to publicly "publish" it. To do that, go to the Google sheet that you want to use and click the "File" menu and then click "Publish to web" (or similar). You should see something <a href="https://i.imgur.com/dmGUKLv.png" target="_blank">like this</a>. Change "Entire Document" to a single sheet (the default one is called "Sheet1"), and then change the output type from "Web page" to "Tab-separated values (.tsv)". Then click "Publish". You'll then be given a URL, and that's the URL that you need to use with this plugin. Make sure you copy the <i>whole</i> URL - it's quite long!</p>
+  <p>First you'll need to import this plugin by pasting this in your Perchance lists editor:</p>
+<pre>
+googleSheets = \{import:google-sheets-plugin\}
+</pre>
+  <p>Then add a list with the settings for the plugin:</p>
+<pre>
+sheetsSettings
+  urls
+    https://docs.google.com/spreadsheets/d/e/xMruYbv....OoEuPn/pub?gid\\=0&amp;single\\=true&amp;output\\=tsv
+    https://docs.google.com/spreadsheets/d/e/Yb2xM8u....Po3gOu/pub?gid\\=0&amp;single\\=true&amp;output\\=tsv
+    <span style="opacity:0.5;">// add all the URLs you want to load</span>
+</pre>
+  <p><b>Note:</b> As shown in the above example (scroll to the right), you need to make sure you put a backslash (<code>\\</code>) before each of the equals signs (<code>=</code>) in your URLs.</p>
+  <p>Now simply put this code at the top of your HTML editor:</p>
+<pre>
+\[googleSheets(root, sheetsSettings)\]
+</pre>
+  <p>The <code>root</code> part tells the plugin where you want to "attach" the imported list data. Using <code>root</code> adds them as top-level lists, but you can use e.g. <code>food</code> if you had a list called <code>food</code> and wanted the imported lists to be made sub-lists of <code>food</code>. So it lets you decide on the "parent" of the imported lists.</p>
+
+<!--<pre>
+\[googleSheets(root, "https://docs.google.com/spreadsheets/d/e/xMruYbv....OuPoEn/pub?gid=0&amp;single=true&amp;output=tsv", "@version1")\]
+</pre>
+<p>Notice that the first input is <code>root</code>, the second input is the URL (with quotation marks around it), and the third input is <code>"@version1"</code> (with quotation marks around it). The <code>"@version1"</code> part is so that I can update the plugin with "backwards-incompatible" changes without disrupting/breaking the generators of the earlier users.</p> -->
+  
+  <p>Now here's what the plugin will do. Let's say you've got a spreadsheet like this:</p>
+  <p style="text-align:center;"><img src="https://i.imgur.com/PARDKrd.png" style="max-width:250px;"></p>
+  <p>The plugin will take the first item in each column and use that as the list name, then it will take all the items under that header and put them into the list - just like you'd probably expect. So after importing the plugin, if we were to write <code>\[veg\]</code> then we'd get a random vegetable.</p>
+  <p>BUT we're not finished yet. If you try the above instructions you'll notice that you get an error like "\[fruit\]" returned undefined. The problem is that Perchance tries to load the \[fruit\] list instantly when you load your generator, but Google Sheets takes a little while to return your data, so we end up with the errors because the lists don't exist yet when Perchance tries to find them. To "fix" this we can add some placeholder data while the Google Sheet loads:</p>
+<pre>
+fruit
+  &lt;b>loading...&lt;/b>
+veg
+  &lt;b>loading...&lt;/b>
+</pre>
+  <p>Now our <code>\[fruit\]</code> and <code>\[veg\]</code> outputs will display "loading..." (in bold) while the Google Sheets data loads.</p>
+  <p>You could actually just put not-quite-up-to-date versions of your lists in your generator, and then this plugin will just "override" those lists with up-to-date copies when it loads. That's a good way to ensure that your generator keeps working even if Google Sheets shuts down their publishing API.</p>
+  <p>Note that the plugin internally calls <code>update()</code> when the Google Sheets data has loaded, so it's as if the user clicks the "randomize" button after a second or so, which might be a bit annoying, so what if you wanted to only <code>update</code> a few specific elements? You can do that by adding an <code>id</code> to the elements that you want to update:</p>
+<pre>
+&lt;p id="myCoolElement"&gt; ... &lt;/p&gt;
+&lt;div id="myOtherElement"&gt; ... &lt;/div&gt;
+</pre>
+  <p>And then add an <code>onLoad() =></code> function as shown below, with a list of commands that you want to run after the data has been loaded:</p>
+<pre>
+sheetsSettings
+  urls
+    https://docs.google.com/spreadsheets/d/e/xMruYbv....OoEuPn/pub?gid=0&amp;single=true&amp;output=tsv
+    https://docs.google.com/spreadsheets/d/e/Yb2xM8u....Po3gOu/pub?gid=0&amp;single=true&amp;output=tsv
+  onLoad() =>
+    update(myCoolElement)
+    update(myOtherElement)
+</pre>
+  <p><a href="https://perchance.org/google-sheets-plugin-onload-example#edit" target="_blank">Here's an example</a> of that. That way you can selectively <code>update</code> only the elements that actually need to use the data from the Google Sheet, rather than updating <i>everything</i> on the page.</p>
+  <br>
+	<p><b>Notes:</b></p>
+	<ul>
+		<li><a href="https://perchance.org/google-sheets-plugin-example#edit" target="_blank">Here's a simple generator</a> based on the above fruit and veg example to get you started.</li>
+		<li>It will take a while for the imported data to be updated after you edit your Google Sheet. This is just because Google only updates the published version every ~5 minutes, rather than instantly.</li>
+		<li>Use <code>onLoad() => return</code> if you don't want to <code>update</code> <i>anything</i> when the data loads.</li>
+		<li>As mentioned earlier, instead of passing <code>root</code> as the first input to the plugin, you can specify a list that you have in your generator, and the Google Sheets lists will get "attached" as sub-lists under that list. So if you had a list called "food" and you wrote <code>googleSheets(food, ....)</code>, then you'd access your <code>fruit</code> and <code>veg</code> lists with <code>\[food.fruit\]</code> and <code>\[food.veg\]</code>.</li>
+		<li>You can add odds notation (including dynamic odds like <code>^\[a == 10\]</code>) to your items, but you can't currently create properties and sub-lists within your Google Sheets lists.</li>
+		<li>Check out more plugins at <a href="/plugins">perchance.org/plugins</a></li>
+	</ul>
+</div>
+<p style="text-align:center; font-size:200%; opacity:0.2; margin-top:0.5em;"><span>⚄&#xFE0E;</span></p>
+<br><br><br>
+
+<style>
+	body {
+			background:#eee;
+	}
+	code {
+		background-color:#eee;
+		padding:0.13em 0.2em
+	}
+	ul li { margin-top:0.4em; }
+  	code {
+		background-color:#eee;
+		padding: 0 0.2em;
+	}
+	pre {
+		text-align:left;
+		background: #333;
+    color: white;
+    padding: 1em;
+    border-radius: 2px;
+		tab-size: 2;
+		-moz-tab-size: 2;
+		-o-tab-size: 2;
+		-webkit-tab-size: 2;
+	}
+</style>
+

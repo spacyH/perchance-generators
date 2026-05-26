@@ -1,0 +1,81 @@
+<h1>Dynamic Import Plugin</h1>
+
+<div style="margin:0 auto;width:100%;max-width:750px;background:white;border-radius:2px;padding:1em; box-sizing:border-box; text-align:left;">
+  
+  <p style="margin-top:0">This plugin allows you import lists from other generators only when needed, rather than downloading <i>all</i> your imports during the initial page load. It's useful if, for example, you have a <b>very large</b> number of generators that you need to import to make your generator work, but most of the time only a small number of them are actually needed.</p>
+  <p style="margin-top:0"><b style="color:red;">Warning:</b> Using this plugin will mean that if you download your generator (or allow others to do so with the <a href="https://perchance.org/download-button-plugin" target="_blank">download-button-plugin</a>), then <b>the generator won't work without an internet connection</b> because it needs to fetch generator data from the Perchance server 'on-the-fly'.</p>
+  <p style="margin-top:0"><b style="color:red;">Also:</b> By default this plugin will cause the page to become momentarily non-interactible (i.e. "freeze") while an import loads (unless you use the <b>preload</b> feature explained lower on this page). With a decent internet connection this is usually not a problem, but if the user's internet connection is intermittently slow/laggy, this could be more annoying than just waiting a bit longer during the initial load.</p>
+  <p>Due to the above points, you should only use this plugin if the loading speed of your generator is <b>significantly</b> impacted by the large number of imports that you have.</p>
+  
+  <p>To use this plugin, you'll first need to import it by adding this line to your lists editor:</p>
+<pre>
+dynamicImport = \{import:dynamic-import-plugin\}
+</pre>
+  <p>Then just write <code>\[animal = dynamicImport('animal')\]</code> to load the <a href="https://perchance.org/animal" target="_blank">animal</a> generator, for example. And that's it - <code>\[animal\]</code> will now give you a random animal each time you use it, just as if you'd imported it 'statically' like <code>animal = \{import:animal\}</code>.</p>
+  <p>Here's an example that you can try pasting into your lists editor:</p>
+<pre>
+generatorNames
+  animal
+  noun
+  adjective
+  <span style="opacity:0.4;">// ...</span>
+  
+output
+  \[gen = generatorNames.selectOne, list = dynamicImport(gen), ""\] The \[gen\] generator was imported, and here's a random item from it: \[list\]
+</pre> 
+  <p><a href="https://perchance.org/dynamic-import-plugin-example#edit" target="_blank">Here's an example generator</a> which <b>imports hundreds of other generators</b> without increasing the initial page load time at all.</p>
+  <p>Once you've dynamically imported a generator, all future dynamic imports of that generator will <b>instantly</b> return exactly the same list/generator instance with no freeze/lag at all, since imported generators are cached. So you can actually just directly write <code>dynamicImport("noun")</code> whenever you want a noun, rather than assigning it to a variable like <code>noun=dynamicImport("noun")</code>. And of course you can change the name you use for this plugin to anything - e.g. <code>dim = \{import:dynamic-import-plugin\}</code>, which means you can have something short like <code>dim("noun")</code>. So this: <code>\[noun=dim("noun")\] \[noun\] \[noun\]</code> is equivalent to this: <code>\[dim("noun")\] \[dim("noun")\] \[dim("noun")\]</code> in terms of what it will output, and how fast it will output it.</p>
+  <p>Also, a technical note: It's returning the same actual 'instance' of the noun generator each time (rather than a copy/clone), so <code>\[dim("noun")==dim("noun")\]</code> will return <code>true</code>.</p>
+  <h2>Preload</h2>
+  <p>One way to reduce/avoid page freezes while dynamic imports load for the first time is to <b>'preload'</b> list data in the background based on some sort of user interaction event. For example, you could have a 'tab' which, when clicked, will trigger preloading of a few lists that you know will likely be needed within that tab. So then when you do a 'normal' execution of <code>dynamicImport</code>, the data will likely already be downloaded and cached. If it did preload in time, then there won't be any freeze at all.</p>
+  <p>Just add <code>'preload'</code> as the second parameter to the dynamicImport plugin, like this: <code>dynamicImport('noun', 'preload')</code>. That preloads the <a href="/noun" target="_blank">noun</a> generator data. In the example code below we preload the noun generator's data when a button is clicked:</p>
+<pre>
+&lt;button onclick="dynamicImport('noun', 'preload')"&gt;preload noun data&lt;/button&gt;
+</pre> 
+  <p>To repeat/summarize: Using the preload mode allows you to load the 'animal' generator's data in the background by just executing <code>\[dynamicImport('animal', 'preload'), ""\]</code> wherever/whenever you want, so that when it comes to actually <i>using</i> the <code>animal</code> generator with e.g. <code>\[a = dynamicImport('animal').selectOne\]</code>, you don't get a freeze.</p>
+  <p>Note even if you run <code>\[dynamicImport('animal', 'preload'), ""\]</code> 1000 times, it'll only ever do a single download - i.e. after the first time, all subsequent executions/evaluations of <code>\[dynamicImport('animal', 'preload'), ""\]</code> will do nothing, since the data is already downloaded and cached.</p>
+  <h2>Async</h2>
+  <p>If you're a more experienced coder who knows how to write JavaScript functions and use async/await, then you can use the 'async' mode which doesn't cause a freeze (at the cost of not being 'immediate', of course):</p>
+<pre>
+async doStuff() =>
+  root.noun = await dynamicImport('noun', 'async'); <span style="opacity:0.4;">// we attach it to the 'root' of our existing perchance tree so it's 'globally' accessible.</span>
+</pre> 
+   
+	<p><b>Notes:</b></p>
+	<ul>
+    <li><a href="https://perchance.org/4auik0v09f#edit" target="_blank">Here's an example</a> where we dynamically import a generator that itself (both statically and dynamically) imports other generators.</li>
+    <li><a href="https://perchance.org/import-only-in-html-panel-no-dependency-example#edit" target="_blank">Here's an example</a> where we dynamically import the comments plugin so that we can include a comments box on our generator <i>without</i> causing importers of that generator to have the comments plugin as an extra unused dependency.</li>
+    <li>As mentioned, the downloaded generator is cached, so once you've executed <code>dynamicImport("noun")</code> the first time, all future executions of <code>dynamicImport("noun")</code> won't require any download, so there won't be a page freeze.</li>
+    <li>Behind the scenes, (as you can see if you click the edit button on this plugin), this plugin just downloads the generator text from the API, and then uses <code>createPerchanceTree(listsText)</code> to dynamically create a Perchance list/tree. You're free to fork this plugin and do things differently since the <code>/api/downloadGenerator</code> endpoint is a stable API with a backwards-compatibility guarantee.</li>
+    <li>Check out more plugins at <a href="/plugins" target="_blank">perchance.org/plugins</a></li>
+	</ul>
+</div>
+<p style="text-align:center; font-size:200%; opacity:0.2; margin-top:0.5em;"><span>⚄&#xFE0E;</span></p>
+<br><br><br>
+
+<style>
+	body {
+			background:#eee;
+	}
+	code {
+		background-color:#eee;
+		padding:0.13em 0.2em
+	}
+	ul li { margin-top:0.4em; }
+  	code {
+		background-color:#eee;
+		padding: 0 0.2em;
+	}
+	pre {
+		text-align:left;
+		background: #333;
+    color: white;
+    padding: 1em;
+    border-radius: 2px;
+		tab-size: 2;
+		-moz-tab-size: 2;
+		-o-tab-size: 2;
+		-webkit-tab-size: 2;
+	}
+</style>
+

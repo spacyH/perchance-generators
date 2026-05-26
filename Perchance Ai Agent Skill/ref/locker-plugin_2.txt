@@ -1,0 +1,133 @@
+<h1>🔐 Locker Plugin 🔓</h1>
+
+<div style="margin:0 auto;width:100%;max-width:800px;background:white;border-radius:2px;padding:1em; box-sizing:border-box;">
+	<p style="text-align:justify; margin-top:0;">This plugin is a more powerful version of the <a href="https://perchance.org/lockable-list-plugin">lockable-list</a> plugin. It allows you to create a "locker" which holds a value if the user clicks a lock icon. It's slightly more complicated than the lockable-list plugin, so I'll go through a few simple examples and explain it slowly. First you'll just need to import the plugin by putting this code in your Perchance code panel:</p>
+	 
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+locker = \{import:locker-plugin\}
+</pre>
+	
+  <p>And here's a simple example of how to use it (explained below):</p>
+	
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+output
+	The \[locker("a1", animal.selectOne)\] \[locker("a1_button")\] has befriended the \[locker("a2", animal.selectOne)\] \[locker("a2_button")\].
+	
+animal
+	frog
+	mouse
+	rabbit
+	cow
+	...
+</pre>
+
+	<p>and that would output this:</p>
+	
+	<p id="example1" style="padding:1rem; background:#efefef;">The [$output("a1", animal.selectOne)] [$output("a1_button")] has befriended the [$output("a2", animal.selectOne)] [$output("a2_button")].</p>
+	<button onclick="update(example1)">randomize</button>
+	
+	<p>Here's what's happening there: When we write <code>\[locker("a1", animal.selectOne)\]</code>, we're creating a locker called <code>a1</code> and putting a value inside it: <code>animal.selectOne</code>. If the locker is currently <b>unlocked</b>, then the statement <code>\[locker("a1", animal.selectOne)\]</code> will simply output the value we put in: <code>animal.selectOne</code>. <b>But</b> if the locker is currently <b>locked</b>, then it "rejects" our value and outputs the value that has been locked inside it. So if the <code>a1</code> locker is locked on "frog", then <code>\[locker("a1", animal.selectOne)\]</code> will output "frog" instead of <code>animal.selectOne</code>.</p>
+	
+	<p>Here's another example:</p>
+	
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+output
+	Pair 1: \[locker("p1", letterPair.evaluateItem)\] \[locker("p1_button")\]&lt;br&gt;Pair 2: \[locker("p2", letterPair.evaluateItem)\] \[locker("p2_button")\]
+	
+letterPair
+	\{A-Z\}\{A-Z\}
+</pre>
+	
+	<p id="example2" style="padding:1rem; background:#efefef;">Pair 1: [$output("p1", letterPair.evaluateItem)] [$output("p1_button")]<br>Pair 2: [$output("p2", letterPair.evaluateItem)] [$output("p2_button")]</p>
+	<button onclick="update(example2)">randomize</button>
+	
+	<p>Notice that this plugin is unlike the <a href="/lockable-list-plugin" target="_blank">lockable-list plugin</a> in that rather than passing a list name, we need to input the actual, final value that we want to store in the locker. So in this case we use <code>.evaluateItem</code> (explained in the <a href="/tutorial">tutorial</a>) to fully get a fully-evaluated letter pair (i.e. just plain text - no curly brackets). If we'd written <code>letterPair.selectOne</code>, then we'd be storing the unevaluated <code>\{A-Z\}\{A-Z\}</code> item in the locker. That's perfectly allowable, but it wouldn't give us what we want - we want the user to be able to lock onto a specific letter pair - not on that pair of curly blocks (which would result in a new letter pair every time you click randomize).</p>
+	
+	<p>If you want to get the current value that is in a particular locker <b>without</b> attempting to replace it with another value, then you can do that like this:</p>
+	
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+output
+	The current value that's inside the "hello" locker is: \[locker("hello")\].
+</pre>
+	
+	<p>And you can of course assign it to a variable so you can use it later:</p>
+	
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+output
+	\[h = locker("hello")\] \[h\] \[h\] \[h\] \[h\] \[h\]
+</pre>
+	
+	<p>And you can also put the locker's value into a variable at the moment that you (try to) input a new value to the locker:</p>
+	
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+output
+	\[a = locker("a1", animal.selectOne)\] \[a\] \[a\] \[a\] \[a\] \[a\]
+</pre>
+	
+	<p>In that case, if the <code>a1</code> locker was locked, then our new <code>animal.selectOne</code> value will be rejected, and <code>a</code> will be assigned the value that was already in the locker. Otherwise <code>a</code> will be assigned the new value (whatever <code>animal.selectOne</code> turned out to be).</p>
+	
+	<p>You can attempt to put <b>any</b> value inside a locker at any time - a locker isn't specific to a particular list - if it's unlocked then it will accept any value you throw at it. The value will get rejected if the locker is currently locked. You could attempt to put the number 10 in the "num" locker like this:</p>
+	
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+\[a = locker("num", 10)\] is a number and it's bigger than \[a-2\]
+</pre>
+	
+	<p><code>a</code> will be 10 if the locker was unlocked, otherwise it will be whatever was in the locker when it was locked.</p>
+	
+	<p>You can change the lock/unlock icon by doing two things. <b>First</b>, you need to paste this anywhere in your Perchance code panel:</p>
+
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+lockerOptions
+	lockedIcon = 🛑
+  unlockedIcon = 🎲
+</pre>
+  <p>And <b>second</b>, you need to paste this at the top of your HTML code panel (the bottom-right text editor) to "initialize" the plugin with those options:</p>
+	
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+\[locker(lockerOptions)\]
+</pre>
+  
+	<p><a href="https://perchance.org/locker-plugin-options-example#edit" target="_blank">Here's an example generator</a> showing how to do those two steps. In this example I've chosen some other emojis, but you can choose whatever you want (even an HTML image tag, for example). You can also use this feature to change the size of the existing icons:</p>
+	
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+lockerOptions
+  lockedIcon = &lt;span style="font-size:200%;"&gt;🔐&lt;/span&gt;
+</pre>
+	
+	<br><br>
+	<p><b>Notes:</b></p>
+	<ul class="dot-list">
+		<li><a href="https://perchance.org/locker-plugin-example#edit">Here's an example</a> of a generator that uses this plugin.</li>
+		<li><a href="https://perchance.org/locker-plugin-options-example#edit">Here's a simple example</a> that changes the icons with <code>lockerOptions</code>.</li>
+		<li>The main difference between this plugin and the lockable-list plugin is that this plugin allows you to put arbitrary values in arbitrary lockers. The lockable-list plugin only allows you to apply locks to actual lists, and this can be very inconvenient if, for example, you wanted to use a single list multiple times with independent locks. This plugin, on the other hand, makes that very easy. Just remember to write in <code>list.selectOne</code> or <code>list.evaluateItem</code> in the brackets, rather than just <code>list</code>.</li>
+		<li>Remember that you can ask for help on the <a href="https://www.reddit.com/r/perchance">forum</a> if needed.</li>
+		<li>Check out more plugins at <a href="/plugins">perchance.org/plugins</a></li>
+	</ul>
+</div>
+<br><br><br>
+
+<style>
+	p { text-align:left; }
+	body {
+			background:#eee;
+	}
+	code {
+		background-color:#eee;
+		padding: 0 0.2em;
+		white-space:nowrap;
+	}
+	ul.dot-list li {
+	  margin-top:0.5em;	
+	} 
+	pre.custom {
+		text-align:left;
+		background: #333;
+    color: white;
+    padding: 1em;
+    border-radius: 2px;
+		tab-size: 2;
+		-moz-tab-size: 2;
+		-o-tab-size: 2;
+		-webkit-tab-size: 2;
+	}
+</style>

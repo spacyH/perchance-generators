@@ -1,0 +1,71 @@
+$output (generatorName, dataType) =>
+  if(generatorName === null) generatorName = window.generatorName;
+  if(dataType == undefined) {
+	  dataType = generatorName;
+	  generatorName = window.generatorName; 
+	}
+
+	if(dataType === undefined) return "(error: you need to specify a second parameter of either 'views' or 'lastEditTime')";
+	if(dataType !== "views" && dataType !== "lastEditTime") return "(error: invalid second parameter. valid options are 'views' and 'lastEditTime')";
+
+	if(!window.generatorStatsPlugin092750294857) window.generatorStatsPlugin092750294857 = {};
+
+  if(typeof window.generatorStatsPlugin092750294857[generatorName] === "string") { // if it's a cached cached error message
+	  return `<span>${window.generatorStatsPlugin092750294857[generatorName]}</span>`;
+	} else if(window.generatorStatsPlugin092750294857[generatorName]) {
+		return `<span>${formatData(window.generatorStatsPlugin092750294857[generatorName])[dataType]}</span>`
+	}
+
+	let elId = ("generator-stats-"+Math.random()).replace(".","");
+	let outputEl = `<span id='${elId}'></span>`;
+	
+	(async () => {
+		
+		let result = (await (await fetch("/api/getGeneratorStats?name="+generatorName)).json());
+		if(result.status !== "success") {
+			document.querySelector("#"+elId).innerHTML = "("+result.status+")";
+      window.generatorStatsPlugin092750294857[generatorName] = "("+result.status+")";
+			return;
+		} else {
+			window.generatorStatsPlugin092750294857[generatorName] = result.data;
+		}
+		
+		let waitUntilElExistsInterval = setInterval(() => {
+		  if(document.querySelector("#"+elId)) {
+			  document.querySelector("#"+elId).innerHTML = formatData(window.generatorStatsPlugin092750294857[generatorName])[dataType];
+				clearInterval(waitUntilElExistsInterval);
+			}
+		}, 50);
+
+	})();
+	
+	return outputEl;
+	
+	
+formatData (g) =>
+	g = JSON.parse(JSON.stringify(g)); // clone
+	if(!g.views) g.views = 0;
+	g.views = g.views > 999 ? (g.views/1000).toFixed(1) + 'k' : g.views;
+
+  g.lastEditTime = Date.now() - g.lastEditTime;
+	g.lastEditTime /= 1000;
+	if(g.lastEditTime > 60*60*24*30*12) {
+		let t = Math.round(g.lastEditTime/(60*60*24*30*12));
+		g.lastEditTime = t + ` year${t==1?"":"s"} ago`;
+	} else if(g.lastEditTime > 60*60*24*30) {
+		let t = Math.round(g.lastEditTime/(60*60*24*30));
+		g.lastEditTime = t + ` month${t==1?"":"s"} ago`;
+	} else if(g.lastEditTime > 60*60*24) {
+		let t = Math.round(g.lastEditTime/(60*60*24));
+		g.lastEditTime = t + ` day${t==1?"":"s"} ago`;
+	} else if(g.lastEditTime > 60*60) {
+		let t = Math.round(g.lastEditTime/(60*60));
+		g.lastEditTime = t + ` hour${t==1?"":"s"} ago`;
+	} else if(g.lastEditTime > 60) {
+		let t = Math.round(g.lastEditTime/(60));
+		g.lastEditTime = t + ` minute${t==1?"":"s"} ago`;
+	} else {
+		let t = Math.round(g.lastEditTime);
+		g.lastEditTime = t + ` second${t==1?"":"s"} ago`;
+	}
+	return g;

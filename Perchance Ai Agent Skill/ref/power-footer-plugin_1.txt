@@ -1,0 +1,76 @@
+title
+  Power Footer Plugin
+
+temp = {import:power-plugin-template}
+temps = {import:power-plugin-temps}
+
+comm = {import:comments-plugin}
+
+$output(items, backColor, style, hoverColor, hoverColorText, clickColor, clickColorText) =>
+  let q = [];
+  if (backColor == undefined) backColor = "#EEEEEE";
+  if (style == undefined) style = "";
+  if (hoverColor == undefined) hoverColor = "#E0E0E0";
+  if (hoverColorText == undefined) hoverColorText = "black";
+  if (clickColor == undefined) clickColor = "#D0D0D0";
+  if (clickColorText == undefined) clickColorText = "black";
+  let ID = Math.random().toString().replace(/0\./g, "");
+  for (let i = 0; i < items.getLength; i++) {
+    q.push(items.$children[i]);
+    if (q[i].match("::link:") === null) {
+      q[i] = `<div class='ft${ID}'>${q[i]}</div>`
+    } else {
+      q[i] = `<div class='ft${ID}'><a style="color: black" href="${q[i].match("::link:open-in-new-tab:") === null ? q[i].replace(/.*::link:(.*)/g, "$1") : q[i].replace(/.*::link:open-in-new-tab:(.*)/g, "$1")}" ${q[i].match("::link:open-in-new-tab:") === null ? "" : "target='_blank'"}>${q[i].replace(/(.*)::link:.*/g, "$1")}</a></div>`
+      // if (q[i].match("::link:open-in-new-tab:") === null) {
+      //   q[i] = `<a class='ft${ID} flnk${ID}' href='' title='${q[i].replace(/.*::link:(.*)/g, "$1")}'>${q[i].replace(/(.*)::link:.*/g, "$1")}</a>`
+      // } else {
+      //   q[i] = `<div class='ft${ID} flnk${ID}' onclick='window.open("${q[i].replace(/.*::link:open-in-new-tab:(.*)/g, "$1")}")' title='${q[i].replace(/.*::link:open-in-new-tab:(.*)/g, "$1")}'>${q[i].replace(/(.*)::link:.*/g, "$1")}</div>`
+      // }
+    }
+  }
+  return `
+  <style>
+    .ft${ID} \\\{
+      padding: 6px 12px;
+      display: inline-block;
+      margin: 4px;
+      background-color: ${backColor};
+      border-radius: 16px;
+      font-size: 0.8em;
+      outline: none;
+      cursor: pointer;
+      color: black;
+      display: inline-block;
+      ${style};
+    \\\}
+    .ft${ID}:hover, .ft${ID}:hover a \\\{
+      background-color: ${hoverColor};
+      color: ${hoverColorText};
+    \\\}
+    .ft${ID}:active, .ft${ID}:active a \\\{
+      background-color: ${clickColor};
+      color: ${clickColorText};
+    \\\}
+    .flnk${ID}:hover \\\{
+      text-decoration: underline;
+    \\\}
+  </style>
+  <p>${q.join("")}</p>
+  `;
+
+footerItems
+  This is a footer
+  {1-1000}
+  {import:cliche}
+  I have {a} {import:noun}.
+  
+footerItemsAnything
+  <span onclick\="update()">Randomize{!|.|}</span>
+  <font color\="{import:hex-color}">The {import:animal}</font>
+  <b><i><u>Let them do it.</u></i></b>
+  
+footerItemsLinks
+  Power Name Generator::link:power-name
+  Minecraft Block Generator by Geowing39::link:minecraft-random-block-generator
+  An example website::link:https://example.com
+  My generators::link:open-in-new-tab:power-generator-manager

@@ -1,0 +1,66 @@
+styler = {import:power-generator-styler}
+
+$output
+  commandBar(pos, isPreprocessor) =>
+    return `<table ${pos == "bottom" ? "class='bottom'" : ""} id="linkbar">
+    <tr>
+    <th onclick="window.open('${generatorName.replace("-plugin", "")}-example#edit')" class="h" style="border-${pos}-left-radius: 24px; color: var(--pri-accent-color)">${ico("file")}Example</th>
+    <th onclick="comments.style.display = 'block'">${ico("comment")}Comments</th>
+    <th onclick="window.open('https://docs.google.com/forms/d/e/1FAIpQLScnO47tgTKdUUD86H5BSRAdYABkbaFOBftXKUdof-7j1sWjeA/viewform?usp=pp_url&entry.623503976=${generatorName.split("-").join(" ").titleCase.replace(/ /g, "+") || "" }')">${ico("paper-plane")}Feedback</th>
+    <th onclick="window.open('${isPreprocessor ? "preprocessors" : "plugins"}')" style="border-${pos}-right-radius: 24px">${ico(isPreprocessor ? "cogs" : "puzzle-piece")}${isPreprocessor ? "Preprocessors" : "More Plugins"}</th>
+    </tr>
+    </table>`
+  
+  credit(url) =>
+    return `<div class="attrib" style="display: [generatorName == '${url}' ? 'flex' : 'none']">Made by
+    <a href="https://mastodon.social/@BluePower" target="_blank" style="display: flex; font-weight: 600">
+      <!-- Generator: Adobe Illustrator 23.0.3, SVG Export Plug-In  -->
+      <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" width="14px" viewBox="0 0 64 64" style="enable-background:new 0 0 64 64; margin: 0 4px 0 6px" xml:space="preserve">
+        <defs>
+        </defs>
+        <g>
+          <path class="st0" d="M32,64C14.4,64,0,49.6,0,32C0,20.6,6.1,10,16,4.3C18.2,3,21,3.8,22.2,6c1.3,2.2,0.5,5-1.7,6.2
+            C13.5,16.3,9.1,23.9,9.1,32c0,12.6,10.3,22.9,22.9,22.9S54.9,44.6,54.9,32c0-2.5,2-4.6,4.6-4.6c2.5,0,4.6,2,4.6,4.6
+            C64,49.6,49.6,64,32,64z"/>
+          <path class="st0" d="M55.8,22.9c-1.6,0-3.1-0.8-4-2.3C47.7,13.5,40.1,9.1,32,9.1c-2.5,0-4.6-2-4.6-4.6S29.5,0,32,0
+            c11.4,0,22,6.1,27.7,16c1.3,2.2,0.5,5-1.7,6.2C57.3,22.7,56.5,22.9,55.8,22.9z"/>
+        </g>
+        </svg>BluePower/Polygonal</a>&nbsp;(<a href="power-generator-manager" target="_blank">my generators</a>)
+    </div>
+    <div class="attrib" style="display: [generatorName == '${url}' ? 'none' : 'flex']">
+      ${ico("exclamation-triangle", "margin-right: 4px")}This is a copy of the&nbsp;<a href="${url}" target="_blank" style="display: flex; font-weight: 600">${url}</a>.
+    </div>`
+  
+  _aaa(aa) => return aa;
+  
+  suggestionfeedback = If you want to submit bug reports, suggestions, or some feedback, head over to the Feedback form below or go to the <a href="https://lemmy.world/c/casual_perchance" target="_blank">Casual Perchance community</a> and make a post (make sure to tag it with \[Power Plugin Suggestion\], \[Power Plugin Bug Report\] or \[Power Plugin Feedback\] in the title so it'll be organizable).
+  maybefixed = This plugin may be updated for additional features and bug fixes.
+  
+  newPlugin = <div class="new"><p><b>This is a new plugin!</b> New features might be added, and bugs may appear that are yet to be fixed. Feel free to give feedback and report bugs on the new <a href="https://forms.gle/MVDYpshtmsUhVtkN9">feedback form</a>!</p></div> 
+  comments(ct) => return `<div id="comments"><div class="comtext">${ct}<h5 style="cursor: pointer" onclick="comments.style.display = 'none'">Close</h5></div></div>`
+  copt
+    width = 100%
+    height = 360
+    submitButtonText = Submit
+    adminPasswordHash = 26153cef2109a1e4163af9859c543f320617ce42b31147b3917645f06e1cd940
+    adminFlair = 👑 Owner
+    onComment(comment) =>
+      if (comment.byCurrentUser && generatorName == "power-rain-plugin") {
+        if (comment.message.includes("rain")) rain();
+        else if (comment.message.includes("stop")) rain("stop");
+      }
+    //newestCommentsAtTop = true
+
+cmtOnComment(comment) =>
+  if (comment.byCurrentUser && generatorName == "power-rain-plugin") {
+    if (comment.message.includes("rain")) rain();
+    else if (comment.message.includes("stop")) rain("stop");
+  }
+
+rain = {import:power-rain-plugin}
+ico = {import:icon-plugin-v6}
+
+starticon = puzzle-piece
+endicon = puzzle-piece
+
+title = Power Plugin

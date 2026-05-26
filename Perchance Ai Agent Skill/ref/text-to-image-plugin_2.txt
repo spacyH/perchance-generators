@@ -1,0 +1,255 @@
+<div style="display:[window.generatorName === 'text-to-image-plugin' ? 'none' : 'block'];color:red; font-weight:bold; padding:3rem;">Heads up! This is a fork/remix of the <a href="/text-to-image-plugin" target="_blank">text-to-image-plugin</a>, but unfortunately it's a really bad idea to fork this plugin, since its code is 'coupled' with the server code, so if I need to change the server code, your version of this plugin will likely break. If you'd like new features, best to ask for them on the community forum so your generators don't randomly break in the future when I update the server code. Alternatively, you can create a new plugin that <u>imports the official version of this plugin</u> - i.e. basically create a "wrapper" plugin that changes/expands on the plugin's behavior</div>
+
+<h1>🤖 Text to Image Plugin 🎨</h1>
+
+<main>
+	<p>This plugin allows you input some text and get an image out. It doesn't run on your actual device like other Perchance plugins because it requires too much computational power (and would require a 3GB download), so it runs on <a href="https://en.wikipedia.org/wiki/Server_(computing)" target="_blank">server</a> GPUs, which means it costs me money to run. For this reason, this plugin is funded with ads, so <b style="color:red;">an ad will appear on your generator <u>for non-logged-in users</u> if you import this plugin</b>. The ad will appear at the bottom of the screen <a href="https://user.uploads.dev/file/e3cdfc34728610cf6e351b72052ef0c1.jpeg" target="_blank" title="graphic design is my passion">like this</a>. The ad will go away if you remove the plugin, of course. <b></b> Please see the notes at the end of this page for more info.</p>
+  
+  <p>To use this plugin, you'll first need to import it by adding this line to your lists editor:</p>
+<pre>
+image = \{import:text-to-image-plugin\}
+</pre>
+  <p>And now try putting this in your lists editor:</p>
+<pre>
+character
+  a \{mech|demon|cyberpunk\} \{warrior|minion|samurai\}
+
+place
+  soviet russia
+  a small village
+  a mountainous region
+  an underwater cavern
+
+season
+  winter
+  summer
+  
+prompt
+  detailed painting of \[character\] in \[place\], \[season\]
+  
+output
+  \[image(prompt)\]
+</pre>
+  <p>Now just write <code>\[output\]</code> in the HTML wherever you want an image to appear. Here's a live, working example of what that outputs:</p>
+  <p id="outputEl1" style="text-align:center;">[$output(prompt)]</p>
+  <p style="text-align:center;"><button onclick="update(outputEl1)">randomize</button></p>
+  
+  <p>You can hover your mouse over the image (or long-press on mobile) to see the prompt that was used, or click the info icon in the corner of the image. You can also manually display the prompt below the image by using the special <code>lastTextToImagePrompt</code> variable that this plugin creates:</p>
+<pre>
+output
+  \[image(prompt)\] &lt;br&gt; \[lastTextToImagePrompt\]
+</pre>
+  <p><a href="https://perchance.org/text-to-image-plugin-example-4#edit" target="_blank">Here's an example generator</a> that uses the above code. Try playing around with the lists and saving your own copy.</p>
+  <p>As the name suggests, <code>\[lastTextToImagePrompt\]</code> will always contain the most recently used prompt. If you instead wrote <code> \[image(prompt)\] … \[prompt\]</code> then the prompt used to generate the image (seen on hover) and the prompt output under the image would be different, because each time <code>prompt</code> is evaluated, it is randomized (it's just a normal Perchance list, after all).</p>
+  
+  <p>If you want the prompt text to be <i>above/before</i> the image, you can do that like this:</p>
+<pre>
+output
+  \[p = prompt.evaluateItem\] &lt;br&gt; \[image(p)\]
+</pre>
+    <p><a href="https://perchance.org/text-to-image-plugin-example#edit" target="_blank">Here's an example generator</a> that uses the above code. And <a href="https://perchance.org/multiple-images-with-text-to-image-plugin#edit" target="_blank">this example</a> shows how to add multiple images to your generator.</p>
+    <p><a href="https://perchance.org/text-to-image-with-user-input-example#edit" target="_blank">Here's an example generator</a> that has multiple images and also allows the user to input a text prompt.</p>
+  
+    <p>There are some options/settings that you can set two different ways - the first is by putting them in a promptData list like this:</p>
+<pre>
+promptData
+  prompt = painting of \[character\] in \[place\], \[season\]
+  seed = 123
+  size = 400  <span style="opacity:0.5">// size is only a valid property for square resolutions</span>
+  style = border:4px solid blue; margin-top:20px; <span style="opacity:0.5">// CSS styles</span>
+</pre>
+  <p>You'd then write <code>\[image(promptData)\]</code> to generate an image using those settings (and in this case you can use <code>\[promptData.lastUsedPrompt\]</code> instead of <code>\[lastTextToImagePrompt\]</code> to get the prompt that was used if you want).</p>
+  <p>The second way is to put the options directly in your prompt text like this:</p>
+<pre>
+prompt
+  \[character\] in \[place\] (size:::400) (seed:::123)
+  
+output
+  \[image(prompt)\]
+</pre>
+  <p><a href="https://perchance.org/text-to-image-plugin-options-in-prompt-example#edit" target="_blank">Here's an example generator</a> that has the options/settings within the prompt text itself. The options should always be at the end of the prompt, and should follow the <code>(name:::value)</code> format.</p>
+  <p>You can of course omit settings that you don't want to customize.</p>
+  <p>You can choose between 3 different resolutions using the <code>resolution</code>. The valid resolution values are 512x512, 512x768 and 768x512:</p>
+<pre>
+promptData
+  prompt = fantasy \{forest|city|village|cafe|cavern|island|plains|castle|canyon|supercity|megalopolis\}, extremely detailed oil painting, unreal 5 render, rhads, bruce pennington, studio ghibli, tim hildebrandt, digital art, octane render, beautiful composition, trending on artstation, award-winning photograph, masterpiece
+  resolution = 512x768
+  width = 400  <span style="opacity:0.5">// height will be auto-chosen based on aspect ratio if omitted, and vice versa for width</span>
+</pre>
+  <p><a href="https://perchance.org/text-to-image-plugin-example-3#edit" target="_blank">Here's an example generator</a> that uses the above code, and here's a live demo of that:</p>
+  <p id="outputEl2" style="text-align:center;">[$output({prompt:"fantasy {forest|city|village|cafe|cavern|island|plains|castle|canyon|supercity|megalopolis}, extremely detailed oil painting, unreal 5 render, rhads, bruce pennington, studio ghibli, tim hildebrandt, digital art, octane render, beautiful composition, trending on artstation, award-winning photograph, masterpiece", resolution:"512x768", width:400})]</p>
+  <p style="text-align:center;"><button onclick="update(outputEl2)">randomize</button></p>
+  
+  <p>There are a couple of other parameters to play with:</p>
+  <ul>
+    <li><b><code>negativePrompt</code></b>: Tell the AI what you <u>don't</u> want in the image. E.g. if you don't want any blurriness in the output image, you'd write something like <code>negativePrompt = blur, blurry image, motion blur</code>. Here's <a href="https://perchance.org/negative-prompt-example-text-to-image-plugin#edit" target="_blank">an example generator</a> showing this feature.</li>
+    <li><b><code>guidanceScale</code></b>: Roughly speaking, this controls how much the output image "matches" the prompt. You can make the value higher to make the output "match" the prompt more, at the expense of realism. The default value is 7, the minimum is 1, and the maximum is 30.</li>
+  </ul>
+  
+  <p>You'll notice that when you hover your mouse over the image there's a button which opens a menu that allows you to save images to a public gallery (for your generator), and to display said gallery. You can set the title and description that a gallery image will be saved with like this:</p>
+<pre>
+promptData
+  prompt = ...
+  saveTitle = ...
+  saveDescription = ...
+</pre>
+  <p>If you don't set a <code>saveTitle</code> and <code>saveDescription</code>, then by default the title will be the part of the prompt that comes before the first full-stop/comma/question-mark/exclamation-mark, and the description will be the whole prompt.</p>
+  
+  <p>After an image has finished generating, if you mouseover it, you'll notice some buttons. One of the buttons opens a menu which shows a button to download the image, and to save to a gallery, or to open the gallery. You can hide the gallery buttons like this:</p>
+<pre>
+promptData
+  prompt = ...
+  hideGalleryButtons = true
+</pre>
+
+  <h2 style="margin-top:3rem;">Gallery Options</h2>
+  <p>If you'd like to display the gallery on your page, rather than users having to click the button to open it, you can use "special" options list with the <code>gallery</code> property like this:</p>
+<pre>
+galleryOptions
+  gallery = true
+  sort = top <span style="opacity:0.5">// or 'recent' or 'trending'</span>
+  timeRange = 1-week
+  hideIfScoreIsBelow = -2 <span style="opacity:0.5">// images will be removed if they get down-voted to a score below -2</span>
+  adaptiveHeight = true <span style="opacity:0.5">// expand height to fit all images (so there's no scrollbar on the gallery)</span>
+  style = ... <span style="opacity:0.5">// optional CSS styles (you can delete this line)</span>
+  customButton = ... <span style="opacity:0.5">// see below for details</span>
+  customButton2 = ... <span style="opacity:0.5">// see below for details</span>
+  defaultGalleryNames = characters,memes,chat <span style="opacity:0.5">// clickable gallery names displayed by default</span>
+</pre>
+  <p>And then just put this in your HTML editor (bottom-right editor):</p>
+<pre>
+\[image(galleryOptions)\]
+</pre>
+  <p>The valid values for <code>timeRange</code> are: <code>1-day</code>, <code>3-day</code>, <code>1-week</code>, <code>1-month</code>, <code>1-year</code>, <code>all-time</code>. <a href="https://perchance.org/text-to-image-plugin-gallery-example#edit" target="_blank">Here's an example generator</a> that displays the gallery.</p>
+  
+  <h2 style="margin-top:3rem;">Gallery Moderation</h2>
+  <p>You can ban users and prompt phrases from the gallery using the <b>bannedUsers</b>, <b>bannedPromptPhrases</b>, and <b>bannedNegativePromptPhrases</b> options. Have a look at <a href="https://perchance.org/text-to-image-gallery-moderation-example#edit" target="_blank">this example</a> to see these features in action.</p>
+<pre>
+galleryOptions
+  gallery = true
+  <span style="opacity:0.5">// ...</span>
+  bannedUsers <span style="opacity:0.5">// click the settings button at the top of the gallery and type "admin" to toggle admin mode on, then double-click on an image to get the user ID of the creator.</span>
+    263efb15c47c2d2f398e91bf169f50d4a0ca69251638c9d0eb5823c0e4fba538
+    f50d4a0ca69251638c9d0eb5823c0e4fba538263efb15c47c2d2f398e91bf169
+  bannedPromptPhrases
+    pg13:blood <span style="opacity:0.5">// ban the word 'blood' in pg13 mode</span>
+    /twin.?towers?/ <span style="opacity:0.5">// example of 'regex'-based pattern matching to ban 'twin towers' or 'twin-tower' or 'twin_towers', and so on</span>
+    pg13:/\b(gore|blood)\b/i <span style="opacity:0.5">// another example of 'regex'-based pattern matching - uses word boundaries and case-insensitive matching</span>
+  bannedNegativePromptPhrases
+    pg13:wearing clothes <span style="opacity:0.5">// ban the word 'wearing clothes' in the *negative* prompt when in pg13 mode</span>
+</pre>
+  <p>You can click the settings button at the top of the gallery and type "admin" to toggle on "admin mode". This will show images that contain banned phrases with a red border instead of hiding them (useful for debugging regexes and ensuring that your ban lists aren't banning harmless prompts), and you can double-click on any image to get the user ID of the creator. Again, look at <a href="https://perchance.org/text-to-image-gallery-moderation-example#edit" target="_blank">this example</a>, for an example of these moderation features.</p>
+
+  <h2 style="margin-top:3rem;">Custom Buttons in Gallery</h2>
+  <p>You can add a custom button to each gallery image, and when the user clicks it, you can run some code based on that:</p>
+<pre>
+galleryOptions
+  gallery = true
+  customButton
+    emoji = ⭐
+    onClick(data) =>
+      <span style="opacity:0.5">// This code runs when the user clicks on the custom button.</span>
+      <span style="opacity:0.5">// The 'data' variable includes information about the image they clicked your custom button on: data.imageId, data.imageUrl, data.userId, data.isNsfw, data.prompt, data.negativePrompt, data.guidanceScale, data.seed, data.galleryName</span>
+      console.log(data);
+</pre>
+  <p><a href="https://perchance.org/text-to-image-gallery-custom-button-example#edit" target="_blank">Here's an example</a> of a custom button that shows a fullscreen version of the image when the custom button is clicked.</p>
+  <p>You can create two different custom buttons: <code>customButton</code> and <code>customButton2</code>. <a href="https://perchance.org/text-to-image-gallery-custom-button2-example#edit" target="_blank">See this page</a> for an example that uses <code>customButton2</code> to add a comments box for each image in the gallery. If you need more buttons, then you could make one of the buttons show a popup menu which contains a list of actions the user can take for that image.</p>
+  
+  <h2 style="margin-top:3rem;">Advanced Usage</h2>
+  <p>If you know JavaScript, then here's some code demonstrating how to use this plugin in your functions:</p>
+<pre>
+async start() =>
+  let result = await image(\{prompt:"a cute mouse"\});
+  document.body.append(result.canvas);
+  imageEl.src = result.dataUrl;
+  console.log("prompt used:", result.inputs.prompt);
+  console.log("all inputs used:", result.inputs);
+</pre>
+  <p><a href="https://perchance.org/text-to-image-plugin-programmatic-example#edit" target="_blank">Here's an example</a> of the above code. Also check <a href="https://perchance.org/text-to-image-canvas-simple-example#edit" target="_blank">this example</a>.</p>
+  <p>Also, here's a <b>simplified</b> version of the above example:</p>
+<pre>
+async start() =>
+  imageEl.src = await image("a cute mouse");
+</pre>
+  <p>And here's an example showing how you can put options in the second argument if the first one is a string, and this also shows the <code>removeBackground</code> option:</p>
+<pre>
+imageEl.src = await image("a cute mouse", \{resolution: "512x768", removeBackground:true\});
+</pre>
+  <p>This works because if we pass plain text into the plugin, it interprets it as the <code>prompt</code>. Also, the resulting 'object' returned by the plugin is always a <code>String</code> object with some extra properties added (i.e. <code>canvas</code>, <code>dataUrl</code>, <code>iframe</code>), so you can write <code>imageEl.src=result</code> instead of <code>imageEl.src=result.dataUrl</code>. They're the same.</p>
+  <p>Also, the iframe has a property <code>iframe.textToImagePluginOutput</code> which is added after the generation is finished, and you can use that to access the image either as a HTML5 canvas or as a Data URL:</p>
+<pre>
+iframe.textToImagePluginOutput.canvas
+iframe.textToImagePluginOutput.dataUrl
+iframe.textToImagePluginOutput.inputs.prompt
+iframe.textToImagePluginOutput.inputs.negativePrompt
+iframe.textToImagePluginOutput.inputs.seed
+...
+</pre>
+	<p><b>Notes:</b></p>
+	<ul>
+		<li>You can use <a href="https://perchance.org/text-to-image-plugin-example#edit" target="_blank">this example</a> to get started. And <a href="https://perchance.org/text-to-image-plugin-example-2#edit" target="_blank">here's another</a> that hides the irrelevant parts of the prompt from the user.</li>
+		<li>Images are <b>not</b> stored on the server unless the user explicitely saves them to the gallery - see <a href="https://lemmy.world/comment/5709061" target="_blank">this post</a> for more info.</li>
+		<li>If you want to programmatically get the actual image data that is generated - so e.g. you can draw some text on it, or make it greyscale, or collage multiple images together, or whatever, check out <a href="https://perchance.org/text-to-image-canvas-simple-example#edit" target="_blank">this example</a>.</li>
+		<li>The quality of the output image can change <b>dramatically</b> depending on the wording in your prompt. You can use a generator <a href="https://perchance.org/ai-text-to-image-generator" target="_blank">like this</a> to play around with your prompt design (click the info icon on the output images to see the full prompt used).</li>
+    <li>You can call the <code>promptData</code> list whatever you want. If your settings list was called <code>promptSettings</code> then you'd write <code>\[image(promptSettings)\]</code> to generate the output image. You can have many prompt-settings lists in one generator.</li>
+    <li>The <code>seed</code> parameter should be any number like 3834329 or 9278236492. A <code>seed</code> of -1 is default and means "choose a random seed for me". If you provide the same seed with the same prompt, it should generate a very similar picture (ideally the same, but not always exact due to GPU hardware technicalities). But <b>note</b>: I'll be upgrading the machine learning models that power this as new ones are released, and during the upgrades, the image that a seed+prompt combination "refers to" will change.</li>
+    <li>If a seed of -1 is used (which again, is default), then an icon will appear (when you hover over the image) to allow you to try generating it again to get a different result. If you want to add your own "try again" button that just regenerates the image and nothing else, then add <code>id=yourImageId</code> to your <code>promptData</code> list and then use this code to create your "try again" button: <code>&lt;button onclick="yourImageId.reload()"&gt;try again&lt;/button&gt;</code>. <a href="https://perchance.org/text-to-image-custom-reload-button-example#edit" target="_blank">Here's an example generator</a> that does that.</li>
+    <li>The model <b>can return NSFW/adult-themed results</b> if prompted with NSFW/adult-themed terms. <b>Treat this like a Google image search</b>, and prompt responsibly. You can add terms like "NSFW" and "nudity" to the <code>negativePrompt</code> option as a way to reduce the probability that you'll get accidental NSFW results. May also want to add "fully clothed" to the <code>prompt</code> in some cases.</li>
+    <li>Each user can only have a few concurrent server requests, so if you have lots of images on one page, they'll queue up.</li>
+    <li>The 19th day of every month is observed as 'Ad-viewer Appreciation Day' in the Perchance community. On this day we pay our respects to the non-logged-in users who fund the GPU servers by viewing ads on generators that import AI-based plugins. Logged-in users are encouraged to spare a moment for these anonymous benefactors, wishing for them a month of relevant and interesting ads, and thanking them for their tolerance of increased browser tab memory usage, and their indirect but valuable contribution to the Perchance community via the digital attention economy. May their mobile game ads not be too sus, and may the gameplay reflect the real gameplay even if only abstractly 🕯️</li>
+		<li>Check out more plugins at <a href="/plugins">perchance.org/plugins</a></li>
+	</ul>
+  <p>As some inspiration, here are some images produced using the prompt "<i>fantasy \[thing\], extremely detailed oil painting, unreal 5 render, rhads, bruce pennington, studio ghibli, tim hildebrandt, digital art, octane render, beautiful composition, trending on artstation, award-winning photograph, masterpiece</i>":</p>
+  <img src="https://i.imgur.com/YNcf0Hj.jpg" style="max-width:100%;"/>
+</main>
+<p style="text-align:center; font-size:200%; opacity:0.2; margin-top:0.5em;"><span>⚄&#xFE0E;</span></p>
+<br><br><br>
+
+<style>
+  html { color-scheme: dark light }
+  main {
+    text-align:left;
+		max-width:900px;
+		margin:0 auto;
+		background: #fff;
+		background: light-dark(#fff, #101010);
+		padding:1em;
+		border-radius:3px;
+		box-shadow: 0 0.5px 0 0 #ffffff inset, 0 1px 2px 0 #B3B3B3;
+		box-shadow: 0 0.5px 0 0 light-dark(#fff, #060606) inset, 0 1px 2px 0 light-dark(#B3B3B3, #2c2c2c);
+	}
+  ul li {
+		margin-top:0.5em;	
+	}
+	p {
+    line-height: 1.4em;
+  }
+  main p:first-child {
+    margin-top:0;
+  }
+	body {
+		background-color:#f6f6f6;	
+		background-color: light-dark(#f6f6f6, #000);
+    color: black;
+    color: light-dark(black, #d6d6d6);
+	}
+	pre {
+		text-align:left;
+		background: #333;
+    background: light-dark(#333, #212121);
+    color: #e2e2e2;
+    padding: 1em;
+    border-radius: 2px;
+		tab-size: 2;
+		-moz-tab-size: 2;
+		-o-tab-size: 2;
+		-webkit-tab-size: 2;
+	}
+	code {
+		background: #eff0f1;
+    background:  light-dark(#eff0f1, #272727);
+    padding: 1px 5px;	
+		white-space: nowrap;
+	}
+</style>
+

@@ -1,0 +1,24 @@
+$output (list) => 
+  if(!list) return "(error: no list given to consumable-leaf-list-plugin)";
+
+	// get all leaves:
+	// general strategy is to add all first level items to the leaves array, then
+	// go through and replace the ones that aren't actually leaves (i.e. have children)
+	// with their children, and then go through those and do the same thing, etc. until
+	// we've got all the leaves.
+	const isLeaf = (node) => Object.keys(node).length === 0;
+	const leaves = [...list.selectAll];
+	for(let i = 0; i < leaves.length; i++) { // note that `leaves` grows during the loop, so it's important that we don't "cache" leaves.length 
+		if(!isLeaf(leaves[i])) {
+			leaves.splice(i, 1, ...leaves[i].selectAll); // it's not actually a leaf, so we replace it with its children
+			i--;
+		}
+	}
+
+  // Make it behave like a list when stringified
+  leaves.toString = function() {
+    if(this.length === 0) return "";
+    return this.selectOne+"";
+  };
+  
+	return leaves;

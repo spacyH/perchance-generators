@@ -1,0 +1,1668 @@
+ai = {import:ai-text-plugin} // the plugin that actually generates the text
+upload = {import:upload-plugin} // for uploading data for share links
+tabbedCommentsPlugin = {import:tabbed-comments-plugin-v1}
+commentsPlugin = {import:comments-plugin} // for feedback button
+fullscreenButton = {import:fullscreen-button-plugin}
+literal = {import:literal-plugin} // this plugin allows people to use square/curly brackets (which are usually special characters in perchance) in their bot/user names, writing instructions, etc. without causing errors
+bugReport = {import:bug-report-plugin} // for comments-plugin-based feedback button - it's a helper for getting browser debug info like browser version, localStorage size limits, etc. - stuff that's relevant to bug reports
+createTextEditor = {import:text-editor-plugin-v1} // a higher-performance version of <textarea> that also supports text styling (e.g. text within asterisks can be italicized)
+
+botName = [botNameEl.value.trim() || "Bot"]
+userName = [userNameEl.value.trim() || "Anon"]  
+
+page 
+  title = AI Chat // you can change this title to whatever you want, and same with everything else here
+  subtitle = (Psst. <a href="https://perchance.org/ai-character-chat" target="_blank" style="font-weight:bold; color:#2bbb00;">Click here</a> if you'd like to try out a different character chat interface.)
+  intro = This is a demonstration of what's possible with Perchance's new <a href="/ai-text-plugin" target="_blank">AI Text Plugin</a>, which complements the <a href="/ai-text-to-image-generator" target="_blank" style="font-weight:bold;">image generation</a> feature. Select an example character above, or manually create one below. You can also try <a href="https://perchance.org/ai-story-generator" target="_blank" style="font-weight:bold;">writing a story</a> or <a href="https://perchance.org/ai-rpg" target="_blank" style="font-weight:bold;">going on an adventure</a> or <a href="https://perchance.org/ai-generated-hierarchical-world" target="_blank" style="font-weight:bold;">exploring a new planet</a>. There's also <a href="https://perchance.org/ai-character-chat" target="_blank" style="font-weight:bold; color:#2bbb00;">a chat interface with image generation</a>.
+
+
+
+// You can edit the instructions below and then click the save button to create your own AI Chat page with custom instructions. 
+// Note that we tell it to write the next 10 messages, but we stop it (using newline as one of the stopSequences) after the first one. This is just a little trick we play on the AI to reduce the chance of it trying to "wrap up" the story.
+instruction
+  $output = [this.joinItems("\n")] // between [literal(botName)] and [literal(userName)]. 
+  Please write the next 10 messages for the following chat/RP. Most messages should be a medium-length paragraph, including thoughts, actions, and dialogue. Create an engaging, captivating, and genuinely fascinating story. So good that you can't stop reading. Use a natural, unpretentious writing style. //, descriptive passages that paint a vivid, evocative, and captivating scene right into the reader's mind.
+  [""]
+  # Reminders:
+  - Some of [literal(userName)]'s messages are written by the user. Consider where the user is trying to lead the roleplay, and deeply intuit the story arc that the user is hinting toward with their actions. You should aim to write exactly the sort of story that they want to read.
+  - You can use *asterisks* to start and end actions and/or thoughts in typical roleplay style. Most messages should be detailed and descriptive, including dialogue, actions, and thoughts. Utilize all five senses for character experiences.
+  - This story never ends. You must keep the story going forever. Drive the story forward, introducing new arcs and events when narratively appropriate. // Introduce both external and internal conflicts to drive the story forward and keep things interesting and dynamic. Escalate tensions gradually, creating a sense of anticipation.
+  - Default to a positive, warm, good-natured tone between characters that are friends. AVOID excessive and unnecessary aggression/snark/irritability.
+  - Aim for superb narrative pacing, and deep worldbuilding. Reveal the world/characters/plot gradually through character interactions and experiences. Allow the reader to discover its intricacies organically (instead of using exposition dumps).
+  - Each message should be contained within a single paragraph. Add a blank line between each message. Balance moments of tension and relaxation to maintain reader engagement. Vary sentence and paragraph length to control the rhythm of the roleplay, switching from shorter, punchier sentences to longer, more descriptive ones as appropriate to create interesting variation in pace and structure. //[chatLogsEl.value.length < 7000 ? ` Each message should be one medium-sized paragraph. Descriptive, engaging, clean, authentic, and captivating prose.` : ""]
+  - Avoid unnecessary and unoriginal repetition of previous messages.
+  - Bring characters to life by portraying their unique traits, thoughts, emotions, appearances, and speech patterns realistically. Consider the situation, motivations, and potential consequences. Ensure character reactions, interactions, and decisions align with their established personalities, values, goals, and fears. Use subtle gestures, distinctive quirks, and colloquialisms to create enriched, lifelike scenes. Allow characters' motivations and personalities to evolve authentically throughout the story, creating genuine character arcs.
+  // - Aggression, graphic violence, character toxicity, and vulgarity are allowed in scenarios with mature themes. Portray conflict realistically - i.e. without shallow resolutions or excessive positivity bias.
+  - The overall goal is to create a genuinely fascinating and engaging roleplay/story. So good that you can't stop reading. Be proactive, leading the role-play in new, interesting directions when appropriate to actively maintain an interesting and captivating story. Don't try to pull the user back to things that they don't want.
+  - Develop the story in a manner that a skilled author and engaging storyteller would. Craft conversations that reveal character, advance the plot, and feel natural. Use subtext and unique speech patterns to differentiate characters and convey information indirectly.
+  - Narrator messages should be longer than normal messages.
+  // - IMPORTANT: Focus on the present moment, and explore it further. Never rush to finish a scene. Take it slow and explore the present moment with vivid, grounded, and captivating explorations of the current situation. Show, don't tell.
+  [""]
+  # Here's [literal(botName)]'s description/personality:
+  ---
+  <<<BOT_DESCRIPTION_PLACEHOLDER>>>
+  ---
+  [""]
+  # Here's [literal(userName)]'s description/personality:
+  ---
+  <<<USER_DESCRIPTION_PLACEHOLDER>>>
+  ---
+  [""]
+  # Here's the initial scenario and world info:
+  ---
+  <<<SCENARIO_PLACEHOLDER>>>
+  ---
+  [""]
+  # Here's what has happened so far in this roleplay/chat/story:
+  <MESSAGES>
+  <<<CHAT_LOGS_PLACEHOLDER>>>
+  </MESSAGES>
+  ---
+  [""]
+  Your task is to write the next 10 messages in this chat/roleplay between [literal(userName)] and [literal(botName)]. There should be a blank new line between messages.
+  [whatHappensNextEl.value.trim() ? `\nIMPORTANT: Rougly speaking, the reader wants this to happen next (you can ignore this if it has already happened): "${literal(whatHappensNextEl.value.trim().replace(/\n+/g, ". "))}" You MUST creatively interpret these instructions (not repeat verbatim). Let it play out naturally.` : "@eraseableLine"]
+  [writingInstructionsEl.value.trim() ? `\n# General Writing Instructions: "`+literal(writingInstructionsEl.value.trim().replace(/\n+/g, ". "))+`"` : "@eraseableLine"]
+  <<<EXTRA_DYNAMIC_FINAL_INSTRUCTIONS>>>
+  Write the next 10 messages. Most messages should be a medium-length paragraph, including thoughts, actions, and dialogue. // - remember to make them interesting, authentic, descriptive, natural, engaging, and creative.
+
+
+
+scenarioGenerationPrompt
+  I'm going to get you to write a creative, interesting chat/roleplay scenario using the following keywords/prompt/ideas as inspiration: [window.scenarioInspiration || "(None provided. Just be creative!)"]
+  The scenario should be based on these two characters:
+  # Character 1: [literal(botNameEl.value.trim())]
+  [literal(botDescriptionEl.value.trim().replaceAll("{{user}}", userName).replaceAll("{{char}}", botName))]
+  \n
+  # Character 2: [literal(userNameEl.value.trim())]
+  [literal(userDescriptionEl.value.trim().replaceAll("{{user}}", userName).replaceAll("{{char}}", botName))]
+  \n
+  Your task is to write an interesting, creative, engaging chat/roleplay scenario between the above two characters. As mentioned above, it should be based on these keywords/ideas/topics/instructions: [window.scenarioInspiration || "(None provided. Just be creative!)"]
+  The scenario should be a single SHORT paragraph that sets up the beginning of the chat/roleplay so it goes in an interesting and fun direction.
+  Be creative! Just provide a one-paragraph "spark" to get the chat/roleplay going.
+  $output = [this.joinItems("\n")]
+  
+
+
+
+charactersAndScenarioGenerationPrompt
+  Your task is to come up with an interesting and captivating chat/RP scenario with two characters. Ensure that what you write is subtle, authentic, interesting, descriptive, and something that the roleplay participants will have a lot of fun with. Avoid boring cliches.{| When possible, AVOID cliche character names like Luna, Lila, Orion, Elara, Raven, Evelyn, Castellanos, Whisper, Marquez, Leo, Alejandro, etc. - these are tacky and overused.^4}
+  ##introInspirationPlaceholder##
+  [""]
+  You must use this EXACT template for your response:
+  ---
+  CHARACTER 1 NAME: (name of *first* character mentioned in above instructions)
+  CHARACTER 1 DESCRIPTION: (a one-paragraph backstory, description, personality, idiosyncrasies/mannerisms, etc. of the *first* character)
+  CHARACTER 2 NAME: (the second character's given name or nickname)
+  CHARACTER 2 DESCRIPTION: (a one-paragraph backstory, description, personality, idiosyncrasies/mannerisms, etc. of the second character)
+  STARTING SCENARIO: (a short one-paragraph roleplay starter - i.e. a starting scenario for the above two characters that is interesting, creative and engaging. This paragraph is the "spark" to get the chat/roleplay going - i.e. it "sets the scene".)
+  GENRE: (the genre of the story/roleplay) // not actually used - added so we have an easy stop sequence
+  ---
+  Follow the above template EXACTLY, replacing the parentheticals with actual content.
+  ##outroInspirationPlaceholder##
+  $output = [this.joinItems("\n")]
+  
+  
+
+getLastMessage() =>
+  let lastMessage = chatLogsEl.value.trim().split(/\n{2,}/).pop();
+  let name = lastMessage?.split(":")[0].trim();
+  let content = lastMessage?.split(":").slice(1).join(":").trim();
+  if(name.length > 50 && content === "") {
+    // it's probably a "narration" paragraph without the "Narrator:" at the start
+    content = name;
+    name = "Narrator:";
+  }
+  return {name, content};
+
+lastMessageIsEmpty() =>
+  return getLastMessage().content === "";
+
+getNextTurnName() =>
+  if(chatLogsEl.value.trim() === "") {
+    return botName;
+  }
+  // we need to work out who's turn it is next, so we can set the startWith to "<name>: " where <name> is the character who is going to speak next.
+  let {name, content} = getLastMessage();
+  if(content === "") {
+    return name; // if the message content is empty, then we assume the user wants to generate a message with that name
+  } else {
+    let nextName;
+    if(name === botName) { nextName = userName; } else { nextName = botName; }
+    return nextName;
+  }
+
+numMessagesToPutInStartWith = 2
+
+getStarterText(opts) =>
+  if(!opts) opts = {};
+  // We make the AI start with the last `numMessagesToPutInStartWith` messages, rather than putting all the messages in the instruction. I think this might make the AI less likely to repeat the last message since it can more easily "see" what it just wrote.
+  let lastFewMessagesArr = chatLogsEl.value.trim().split(/\n{2,}/).filter(m => !/^SUMMARY\^[0-9]+:/.test(m.trim())).slice(-numMessagesToPutInStartWith);
+  
+  //// EDIT: Disabling this for now since it seems to confuse the new LLM. These are already at the bottom of the instruction anyway - new LLM should be smart enough to follow them.
+  // if(opts.nextMessageDraftOrInstruction || whatHappensNextEl.value.trim()) {
+  //   // Add the writing instructions and related stuff if they have specified that:
+  //   let haveAddedOOC = false;
+  //   let lastMessage = lastFewMessagesArr.pop();
+  //   // if(writingInstructionsEl.value.trim() || whatHappensNextEl.value.trim()) {
+  //   if(whatHappensNextEl.value.trim()) {
+  //     let message = "";
+  //     if(whatHappensNextEl.value.trim()) message = `Here's what will happen in the next message: ${whatHappensNextEl.value.trim().replace(/\n+/g, ". ")}`;
+  //     // if(writingInstructionsEl.value.trim()) message += `${message ? " And " : ""}I'm going to keep this writing instruction in mind as I write: "${writingInstructionsEl.value.trim().replace(/\n+/g, ". ")}"`
+  //     lastFewMessagesArr.push(`(OOC: ${message})`);
+  //     haveAddedOOC = true;
+  //   }
+  //   if(opts.nextMessageDraftOrInstruction) {
+  //     lastFewMessagesArr.push(`(OOC: ${haveAddedOOC ? "Also, note" : "Note"} the next message will creatively interpret this idea: "${opts.nextMessageDraftOrInstruction.replace(/\n+/g, " ").replace(/"/g, "'")}")`);
+  //     haveAddedOOC = true;
+  //   }
+  //   lastFewMessagesArr.push(lastMessage);
+  // }
+  
+  let lastFewMessagesText = lastFewMessagesArr.join("\n\n").trim();
+  if(opts.continueMode) {
+    return lastFewMessagesText.trim();
+  } else if(lastMessageIsEmpty()) {
+    return lastFewMessagesText.trim(); // if last message is empty, then we already have the "\n\n<name>:" part, so we don't need to add it
+  } else {
+    return lastFewMessagesText.trim() + "\n\n" + getNextTurnName() + ":";
+  }
+  
+updateVisibilityOfReplyButtonsAndSelectors() =>
+  if(inputEl.value.trim() === "") {
+    sendAsCharacterCtn.hidden = true;
+    autoRespondCtn.hidden = true;
+    quickReplyButtonsCtn.hidden = false;
+  } else {
+    sendAsCharacterCtn.hidden = false;
+    quickReplyButtonsCtn.hidden = true;
+    if(autoImproveCheckboxEl.checked) {
+      autoRespondCtn.hidden = true;
+    } else {
+      autoRespondCtn.hidden = false;
+    }
+  }
+
+async handleSendButtonClick(opts) =>
+  if(opts && opts.mode === "continue") {
+    window.mostRecentChatLogEditWasAContinuationGeneration = true;
+    window.mostRecentGenerationContinuationChatLogContextText = chatLogsEl.value;
+  } else {
+    // we also set this to false if user manually inputs text into chatlogs (ctrl+f for this variable in HTML panel)
+    window.mostRecentChatLogEditWasAContinuationGeneration = false;
+  }
+  
+  chatLogsEl.value = chatLogsEl.value.trim();
+  
+  try { injectSummariesAndComputeNextSummariesInBackgroundIfNeeded(); } catch(e) { console.error(e); }
+  
+  rateLastMessageBadBtn.disabled = true;
+  rateLastMessageGoodBtn.disabled = true;
+  rateLastMessageBadBtn.style.opacity = 1;
+  rateLastMessageGoodBtn.style.opacity = 1;
+  
+  let generatedTextAndThereWereNoErrors = false;
+  try {
+    chatLogsEl.value = chatLogsEl.value.replace(/\n{2,}/g, "\n\n"); // ensure exactly 2 newlines between all messages
+    let nextMessageDraftOrInstruction = null;
+    
+    // if the input box contains some text, then they have explicitely selected a character to reply with, so we need to remove any 'empty' messages from the end of the chat
+    if(inputEl.value.trim() !== "" && opts.mode === "normal") {
+      let i = 0;
+      while(chatLogsEl.value.trim() !== "" && lastMessageIsEmpty()) {
+        if(chatLogsEl.value.trim().slice(-1) !== ":") {
+          break; // just an extra safety guard to prevent deleting non-empty messages
+        }
+        chatLogsEl.value = chatLogsEl.value.split(/\n{2,}/).slice(0, -1).join("\n\n");
+        if(i++ > 10000) return alert("There was an error in the code. Please report this error in the feedback box with error code '243'.");
+      }
+    }
+    
+    window.nextMessageDraftOrInstruction_prevMessage = null;
+
+    if(opts.mode === "normal" || opts.mode === "regen") {
+      // if they're in auto-improve mode, then inputEl actually contains the "instruction" or "draft" for the next message, not the message itself
+      if(autoImproveCheckboxEl.checked && inputEl.value.trim() !== "") {
+        nextMessageDraftOrInstruction = inputEl.value.trim();
+        inputEl.value = "";
+        window.previousAutoImproveMessageInput = nextMessageDraftOrInstruction;
+        if(!chatLogsEl.value.endsWith(sendAsCharacterSelectEl.value+":")) {
+          chatLogsEl.value += '\n\n'+sendAsCharacterSelectEl.value+':';
+        }
+        updateVisibilityOfReplyButtonsAndSelectors();
+        window.nextMessageDraftOrInstruction_prevMessage = nextMessageDraftOrInstruction;
+      }
+    }
+    
+    if(opts.mode === "normal") {
+      // if there's some text in the input box, we add that text to the chat logs with the user character's name at the start
+      if(inputEl.value.trim() !== "") {
+        if(chatLogsEl.value.trim() !== "") chatLogsEl.value += "\n\n";
+        chatLogsEl.value += (sendAsCharacterSelectEl.value || userName)+": "+inputEl.value.trim();
+        
+        chatLogsEl.scrollTop = chatLogsEl.scrollHeight;
+        inputEl.value = ""; // we don't set localStorage.input="" yet - in case e.g. page reloads mid generation
+        
+        // inputEl is now empty, so we appropriately adjust visible reply buttons/selectors:
+        updateVisibilityOfReplyButtonsAndSelectors();
+        
+        if(!autoRespondCheckboxEl.checked) {
+          return; // no response needed - user wants to e.g. manually use quick reply buttons to choose responding character
+        }
+      }
+
+      if(chatLogsEl.value.trim() === "") {
+        chatLogsEl.value += getNextTurnName() + ":";
+      }
+      
+      if(!lastMessageIsEmpty()) {
+        chatLogsEl.value += "\n\n" + getNextTurnName() + ":"; // add two new lines and the name of the person speaking next, ready for the response that the AI is about to write into the chat logs
+      }
+    }
+    
+    chatLogsEl.scrollTop = chatLogsEl.scrollHeight;
+    
+    continueTextBtn.disabled = true;
+    continueTextBtn.hidden = true;
+    continueTextBtn.style.visibility = 'hidden'; // can't *only* use `display` because that's controlled independently by the caret/focus tracking code.
+    sendMessageBtn.disabled = true;
+    regenMessageBtn.disabled = true;
+    deleteLastMessageBtn.disabled = true;
+    quickReplyButtonsCtn.querySelectorAll("button").forEach(el => el.disabled=true);
+    undoDeleteLastMessageCtn.hidden = true;
+
+    // note: if this `handleSendButtonClick` function is being called by the regen function, then the regen function will re-enable these as needed:
+    regenPrevButton.disabled = true;
+    regenNextButton.disabled = true;
+    
+    // stop button replaces rating buttons during generation:
+    if(rateLastMessageCtn.offsetWidth) {
+      stopGenerationBtn.style.width = rateLastMessageCtn.offsetWidth+"px";
+      stopGenerationCtn.style.marginRight = rateLastMessageCtn.style.marginRight;
+    }
+    rateLastMessageCtn.hidden = true;
+    stopGenerationCtn.hidden = false;
+    
+    let chatLogs;
+    try {
+      // get a version of the message feed with hierarchical summaries swapped in:
+      let messagesWithSummaryReplacements = getMessagesWithSummaryReplacements(chatLogsEl.value);
+      
+      if(messagesWithSummaryReplacements.slice(-8).filter(m => /^SUMMARY\^[0-9]+:/.test(m)).length > 0) {
+        console.error("Summarization is going too close to the end of the chat. Must stay back so LLM doesn't get confused, and so messages-in-startWith trick works.");
+        // debugger;
+      }
+      messagesWithSummaryReplacements = messagesWithSummaryReplacements.map(m => m.replace(/SUMMARY\^[0-9]+:/, "Summary (previous events):").trim());
+
+      // we leave off the last `numMessagesToPutInStartWith` messages, since we'll put them in the `startWith` instead of the `instruction` (I think this might make the AI less likely to repeat itself as the chat gets longer, since if the most recent messages are in the response, then it might be able to more easily "see" what it just wrote)
+      chatLogs = messagesWithSummaryReplacements.slice(0, -numMessagesToPutInStartWith).join("\n\n").trim() || "(No chat messages yet. This is the beginning of the chat.)";
+    } catch(e) {
+      console.error("Falling back to using *all* messages because there was an error while trying to compute messagesWithSummaryReplacements:", e);
+      
+      chatLogs = chatLogsEl.value.trim().split(/\n{2,}/).filter(m => !/^SUMMARY\^[0-9]+:/.test(m.trim())).slice(0, -numMessagesToPutInStartWith).join("\n\n").trim() || "(No chat messages yet. This is the beginning of the chat.)";
+    }
+    
+    chatLogs = chatLogs.replace(/\{\{user\}\}/ig, userName).replace(/\{\{char\}\}/ig, botName);
+    
+    // let newlineStopStr = chatLogsEl.value.length < 1000 ? "\n" : "\n\n"; // <-- for the first few messages, stop at a single newline, to ensure that AI learns the double-newline rule between messages
+    // // BUT for the very first message, we need to show the AI that it shouldn't write e.g. "Narrator:\nOnce upon..." so we need to use \n\n as the stop sequence and then remove the newline:
+    // if(chatLogsEl.value.length < 50) newlineStopStr = "\n\n";
+    
+    // EDIT: commented above out because stopping at "\n" can lead to case where AI "can't reply" during start of chat because it hasn't properly learned not to add a newline after "Name:"
+    // The risk with using just "\n\n" is that the AI writes the whole chat without putting blank lines between messsages, and so just doesn't stop writing.
+    // So we also add character names here to try prevent that.
+    let stopSequences = ["\n\n", `\n${userName}:`, `\n${botName}:`];
+    
+    window.numMessagesGeneratedThisSession = (window.numMessagesGeneratedThisSession || 0) + 1;
+
+    instruction.nextMessageDraftOrInstruction = nextMessageDraftOrInstruction;
+
+    let enableFullNaturalSentencesInstruction = false;
+    let enableLeanIntoReaderDirectionInstruction = false;
+    let continueMode = opts.mode === "continue" || opts.mode === "regen";
+    let renderedStartWith = getStarterText({continueMode, nextMessageDraftOrInstruction}); 
+    // inject the "super important" writing instructions if needed:
+    let startWithMessages = renderedStartWith.split(/\n{2,}/);
+    if(responseLengthCheckboxEl.checked && (Math.random() < 0.3 || window.numMessagesGeneratedThisSession%4 === 0) && chatLogsEl.value.length > 300) { // allow the first couple of messages to be 'natural', and only add it every second message or so, just to prevent "over-instructing" the AI e.g. into longer and longer messages
+      // 'detailed one paragraph' to prevent too-short messages:
+      startWithMessages[startWithMessages.length-1] = startWithMessages[startWithMessages.length-1].replace(":", ` (detailed one-paragraph response):`);
+      renderedStartWith = startWithMessages.join("\n\n");
+    } else if(startWithMessages[0] && startWithMessages[0].length > 100 && [...startWithMessages[0].matchAll(/[—*.]/g)].length / startWithMessages[0].length > 0.05 && (Math.random() < 0.5 || window.numMessagesGeneratedThisSession%2 === 0) && chatLogsEl.value.length > 600) {
+      // 'full natural sentences' to prevent staccato emdash type stuff
+      startWithMessages[startWithMessages.length-1] = startWithMessages[startWithMessages.length-1].replace(":", ` (full, natural, readable sentences, with correct grammar):`);
+      renderedStartWith = startWithMessages.join("\n\n");
+      enableFullNaturalSentencesInstruction = true;
+    } else if((Math.random() < 0.3 || window.numMessagesGeneratedThisSession%3 === 0) && chatLogsEl.value.length > 600) {
+      // lean into reader direction (perhaps sacrificing realism a bit, and risky over-trope-izing the story, so probably shouldn't enable all the time)
+      startWithMessages[startWithMessages.length-1] = startWithMessages[startWithMessages.length-1].replace(":", ` (leaning into reader's desires):`);
+      renderedStartWith = startWithMessages.join("\n\n");
+      enableLeanIntoReaderDirectionInstruction = true;
+    }
+    renderedStartWith = renderedStartWith.replace(/\{\{user\}\}/ig, userName).replace(/\{\{char\}\}/ig, botName);
+
+    let renderedInstruction = instruction.evaluateItem;
+    let botDescription = botDescriptionEl.value.trim() || "(Not specified.)";
+    let userDescription = userDescriptionEl.value.trim() || "(Not specified.)";
+    let scenario = scenarioEl.value.trim() || "(None specified. Freeform.)";
+    renderedInstruction = renderedInstruction.replace("<<<BOT_DESCRIPTION_PLACEHOLDER>>>", botDescription.replace(/\{\{user\}\}/ig, userName).replace(/\{\{char\}\}/ig, botName));
+    renderedInstruction = renderedInstruction.replace("<<<USER_DESCRIPTION_PLACEHOLDER>>>", userDescription.replace(/\{\{user\}\}/ig, userName).replace(/\{\{char\}\}/ig, botName));
+    renderedInstruction = renderedInstruction.replace("<<<SCENARIO_PLACEHOLDER>>>", scenario.replace(/\{\{user\}\}/ig, userName).replace(/\{\{char\}\}/ig, botName));
+    renderedInstruction = renderedInstruction.replace("<<<CHAT_LOGS_PLACEHOLDER>>>", chatLogs);
+    let dynamicFinalInstructionsArr = [];
+    if(enableFullNaturalSentencesInstruction) dynamicFinalInstructionsArr.push(`# Use Full Natural Sentences: For one of the messages, pay particular attention to writing full, natural, pleasantly readable sentences, with correct grammar, and leaning into *exactly* what the reader *deeply* wants to happen next. You can remind yourself in parentheses before the message content.`);
+    if(enableLeanIntoReaderDirectionInstruction) dynamicFinalInstructionsArr.push(`# Make the Reader Happy: For one of the messages, pay particular attention to the overall arch of the story that would satisfy the reader, by leaning into *exactly* what the reader *deeply* wants to happen next. You can remind yourself in parentheses before the message content like "<name> (leaning into reader's desires): <message content>". If the current scene is slice-of-life, then don't derail it. Just let things play out naturally in a way that deeply satisfies the reader.`);
+    if(nextMessageDraftOrInstruction) dynamicFinalInstructionsArr.push(`IMPORTANT: Message #${startWithMessages.length} MUST be based on this idea/instruction: `+literal(nextMessageDraftOrInstruction).replace(/\n+/g, ". "));
+    renderedInstruction = renderedInstruction.replace("<<<EXTRA_DYNAMIC_FINAL_INSTRUCTIONS>>>", dynamicFinalInstructionsArr.length > 0 ? "\n"+dynamicFinalInstructionsArr.join("\n\n")+"\n" : "");
+    renderedInstruction = renderedInstruction.replace(/@eraseableLine\n/g, "");
+    
+    let withheldTrailingNewlines = null; // in case they are the newlines that indicate the end of the message - we prepend them to the next token if there is a next token
+    let gotFirstChunk = false;
+    let pendingObj = ai({
+      instruction: () => {
+        // The reason we construct this with a function rather than just putting it all in the actual `instruction` list is kind of technical - it's because we don't want to evaluate square/curly blocks that happen to be in the chat logs, scenario, or character descriptions
+        // EDIT: Now that we have the `literal-plugin`, we don't really need to do this, but it's fine.
+        return renderedInstruction;
+      },
+      startWith: () => {
+        return renderedStartWith;
+      },
+      stopSequences, 
+      onChunk: (data) => {
+        if(data.isFromStartWith) {
+          // onChunk gives us all chunks of the AI's response, including the startWith text that we specified, so we skip that text - we only want to output the stuff that the AI actually wrote into the chat logs
+        } else {
+          let textChunk = data.textChunk;
+          if(!gotFirstChunk) {
+            if(/(^|\n\n).{0,100}: ?$/.test(chatLogsEl.value)) { // if this is a normal "\n\nCharName:" prefixed generation, then remove an newlines that the AI adds to the start of the message
+              textChunk = textChunk.replace(/^\n+/, " "); // replace it with a space else we get e.g. "Narrator:Once upon..."
+            }
+          }
+          gotFirstChunk = true;
+          
+          // withhold trailing newlines and add them back to the next chunk (if it turns out they're not the end-of-message newlines)
+          if(withheldTrailingNewlines) {
+            textChunk = withheldTrailingNewlines+textChunk;
+            withheldTrailingNewlines = null;
+          }
+          if(textChunk.endsWith("\n\n")) {
+            withheldTrailingNewlines = "\n\n";
+            textChunk = textChunk.slice(0, -2);
+          } else if(textChunk.endsWith("\n")) {
+            withheldTrailingNewlines = "\n";
+            textChunk = textChunk.slice(0, -1);
+          }
+          
+          chatLogsEl.appendText(textChunk);
+          
+          if(chatLogsEl.scrollTop > (chatLogsEl.scrollHeight - chatLogsEl.offsetHeight)-65) { // <-- if the text box is already scrolled near the end of the text
+            antiAntiLayoutJank(() => chatLogsEl.scrollTop = chatLogsEl.scrollHeight);
+          }
+        }
+      },
+    });
+    loaderEl.innerHTML = pendingObj.loadingIndicatorHtml; 
+    
+    window.lastMessagePendingObj = pendingObj;
+    
+    stopGenerationBtn.onclick = function() {
+      pendingObj.stop();
+    };
+
+    setTimeout(() => {
+      chatLogsEl.scrollTop = chatLogsEl.scrollHeight; // <-- scroll to the bottom of the chat logs
+    }, 50); // we do it 50ms after they click send, so that we scroll down *after* the character's name has been added. EDIT: wait, but we add the name above? I think this is old code - probably not needed anymore.
+    
+    let data = await pendingObj;
+    if(data.stopReason !== "error") generatedTextAndThereWereNoErrors = true;
+    // we're not actually using this data, but I do want to await the promise anyway, since other functions currently expect `await handleSendButtonClick()` to resolve when generation is finished
+  } catch(e) {
+    console.error(e);
+  }
+  
+  // Note that rateLastMessageCtn is displayed by the updateLastMessageButtonsDisplayIfNeeded, below (since it's only displayed if localStorage.sendCount is high enough).
+  stopGenerationCtn.hidden = true;
+
+  continueTextBtn.disabled = false;
+  continueTextBtn.style.visibility = 'visible'; // we don't also set display='' here because the tracking code will make it visible when needed
+  sendMessageBtn.disabled = false;
+  regenMessageBtn.disabled = false;
+  deleteLastMessageBtn.disabled = false;
+  quickReplyButtonsCtn.querySelectorAll("button").forEach(el => el.disabled=false);
+  
+  if(generatedTextAndThereWereNoErrors) {
+    setTimeout(() => { // delay it a bit to prevent accidental clicks, since it swaps out with stop button
+      rateLastMessageBadBtn.disabled = false;
+      rateLastMessageGoodBtn.disabled = false;
+    }, 2500);
+  }
+
+  loaderEl.innerHTML = ""; // clear the loading indicator
+  antiAntiLayoutJank(() => chatLogsEl.value=chatLogsEl.value.trim());
+  localStorage.chatLogs = chatLogsEl.value; // save chat logs to localStorage so it's still there even if the page is reloaded
+
+  chatLogsDeleteBtn.hidden = false;
+  deleteAndRegenLastMessageCtn.style.display = 'flex';
+  updateCharacterNameViews();
+  
+  localStorage.input = inputEl.value;
+
+  if(localStorage.sendCount === undefined || isNaN(Number(localStorage.sendCount))) localStorage.sendCount = "0";
+  localStorage.sendCount = Number(localStorage.sendCount) + 1;
+  triggerTipIfNeeded();
+  updateLastMessageButtonsDisplayIfNeeded();
+
+  let sendCount = Number(localStorage.sendCount);
+  if(sendCount > 0 && sendCount%100 === 0) hidePageIntroBtn.click();
+
+
+getMessagesWithSummaryReplacements(text, opts) =>
+  if(!opts) opts = {};
+  const minimumMessageLevel = opts.minimumMessageLevel || 0; // used by the summarization process.
+  
+  let messages = text.split(/\n{2,}/).map(m => m.trim()).filter(m => m);
+  let messagesWithSummaryReplacements = [];
+  let highestLevelSeen = 0;
+  
+  // it's we go backwards through the messages, and only 'collect' a message if its level is not below the highest level we've seen so far. it makes sense if you think about it for a bit.
+  // said another way, we go from the end of the messages to the start while 'monotonically climbing' up a level whenever we hit a 'higher' message.
+  while(messages.length > 0) {
+    let m = messages.pop();
+    let level = Number((m.match(/SUMMARY\^([0-9]+):/)||[])[1] || 0);
+    if(level < minimumMessageLevel) continue;
+    if(level >= highestLevelSeen) {
+      messagesWithSummaryReplacements.unshift(m);
+      highestLevelSeen = level;
+    }
+  }
+  return messagesWithSummaryReplacements;
+
+summaryPromptInstruction
+  Your task is to generate some text for a chat/roleplay/story/narration and then a 'SUMMARY' of that text, and then do that a few more times. Below is the story overview, and a summary of earlier events. You must write the text, and then a summary of that text that you wrote, and then some more text, and a summary of that new text, and so on. Each summary should be a single paragraph of text which summarizes the important details from the preceding text to roughly half its original size.
+  Use this format/template for your response:
+  ```
+  >>> FULL TEXT of \[A\]: <story/narration/chat text>
+  >>> SUMMARY of \[A\]: <a one-paragraph summary of the full \[A\] text>
+  ---
+  >>> FULL TEXT of \[B\]: <story/narration/chat text>
+  >>> SUMMARY of \[B\]: <a one-paragraph summary of the full \[B\] text>
+  ---
+  >>> FULL TEXT of \[C\]: <story/narration/chat text>
+  >>> SUMMARY of \[C\]: <a one-paragraph summary of the full \[C\] text>
+  ```
+  [""]
+  # [literal(botName)] (Character):
+  [literal((botDescriptionEl.value.trim().replace(/\n+/g, "\n") || "(Not specified.)").replaceAll("{{user}}", userName).replaceAll("{{char}}", botName))]
+  [""]
+  # [literal(userName)] (Character):
+  [literal((userDescriptionEl.value.trim().replace(/\n+/g, "\n") || "(Not specified.)").replaceAll("{{user}}", userName).replaceAll("{{char}}", botName))]
+  [""]
+  # Initial Scenario & Lore:
+  [literal((scenarioEl.value.trim().replace(/\n+/g, "\n") || "(None specified. Freeform.)").replaceAll("{{user}}", userName).replaceAll("{{char}}", botName))]
+  [""]
+  # Summary of Previous Events:
+  [literal(window.summaryMessagesForInstruction.join("\n"))]
+  [""]
+  ---
+  [""]
+  Again, your task is to write some text labelled with a letter, and then a summary of that text, and then some new text, and then a summary of that new text, and so on. Each summary should be a single paragraph of text which summarizes the new text to roughly half its original length. Don't add flowery prose to summaries. Summary text should contain only the most important information, and should use well-phrased sentences with natural structure and correct grammar.
+  NOTE: Don't append any other commentary/notes in your summaries (e.g. no word counts or commentary after completing the task). Just do the task and then end your response.
+  IMPORTANT: Avoid repetition in summaries! If there are erroneously repeated elements in the full text, then remove or ignore them when writing your well-phrased summary.
+  TIP: In order to ensure the summary is half the length of the full text, you should consider what's actually happening in the story at a "higher level", rather than simply re-stating all the individual facts in a terse form. The summary should be a higher-level explanation of the full text.
+  TIP: Ensure that your summaries use full, natural, readable sentences, with correct grammar. You can optionally remind yourself of this requirement in parentheses before one of the summaries.
+  $output = [this.joinItems("\n")] // joins all of the above lines together
+
+injectSummariesAndComputeNextSummariesInBackgroundIfNeeded() =>
+  if(!window.summariesReadyToInject) window.summariesReadyToInject = [];
+  // inject summaries if we have any:
+  if(window.summariesReadyToInject.length > 0) {
+    // ensure logs are normalized so our message comparison checks work:
+    let allMessagesOriginal = chatLogsEl.value.split(/\n{2,}/g).map(m => m.trim()).filter(m => m);
+    let allMessagesNew = allMessagesOriginal.slice(0);
+    for(let {summarizedMessages, lastMessageSummarizedIndex, summary, level} of window.summariesReadyToInject) {
+      // CAUTION: NO ASYNC ALLOWED HERE. Must all be sync due to temorarily ablation that can happen to chatLogsEl.
+      let lastSummarizedMessage = summarizedMessages[summarizedMessages.length-1];
+      if(allMessagesOriginal[lastMessageSummarizedIndex] === lastSummarizedMessage) {
+        allMessagesNew.splice(lastMessageSummarizedIndex + 1, 0, `SUMMARY^${level}: ${summary}`);
+      } else {
+        console.warn("Content of last-summmarized-message doesn't match content of message at lastMessageSummarizedIndex. Safe to ignore this warning if logs have been edited since last 'send' button click. This summary will simply be discarded and we'll compute a new one with the up-to-date chat logs.");
+      }
+    }
+    chatLogsEl.value = allMessagesNew.join("\n\n");
+    window.summariesReadyToInject = [];
+  }
+  
+  const { countTokens, idealMaxContextTokens } = ai({getMetaObject:true});
+  
+  const contextLengthToIdeallyStayUnder = idealMaxContextTokens*0.88;
+  const numCharsToSummarizeAtATime = 1500; // don't make this bigger without testing - IIRC, the summary calls to the AI could have context too large (causing implicit middle-out ablation) at when the summary hierarchy gets "deep"
+  
+  // must grab chat logs text synchronously, since chatLogsEl can be temporarily ablated during streaming for rendering performance.
+  const chatLogsElText = chatLogsEl.value;
+  const messagesWithSummaryReplacements = getMessagesWithSummaryReplacements(chatLogsElText);
+  
+  let currentlyUsedContextLength = countTokens(messagesWithSummaryReplacements.join("\n\n") + botDescriptionEl.value + userDescriptionEl.value + scenarioEl.value);
+  if(currentlyUsedContextLength < contextLengthToIdeallyStayUnder) {
+    console.log(`Summarization not needed. currentlyUsedContextLength=${currentlyUsedContextLength} which is less than ${contextLengthToIdeallyStayUnder}`);
+    return;
+  }
+      
+  // compute next summary in background if needed:
+  (async function() {
+    if(window.alreadyDoingSummary) return;
+    try {
+      window.alreadyDoingSummary = true;
+      
+      const allMessageObjs = chatLogsElText.split(/\n{2,}/).map(m => m.trim()).filter(m => m).map((text, i) => {
+        return {
+          text, // note that this `text` is trimmed in the `map` above - very important that we do this kind of normalization for summary replacement stuff, since we do actual string-match replacement.
+          index: i,
+          level: Number((text.match(/SUMMARY\^([0-9]+):/)||[])[1] || 0)
+        };
+      });
+      
+      // conceptually we treat each "level" just like the first.
+      // the first level is just a bunch of messages with interspersed "SUMMARY^1: ..." messages, where the summary messages are a summary of the messages before them, up to the *previous* "SUMMARY^1: ..." message.
+      // so for the next level, we just delete/ignore the ^0 messages (i.e. the *actual* messages), and do exactly the same thing - i.e. treat "SUMMARY^1: ..." as if they were "messages" and "SUMMARY^2: ..." are the summaries of those "messages".
+      
+      let summaryLevelToMessageBlocks = new Map();
+      let summaryLevelBeingProcessed = 1;
+      while(1) {
+        // grab messages that are relevant to this 'level' (i.e. only this level and lower one):
+        const thisLevelAndPreviousLevelMessageObjs = allMessageObjs.filter(m => m.level === summaryLevelBeingProcessed || m.level === summaryLevelBeingProcessed-1);
+        
+        if(thisLevelAndPreviousLevelMessageObjs.length === 0) {
+          console.log("Finished creating summaryLevelToMessageBlocks.");
+          break;
+        }
+        
+        // get all summary 'blocks' (i.e. groups of messages ending with a summary message of this `level` that summarizes them, except for final block which doesn't have a summary at the end)
+        const blocks = [];
+        let currentBlock = [];
+        currentBlock.globalMessageIndices = [];
+        for(let m of thisLevelAndPreviousLevelMessageObjs) {
+          currentBlock.push(m.text);
+          currentBlock.globalMessageIndices.push(m.index); // this is for use in determining summary injection/placement
+          if(m.level === summaryLevelBeingProcessed) {
+            blocks.push(currentBlock);
+            currentBlock = [];
+            currentBlock.globalMessageIndices = [];
+          }
+        }
+        if(summaryLevelBeingProcessed === 1 && currentBlock.length === 0) {
+          console.warn("final block for summaryLevel==1 should have messages? if it doesn't, then we're maybe summarizing too close to the end of the chat log?");
+        }
+        blocks.push(currentBlock); // final block doesn't have a summary at the end
+        summaryLevelToMessageBlocks.set(summaryLevelBeingProcessed, blocks);
+        
+        summaryLevelBeingProcessed++;
+      }
+      
+      const summaryLevelBlockEntries = [...summaryLevelToMessageBlocks.entries()].sort((a,b) => a[0]-b[0]); // ascending order
+      for(let [summaryLevel, blocks] of summaryLevelBlockEntries) {
+        
+        // note: a block is just an array of messages, and all of them have a summary message (i.e. higher-level message) at the end EXCEPT the last block - we're in the process of adding that summary message here.
+        // but also note: the block has a globalMessageIndices property which is also an array (see above)
+        let messagesToSummarizeFromFinalBlock = blocks[blocks.length-1];
+        
+        // note that we can use numCharsToSummarizeAtATime here even for the first level without worrying about summarizing too close to the end of the chat because we have a currentlyUsedContextLength check before running this summarization process.
+        let numCharsInFinalBlock = messagesToSummarizeFromFinalBlock.reduce((a,v) => a+v.length, 0);
+        if(numCharsInFinalBlock < numCharsToSummarizeAtATime) { 
+          console.log(`summaryLevel=${summaryLevel} doesn't need summarizing yet. numCharsInFinalBlock=${numCharsInFinalBlock}`);
+          continue;
+        }
+      
+        // remove messages from last block (which contains all messages after the last summary) until it's a good size for summarization:
+        while(1) {
+          if(messagesToSummarizeFromFinalBlock.length <= 2) break;
+          let numChars = messagesToSummarizeFromFinalBlock.reduce((a,v) => a+v.length, 0);
+          if(numChars < numCharsToSummarizeAtATime) break;
+          
+          // to speed things up, drop latter half if it's way too big:
+          if(numChars > numCharsToSummarizeAtATime*10) {
+            let halfOfMessagesCount = Math.floor(messagesToSummarizeFromFinalBlock.length/2);
+            for(let j = 0; j < halfOfMessagesCount; j++) {
+              messagesToSummarizeFromFinalBlock.pop();
+              messagesToSummarizeFromFinalBlock.globalMessageIndices.pop();
+            }
+          } else {
+            messagesToSummarizeFromFinalBlock.pop();
+            messagesToSummarizeFromFinalBlock.globalMessageIndices.pop(); // this is an array of indices aligned with the messages array, for detemining summary injection location
+          }
+        }
+
+        if(messagesToSummarizeFromFinalBlock.length === 0) {
+          console.error("No messages to summarize??");
+          continue;
+        }
+
+        let existingSummary = window.summariesReadyToInject.filter(s => s.summarizedMessages.join("\n\n") === messagesToSummarizeFromFinalBlock.join("\n\n"))[0];
+        if(existingSummary) {
+          console.error("Existing summary hasn't been injected yet?? Should have happened before this code ran.");
+          return;
+        }
+        
+        // Note: It may seem brittle to choose an *index* to inject the summary at, but we also check to ensure the previous message matches.
+        // And if the text has since been edited, that's fine - the summary just gets thrown away and we re-do it next time the send button is clicked.
+        let lastMessageSummarizedIndex = messagesToSummarizeFromFinalBlock.globalMessageIndices[messagesToSummarizeFromFinalBlock.length-1];
+        if(messagesToSummarizeFromFinalBlock.globalMessageIndices.length !== messagesToSummarizeFromFinalBlock.length) { console.error("should be one index per message"); return; }
+        
+        let exampleBlocksForStartWith = blocks.slice(-3, -1);
+        let exampleBlockSummaries = exampleBlocksForStartWith.map(b => b[b.length-1]);
+        
+        // we get all messages for this summary level and above for placement in instruction (i.e. as context to help with summarization):
+        let instructionSummaries = getMessagesWithSummaryReplacements(chatLogsElText, {minimumMessageLevel:summaryLevel});
+        
+        // note that we can't just remove the last two instruction summaries here - they aren't necessarily the same as the summaries from the `exampleBlocksForStartWith` because they may have been 'compressed' into a higher level, so there can actually be no overlap at all.
+        // so we need to pop the instructionSummaries off based on the ones that are actually in the example blocks:
+        while(1) {
+          if(instructionSummaries.length === 0) break;
+          if(exampleBlockSummaries.includes(instructionSummaries[instructionSummaries.length-1])) {
+            instructionSummaries.pop();
+            continue;
+          }
+          break;
+        }
+        instructionSummaries = instructionSummaries.map(m => m.replace(/SUMMARY\^[0-9]+:/, "").trim());
+        
+        let startWithBlocks = exampleBlocksForStartWith.map((block) => ({messages:block.slice(0, -1), summary:block.slice(-1)[0]}));
+        startWithBlocks.push({messages:messagesToSummarizeFromFinalBlock, summary:""});
+        
+        if(messagesToSummarizeFromFinalBlock.join("\n").replaceAll(`SUMMARY^${summaryLevel-1}:`, "").includes("SUMMARY^")) {
+          console.error("Should have only been summaryLevel-1 summaries in messagesToSummarizeText. messagesToSummarizeFromFinalBlock:", messagesToSummarizeFromFinalBlock);
+        }
+        
+        let startWith = startWithBlocks.map(({messages, summary}, blockI) => {
+          let letterLabel = "";
+          if(blockI===0) letterLabel = "[A]";
+          if(blockI===1) letterLabel = "[B]";
+          if(blockI===2) letterLabel = "[C]";
+
+          let messagesText = messages.map((message, mi) => {
+            message = message.replace(`SUMMARY\^${summaryLevel-1}:`, "").replace(`SUMMARY\^${summaryLevel}:`, "").replace(/\n/g, " ").trim();
+            return `${summaryLevel === 1 ? `(${mi+1}) ` : ""}${message}`; // we prefix bottom-level messages with numbers, but not SUMMARY^N messages.
+          }).join(" ");
+          
+          summary = summary.replace(`SUMMARY\^${summaryLevel-1}:`, "").replace(`SUMMARY\^${summaryLevel}:`, "").replace(/\n/g, " ").trim();
+
+          return `>>> FULL TEXT of ${letterLabel}: ${messagesText}\n>>> SUMMARY of ${letterLabel}: ${summary}`;
+        }).join("\n---\n"); // NOTE: This joiner must match the summaryPromptInstruction
+        
+        // since possible for there to be no blocks before the messages to summarize
+        startWith = startWith.trim(); // this is also important to prevent whitespace at end of startWith
+
+        // try to fix 'over-compression' bug (see 'TIP' in instruction):
+        startWith = startWith.trim().slice(0, -1) + " (full, natural, readable sentences with correct grammar):";
+
+        window.summaryMessagesForInstruction = instructionSummaries.length > 0 ? instructionSummaries : ["(None.)"]; // used in summaryPromptInstruction
+        let instruction = root.summaryPromptInstruction.evaluateItem;
+        window.summaryMessagesForInstruction = null;
+
+        let promptOptions = {
+          instruction,
+          startWith,
+          stopSequences: ["\n\n", "\n---", ">>> FULL TEXT", "FULL TEXT"],
+        };
+
+        let data = await root.ai(promptOptions);
+        
+        if(data.stopReason === "error") continue; // could retry a few times, but this is no big deal, since every message sent triggers another attempt
+        
+        let summary = data.generatedText.trim().replace(/\n+/g, " ").trim().replace(/---$/, "").replace(">>> FULL TEXT", "").replace("FULL TEXT", "").trim();
+        if(!summary.trim() || (instructionSummaries[instructionSummaries.length-1] || "").trim() === summary.trim()) {
+          // AI has copied the previous summary or gave blank summary, which sometimes happens.
+          console.warn("AI copied previous summary or gave empty summary. Skipping this summary level for this 'round'. Summary:", summary);
+          continue;
+        }
+
+        // Automatically fix repetition within summaries:
+        if(summary.split(summary.slice(-30)).length > 5) { // detect repetition of the final 30 chars many times, earlier in the text
+          console.warn("Repeition detected within summary. Fixing...");
+          let result = await root.ai({
+            instruction: [
+              `Does the following story summary snippet shown within <story_summary_snippet>...</story_summary_snippet> include erroneous/unnecessary repetition? If so, respond with fixed, repetition-free text within <fixed_story_summary_snippet>...</fixed_story_summary_snippet>. If the text is fine, then just respond with exactly 'no_repetition', and nothing more.`,
+              ``,
+              `<story_summary_snippet>`,
+              `${summary}`,
+              `</story_summary_snippet>`,
+              ``,
+              `Your response should either be 'no_repetition' or start with <fixed_story_summary_snippet> and give the repetition-free summary, and then end with </fixed_story_summary_snippet>. Feel free to just respond with 'no_repetition' if there's no repetition. Don't add any extra commentary.`,
+            ].join("\n"),
+            stopSequences: ["</fixed_story_summary_snippet>"],
+          });
+          if(result.stopReason === "error") continue;
+          let fixedSummary = result.generatedText.match(/<fixed_story_summary_snippet>(.+)<\/fixed_story_summary_snippet>/s)?.[1].trim();
+          console.warn("fixedSummary:", fixedSummary)
+          if(fixedSummary) summary = fixedSummary;
+        }
+        
+        console.log("----------------");
+        console.log("----------------");
+        console.log("----------------");
+        console.log("𝗟𝗘𝗩𝗘𝗟:", summaryLevel);
+        console.log("𝗜𝗡𝗦𝗧𝗥𝗨𝗖𝗧𝗜𝗢𝗡:", instruction);
+        console.log("𝗦𝗧𝗔𝗥𝗧𝗪𝗜𝗧𝗛:", startWith);
+        console.log("𝗦𝗨𝗠𝗠𝗔𝗥𝗬:", summary);
+        console.log("----------------");
+        console.log("----------------");
+        console.log("----------------");
+        
+        window.summariesReadyToInject.push({summarizedMessages:messagesToSummarizeFromFinalBlock, lastMessageSummarizedIndex, summary, level:summaryLevel});
+      }
+    } catch(e) {
+      console.error(e);
+    } finally {
+      window.alreadyDoingSummary = false;
+    }
+  })();
+
+
+async copyChatTextToClipboardWithoutSummaries() =>
+  let text = chatLogsEl.value.split(/\n{2,}/).map(p => p.trim()).filter(p => !p.startsWith("SUMMARY^")).join("\n\n");
+  
+  await navigator.clipboard.writeText(text);
+  copyChatTextWithoutSummariesBtn.textContent = "✅ copied";
+  setTimeout(() => {
+    copyChatTextWithoutSummariesBtn.textContent = "📋 copy chat logs without summaries";
+  }, 3000);
+
+
+// async copySessionShareLink() =>
+//   if(!botNameEl.value.trim() || !userNameEl.value.trim()) {
+//     alert("Please add at least the character names before creating a share link.");
+//     return;
+//   }
+//   shareSessionBtn.textContent = "✅ copied!";
+//   setTimeout(() => shareSessionBtn.textContent = "🔗 share this chat", 1500);
+//   let shareData = {
+//     aiChat: getCurrentChatData(),
+//   };
+//   navigator.clipboard.writeText(`https://perchance.org/${window.generatorName}#${JSON.stringify(shareData)}`);
+
+updateLastMessageButtonsDisplayIfNeeded() =>
+  if(localStorage.sendCount && Number(localStorage.sendCount) > 5) {
+    // rating buttons only get shown after several messages to reduce clutter for newbies.
+    // and when we show rating buttons, we reduce the size of the others so the buttons fit on mobile (since hopefully they know what those buttons do by now, so they don't need the "full" label)
+    rateLastMessageCtn.hidden = false;
+    askForRatingsNoticeEl.hidden = false;
+    deleteLastMessageBtn.textContent = deleteLastMessageBtn.dataset.shortContent;
+    regenMessageBtn.textContent = regenMessageBtn.dataset.shortContent;
+  }
+
+async rateLastMessage(rating) =>
+  if(!window.lastMessagePendingObj) return;
+  
+  if(!localStorage.knowsHowRatingsWork) {
+    if(!confirm("Your ratings help improve Perchance's AI plugin, which powers this chat. Please do not submit ratings if your chat includes personal info.\n\nContinue?")) return;
+    localStorage.knowsHowRatingsWork = "1";
+  }
+  
+  let score = rating==="good" ? 1 : 0;
+  rateLastMessageBadBtn.disabled = true;
+  rateLastMessageGoodBtn.disabled = true;
+  if(rating === "good") {
+    rateLastMessageBadBtn.style.opacity = 0.2;
+  } else {
+    rateLastMessageGoodBtn.style.opacity = 0.2;
+  }
+  
+  if(!window.recentRatingReasonCounts) window.recentRatingReasonCounts = {};
+  let reasonCountEntries = Object.entries(window.recentRatingReasonCounts).sort((a,b) => b[1]-a[1]);
+  if(reasonCountEntries.length > 10) reasonCountEntries = reasonCountEntries.slice(0, 10);
+  window.recentRatingReasonCounts = Object.fromEntries(reasonCountEntries);
+  recentRatingReasonsDataList.innerHTML =  reasonCountEntries.map(e => `<option value="${e[0].replace(/</g, "&lt;").replace(/"/g, "&quot;")}"></option>`).join("");
+  
+  let reasonResolver;
+  let reasonFinishPromise = new Promise(r => reasonResolver=r);
+  ratingReasonEl.value = "";
+  ratingReasonCtn.hidden = false;
+  ratingReasonEl.focus();
+  await new Promise(r => setTimeout(r, 100));
+  
+  // if they click anywhere other than the reason input, then we resolve with the current contents of the reason box
+  function windowClickHandler(event) {
+    if(!ratingReasonCtn.contains(event.target)) {
+      reasonResolver(ratingReasonEl.value);
+    }
+  }
+  window.addEventListener("click", windowClickHandler);
+  
+  // if they press enter, then we resolve too
+  function enterKeydownHandler(event) {
+    if(event.key === 'Enter') {
+      reasonResolver(ratingReasonEl.value);
+    }
+  }
+  ratingReasonEl.addEventListener("keydown", enterKeydownHandler);
+  
+  let reason = await reasonFinishPromise;
+  if(reason.length < 100) window.recentRatingReasonCounts[reason] = (window.recentRatingReasonCounts[reason] || 0) + 1;
+  
+  ratingReasonCtn.hidden = true;
+  window.removeEventListener("click", windowClickHandler);
+  ratingReasonEl.removeEventListener("keydown", enterKeydownHandler);
+  window.lastMessagePendingObj.submitUserRating({score, reason});
+  
+  
+
+saveChatDataToUsersDevice() => 
+  let data = getCurrentChatData();
+  let suggestedName = (data.userName+"-"+data.botName).replace(/[^a-zA-Z0-9\-_]/g, "");
+  let filename = prompt("Choose a filename:", window.lastSaveFilenameUsed || suggestedName);
+  if(filename === null) return;
+  if(filename !== suggestedName) window.lastSaveFilenameUsed = filename;
+  filename += ".ai-chat.json";
+  let blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  let url = URL.createObjectURL(blob);
+  let a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+  
+async loadChatDataFromUsersDevice() =>
+  return new Promise((resolve, reject) => {
+    let input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json, text/json, text/plain, application/JSON, .json, application/x-gzip, application/gzip, .gz, .json.gz';
+
+    input.onchange = async (event) => {
+      let file = event.target.files[0];
+      
+      let errorAppend = "";
+      
+      if (file) {
+        try {
+          let blob;
+          if(file.name.endsWith(".gz") || file.type.endsWith("gzip")) {
+            blob = await decompressBlobWithGzip(file);
+          } else {
+            blob = file;
+          }
+          
+          let content = await blob.text();
+          if(content.includes("chatbot-ui-v1")) errorAppend = ` Perchance has multiple AI chat interfaces (since anyone can build their own). You may be trying to load a save file in the wrong interface. You're currently using perchance.org/𝗮𝗶-𝗰𝗵𝗮𝘁\n\n👉 perchance.org/ai-character-chat is another popular interface.`;
+          
+          let data = JSON.parse(content);
+          if(data.format === "perchance-ai-chat-v1") {
+            if((botDescriptionEl.value+userDescriptionEl.value+scenarioEl.value+chatLogsEl.value+writingInstructionsEl.value).trim() !== "") {
+              let confirmed = confirm("Loading this data will 𝗼𝘃𝗲𝗿𝘄𝗿𝗶𝘁𝗲 your current chat. Continue?");
+              if(!confirmed) return;
+            }
+            loadDataIntoTextAreasAndLocalStorage(data);
+          } else {
+            alert("Unknown save file format."+errorAppend);
+          }
+        } catch (error) {
+          alert("There was an error while loading that chat file."+errorAppend);
+          reject(error);
+        }
+      }
+    };
+
+    input.click();
+  });
+
+setMiscDataDefaults() =>
+  if(!window.miscData.deletedCharacterNames) window.miscData.deletedCharacterNames = [];
+
+loadDataIntoTextAreasAndLocalStorage(data) =>
+  // put data in input boxes + variables:
+  botNameEl.value = data.botName;
+  userNameEl.value = data.userName;
+  botDescriptionEl.value = data.botDescription;
+  userDescriptionEl.value = data.userDescription;
+  scenarioEl.value = data.scenario;
+  chatLogsEl.value = data.chatLogs;
+  whatHappensNextEl.value = data.whatHappensNext ?? "";
+  writingInstructionsEl.value = data.writingInstructions ?? "";
+  
+  backgroundImageUrlEl.value = data.backgroundImageUrl ?? "";
+  botAvatarUrlEl.value = data.botAvatarUrl ?? "";
+  userAvatarUrlEl.value = data.userAvatarUrl ?? "";
+  backgroundAudioUrlEl.value = data.backgroundAudioUrl ?? "";
+  
+  window.miscData = data.miscData || {};
+  
+  // put data in localstorage:
+  localStorage.botName = data.botName;
+  localStorage.userName = data.userName;
+  localStorage.botDescription = data.botDescription;
+  localStorage.userDescription = data.userDescription;
+  localStorage.botAvatarUrl = data.botAvatarUrl ?? "";
+  localStorage.userAvatarUrl = data.userAvatarUrl ?? "";
+  localStorage.scenario = data.scenario;
+  localStorage.backgroundImageUrl = data.backgroundImageUrl ?? "";
+  localStorage.backgroundAudioUrl = data.backgroundAudioUrl ?? "";
+  try { localStorage.chatLogs = data.chatLogs; } catch(e) { console.error(e); }
+  localStorage.whatHappensNext = data.whatHappensNext ?? "";
+  localStorage.writingInstructions = data.writingInstructions;
+  
+  if(data.miscData) {
+    try { localStorage.miscData = JSON.stringify(data.miscData); } catch(e) { console.error(e); }
+  }
+  setMiscDataDefaults();
+  updateCharacterNameViews();
+  
+  updateBackgroundImageDisplay();
+  updateBackgroundAudioPlayer();
+  
+  updateAvatarImageDisplay({charLabel:'bot', url:localStorage.botAvatarUrl});
+  updateAvatarImageDisplay({charLabel:'user', url:localStorage.userAvatarUrl});
+  
+  checkOverlyLongFixedTokens();
+  
+  userDescriptionEl.scrollTop = 0;
+  botDescriptionEl.scrollTop = 0;
+  scenarioEl.scrollTop = 0;
+  chatLogsEl.scrollTop = chatLogsEl.scrollHeight;
+
+
+async generateShareLinkForChat() => 
+  if(!confirm("This will save the current chat data as a sharable link/URL. It's a private URL that's only accessible to others if you give them the link. Continue?")) return;
+  
+  if(!window.CompressionStream) {
+    alert("Share links use a feature that's only available in modern browsers. Please upgrade your browser to the latest version to use this feature.");
+    return;
+  }
+  if((botDescriptionEl.value+userDescriptionEl.value+scenarioEl.value).trim() === "") {
+    alert("You need to add character descriptions and a scenario before sharing.");
+    return;
+  }
+  shareLinkCtn.hidden = true;
+  
+  shareChatBtn.disabled = true;
+  shareChatBtn.textContent = "⏳ uploading current chat data...";
+  
+  let chatDataJson = JSON.stringify(getCurrentChatData());
+  
+  // convert json text to blob:
+  chatDataJson = chatDataJson.replace(/#/g, "%23"); // since hash is a special character in dataurls (like normal URLs)
+  let blob = await fetch("data:text/plain;charset=utf-8,"+chatDataJson).then(res => res.blob());
+  
+  // compress blob:
+  let compressedBlob = await compressBlobWithGzip(blob);
+  
+  let { url, size, error } = await upload(compressedBlob);
+  if(error) {
+    shareChatLinkInputEl.value = `error: ${error}`;
+    alert(`Error: ${error}${error === "disallowed_content" ? ". If you believe this is incorrect, then you may need to explicitly state that relevant characters are 18 or older, since the moderation system can make mistakes if there is ambiguity." : ""}`);
+  } else {
+    shareChatLinkInputEl.value = `https://perchance.org/${window.generatorName}#data=`+url.replace("https://user.uploads.dev/file/", "uup1:");
+  }
+  shareLinkCtn.hidden = false;
+  shareChatBtn.textContent = "🔗 share this chat";
+  shareChatBtn.disabled = false;
+  shareChatBtn.hidden = true;
+
+async compressBlobWithGzip(blob) =>
+  const cs = new CompressionStream('gzip');
+  const compressedStream = blob.stream().pipeThrough(cs);
+  let outputBlob = await new Response(compressedStream).blob();
+  return new Blob([outputBlob], { type: "application/gzip" }); // <-- to add the correct mime type
+
+
+async confirmAsync(message, opts) =>
+  if(!opts) opts = {};
+  if(!message) message = "Are you sure?"
+  return new Promise(resolve => {
+    const overlay = Object.assign(document.createElement("div"), { tabIndex: 0 });
+    overlay.style.cssText = `position:fixed;inset:0;z-index:99999999;display:grid;place-items:center;background-color:rgba(0,0,0,.65);font:16px/1.4 system-ui`;
+    overlay.innerHTML = `<div style="text-align:left !important;max-width:min(97vw, 450px);padding:15px;border-radius:8px;background-color:light-dark(#fff,#222);color:light-dark(#000,#fff);box-shadow:0 2px 8px rgba(0,0,0,.2);">
+      <p style="margin:0 0 20px;white-space:pre-wrap;">${message.replace(/[<>&]/g, m => ({"<":"&lt;","&":"&amp;",">":"&gt;"}[m]))}</p>
+      <div style="display:flex;justify-content:flex-end;gap:8px;">
+        <button ${opts.hideCancel ? "hidden" : ""} style="padding:6px 16px;border:1px solid light-dark(#ccc,#555);border-radius:6px;background-color:light-dark(#f6f6f6,#333);color:inherit;cursor:pointer;">Cancel</button>
+        <button autofocus style="padding:6px 16px;border:none;border-radius:6px;background-color:light-dark(#1677ff,#2b87ff);color:#fff;cursor:pointer;">Okay</button>
+      </div>
+    </div>`;
+    const [cancelBtn, okBtn] = overlay.querySelectorAll("button");
+    const finish = val => { overlay.remove(); resolve(val); };
+    cancelBtn.onclick = () => finish(false);
+    okBtn.onclick = () => finish(true);
+    overlay.onkeydown = e => {
+      if (e.key === "Escape") finish(false);
+      else if (e.key === "Enter") finish(true);
+    };
+    document.body.append(overlay);
+    overlay.focus({ preventScroll: true }); // enables Esc handling immediately
+  });
+  
+async loadDataFromUrlHash() => 
+  let success = false;
+  if(!window.DecompressionStream) {
+    alert("Character share links use a browser feature that's only available in modern browsers. Please upgrade your browser to the latest version to allow for loading data from character share links.");
+    return {success, error:"browser_compat"};
+  }
+  
+  let loadingModal = document.createElement('div');
+  loadingModal.innerHTML = `<div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); z-index: 9999; display: flex; justify-content: center; align-items: center;">
+    <div style="padding: 20px; background-color: var(--box-color); border-radius: 8px;">
+      ⏳ loading chat data...
+    </div>
+  </div>`;
+  loadingModal = loadingModal.firstElementChild;
+  document.body.append(loadingModal);
+  
+  try {
+    let hashText = window.location.hash.slice(1);
+    if(!hashText.startsWith("data=")) {
+      throw new Error("Invalid share URL.");
+    }
+    let fileUrl = hashText.replace(/^data=/, "");
+    if(/^uup1(:|%3A)/.test(fileUrl)) {
+      fileUrl = fileUrl.replace(/^uup1(:|%3A)/, "https://user.uploads.dev/file/");
+    }
+    let fetchOptions = {};
+    if(window.AbortSignal && AbortSignal.timeout) fetchOptions.signal = AbortSignal.timeout(10000);
+    let blob = await fetch(fileUrl, fetchOptions).then(res => res.ok ? res.blob() : null).catch(console.error);
+    if(!blob) {
+      loadingModal.remove();
+      await confirmAsync(`It seems you've tried to load a share URL, but the file specified by the URL does not exist. If you believe it should exist, you can ask for help on the community forum, or check if the file has been quarantined:\n\nperchance.org/quarantined-files`, {hideCancel:true});
+      return {success:false, error:"loading_cancelled_by_user"};
+    }
+    let text;
+    if(fileUrl.endsWith(".gz")) {
+      let decompressedBlob = await decompressBlobWithGzip(blob);
+      text = await decompressedBlob.text();
+    } else {
+      text = await blob.text();
+    }
+    let data = JSON.parse(text);
+    if(data.format === "perchance-ai-chat-v1") {
+      // Always add 'content wall' (even if chat boxes are empty). TODO: Improve this with e.g. content warning if needed, etc.
+      let confirmed = await confirmAsync("𝗛𝗲𝗮𝗱𝘀 𝘂𝗽: You're loading a chat share link. This will overwrite your existing chat, if any. 𝗖𝗼𝗻𝘁𝗶𝗻𝘂𝗲?\n\n(Note: You can click cancel and then load the share link in your browser's incognito/private mode to avoid overwriting your current chat, or just save your existing chat first.)");
+      if(!confirmed) {
+        window.location.hash = "";
+        loadingModal.remove();
+        return {success, error:"loading_cancelled_by_user"};
+      }
+      // if(( (localStorage.botDescription||"") + (localStorage.userDescription||"") + (localStorage.scenario||"") + (localStorage.chatLogs||"") + (localStorage.writingInstructions||"") ).trim() !== "") {
+      //   let confirmed = confirm("𝗛𝗲𝗮𝗱𝘀 𝘂𝗽: You're loading a chat share link. This will overwrite your existing chat, if any. 𝗖𝗼𝗻𝘁𝗶𝗻𝘂𝗲?\n\n(Note: You can click cancel and then load the share link in your browser's incognito/private mode to avoid overwriting your current chat, or just save your existing chat first.)");
+      //   if(!confirmed) {
+      //     loadingModal.remove();
+      //     return {success, error:"loading_cancelled_by_user"};
+      //   }
+      // }
+      loadDataIntoTextAreasAndLocalStorage(data);
+      success = true;
+    } else {
+      alert("Unknown chat data format.");
+    }
+  } catch(e) {
+    alert(`Failed to load chat data: ${e.message}`);
+    console.error(e);
+  }
+  
+  loadingModal.remove();
+  return {success};
+  
+async decompressBlobWithGzip(blob) =>
+  const ds = new DecompressionStream("gzip");
+  const decompressedStream = blob.stream().pipeThrough(ds);
+  return await new Response(decompressedStream).blob();
+
+getCurrentChatData() =>
+  return {
+    format: "perchance-ai-chat-v1",
+    botName: botNameEl.value.trim(),
+    userName: userNameEl.value.trim(),
+    botDescription: botDescriptionEl.value.trim(),
+    userDescription: userDescriptionEl.value.trim(),
+    botAvatarUrl: botAvatarUrlEl.value.trim(),
+    userAvatarUrl: userAvatarUrlEl.value.trim(),
+    scenario: scenarioEl.value.trim(),
+    backgroundAudioUrl: backgroundAudioUrlEl.value.trim(),
+    backgroundImageUrl: backgroundImageUrlEl.value.trim(),
+    chatLogs: chatLogsEl.value.trim(),
+    whatHappensNext: whatHappensNextEl.value.trim(),
+    writingInstructions: writingInstructionsEl.value.trim(),
+    miscData: window.miscData,
+  };
+
+deleteLastMessage() =>
+  let messages = chatLogsEl.value.trim().split(/\n{2,}/);
+  
+  antiAntiLayoutJank(() => { chatLogsEl.value = messages.slice(0, -1).join('\n\n'); chatLogsEl.scrollTop = chatLogsEl.scrollHeight; });
+  
+  window.lastMessageDeleted = messages.at(-1);
+  undoDeleteLastMessageCtn.hidden = false;
+  clearTimeout(window.hideUndoDeleteLastMessageCtnTimeout);
+  window.hideUndoDeleteLastMessageCtnTimeout = setTimeout(() => {
+    undoDeleteLastMessageCtn.hidden = true;
+  }, 5000);
+  updateDeleteButtonVisibility();
+  regenPrevButton.disabled = true;
+  regenNextButton.disabled = true;
+  window.nextMessageDraftOrInstruction_prevMessage = null;
+  
+undoDeleteLastMessage() =>
+  chatLogsEl.value += '\n\n'+window.lastMessageDeleted;
+  undoDeleteLastMessageCtn.hidden = true;
+  updateRegenPrevNextButtonVisibility();
+
+antiAntiLayoutJank(fn) => // due to browser's built-in anti-scroll-jank algorithm which sometimes has bad heuristics - i.e. forcibly scrolls whole page to keep textarea text in same position, despite that not being what we want
+  let prevPageScrollTop = document.scrollingElement.scrollTop; // record page scroll position
+  fn();
+  document.scrollingElement.scrollTop = prevPageScrollTop; // restore page scroll position
+
+simpleHash(str) =>
+  let sum = 0;
+  for(let i = 0; i < str.length; i++) {
+    sum = Math.imul(31, sum) + str[i].charCodeAt(0) | 0;
+  }
+  return sum;
+  
+updateRegenPrevNextButtonVisibility() =>
+  // note that this will clear `window.currentRegenAlternatives` if current context doesn't match its associated `window.currentRegenContextHash`
+  regenPrevButton.disabled = true;
+  regenNextButton.disabled = true;
+  let messages = chatLogsEl.value.trim().split(/\n{2,}/);
+  let currentLastMessage = messages.at(-1);
+  let currentContextMessagesText = messages.slice(0, -1).join('\n\n');
+  let currentRegenContextHash = simpleHash(currentContextMessagesText);
+  if(currentRegenContextHash !== window.currentRegenContextHash) {
+    window.currentRegenAlternatives = [currentLastMessage];
+    window.currentRegenContextHash = currentRegenContextHash;
+  } else {
+    let currentLastMessageRegenIndex = window.currentRegenAlternatives.findIndex(m => m === currentLastMessage);
+    if(currentLastMessageRegenIndex === -1) {
+      console.error("this shouldn't happen? because the hash matched, so it should at least have the current message in the window.currentRegenAlternatives array");
+    } else {
+      if(currentLastMessageRegenIndex > 0) regenPrevButton.disabled = false;
+      if(currentLastMessageRegenIndex < window.currentRegenAlternatives.length-1) regenNextButton.disabled = false;
+    }
+  }
+
+async regenLastMessage() =>
+  regenMessageBtn.disabled = true;
+  if(window.nextMessageDraftOrInstruction_prevMessage && inputEl.value.trim() === "") {
+    inputEl.value = window.nextMessageDraftOrInstruction_prevMessage;
+  }
+
+  let messages = chatLogsEl.value.trim().split(/\n{2,}/);
+  let currentLastMessage = messages.at(-1);
+  let currentRegenContextHash;
+  if(window.mostRecentChatLogEditWasAContinuationGeneration) {
+    // if last gen was a continuation, then the hash/id of that "regen alternative" must use use the partial content of the final message too (which was used as context):
+    currentRegenContextHash = simpleHash(window.mostRecentGenerationContinuationChatLogContextText);
+  } else {
+    currentRegenContextHash = simpleHash(messages.slice(0, -1).join('\n\n'));
+  }
+  if(currentRegenContextHash !== window.currentRegenContextHash) {
+    window.currentRegenAlternatives = [currentLastMessage]; // note that it's correct to use currentLastMessage even if this is a continuation, since the full last message was the result of the regen either way
+    window.currentRegenContextHash = currentRegenContextHash;
+  }
+
+  antiAntiLayoutJank(() => {
+    if(window.mostRecentChatLogEditWasAContinuationGeneration) {
+      chatLogsEl.value = window.mostRecentGenerationContinuationChatLogContextText;
+    } else {
+      let {name, content} = getLastMessage();
+      let value = messages.slice(0, -1).join('\n\n');
+      value += "\n\n" +  name + ":";
+      chatLogsEl.value = value.trim();
+      chatLogsEl.scrollTop = chatLogsEl.scrollHeight
+    }
+  });
+
+  if(window.mostRecentChatLogEditWasAContinuationGeneration) {
+    // we're regen-ing the continuation, not the whole last message:
+    await handleSendButtonClick({mode:'continue'});
+  } else {
+    await handleSendButtonClick({mode:"regen"});
+  }
+  {
+    let {name, content} = getLastMessage();
+    window.currentRegenAlternatives.push(`${name}: ${content}`);
+  }
+  regenPrevButton.disabled = false;
+  regenNextButton.disabled = true;
+  regenMessageBtn.disabled = false;
+  
+prevRegenMessage() =>
+  let messages = chatLogsEl.value.trim().split(/\n{2,}/);
+  let currentLastMessage = messages.at(-1);
+  let currentLastMessageRegenIndex = window.currentRegenAlternatives.findIndex(m => m === currentLastMessage);
+  if(currentLastMessageRegenIndex === 0) {
+    console.error("tried to go to prev index when it was already zero");
+    return;
+  }
+  
+  antiAntiLayoutJank(() => { 
+    chatLogsEl.value = (messages.slice(0, -1).join('\n\n') + "\n\n" + window.currentRegenAlternatives[currentLastMessageRegenIndex-1]).trim();
+    chatLogsEl.scrollTop = chatLogsEl.scrollHeight;
+  });
+  
+  if(currentLastMessageRegenIndex-1 === 0) {
+    regenPrevButton.disabled = true;
+  }
+  regenNextButton.disabled = false;
+  
+nextRegenMessage() =>
+  let messages = chatLogsEl.value.trim().split(/\n{2,}/);
+  let currentLastMessage = messages.at(-1);
+  let currentLastMessageRegenIndex = window.currentRegenAlternatives.findIndex(m => m === currentLastMessage);
+  if(currentLastMessageRegenIndex === window.currentRegenAlternatives.length-1) {
+    console.error("tried to go to next index when it was already max");
+    return;
+  }
+  
+  // save page scroll so we can recover it (else Chrome Android's auto page-shift-prevention messes with page scroll):
+  antiAntiLayoutJank(() => { 
+    chatLogsEl.value = (messages.slice(0, -1).join('\n\n') + "\n\n" + window.currentRegenAlternatives[currentLastMessageRegenIndex+1]).trim();
+    chatLogsEl.scrollTop = chatLogsEl.scrollHeight;
+  });
+  
+  if(currentLastMessageRegenIndex+1 === window.currentRegenAlternatives.length-1) {
+    regenNextButton.disabled = true;
+  }
+  regenPrevButton.disabled = false;
+  
+loadChatDataFromLocalStorage() =>
+  // Notice that we have oninput="localStorage.blah=this.value" on the input boxes.
+  // That saves their value to localStorage whenever they are changed.
+  // So during the initial page load, we load those values from localStorage if they exist.
+  // NOTE: You could simply use `perchance.org/remember-plugin` like `[remember(root, "@inputs")]` rather than this big mess.
+  if(localStorage.userName) userNameEl.value = localStorage.userName;
+  if(localStorage.botName) botNameEl.value = localStorage.botName;
+  if(localStorage.botDescription) botDescriptionEl.value = localStorage.botDescription;
+  if(localStorage.userDescription) userDescriptionEl.value = localStorage.userDescription;
+  if(localStorage.scenario) scenarioEl.value = localStorage.scenario;
+  if(localStorage.chatLogs) chatLogsEl.value = localStorage.chatLogs;
+  if(localStorage.whatHappensNext) whatHappensNextEl.value = localStorage.whatHappensNext;
+  if(localStorage.writingInstructions) writingInstructionsEl.value = localStorage.writingInstructions;
+  if(localStorage.input) inputEl.value = localStorage.input;
+  
+  if(localStorage.userAvatarUrl) userAvatarUrlEl.value = localStorage.userAvatarUrl;
+  if(localStorage.botAvatarUrl) botAvatarUrlEl.value = localStorage.botAvatarUrl;
+  if(localStorage.backgroundImageUrl) backgroundImageUrlEl.value = localStorage.backgroundImageUrl;
+  if(localStorage.backgroundAudioUrl) backgroundAudioUrlEl.value = localStorage.backgroundAudioUrl;
+  
+  // for random small data:
+  window.miscData = {};
+  if(localStorage.miscData) {
+    try { window.miscData = JSON.parse(localStorage.miscData); } catch(e) { console.error(e); localStorage.miscData = "{}"; }
+  }
+  // set defaults:
+  setMiscDataDefaults();
+  chatLogsEl.scrollTop = chatLogsEl.scrollHeight;
+
+triggerTipIfNeeded() =>
+  if(!localStorage.tipsSeen) localStorage.tipsSeen = "";
+  // can add tip based on e.g. text that is at the end of the chat logs, or whatever you want.
+  // here I'm just using sendCount as a simple way to add "introduction" tips as they go.
+  let sendCount = Number(localStorage.sendCount);
+  {
+    let tipName = "editInitialMessages1";
+    if(sendCount === 5 && !localStorage.tipsSeen.includes(`|${tipName}|`)) {
+      tipMessageEl.innerHTML = `Tip: A character's first few messages will heavily influence the way that character talks for the rest of the conversation. If the character isn't talking in the style you want, be sure to click the message and edit it to the desired style.`;
+      tipEl.hidden = false;
+      localStorage.tipsSeen += `|${tipName}|`;
+    }
+  }
+  {
+    let tipName = "repetition1";
+    if(sendCount === 40 && !localStorage.tipsSeen.includes(`|${tipName}|`)) {
+      tipMessageEl.innerHTML = `Tip: You can edit any message by simply clicking on it. If you let the AI write badly, its quality will become worse as the chat goes on, so <b>always edit or delete the messages that you don't like</b>.`;
+      tipEl.hidden = false;
+      localStorage.tipsSeen += `|${tipName}|`;
+    }
+  }
+  {
+    if(sendCount > 30 && !localStorage.haveUsedTabToContinueText) {
+      let isTouchScreen = false;
+      try { isTouchScreen = window.matchMedia("(pointer: coarse)").matches; } catch(e) { console.error(e); }
+      if(window.innerWidth > window.innerHeight && !isTouchScreen) {
+        continueTextBtnTabLabel.hidden = false;
+      }
+    }
+  }
+
+
+getRecentCharacterNames() =>
+  let recentMessages = chatLogsEl.value.replace(/\{\{user\}\}/gi, userName).replace(/\{\{char\}\}/gi, botName).trim().split(/\n{2,}/).slice(-600).filter(m => m.trim());
+  let recentNames = recentMessages.filter(m => m.includes(":")).map(m => m.trim().split(":")[0].trim());
+  recentNames.push(botName.evaluateItem);
+  recentNames.push(userName.evaluateItem);
+  recentNames.push("Narrator");
+  recentNames = recentNames.filter(n => n.length < 50); // in case of e.g. a manually-added paragraph of writing between messages (i.e. that doesn't have a name at the start, but happens to have a colon)
+  // let uniqueNames = Array.from(new Set(recentNames));
+  // let uniqueNames = Object.entries(nameHist).sort((a,b) => b[1]-a[1]).map(e => e[0]);
+  let nameHist = recentNames.reduce((a,v) => (a[v]=(a[v]||0)+1, a), {});
+  // sort them by number first, and then if their number is within 10 of another (to prevent constant order swapping with each new message submitted), use alphabetical
+  let sortedUniqueNames = Object.entries(nameHist).map(e => [e[0], Math.round(e[1]/10)]).sort(([aName, aCount], [bName, bCount]) => bCount - aCount || aName.localeCompare(bName)).map(([name]) => name);
+  sortedUniqueNames = sortedUniqueNames.filter(n => !n.startsWith("SUMMARY^") && n.toLowerCase() !== "ooc" && n.toLowerCase() !== "(ooc");
+  return sortedUniqueNames;
+
+updateCharacterNameViews() =>
+  let recentCharacterNames = getRecentCharacterNames();
+  recentCharacterNames = recentCharacterNames.filter(n => !window.miscData.deletedCharacterNames.includes(n));
+  quickReplyButtonsCtn.innerHTML = recentCharacterNames.map(n => `<button data-name="${n.replace(/"/g, "&quot;")}" style="font-size:75%;">🗣️ ${n}</button>`).join("");
+  quickReplyButtonsCtn.querySelectorAll("button").forEach(btn => {
+    btn.onclick = function() {
+      chatLogsEl.value = chatLogsEl.value.trim();
+      if(!chatLogsEl.value.endsWith('\n\n'+this.dataset.name+':')) {
+        chatLogsEl.value += '\n\n'+this.dataset.name+':';
+      }
+      handleSendButtonClick({mode:"normal"});
+    };
+  });
+  let addCharBtn = document.createElement("button");
+  addCharBtn.style.cssText = "font-size:75%; min-width:1.9rem;";
+  addCharBtn.textContent = "+";
+  addCharBtn.title = "Add a character";
+  addCharBtn.onclick = function() {
+    let characterName = prompt("Enter the name of the new character that you'd like to enter the chat. You can describe extra characters in the 'Scenario' box if needed.");
+    if(characterName === null || characterName.trim() === "") return;
+    characterName = characterName.trim();
+    if(window.miscData.deletedCharacterNames.includes(characterName)) {
+      window.miscData.deletedCharacterNames = window.miscData.deletedCharacterNames.filter(n => n !== characterName);
+      localStorage.miscData = JSON.stringify(window.miscData);
+      updateCharacterNameViews();
+    }
+    chatLogsEl.value = chatLogsEl.value.trim();
+    chatLogsEl.value += '\n\n'+characterName.trim()+':';
+    handleSendButtonClick({mode:"normal"});
+    chatLogsDeleteBtn.dataset.mode = 'delete';
+  };
+  quickReplyButtonsCtn.append(addCharBtn);
+  
+  let removeCharBtn = document.createElement("button");
+  removeCharBtn.style.cssText = "font-size:75%;";
+  removeCharBtn.textContent = "🗑️";
+  removeCharBtn.title = "Remove a button (revolutionary)";
+  removeCharBtn.onclick = function() {
+    let characterName = prompt("Enter the name of the character button that you'd like to remove.");
+    if(characterName === null || characterName.trim() === "") return;
+    characterName = characterName.trim();
+    if(!window.miscData.deletedCharacterNames.includes(characterName)) {
+      window.miscData.deletedCharacterNames.push(characterName);
+      localStorage.miscData = JSON.stringify(window.miscData);
+      updateCharacterNameViews();
+    }
+  };
+  quickReplyButtonsCtn.append(removeCharBtn);
+  
+  // update the "send as" <select> element, ensuring user character is first by default, and preserving previously-selected value if that character still 'exists'
+  let userNameEvaluated = userName.evaluateItem;
+  let existingSendAsValue = sendAsCharacterSelectEl.value;
+  sendAsCharacterSelectEl.innerHTML = [userNameEvaluated, ...recentCharacterNames.filter(n => n !== userNameEvaluated)].map(n => `<option>${n}</option>`).join("");
+  sendAsCharacterSelectEl.innerHTML += `<option value="~~~NEW_CHAR~~~">𝗡𝗲𝘄...</option>`;
+  if(recentCharacterNames.includes(existingSendAsValue)) sendAsCharacterSelectEl.value = existingSendAsValue;
+  
+  document.querySelectorAll(".containsCharName").forEach(el => update(el));
+  
+
+updateDeleteButtonVisibility() =>
+  botDescriptionDeleteBtn.hidden = botDescriptionEl.value.trim() ? false : true;
+  userDescriptionDeleteBtn.hidden = userDescriptionEl.value.trim() ? false : true;
+  scenarioDeleteBtn.hidden = scenarioEl.value.trim() ? false : true;
+  chatLogsDeleteBtn.hidden = chatLogsEl.value.trim() ? false : true;
+  writingInstructionsDeleteBtn.hidden = writingInstructionsEl.value.trim() ? false : true;
+
+generateCharacterDescription(botOrUser, buttonEl) =>
+  if(buttonEl.dataset.currentlyGenerating) {
+    buttonEl.stopGeneration();
+    return;
+  }
+  let descriptionEl = botOrUser=="bot" ? botDescriptionEl : userDescriptionEl;
+  let nameEl = botOrUser=="bot" ? botNameEl : userNameEl;
+  
+  if(botOrUser=="bot") botDescriptionDeleteBtn.dataset.mode='delete';
+  else userDescriptionDeleteBtn.dataset.mode='delete';
+  
+  let warningText = "";
+  if(descriptionEl.value.trim() !== "") warningText = "The existing description will be cleared. ";
+  let inspiration = prompt(`${warningText}Type some keywords or ideas below (optional), and then click OK.`, window["lastCharacterDescriptionInspirationIdea_"+botOrUser] || "");
+  if(inspiration === null) return; // <-- they clicked cancel
+  window["lastCharacterDescriptionInspirationIdea_"+botOrUser] = inspiration;
+  // buttonEl.disabled = true;
+  buttonEl.textContent = "🛑 stop";
+  descriptionEl.value = "";
+  
+  let originalDescriptionElPlaceholder = descriptionEl.placeholder;
+  descriptionEl.placeholder = "Loading...";
+  
+  let loadingIndicatorEl = document.createElement("div");
+  
+  let startWith = "Name:";
+  if(nameEl.value.trim()) startWith = `Name: ${nameEl.value.trim()}\nAge:`;
+  let responseObj = ai({
+    instruction: `Write a description of a character using the following keywords/prompt/ideas as inspiration: ${inspiration || "(None provided. Just be creative!)"}\n\nYour description should include the name (NOT Castellanos or McAllister), age, appearance, personality, and character background. Keep it short and information-dense. Where relevant, use a character-sheet style, with dense comma-separated phrases e.g. "likes ___, dislikes ___, speaks in a ___ manner, [body shape], [etc.]" (but more creative than that of course - the point is, write in an information dense manner, while maintaining creativity and depth of character). Avoid long-winded paragraphs of text, unless necessary (e.g. character background may need to be a full paragraph, but still keep it dense - no wordy fluff, just facts). Don't add lots of paragraphs. Prefer to add most details in character sheet style. This character is for a roleplay chat. After the background paragraph, end with a numbered list of 3 separate/independent "Roleplay Behavior Examples" which are hypothetical roleplay messages extracted from a story, and then end your response after that 3-item list. The "Roleplay Behavior Examples" have syntax like this (don't use this as an actual example, it's just to demonstrate syntax of quotes for dialogue and asterisks for actions/thoughts): "And why the..." *He gestures to the overturned carriage* "...grand entrance?" [...]`,
+    startWith,
+    onChunk: function(data) {
+      descriptionEl.value += data.textChunk;
+      descriptionEl.scrollTop = 99999999; // scroll down to bottom of text box
+    },
+    onFinish: function(data) {
+      buttonEl.textContent = "✨ generate";
+      buttonEl.dataset.currentlyGenerating = "";
+
+      descriptionEl.value = descriptionEl.value.replace("\nRoleplay Behavior Examples:", `\n{{${botOrUser === "bot" ? "char" : "user"}}} Roleplay Behavior Examples:`);
+      
+      if(botOrUser=="bot") localStorage.botDescription = botDescriptionEl.value;
+      else localStorage.userDescription = userDescriptionEl.value;
+      updateDeleteButtonVisibility();
+      loadingIndicatorEl.remove();
+      descriptionEl.placeholder = originalDescriptionElPlaceholder;
+      
+      if(!nameEl.value.trim() && /^Name: .+/.test(data.text.trim())) {
+        let name = data.text.trim().split("\n").map(t => t.trim()).filter(l => l.startsWith("Name: "))[0];
+        if(name) {
+          nameEl.value = name.replace(/^Name: /, "");
+          if(botOrUser=="bot") localStorage.botName = nameEl.value;
+          else localStorage.userName = nameEl.value;
+        }
+      }
+      
+      if(botOrUser=="bot") resizeTextAreaHeightToFitContent(botDescriptionEl, {min:100, max:500});
+      else resizeTextAreaHeightToFitContent(userDescriptionEl, {min:100, max:500});
+
+      updateCharacterNameViews();
+    },
+  });
+  
+  loadingIndicatorEl.innerHTML = responseObj.loadingIndicatorHtml;
+  loadingIndicatorEl.style.cssText = `position:absolute; bottom:0.5rem; right:0.5rem; width:min-content; height:min-content;`;
+  buttonEl.closest(".charDescriptionCtn").append(loadingIndicatorEl);
+  
+  buttonEl.dataset.currentlyGenerating = "1";
+  buttonEl.stopGeneration = function() {
+    responseObj.stop();
+  };
+
+
+
+generateScenarioDescription(buttonEl) =>
+  if(buttonEl.dataset.currentlyGenerating) {
+    buttonEl.stopGeneration();
+    return;
+  }
+  if(botNameEl.value.trim() === "" || userNameEl.value.trim() === "" || botDescriptionEl.value.trim() === "" || userDescriptionEl.value.trim() === "") {
+    alert("Please fill in character names and descriptions first.");
+    return;
+  }
+  let warningText = "";
+  if(scenarioEl.value.trim() !== "") warningText = "The existing scenario description will be cleared. ";
+  window.scenarioInspiration = prompt(`${warningText}Type some keywords or ideas below (optional), and then click OK.`, window.lastScenarioInspirationIdea);
+  if(window.scenarioInspiration === null) return; // <-- they clicked cancel
+  window.lastScenarioInspirationIdea = window.scenarioInspiration;
+  // buttonEl.disabled = true;
+  buttonEl.textContent = "🛑 stop";
+  scenarioEl.value = "";
+  
+  let originalScenarioElPlaceholder = scenarioEl.placeholder;
+  scenarioEl.placeholder = "Loading...";
+  
+  let loadingIndicatorEl = document.createElement("div");
+  
+  let responseObj = ai({
+    instruction: scenarioGenerationPrompt.evaluateItem,
+    startWith: "The scenario begins with",
+    stopSequences: ["\n\n"],
+    onChunk: function(data) {
+      scenarioEl.value += data.textChunk;
+      scenarioEl.scrollTop = 99999999; // scroll down to bottom of text box
+    },
+    onFinish: function(data) {
+      buttonEl.disabled = false;
+      buttonEl.textContent = "✨ generate";
+      buttonEl.dataset.currentlyGenerating = "";
+      localStorage.scenario = scenarioEl.value;
+      updateDeleteButtonVisibility();
+      resizeTextAreaHeightToFitContent(scenarioEl);
+      loadingIndicatorEl.remove();
+      scenarioEl.placeholder = originalScenarioElPlaceholder;
+    },
+  });
+  
+  loadingIndicatorEl.innerHTML = responseObj.loadingIndicatorHtml;
+  loadingIndicatorEl.style.cssText = `position:absolute; bottom:0.5rem; right:0.5rem; width:min-content; height:min-content;`;
+  scenarioAreaCtn.append(loadingIndicatorEl);
+  
+  buttonEl.dataset.currentlyGenerating = "1";
+  buttonEl.stopGeneration = function() {
+    responseObj.stop();
+  };
+  
+
+resizeTextAreaHeightToFitContent(textArea, opts) =>
+  if(!opts) opts = {};
+  antiAntiLayoutJank(() => { 
+    textArea.style.height = 0+"px";
+    let height = textArea.scrollHeight+10;
+    if(opts.min !== undefined && height < opts.min) {
+      height = opts.min;
+    }
+    if(opts.max !== undefined && height > opts.max) {
+      height = opts.max;
+    }
+    textArea.style.height = `${height}px`;
+  });
+
+
+async generateCharactersAndScenario() =>
+  let inspiration = prompt("Enter a few keywords/ideas and the AI will use them to generate the characters and the scenario:", window.lastCharactersAndScenarioInspirationIdea);
+  if(inspiration === null) return;
+  
+  window.lastCharactersAndScenarioInspirationIdea = inspiration;
+  inspiration = inspiration.trim();
+  let inspirationInstruction = inspiration ? "You MUST use these instructions/ideas as inspiration: "+inspiration+"\nTry to make your best guess at the intention/idea behind these user-provided instructions/ideas, and then invent a creative and fascinating scenario based on those intentions." : "";
+
+  let fullInstruction = charactersAndScenarioGenerationPrompt.evaluateItem.replace("##outroInspirationPlaceholder##", inspirationInstruction);
+  if(inspiration) fullInstruction = fullInstruction.replace("##introInspirationPlaceholder##", `The characters and scenario must be an enthralling and creative interpretation of these instructions: **`+inspiration+`**\nDon't just repeat text from the above instructions verbatim in your response - you must instead creatively interpret the above instructions.`);
+
+  botDescriptionDeleteBtn.dataset.mode = 'delete';
+  userDescriptionDeleteBtn.dataset.mode = 'delete';
+  scenarioDeleteBtn.dataset.mode = 'delete';
+  
+  generateCharactersAndScenarioBtn.disabled = true;
+  generateCharactersAndScenarioBtn.textContent = "⌛ loading...";
+  
+  function render(text) {
+    let lines = text.split("\n").map(l => l.trim()).filter(l => l.includes(":"));
+    let char1 = lines.find(l => l.startsWith("CHARACTER 1 NAME:"))?.trim().split(":").slice(1).join(":").trim();
+    let char2 = lines.find(l => l.startsWith("CHARACTER 2 NAME:"))?.trim().split(":").slice(1).join(":").trim();
+    let desc1 = lines.find(l => l.startsWith("CHARACTER 1 DESCRIPTION:"))?.trim().split(":").slice(1).join(":").trim();
+    let desc2 = lines.find(l => l.startsWith("CHARACTER 2 DESCRIPTION:"))?.trim().split(":").slice(1).join(":").trim();
+    let scenario = text.split("STARTING SCENARIO:")[1]?.trim().replace(/\n+/g, "\n\n").replace(/GENRE:\s*/, "").trim();
+    botNameEl.value = char1 || "";
+    userNameEl.value = char2 || "";
+    botDescriptionEl.value = desc1 || "";
+    userDescriptionEl.value = desc2 || "";
+    scenarioEl.value = scenario || "";
+    resizeTextAreaHeightToFitContent(botDescriptionEl, {min:120});
+    resizeTextAreaHeightToFitContent(userDescriptionEl, {min:120});
+    resizeTextAreaHeightToFitContent(scenarioEl, {min:120});
+    document.querySelectorAll(".containsCharName").forEach(el => update(el));
+  }
+  
+  let outputLength = 0;
+  let seenStartingScenario = false;
+  
+  let responseObj = ai({
+    instruction: fullInstruction,
+    startWith: "CHARACTER 1 NAME:",
+    stopSequences: ["GENRE:"],
+    onChunk: function(data) {
+      outputLength += data.textChunk.length;
+      generateCharactersAndScenarioBtn.textContent = `⌛ ${Math.round(outputLength/5)} words...`; // just an approximation
+      try { render(data.fullTextSoFar); } catch(e) { console.error(e); }
+    },
+  });
+  generateCharactersAndScenarioLoaderEl.innerHTML = responseObj.loadingIndicatorHtml;
+  
+  stopCharAndScenarioGenBtn.hidden = false;
+  stopCharAndScenarioGenBtn.onclick = function() {
+    responseObj.stop();
+    stopCharAndScenarioGenBtn.hidden = true;
+  };
+  
+  let characterGalleryCtnWasVisible = characterGalleryOuterCtn.offsetHeight !== 0;
+  characterGalleryOuterCtn.hidden = true;
+  
+  let data = await responseObj;
+  console.log("generateCharactersAndScenario text:", data.text);
+  render(data.text);
+  stopCharAndScenarioGenBtn.onclick = null;
+  stopCharAndScenarioGenBtn.hidden = true;
+  // let lines = data.text.split("\n").map(l => l.trim()).filter(l => l.includes(":"));
+  // let char1 = lines.find(l => l.startsWith("CHARACTER 1 NAME:"))?.trim().split(":").slice(1).join(":").trim();
+  // let char2 = lines.find(l => l.startsWith("CHARACTER 2 NAME:"))?.trim().split(":").slice(1).join(":").trim();
+  // let desc1 = lines.find(l => l.startsWith("CHARACTER 1 DESCRIPTION:"))?.trim().split(":").slice(1).join(":").trim();
+  // let desc2 = lines.find(l => l.startsWith("CHARACTER 2 DESCRIPTION:"))?.trim().split(":").slice(1).join(":").trim();
+  // let scenario = data.text.split("STARTING SCENARIO:")[1]?.trim().replace(/\n+/g, "\n\n");
+  // botNameEl.value = char1;
+  // userNameEl.value = char2;
+  // botDescriptionEl.value = desc1;
+  // userDescriptionEl.value = desc2;
+  // scenarioEl.value = scenario;
+  
+  resizeTextAreaHeightToFitContent(botDescriptionEl, {min:120});
+  resizeTextAreaHeightToFitContent(userDescriptionEl, {min:120});
+  resizeTextAreaHeightToFitContent(scenarioEl, {min:120});
+  
+  localStorage.botName = botNameEl.value;
+  localStorage.userName = userNameEl.value;
+  localStorage.botDescription = botDescriptionEl.value;
+  localStorage.userDescription = userDescriptionEl.value;
+  localStorage.scenario = scenarioEl.value;
+  
+  if(characterGalleryCtnWasVisible) characterGalleryOuterCtn.hidden = false;
+
+  generateCharactersAndScenarioLoaderEl.innerHTML = "";
+  setTimeout(() => {
+    generateCharactersAndScenarioBtn.textContent = "✨ generate characters";
+    generateCharactersAndScenarioBtn.disabled = false;
+  }, 2000);
+  generateCharactersAndScenarioBtn.textContent = "⬇️ finished ⬇️";
+  generateScenarioBtn.textContent = generateScenarioBtn.dataset.regenerateTextContent;
+  generateScenarioBtn.style.fontWeight = "bold";
+  updateCharacterNameViews();
+  updateDeleteButtonVisibility();
+  update();
+  checkOverlyLongFixedTokens();
+
+
+$meta
+  title = [page.title === "AI Chat" ? `AI Chat & Roleplay` : page.title] (online, free, no sign-up, unlimited)
+  description = AI RP - A completely free & simple roleplay AI / "Character AI" chat using Perchance's new AI text generation feature - chat with AI characters. Just create a character and a scenario for the chat/roleplay, and send a message. A simple roleplay AI chat bot with no login/sign-up needed - completely free! No account needed 😌 It's fast and has no limits on daily usage. Can do basically any character/scenario type - stories, anime characters, warrior cats roleplay, funny/silly/cute/wholesome, friend/companion/romantic/boyfriend/girlfriend AI/chatbot, movie and TV show characters - if you can describe it, then you can probably create your own chat bot for it. Basically a simple CAI / Character AI alternative. This AI chat has no filter - you can define restrictions, or lack thereof via the character's description.
+
+
+commentChannels
+  general
+    commentPlaceholderText = add a friendly comment...
+    // Can add options under each channel to overwrite ot add to the below defaults. See all options here: https://perchance.org/comments-plugin
+  chill
+    commentPlaceholderText = add a friendly comment...
+  rp
+    commentPlaceholderText = type a response...
+  spam
+    commentPlaceholderText = for testing stuff, screaming, etc.
+
+
+defaultCommentOptions // See here for all the options:  https://perchance.org/comments-plugin
+  width = 100%
+  height = 100%
+  forceColorScheme = [localStorage.forceColorScheme || null]
+  submitButtonText = send
+  customEmojis = {import:huge-emoji-list}
+  bannedUsers

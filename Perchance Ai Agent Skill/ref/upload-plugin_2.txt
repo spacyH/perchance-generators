@@ -1,0 +1,102 @@
+<div style="display:[window.generatorName === 'upload-plugin' ? 'none' : 'block'];color:red; font-weight:bold; padding:3rem;">Heads up! This is a fork/remix of the <a href="/upload-plugin" target="_blank">upload-plugin</a>, but unfortunately it's a really bad idea to fork this plugin, since its code is 'coupled' with the server code, so if I need to change the server code, your version of this plugin will likely break. If you'd like new features, best to ask for them on the community forum so your generators don't randomly break in the future when I update the server code. Alternatively, you can create a new plugin that <u>imports this plugin</u> - i.e. basically create a "wrapper" plugin that changes/expands on this plugin's behavior</div>
+
+<h1>Upload Plugin</h1>
+
+<div style="margin:0 auto;width:100%;max-width:750px;background:white;border-radius:2px;padding:1em; box-sizing:border-box; text-align:left;">
+  <p style="background: #ffda89;padding:0.5rem;margin-top: 0;border-radius: 3px; text-align:left;"><b>Important:</b> When uploading files that are only needed temporaily, use the <code>expires</code> option to get up to <b>400x</b> higher file size and daily upload limits. See the "Temporary Files" section below for info.</p>
+  <p style="margin-top:0">This plugin allows you to 'programatically' upload data to Perchance's file storage server - like <a href="https://perchance.org/upload" target="_blank">perchance.org/upload</a>, except via code instead of a drag-and-drop interface.</p>
+  <p>So, for example, you could make a generator where the user can click a button to save their generated result, and get a URL for it. The user doesn't need to be logged in to Perchance to trigger the upload, but the file size allowance for this plugin is smaller than <a href="https://perchance.org/upload" target="_blank">perchance.org/upload</a>.</p>
+  <p><b>Note</b>: For now, this plugin is mainly for people who know how to use functions/JavaScript. It's probably not that useful for "regular" Perchance generators, but might be handy if you're building something a bit more complex. For example, it's used in <a href="https://perchance.org/ai-chat" target="_blank">perchance.org/ai-chat</a> to allow users to create a character and then share their character via a URL.</p>
+  <p>To use this plugin, you'll first need to import it by adding this line to your lists editor:</p>
+<pre>
+upload = \{import:upload-plugin\}
+</pre>
+  <p>And then you can use it inside functions like this:</p>
+<pre>
+async saveSomeText() =>  <span style="opacity:0.5">// &lt;-- add 'async' before the function name since we need to use 'await' in this function</span>
+  let \{ url \} = await upload("this text will be uploaded as a text file");
+  outputEl.innerHTML = url;
+</pre> 
+  <p><a href="https://perchance.org/upload-plugin-example#edit" target="_blank">Here's an example generator</a> to start you off, and <a href="https://perchance.org/upload-plugin-compression-example#edit" target="_blank">here's and example</a> that shows how to compress data before uploading (and then decompress when downloading) which can allow you to fit up to ~10x more data within the upload limit.</p>
+  <p>You can give a string or a <a href="https://developer.mozilla.org/en-US/docs/Web/API/Blob" target="_blank">Blob</a> to the upload function, and it will return an object with <code>url</code>, <code>size</code>, and <code>error</code> properties. The <code>error</code> value will be <code>null</code> unless there was actually an error. The <code>size</code> value is in bytes.</p>
+<pre>
+let \{ url, size, error \} = await upload("...");
+</pre> 
+  <p>If an error occurred during upload, then <code>error</code> will be a string like <code>"over_daily_allowance"</code> or <code>"file_too_big"</code> or <code>"invalid_filetype"</code>.</p>
+  
+  <h2>Temporary Files</h2>
+  <p>If the uploaded file is only needed temporarily, then you should add an <code>expires</code> parameter with the specific time (in milliseconds) that you want the file to "expire".</p>
+  <p>The maximum file sizes and daily quotas are <b>much</b> higher for temporary files. The sooner the file expires, the larger the boost in allowed size/quota. For example, if you set the <code>expires</code> parameter to 24 hours or less, then the maximum file size and allowed daily quota are increased by <b>400x</b>. And on the other extreme, if the <code>expires</code> parameter is 1 year, then you'll get a 20x boost to the limits.</p>
+  <p>Below is an example of uploading a text file with the content "abc", and setting the expiry time to 24 hours from now. We put "abc" as the first input to the function, and then after a comma we add an <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Working_with_objects" target="_blank">object</a> with the <code>expires</code> parameter in it.</p>
+<pre>
+let \{ url, size, error \} = await upload("abc", \{expires:Date.now()+1000*60*60*24\});
+</pre>
+  <p><code>Date.now()</code> gives us the <a href="https://en.wikipedia.org/wiki/Unix_time" target="_blank">current time</a> in milliseconds, and we add <code>1000*60*60*24</code> to it, which is the number of milliseconds in 24 hours.</p>
+  <p>Note that the file is not guaranteed to be deleted after the <code>expires</code> time that you set. All that's guaranteed is that the file will last <i>at least</i> that long.</p>
+  <h2>Manual Deletion</h2>
+  <p>Files can be deleted within 3 days of upload. To delete an uploaded file using this plugin, make a request to the <code>deletionUrl</code> value that is returned by <code>upload</code>:</p>
+<pre>
+<span style="opacity:0.5;">// the 'deletionUrl' value is a URL which triggers deletion when a fetch request is made to it:</span>
+let \{ url, deletionUrl \} = await upload("...");
+<span style="opacity:0.5;">// the file has been uploaded</span>
+
+<span style="opacity:0.5;">// then, later...</span>
+
+<span style="opacity:0.5;">// make a request to the 'delete' URL to delete it:</span>
+let \{ success \} = await fetch(deletionUrl).then(r => r.json());
+if (success) \{
+  <span style="opacity:0.5;">// the file is now deleted</span>
+\}
+</pre> 
+
+
+  <h2>Moderation</h2>
+  <p>If you want to allow users to upload files on your generator, but e.g. want a way to detect whether the file is nsfw (e.g. before displaying it on a page where everyone can see it), then you can use this:</p>
+<pre>
+let \{ url, size, error \} = await upload("...");
+let result = await fetch(`https://upload.perchance.org/api/fileInfo?url=$\{url\}`).then(r => r.json());
+if(result && result.tags.includes("nsfw")) \{
+  // do whatever
+\}
+</pre>
+  <p>You can also use the file ID like this: <code>https://upload.perchance.org/api/fileInfo?id=$\{\}`</code></p>
+<pre>
+let id = url.split("/").at(-1);
+let result = await fetch(`https://upload.perchance.org/api/fileInfo?id=$\{id\}`).then(r => r.json());
+</pre>
+  
+  <p>See the <a href="https://perchance.org/upload-plugin-deletion-example#edit" target="_blank">deletion example</a> for a simple demo of this.</p>
+	<p><b>Notes:</b></p>
+	<ul>
+    <li>Check out more plugins at <a href="/plugins">perchance.org/plugins</a></li>
+	</ul>
+</div>
+<p style="text-align:center; font-size:200%; opacity:0.2; margin-top:0.5em;"><span>⚄&#xFE0E;</span></p>
+<br><br><br>
+
+<style>
+	body {
+			background:#eee;
+	}
+	code {
+		background-color:#eee;
+		padding:0.13em 0.2em
+	}
+	ul li { margin-top:0.4em; }
+  	code {
+		background-color:#eee;
+		padding: 0 0.2em;
+	}
+	pre {
+		text-align:left;
+		background: #333;
+    color: white;
+    padding: 1em;
+    border-radius: 2px;
+		tab-size: 2;
+		-moz-tab-size: 2;
+		-o-tab-size: 2;
+		-webkit-tab-size: 2;
+	}
+</style>
+

@@ -1,0 +1,173 @@
+<div style="display:[window.generatorName === 'ai-text-plugin' ? 'none' : 'block'];color:red; font-weight:bold; padding:3rem;">Heads up! This is a fork/remix of the <a href="/ai-text-plugin" target="_blank">ai-text-plugin</a>, but unfortunately it's a really bad idea to fork this plugin, since its code is 'coupled' with the server code, so if I need to change the server code, your version of this plugin will likely break. If you'd like new features, best to ask for them on the community forum so your generators don't randomly break in the future when I update the server code. Alternatively, you can create a new plugin that <u>imports the official version of this plugin</u> - basically create a "wrapper" plugin that changes/expands on the plugin's behavior.</div>
+
+<h1>🖋️📜 AI Text Plugin 📖🤖</h1>
+
+<main>
+  <p>This plugin allows you generate text with AI. It doesn't run on your actual device like other Perchance plugins because it requires too much computational power (and would require a many-gigabyte download), so it runs on <a href="https://en.wikipedia.org/wiki/Server_(computing)" target="_blank">server</a> GPUs, which means it costs me money to run. For that reason, this plugin is funded with ads, so <b style="color:red;">an ad will appear on your generator <u>for non-logged-in users</u> if you import this plugin</b>. The ad will appear at the bottom of the screen <a href="https://user.uploads.dev/file/e3cdfc34728610cf6e351b72052ef0c1.jpeg" target="_blank" title="graphic design is my passion">like this</a>. The ad will go away if you remove the plugin, of course.</p>
+  
+  <p>To use this plugin, you'll first need to import it by adding this line to your lists editor:</p>
+<pre>
+ai = \{import:ai-text-plugin\}
+</pre>
+  <p>And now try putting this in your lists editor:</p>
+<pre>
+character
+  \{mech|demon|cyberpunk\} \{warrior|minion|samurai\}
+
+place
+  a retropunk distopia
+  a small village
+  a mountainous region
+  an underwater cavern
+
+season
+  winter
+  summer
+  
+poemPrompt
+  instruction = Write a haiku about a \[character\] in \[place\] during \[season\].
+  
+output
+  \[ai(poemPrompt)\]
+</pre> 
+  <p><a href="https://perchance.org/ai-text-plugin-poem-example-1#edit" target="_blank">Here's an example generator</a> to start you off, and here's a live version of the above code, running on this page:</p>
+  <p id="outputEl1" style="text-align:center;">[$output(poemPrompt)]</p>
+  <p style="text-align:center;"><button onclick="update(outputEl1)">randomize</button></p>
+  
+  <p>You can hover your mouse over the little icon that appears at the end of the text to see the instruction that was used to generate it.</p>
+  <p>Here's an example where we give the AI an instruction, but we also ensure that the response starts with "It was the night before Christmas in":</p>
+<pre>
+storyPrompt
+  instruction = Write a \{spooky|silly\} story involving \{a\} \{import:object\}.
+  startWith = It was the night before Christmas in
+</pre>
+  <p><a href="https://perchance.org/ai-character-design-example-simple#edit" target="_blank">Here's a simple example</a> that uses <code>startWith</code>.</p>
+  
+  <p>If you pass some text directly into this plugin, it'll be interpreted as the <code>instruction</code>:</p>
+<pre>
+output
+  \[ai("Explain quantum field theory to a toddler.")\]
+</pre> 
+  <p>Check out some of these example generators to see different ways to use this plugin, and learn about some advanced features:</p>
+	<ul>
+  		<li><a style="font-weight:bold;" href="https://perchance.org/ai-character-design-example#edit" target="_blank">Fantasy Character</a> - Description + image using <code>onFinish</code> and <a href="/text-to-image-plugin" target="_blank">text-to-image-plugin</a>.</li>
+      <li><a style="font-weight:bold;" href="https://perchance.org/ai-text-plugin-tester#edit" target="_blank">Prompt Tester</a> - Easily test your prompts. Also demonstrates <code>outputTo</code> property.</li>
+  		<li><a style="font-weight:bold;" href="https://perchance.org/ai-chat-example#edit" target="_blank">AI Chat</a> - Design and chat with an AI character. Uses <code>stopSequences</code> and <code>onFinish</code>.</li>
+  		<li><a style="font-weight:bold;" href="https://perchance.org/ai-text-plugin-render-example#edit" target="_blank">Render Example</a> - Displays 'actions' like *smiles smugly* into <i style="opacity:0.6;">smiles smugly</i> using <code>render</code>.</li>
+  		<li><a style="font-weight:bold;" href="https://perchance.org/random-character-chat-example#edit" target="_blank">Two Character Chat</a> - Makes 2 random game characters chat with one another.</li>
+  		<li><a style="font-weight:bold;" href="https://perchance.org/ai-short-story-generator-example#edit" target="_blank">Short Story</a> - Generates a short story with pictures. Uses <code>render</code> in an interesting way.</li>
+  		<li><a style="font-weight:bold;" href="https://perchance.org/ai-story-outline-generator-example#edit" target="_blank">Story Outline</a> - Generates a story outline (plot, characters, etc.) with a cover image.</li>
+  		<li><a style="font-weight:bold;" href="https://perchance.org/ai-text-plugin-text-to-speech-example#edit" target="_blank">Text-to-Speech</a> - Streams generated text into the <a href="/text-to-speech-plugin" target="_blank">text-to-speech-plugin</a>.</li>
+  		<li><a style="font-weight:bold;" href="https://perchance.org/ai-story-writing-helper-example#edit" target="_blank">Story Writing Helper</a> - Shows use of <code>onChunk</code> and <code>stop()</code>.</li> 
+  		<li><a style="font-weight:bold;" href="https://perchance.org/ai-text-adventure-example#edit" target="_blank">Multi-Choice Text Adventure</a> - Story where each step has several actions to choose from.</li>
+  		<li><a style="font-weight:bold;" href="https://perchance.org/ai-generated-hierarchical-world-example#edit" target="_blank">Hierarchical World Explorer</a> - Similar to the <a href="https://perchance.org/nested-plugin" target="_blank">nested-plugin</a>.</li>
+  		<li><a style="font-weight:bold;" href="https://perchance.org/ai-text-example-with-user-input#edit" target="_blank">User Input Example</a> - Take some user input as part of the writing instructions for the AI.</li>
+	</ul>
+  
+  <p>You can make <code>instruction</code> and/or <code>startWith</code> into a list, and then add <code style="white-space:pre;">$output = \[this.joinItems("\\n")\]</code> to the top of the list to join all the lines together like in <a href="https://perchance.org/ai-text-plugin-multi-line-example#edit" target="_blank">this example</a>:</p>
+<pre>
+catGymPrompt
+  startWith
+    cat: i umm... *muffled heavy breathing* i am a cat, and i'm calling to ask about your tuesday pilates classes
+    kind staff member: sure! i can help you with that, can-
+    cat:
+    $output = \[this.joinItems("\\n")\] <span style="opacity:0.5">// &lt;-- this joins all the above lines together instead of selecting a random one</span>
+</pre>
+  <p style="font-size:80%;"><b>Note:</b> You might be accustomed to using <code>this.joinItems("&lt;br&gt;")</code>, but in this case <code>\\n</code> (which means <b>n</b>ewline) is probably better since the AI is trained primarily on text, rather than HTML (but it definitely can generate HTML if you need that!). I've made it so <code>\\n</code> does actually create a line break in the visual display of the AI's outputs (most HTML element types don't do this <a href="https://developer.mozilla.org/en-US/docs/Web/CSS/white-space" target="_blank">by default</a>).</p>
+  
+  <p><a href="https://perchance.org/mario-ai-therapist#edit" target="_blank">Here's</a> how to add a <code>style</code> option to adjust the visual display of the output text:</p>
+<pre>
+marioAffirmationsPrompt
+  instruction = Be Mario, and give me 3 positive affirmations with Mario's accent.
+  style = text-align:left; color:blue; font-weight:bold; border:2px solid red; display:block; max-width:600px; margin:0 auto; padding:0.5rem; 
+</pre>
+  
+  <p><b>Prompt Options:</b></p>
+  <p>You can see a bunch of the options below at play in the example generators listed above, and in <a href="https://perchance.org/ai-text-plugin-demo" target="_blank">this sandbox demo</a> made by <a href="https://lemmy.world/u/wthit56" target="_blank">wthit56</a>.</p>
+	<ul>
+    <li><code style="font-weight:bold;">instruction</code> - Your instruction to the AI on what to write.</li>
+    <li><code style="font-weight:bold;">startWith</code> - The text that you want the AI's writing to start with.</li>
+    <li><code style="font-weight:bold;">stopSequences</code> - The AI will stop writing "naturally" when it thinks it's finished, but you can use <code>stopSequences</code> to provide a list of words/phrases that should make the AI stop if it writes them.</li>
+    <li><code style="font-weight:bold;">hideStartWith</code> - set this equal to <code>true</code> if you don't want the <code>startWith</code> text that you specified to actually get displayed. I.e. only the text <i>after</i> that will get displayed. You could also use a custom <code>render(data)</code> function (explained below) to achieve this.</li>
+    <li><code style="font-weight:bold;">outputTo</code> - Use this to tell the plugin to output the AI's response into a specific element, based on that element's ID. If you had an element with <code>id="myCoolElement"</code> in the HTML editor, then you'd write <code>outputTo = \[myCoolElement\]</code> to get the AI to output to that element. By default the AI's text will be put wherever you write <code>\[ai(...)\]</code>.</li>
+    <li><code style="font-weight:bold;">onChunk(data)</code> - the code you put in this will run after every chunk (which is usually a word, or part of a word). See <a href="https://perchance.org/ai-story-writing-helper-example#edit" target="_blank">this</a> generator for an example that uses it. You can access <code>data.textChunk</code> and <code>data.fullTextSoFar</code> and <code>data.isFromStartWith</code> (since the <code>startWith</code> text, if specified, is <u>always</u> the first chunk).</li> 
+    <li><code style="font-weight:bold;">onStart(data)</code> - the code you put in this will run at the start of the generation process. You can access the inputs being used with <code>data.inputs.instruction</code>, <code>data.inputs.startWith</code>, etc.</li>
+    <li><code style="font-weight:bold;">onFinish(data)</code> - the code you put in this will run at the end of the generation process. You can access the final text with <code>data.text</code>, and note that this <b>includes</b> the <code>startWith</code> text, if you specified any. If you want the output text <b>excluding</b> the <code>startWith</code>, then you can access that via <code>data.generatedText</code>. If you didn't specify any <code>startWith</code> then <code>data.generatedText</code> and <code>data.text</code> will be the same. You can use <code>data.liveResponseText</code> at any time to get the current text <i>including any edits that the user has made</i> using the edit button at the end of the response.</li>
+    <li><code style="font-weight:bold;">render(data)</code> - the code you put in this will run after every chunk, and value that you <code>return</code> from this function is what actually gets displayed. This allows you to transform what the AI writes into something else - e.g. convert asterisks around text to bold or italic HTML tags. <code>data.text</code> contains the text so far and <code>data.isPartial</code> tells you whether the text is partial/incomplete (i.e. the AI is still generating). <a href="https://perchance.org/ai-text-plugin-render-example#edit" target="_blank">Here's</a> a basic example, and <a href="https://perchance.org/ai-short-story-generator-example#edit" target="_blank">here's</a> one that uses <code>data.isPartial</code>.</li>
+    <li><code style="font-weight:bold;">endButtons</code> - add <code>endButtons = none</code> to your prompt options if you don't want the edit/continue buttons to show at the end of the response.</li>
+    <li>Note that <code>instruction</code>, <code>startWith</code>, and <code>stopSequences</code> can all be <i>functions</i> if you want. You return the value that you want to use. See <a href="https://perchance.org/ai-text-plugin-tester#edit" target="_blank">this</a> generator for an example where we use it to prevent evaluation of the square and curly blocks in the given <code>instruction</code> and <code>startWith</code>.</li>
+    <li>There are some other features not listed here, but they're used in the examples list above. If there's a feature that you want, but can't find, feel free to ask for it on the community forum.</li>
+	</ul>
+  <p>Here's an example of using it in JavaScript function where we <code>console.log</code> each chunk, and also the final <code>generatedText</code>:</p>
+<pre>
+async start() =>
+  let result = await ai(\{
+    instruction: "write a poem",
+    onChunk: function(data) \{
+      console.log("chunk:", data);
+    \},
+  \});
+  console.log(result.generatedText, result);
+</pre>
+  <p>The <code>result.text</code> includes the <code>startWith</code> text, whereas <code>result.generatedText</code> doesn't, but in the above example they're equivalent because we didn't specify a <code>startWith</code>. Also note that <code>result</code> is also actually a <code>String</code> which is equivalent to <code>result.text</code>. So you can just write e.g. <code>foo.innerHTML = result</code> instead of <code>foo.innerHTML = result.text</code>.</p>
+	<p><b>Notes:</b></p>
+	<ul>
+    <li>Text prompt/response data is <b>not</b> stored on the server - see <a href="https://lemmy.world/comment/5709061" target="_blank">this post</a> for more info.</li>
+    <li>If you'd like to play around with running AI text generation models on your own machine ("locally"), then <a href="https://www.reddit.com/r/LocalLLaMA/top/?t=month" target="_blank">r/LocalLLama</a> is a good community to join.</li>
+    <li>Each user can only have a few concurrent server requests, so if you have lots of completions pending on one page, they'll queue up.</li>
+    <li>The model <b>may produce NSFW/adult-themed content</b> if instructed/prompted with NSFW/adult-themed terms. You should <b>treat this a bit like a Google search</b> - ask for inappropriate stuff, and you'll probably get inappropriate stuff. Please prompt responsibly. If the AI is producing inappropriate content without being prompted, you can try adding a sentence to your <code>instruction</code> telling it not to do that.</li>
+    <li>The 19th day of every month is observed as 'Ad-viewer Appreciation Day' in the Perchance community. On this day we pay our respects to the non-logged-in users who fund the GPU servers by viewing ads on generators that import AI-based plugins. Logged-in users are encouraged to spare a moment for these anonymous benefactors, wishing for them a month of relevant and interesting ads, and thanking them for their tolerance of increased browser tab memory usage, and their indirect but valuable contribution to the Perchance community via the digital attention economy. May their mobile game ads not be too sus, and may the gameplay reflect the real gameplay even if only abstractly 🕯️</li>
+    <li>Check out more plugins at <a href="/plugins">perchance.org/plugins</a></li>
+	</ul>
+</main>
+<p style="text-align:center; font-size:200%; opacity:0.2; margin-top:0.5em;"><span>⚄&#xFE0E;</span></p>
+<br><br><br>
+
+<style>
+  html { color-scheme: dark light }
+  main {
+    text-align:left;
+		max-width:900px;
+		margin:0 auto;
+		background: #fff;
+		background: light-dark(#fff, #101010);
+		padding:1em;
+		border-radius:3px;
+		box-shadow: 0 0.5px 0 0 #ffffff inset, 0 1px 2px 0 #B3B3B3;
+		box-shadow: 0 0.5px 0 0 light-dark(#fff, #060606) inset, 0 1px 2px 0 light-dark(#B3B3B3, #2c2c2c);
+	}
+  main p:first-child {
+    margin-top:0;
+  }
+  ul li {
+		margin-top:0.5em;	
+	}
+	p {
+    line-height: 1.4em;
+  }
+	body {
+		background-color:#f6f6f6;	
+		background-color: light-dark(#f6f6f6, #000);
+    color: black;
+    color: light-dark(black, #d6d6d6);
+	}
+	pre {
+		text-align:left;
+		background: #333;
+    background: light-dark(#333, #212121);
+    color: #e2e2e2;
+    padding: 1em;
+    border-radius: 2px;
+		tab-size: 2;
+		-moz-tab-size: 2;
+		-o-tab-size: 2;
+		-webkit-tab-size: 2;
+	}
+	code {
+		background: #eff0f1;
+    background:  light-dark(#eff0f1, #272727);
+    padding: 1px 5px;	
+		white-space: nowrap;
+	}
+</style>
+

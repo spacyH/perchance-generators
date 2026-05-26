@@ -1,0 +1,23 @@
+ai = {import:ai-text-plugin} 
+speak = {import:text-to-speech-plugin} // change the voice, speed, pitch etc. - see the plugin page: https://perchance.org/text-to-speech-plugin
+  
+sceneScriptPrompt
+  instruction = [instructionEl.value]
+  outputTo = [outputEl]
+  onStart(pendingObj) =>
+    stopBtn.disabled = false;
+    outputEl.innerHTML = pendingObj.loadingIndicatorHtml;
+  
+async generate() =>
+  generateBtn.disabled = true;
+  pendingTextObj = ai(sceneScriptPrompt)
+  speakPromise = speak(pendingTextObj);
+  await speakPromise;
+  stopBtn.disabled = true;
+  generateBtn.disabled = false;
+  
+stop() =>
+  pendingTextObj.stop();
+  speakPromise.stop();
+  stopBtn.disabled = true;
+  generateBtn.disabled = false;

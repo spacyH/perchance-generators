@@ -1,0 +1,119 @@
+<h1>AI Hierarchical World Generator</h1> 
+
+<p style="font-size:80%; max-width:670px; width:95%; margin: 1rem auto;">Start with a description and it'll generate some continents/regions. <b>Click an item to explore it</b>, click sub-items to explore further, and so on. This in an example generator that was built to demonstrate the <a href="https://perchance.org/ai-text-plugin" target="_blank">ai-text-plugin</a>.</p>
+
+<div id="startCtn" style="margin-bottom:0.5rem;"> 
+  <div style="margin:1rem auto; width:min-content; display:flex; border:1px solid grey; padding:0.25rem; border-radius:3px;"><input id="generateImagesCheckbox" checked type="checkbox" style="cursor:pointer;"><span style="margin-left:0.25rem; font-size:80%; cursor:pointer; user-select:none; width:max-content;" onclick="generateImagesCheckbox.click();">generate images too</span></div>
+  <div>— high-level world description —</div>
+  <textarea style="width:95%; max-width:500px; margin-top:0.25rem; margin-bottom:0.25rem;" id="worldInstructionsEl" oninput="localStorage.worldInstruction=this.value" placeholder="Describe the world.">[localStorage.worldInstruction || "alien medieval world with roaming mindless giants"]</textarea>
+  <br>
+  <button id="startBtn" onclick="startButtonClick()" style="font-size:150%; margin-top:0.5rem;">🗺️ start</button>
+</div>
+
+<p id="outputEl" style="min-height:200px; text-align:left; width:95%; max-width:900px; margin:0 auto; white-space:pre-wrap;"></p>
+
+<br>
+
+<style> 
+  .worldItem {
+    margin-top:0.5rem;
+  }
+  .worldItemText {
+    cursor: pointer;
+  }
+  .worldItemText:hover {
+    background: var(--box-color); 
+  }
+  .imageCtn::-webkit-scrollbar {
+    display: none;
+  }
+</style>
+
+
+<p style="font-size:80%; margin:0 auto; max-width:400px;"><a href="https://perchance.org/vionet20-gens" target="_blank">VioneT20</a> made a <a href="https://perchance.org/question-this" target="_blank">related generator</a> which hierarchically generates questions/answers to help you flesh out a world/story/etc.</p>
+
+<div id="commentsCtn"></div>
+<br><br>
+
+<!-- COMMENTS STUFF -->
+<script>
+  function createCommentsSectionHtml() {
+    let startVisible = false;
+    if(window.commentsEl && window.commentsEl.style.display !== 'none') startVisible = true;
+    commentsCtn.innerHTML = ""; // must delete existing comments section first because comments plugin has code which cause it to not output any HTML if that comments section already exists on the page
+    let commentsPluginHtml = comments(commentsOptions);
+    commentsCtn.innerHTML = `
+      <p><button onclick="if(commentsEl.style.display == 'none') { commentsEl.style.display=''; this.textContent='hide comments'; } else { commentsEl.style.display='none'; this.textContent='💬 show comments'; }">${startVisible ? "hide comments" : "💬 show comments"}</button></p>
+      <p id="commentsEl" style="${startVisible ? "" : "display:none;"}">
+        ${commentsPluginHtml}
+      </p>
+    `;
+  }
+  createCommentsSectionHtml();
+</script>
+
+<!-- DARK MODE STUFF -->
+<div style="position:fixed; bottom:0.5rem; left:0.5rem; z-index:10;">
+  <button id="darkModeBtn" style="cursor:pointer;" onclick="window.toggleManualDarkMode(); createCommentsSectionHtml();">🌃</button>
+</div>
+<script>
+  function toggleManualDarkMode() {
+    let newColorScheme = (getCurrentColorScheme() === "dark" ? "light" : "dark");
+    localStorage.forceColorScheme = newColorScheme;
+    setColorScheme(newColorScheme);
+    // if chosen mode matches current OS default, we remove manual "forced" mode:
+    let systemColorScheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? "dark" : "light";
+    if(systemColorScheme === newColorScheme) {
+      localStorage.removeItem("forceColorScheme");
+    }
+  }
+  function getCurrentColorScheme() {
+    if(localStorage.forceColorScheme !== undefined) {
+      return localStorage.forceColorScheme;
+    } else {
+      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? "dark" : "light";
+    }
+  }
+  function setColorScheme(scheme) {
+    if(scheme !== "dark" && scheme !== "light") throw new Error("scheme should be 'light' or 'dark'");
+    document.querySelector("#darkModeBtn").textContent = (scheme === "dark" ? "🌄" : "🌃");
+    if(scheme === "dark") {
+      document.body.style.colorScheme = "dark";
+      document.body.style.color = "#d8d4cf";
+      document.body.style.backgroundColor = "#131516";
+      document.documentElement.style.setProperty('--box-color', '#2a2a2a');
+    } else {
+      document.body.style.colorScheme = "light";
+      document.body.style.color = "black";
+      document.body.style.backgroundColor = "white";
+      document.documentElement.style.setProperty('--box-color', '#ebebeb');
+    }
+  }
+  // during page load, set the chosen mode based on localStorage value if it exists:
+  if(localStorage.forceColorScheme !== undefined) {
+    setColorScheme(localStorage.forceColorScheme);
+  } else {
+    // user has not manually overwritten, so we use OS default:
+    let systemIsInDarkMode = !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    setColorScheme(systemIsInDarkMode ? "dark" : "light");
+  }
+</script>
+ 
+<!-- FEEDBACK STUFF -->
+<div style="position:fixed; bottom:0.5rem; right:0.5rem; text-align:right; z-index:100;">
+  <div id="feedbackCommentsCtn"></div>
+  <button id="feedbackBtn893745ykfuhd" onclick="if(feedbackCommentsCtn.innerHTML.length === 0) { feedbackCommentsCtn.innerHTML=generateFeedbackCommentsHtml(); this.innerHTML='✖ close'; } else {  feedbackCommentsCtn.innerHTML='';  this.innerHTML='🗨️ feedback'; }">🗨️ feedback</button>
+</div>
+<script>
+  function generateFeedbackCommentsHtml() {
+    let options = {channel:"feedback", hideComments:location.hash.includes("#showfeedback") ? false : true, height:location.hash.includes("#showfeedback") ? 500 : 120, commentPlaceholderText: "Share some feedback. Do not share personal info, data is public.", submitButtonText: "submit feedback"};
+    if(localStorage.forceColorScheme) options.forceColorScheme = localStorage.forceColorScheme;
+    return comments(options);
+  }
+</script>
+
+<style>
+  button:disabled {
+    filter: grayscale(1); /* since firefox doesn't seem to change emoji colors to indicate disabledness - only affects text */
+  }
+</style>

@@ -1,0 +1,29 @@
+selectLeaf = {import:select-leaf-plugin}
+
+// This is the JavaScript function that powers this plugin:
+$output (list, ...a) =>
+  if(!list) return "(no list given to selectLeaves plugin)";
+
+	// just a copy of the selectMany function, except using selectLeaf instead of selectOne
+	function selectMany(...a) {
+		let num; 
+		if(a.length === 1) {
+			if(Array.isArray(a[0])) {
+				num = Number(a[0][Math.floor(Math.random()*a[0].length)]);
+			} else {
+				num = Number(a[0]);
+			}
+		} else if(a.length === 2) {
+			num = Number(a[0]) + Math.round(Math.random()*(a[1]-a[0]));
+		} else if(a.length > 2) {
+			num = Number(a[Math.floor(Math.random()*a.length)]);
+		}
+		if(isNaN(num)) debugger;
+	  let arr = [];
+	  for(let i = 0; i < num; i++) {
+		  arr.push(selectLeaf(list));
+		}
+		arr.toString = function() { return this.join(""); };
+		return arr;
+	}
+	return selectMany(...a);

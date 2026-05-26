@@ -1,0 +1,150 @@
+// This is the JavaScript function that powers this plugin:
+$output (text, voice, pitch, speed, delay) =>
+  
+  let onSpoken, textStream;
+  if(typeof text === "object" && (typeof text.text === "string" || text.textStream)) { // for this form: speak({text, ...})
+    let obj = text;
+    text = obj.text;
+    textStream = obj.textStream;
+    voice = obj.voice || voice;
+    pitch = obj.pitch || pitch;
+    speed = obj.speed || speed;
+    delay = obj.delay || delay;
+    onSpoken = obj.onSpoken;
+  } else if(typeof text === "string" && typeof voice === "object") { // for this form: speak(text, {...})
+    let obj = voice;
+    voice = obj.voice;
+    pitch = obj.pitch;
+    speed = obj.speed;
+    delay = obj.delay;
+    onSpoken = obj.onSpoken;
+  }
+  
+  let stopSignalRecieved = false;
+  let resolver;
+  let promise = new Promise(r => resolver=r);
+  let spokenText = ""; // in the case that the input is a text stream, we track the text spoken so far so we can include that in the return value of `stop`, so the caller has a way to know what was already spoken before stop() was called.
+  
+  if(!textStream && text && text.split && text.split(/\p{Sentence_Terminal}+/u).length >= 4) { // if 4 or more sentences, break it into a stream. This allows `spokenText` tracking to be more granular in the case that the speech is premuaturely `.stop()`ed
+    let textStreamController;
+    textStream = new ReadableStream({
+      start(controller) {
+        let sentences = [...text.matchAll(/.+?\p{Sentence_Terminal}/ugs)].map(c => c[0]);
+        for(let s of sentences) {
+          controller.enqueue(s);
+        }
+        
+        // in case of final 'sentence' at the end without any fullstop
+        let lastChunk = text.split(/\p{Sentence_Terminal}/u).at(-1);
+        if(lastChunk) controller.enqueue(lastChunk);
+        
+        controller.close();
+      }
+    });
+  }
+  
+  let regexLookbehindSupported = false;
+  try { "foo".split(/(?<=\p{Sentence_Terminal})/u); regexLookbehindSupported = true; } catch(e) {}
+  
+  let currentTextStreamSentencePromise;
+  if(textStream) { // if `text` is actually an object and it has a `textStream` property (like some plugins produce), then we chunk it into sentences and call $output on those sentences sequentially   
+    (async () => {
+      let unspokenText = "";
+      const reader = textStream.getReader();
+      while (true) {
+        const { value, done } = await reader.read();
+        if(done) break;
+        unspokenText += value;
+        let endOfSentenceIndex = -1;
+        if(regexLookbehindSupported) {
+          let accumulatedChunksText = "";
+          let chunks = unspokenText.split(/(?<=\p{Sentence_Terminal})/u);
+          if(chunks.length > 1) {
+            for(let chunk of unspokenText.split(/(?<=\p{Sentence_Terminal})/u)) {
+              accumulatedChunksText += chunk;
+              if(!/\b(Mr|Mrs|Dr|Ms|St|Jr|Sr|Prof)\.$/i.test(accumulatedChunksText)) {
+                endOfSentenceIndex = accumulatedChunksText.length-1;
+                break;
+              }
+            }
+          }
+        } else {
+          endOfSentenceIndex = unspokenText.match(/\p{Sentence_Terminal}/u)?.index ?? -1;
+        }
+        if(endOfSentenceIndex !== -1) {
+          if(stopSignalRecieved) {
+            resolver({spokenText});
+            return;
+          }
+          while(unspokenText[endOfSentenceIndex] && unspokenText[endOfSentenceIndex].match(/\p{Sentence_Terminal}/u)) {
+            endOfSentenceIndex++; // So we include the sentence terminator and also so e.g. "Hi!!!" is properly interpreted 1 sentence
+          }
+          let sentenceText = unspokenText.slice(0, endOfSentenceIndex);
+          console.log("Speaking sentence:", sentenceText);
+          currentTextStreamSentencePromise = $output(sentenceText, voice, pitch, speed, delay);
+          await currentTextStreamSentencePromise;
+          spokenText += sentenceText;
+          unspokenText = unspokenText.slice(endOfSentenceIndex);
+        }
+      }
+      if(unspokenText.length > 0) {
+        if(stopSignalRecieved) {
+          resolver({spokenText});
+          return;
+        }
+        if(unspokenText.trim()) await $output(unspokenText, voice, pitch, speed, delay);
+        spokenText += unspokenText; // IMPORTANT: must append unspokenText even if it's just whitespace, since it can be used in userland to exact-regex-match up to e.g. where in the story has already been read.
+        unspokenText = "";
+      }
+      resolver({spokenText});
+    })();
+  } else {
+    if(text === undefined) return "";
+    text = text+"";
+    if(!text) return "";
+    if(!delay) delay = 0;
+    setTimeout(() => {
+      if(!window.perchanceTtsPluginVoices) {
+        // load the voices:
+        let tryVoicesInterval = setInterval(() => {
+          window.perchanceTtsPluginVoices = window.speechSynthesis.getVoices();
+          if(window.perchanceTtsPluginVoices) {
+            clearInterval(tryVoicesInterval);
+            doTheVoice();
+          }
+        },100)
+      } else {
+        doTheVoice();
+      }
+    }, delay*1000);
+
+    function doTheVoice() {
+      let voices = window.perchanceTtsPluginVoices;
+      let utterThis = new SpeechSynthesisUtterance(text);
+      if(voice) {
+        utterThis.voice = voices.find(v => v.lang === voice || v.voiceURI === voice) || utterThis.voice;
+      }
+      if(speed) utterThis.rate = speed;
+      if(pitch) utterThis.pitch = pitch;
+      utterThis.addEventListener("end", (event) => {
+        console.log("Finished utterance:", utterThis);
+        resolver({spokenText});
+      });
+      console.log("Started utterance:", utterThis);
+      window.speechSynthesis.speak(utterThis);
+    }
+  }
+  
+  promise.toString = () => "";
+  promise.stop = function() {
+    stopSignalRecieved = true;
+    if(currentTextStreamSentencePromise) currentTextStreamSentencePromise.stop();
+    window.speechSynthesis.cancel();
+    console.log("text-to-speech-plugin: stopSignalRecieved");
+    resolver({spokenText});
+    return {spokenText};
+  };
+  return promise;
+	
+// You can learn JavaScript here:
+// https://www.codecademy.com/learn/javascript 

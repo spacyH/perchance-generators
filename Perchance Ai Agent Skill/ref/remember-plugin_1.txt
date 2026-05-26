@@ -1,0 +1,177 @@
+$output(callerRoot, command) =>
+  if(!callerRoot || !command) return "(error: you didn't input root and/or variable names to the remember plugin)";
+  
+  // To prevent conflict with other generators (EDIT: not actually needed anymore now that each generator has its own subdomain, but need to keep it the same else they'll lose their data)
+  let prefix = generatorName+"__rememberPlugin__variable__"; 
+  
+  if(command === "@forget") {
+  
+  
+    clearInterval(window.__rememberPluginSaveInterval7645665);
+    for(let key in localStorage) {
+      // if(key.startsWith(prefix)) delete localStorage[key];
+      if(key.startsWith(prefix)) localStorage.removeItem(key);
+    }
+    window.location.reload();
+    return;
+    
+    
+  } else {
+  
+  
+    let variables = command.split(",").map(v => v.trim());
+    
+    // Deal with the @input option stuff:
+    if(variables.includes("@inputs")) {
+      variables = variables.filter(v => v !== "@inputs");
+  
+      if(!window.___alreadyAddedRememberUserInputsHandler23942397) {
+        window.___alreadyAddedRememberUserInputsHandler23942397 = true;
+        
+        // We need to set a timeout because otherwise these triggers can cause the handlers to run in the middle of the
+        // initial page update(), which messes with stuff, because the handlers can themselves call update(). You
+        // should think of it like we're just emulating what the user would do if they themselves remembered the
+        // data and manually entered it in after the page load.
+        // Note that this is for input fields only - the variables are loaded instantly (see the code closer to the bottom of this function)
+        setTimeout(() => {
+        
+          let els = document.querySelectorAll('input, select, textarea');
+
+          // load data from localStorage into input forms:
+          for(let el of els) {
+            let data = localStorage.getItem( prefix + "_input_forms_" + getCssPath(el) );
+            
+            // Note that we also need to trigger change and input events in case the person using this plugin has input/change handlers on their inputs,
+            // like <input oninput="..."> or <select onchange="...">.
+            // Remember, we're really just trying to "emulate" the user changing typing/selecting the inputs after loading the page.
+            
+            if(data) {
+              if(el.type === "checkbox") {
+                el.checked = data==="false" ? false : true;
+                triggerEvent(el, "change");
+                triggerEvent(el, "input");
+              } else if(el.type === "radio") {
+                el.checked = data==="false" ? false : true;
+                if(el.checked) { // only the "clicked" radio button in a group of radio buttons has its oninput and onchange fired, even though the state of one of the others (which was the previously selected one) does actually change (from true to false)
+                  triggerEvent(el, "change");
+                  triggerEvent(el, "input");
+                }
+              } else {
+                el.value = data;
+                triggerEvent(el, "change");
+                triggerEvent(el, "input");
+              }
+            }
+          }
+
+          // attach listeners so that when user changes input values, the text gets saved to localstorage
+          // we do this a little while after loading the data so it doesn't get unnecessarily run due to the above triggers
+          setTimeout(() => {
+            function handler() {
+              // let key = prefix + "_input_forms_" + getCssPath(this);
+              // let value = (this.type=="checkbox" || this.type=="radio") ? this.checked : this.value;
+              // localStorage.setItem(key, value);
+              if (this.type == "checkbox") { // If a checkbox, set the localStorage based on the item's current state.
+                localStorage.setItem( prefix + "_input_forms_" + getCssPath(this), this.checked);
+              } else if (this.type == "radio") { // If a radio, set the get the group of the item and set their states accordingly - i.e. set the checked radio to true, and others in the group false.
+                let group = document.querySelectorAll(`input[type='radio'][name='${this.name}']`);
+                group.forEach(a => localStorage.setItem( prefix + "_input_forms_" + getCssPath(a), a.checked));
+              } else { // Else, save the value from the input
+                localStorage.setItem( prefix + "_input_forms_" + getCssPath(this), this.value);
+              }
+            }
+            for(let el of els) {
+              el.addEventListener('input', handler);
+              el.addEventListener('change', handler);
+            }
+          }, 400);
+        
+        }, 200);
+
+      }
+      
+    }
+    
+    // Periodically save variables to localStorage:
+    clearInterval(window.__rememberPluginSaveInterval7645665);
+    window.__rememberPluginSaveInterval7645665 = setInterval(() => {
+      for(let v of variables) {
+        if(callerRoot[v] !== undefined) {
+          let value = callerRoot[v];
+          if(Array.isArray(value.getPropertyNames) && value.getLength !== undefined) value = `[ERROR: Looks like you're trying to save a Perchance list called "${v}" using the remember-plugin? Currently this plugin only supports remembering variables.]`; // the brackets are just a hacky way to trigger the red error box and show this text. 
+          // if(Array.isArray(value.getPropertyNames) && value.getLength !== undefined) { // hackily detect if it's a Perchance node
+          //   // if it's all properties, then save it as JSON, otherwise toString it (we can't persist a perchance list/node).
+          //   if(value.getPropertyNames.length > 0 && value.getLength === 0) {
+          //     let newValue = {};
+          //     for(let name of value.getPropertyNames) {
+          //       newValue[name] = value[name];
+          //     }
+          //     value = newValue;
+          //   } else {
+          //     value = value.toString(); // it's a node/list, so we need to toString it to persist it (otherwise JSON.stringify will give us "[object Object]"
+          //   }
+          // }
+          localStorage[prefix+v] = JSON.stringify(value);
+        } else if(window[v] !== undefined) {
+          let value = window[v];
+          if(Array.isArray(value.getPropertyNames) && value.getLength !== undefined) value = `[ERROR: Looks like you're trying to save a Perchance list called "${v}" using the remember-plugin? Currently this plugin only supports remembering variables.]`; // the brackets are just a hacky way to trigger the red error box and show this text. 
+          localStorage[prefix+v] = JSON.stringify(value);
+        } else {
+          delete localStorage[prefix+v];
+        }
+      }
+    }, 500);
+    // Load variables:
+    if(!window.__rememberPluginAlreadyLoadedVariables34394539) {
+      for(let v of variables) {
+        if(localStorage[prefix+v] !== undefined) {
+          callerRoot[v] = JSON.parse(localStorage[prefix+v]);
+        }
+      }
+      window.__rememberPluginAlreadyLoadedVariables34394539 = true;
+    }
+    
+    
+  }
+  
+  return "";
+  
+
+
+triggerEvent(el, type) =>
+  if (document.createEvent) {
+    let event = document.createEvent("HTMLEvents");
+    event.initEvent(type, true, true);
+    el.dispatchEvent(event);
+  } else {
+    let event = document.createEventObject();
+    el.fireEvent('on' + type, event);
+  }
+
+
+getCssPath(el) =>
+  if(!(el instanceof Element)) {
+    return;
+  }
+  let path = [];
+  while(el.nodeType === Node.ELEMENT_NODE) {
+    let selector = el.nodeName.toLowerCase();
+    if(el.id) {
+      selector += '#' + el.id;
+      path.unshift(selector);
+      break;
+    } else {
+      let sib = el, nth = 1;
+      while(sib = sib.previousElementSibling) {
+        if (sib.nodeName.toLowerCase() == selector) {
+          nth++;
+        }
+      }
+      if(nth != 1) {
+        selector += ":nth-of-type("+nth+")";
+      }
+    }
+    path.unshift(selector);
+    el = el.parentNode;
+  }
+  return path.join(" > ");

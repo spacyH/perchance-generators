@@ -1,0 +1,250 @@
+<h1>🦓 Pattern Maker Plugin 🎨</h1>
+
+<div style="margin:0 auto;width:100%;max-width:650px;background:white;border-radius:2px;padding:1em; box-sizing:border-box; text-align:left;">
+	<p style="margin-top:0">This plugin allows you to create random patterns based on an "example pattern" that you input. It uses a <a href="https://github.com/mxgmn/WaveFunctionCollapse" target="_blank">smart algorithm</a> by <a href="https://twitter.com/ExUtumno" target="_blank">Maxim Gumin</a> to generate random patterns that look similar to the pattern that you give it.</p>
+  <p>Here are some example input patterns (left) and some example output patterns that it generates (right):</p>
+  <img src="https://i.imgur.com/XjdAKur.png" style="max-width:100%;">
+  
+  <p>To use it, you'll first need to import it by adding this line to your lists editor:</p>
+<pre>
+patternMaker = \{import:pattern-maker-plugin\}
+</pre>
+
+  
+  <p>Now that you've imported your plugin, you'll need to make a <b>very small</b> input image or a grid of emoji/text. If you'd like to draw your example/input grid using emojis, you can paste the following example into your code editor:</p>
+<pre>
+patternOptions
+  inputTextGrid
+    🌳🟩🟩🟩🌲🟩🟩🟩🟩🟩🟩🌾
+    🟩🟩🟩🟦🟩🟩🟩🔲🔲🔲🔲🟩
+    🟩🟦🟦🟦🟩🟩🟩🔲🟫🪑🔲🟩
+    🟩🟦🟦🟦🌲🌷🌷🔲🟫🟫🔲🟩
+    🟩🟩🟦🟦🟩🟩🟩🔲🚪🔲🔲🟩
+    🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩
+    🟩🌳🌳🟩🟩🟩🟩🟩🟩🟩🟩🟩
+    🟩🟩🌳🟦🟦🟦🟩🟩🌷🟩🟦🟦
+    🟩🌳🟦🟦🟦🟩🟩🪨🟩🟩🟦🟩
+    🌾🟩🟦🟦🟦🟩🟩🌳🟦🟦🟦🟩
+    🟩🟩🟦🟦🟦🟦🟦🟦🟦🌳🟩🟩
+  settings
+    width = 40
+    height = 40
+    n = 3
+    symmetry = 8
+</pre>
+  <p>And you can now just paste this anywhere in your code:</p>
+<pre>
+\[patternMaker(patternOptions)\]
+</pre>
+  <p>The plugin will generate a random pattern based on the example emoji pattern that you provided. You can paste it in your HTML panel, or as part of a list in your Perchance lists panel (keep reading to learn what the <code>n</code> and <code>symmetry</code> settings mean).</p>
+  <p><a href="https://perchance.org/pattern-maker-plugin-emoji-example#edit" target="_blank">Here's an example generator</a> using the above pattern options. You can create your own emoji patterns manually, or with <a href="https://emojicombos.com/emoji-art-editor" target="_blank">this emoji art editor</a>.</p>
+  
+  <p>If you're creating an image, then it should probably be less than 30px in width and height, otherwise it will take too long to generate. It can be larger if you're only using a small number of colors. <a href="https://i.imgur.com/9A0FSw0.png" target="_blank">Here's an example image</a>.</p>
+  <p>To create your image, you can use the simple drawing tool below, or you can use a site like <a href="https://photopea.com" target="_blank">Photopea</a>. The tool below allows you to draw an input image and quickly test it by clicking "Generate Image". Click in the box to start drawing. Once you're happy with your image you can click "Save" and continue with the instructions below.</p>
+  <div style="text-align: center;">
+    <!-- Note: can't add border or padding to canvas directly or it'll mess up click event calculations -->
+    <div style="display:inline-block; border:1px solid grey;">
+      <canvas id="drawingCanvas" width="30" height="30" style="user-select:none; width:300px; image-rendering:pixelated; display: block;"></canvas>
+    </div>
+    <br>
+    <div style="display:inline-flex;">
+      <div style="display:inline-flex; align-items:center; justify-content:center; background:lightgrey; height:fill-available; padding:0.5rem;">Color:&nbsp;<input id="drawingColorPicker" type="color"></div>
+      <div style="margin-left:0.25rem; display:inline-flex; align-items:center; justify-content:center; background:lightgrey; padding:0.5rem;"><button onclick="clearDrawingCanvas()">Clear</button></div>
+      <div style="margin-left:0.25rem; display:inline-flex; align-items:center; justify-content:center; background:lightgrey; padding:0.5rem;"><button onclick="generateFromDrawingCanvas()">Generate Image</button></div>
+      <div style="margin-left:0.25rem; display:inline-flex; align-items:center; justify-content:center; background:lightgrey; padding:0.5rem;"><button onclick="resizeDrawingCanvas()">Resize</button></div>
+      <div style="margin-left:0.25rem; display:inline-flex; align-items:center; justify-content:center; background:lightgrey; padding:0.5rem;"><button onclick="saveDrawingCanvas()">Save</button></div>
+    </div>
+    <br>
+    <div id="currentColorsListEl" style="display:inline-flex;margin-top: 0.25rem;"></div>
+    <div id="drawingDataUrlCtn" style="display:none; margin-top:0.25rem; align-items:center; justify-content:center; background:lightgrey; padding:0.5rem;">Output URL:&nbsp;<input id="drawingCanvasDataUrlOutputEl" placeholder="Click save to generate">&nbsp;<button onclick="navigator.clipboard.writeText(dataUrlOutputEl.value); this.innerHTML='copied!'; setTimeout(() => this.innerHTML='copy', 2000);">copy</button></div>
+    <br>
+    <div id="drawingGenerationTestSettingsCtn" style="display:none; margin-top:0.25rem; align-items:center; justify-content:center; background:lightgrey; padding:0.5rem;">
+      <div>n: <input type="range" value="3" min="2" max="4" onchange="drawingSettings['n']=Number(this.value); this.nextElementSibling.innerHTML=this.value;">&nbsp;<span>3</span></div>
+      <div>symmetry: <input type="range"value="8"  min="1" max="8" onchange="drawingSettings['symmetry']=Number(this.value); this.nextElementSibling.innerHTML=this.value;">&nbsp;<span>8</span></div>
+    </div>
+    <br>
+    <div id="drawingGenerationTestOutputCtn" style="display:none; margin-top:0.25rem; align-items:center; justify-content:center; border:1px solid grey;"></div>
+    <style>#drawingGenerationTestOutputCtn canvas {display: block;}</style> <!-- to remove gap below canvas -->
+    
+    <script>
+      let drawingSettings = {};
+      let drawingCanvasCtx = drawingCanvas.getContext('2d'); 
+      drawingCanvasCtx.fillStyle = "white";
+      drawingCanvasCtx.fillRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+      
+      drawingCanvas.addEventListener('mousemove', handleMouseMoveClickOnDrawingCanvas);
+      drawingCanvas.addEventListener('mousedown', handleMouseMoveClickOnDrawingCanvas);
+      function handleMouseMoveClickOnDrawingCanvas(e) {
+        if(e.buttons !== 1) return;
+        let pixelSize = drawingCanvas.offsetWidth / drawingCanvas.width;
+        console.log(pixelSize)
+        let x = Math.round(((e.offsetX-0.5*pixelSize) / drawingCanvas.offsetWidth) * drawingCanvas.width);
+        let y = Math.round(((e.offsetY-0.5*pixelSize) / drawingCanvas.offsetHeight) * drawingCanvas.height);
+        drawingCanvasCtx.fillStyle = drawingColorPicker.value;
+        drawingCanvasCtx.fillRect(x, y, 1, 1);
+      }
+      
+      drawingColorPicker.addEventListener("change", function() {
+        // get all colors that are currently on the canvas:
+        let imageData = drawingCanvasCtx.getImageData(0, 0, drawingCanvas.width, drawingCanvas.height);
+        let colors = new Set();
+        for(let i = 0; i < imageData.data.length; i += 4) {
+          let r = imageData.data[i];
+          let g = imageData.data[i+1];
+          let b = imageData.data[i+2];
+          let hexColor = "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+          colors.add(hexColor);
+        }
+        // output them to the "current colors" palette/list:
+        currentColorsListEl.innerHTML = `<div style="display:inline-flex; align-items:center; justify-content:center; background:lightgrey; height:fill-available; padding:0.5rem;">Colors:</div>`;
+        for(let color of colors) {
+          currentColorsListEl.innerHTML += `<div style="margin-left:0.25rem; display:inline-flex; align-items:center; justify-content:center; background:lightgrey; padding:0.5rem;"><button onclick="drawingColorPicker.value=this.dataset.color; drawingColorPicker.dispatchEvent(new Event('change'));" data-color="${color}" style="padding: 0.25rem;"><span style="display:inline-block; background-color:${color};border-radius: 2px;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></button></div>`;
+        }
+      });
+      function clearDrawingCanvas() {
+        drawingCanvasCtx.fillStyle = drawingColorPicker.value;
+        drawingCanvasCtx.fillRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+        drawingDataUrlCtn.style.display = "none";
+        drawingGenerationTestOutputCtn.style.display = "none";
+        drawingGenerationTestSettingsCtn.style.display = "none";
+      }
+      function resizeDrawingCanvas() {
+        let size = Number(prompt(`Enter the new canvas size:`, drawingCanvas.width)) || 30;
+        drawingCanvas.width = size;
+        drawingCanvas.height = size;
+      }
+      function saveDrawingCanvas() {
+        drawingCanvasDataUrlOutputEl.value = drawingCanvas.toDataURL();
+        drawingDataUrlCtn.style.display = "inline-flex";
+        drawingGenerationTestOutputCtn.style.display = "none";
+        drawingGenerationTestSettingsCtn.style.display = "none";
+      }
+      function generateFromDrawingCanvas() {
+        let dataUrl = drawingCanvas.toDataURL();
+        drawingGenerationTestOutputCtn.style.display = "inline-block";
+        drawingGenerationTestSettingsCtn.style.display = "inline-block";
+        let settings = {width:50, height:50, n:3, symmetry:8};
+        settings.n = drawingSettings.n ?? settings.n;
+        settings.symmetry = drawingSettings.n ?? settings.symmetry;
+        drawingGenerationTestOutputCtn.innerHTML = $output({inputImage:dataUrl, settings});
+      }
+    </script>
+  </div>
+  <p>Try playing around with the <code>n</code> and <code>symmetry</code> values if the generated image doesn't look good (I'll explain what these values mean soon). Note that <span style="background:#fce8bf;">the larger and more "complicated" your input image is, the longer it'll take to generate output images</span>. Try to use a small number of colors. The <code>n</code> and <code>symmetry</code> values will also affect the generation speed.</p>
+  <p>Once you're done, click save, and it'll generate some special output text that starts with <code>data:image/png</code>. Your image is saved/stored within this text - it represents the image that you just drew. Copy the following list into your Perchance code editor, and replace the example <code>data:image/png;...</code> with your own text that you generated above.</p>
+<pre>
+patternOptions
+  inputImage = data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA8AAAAXCAIAAABbMYLrAAAACXBIWXMAAAsSAAALEgHS3X78AAAAwUlEQVQ4jY2SsRHCMAxFZR1ViszCBFzo2IAJWIhpQpUcEzAGtYsUNFDoTshfPwFV9veX9KSkTM8qf4fCfeh66jNdQSojSXC9AMnQ9fNC2ExHkjJyYtPRLSLHO5K4otJONh0qJNjZdM2T2UMMV3Re6vskcbIfJHkyK2YNI5tCth8i4ZckXuJAmVDiBqPVwgkbbjflbUAVzQ9r1sadv0tu2NSGhNwK/xO6n1X3hpW7N/bDa6/F7nW9EHkvVOe1b48z1T+2Qmo2rMjyHQAAAABJRU5ErkJggg==
+  settings
+    width = 50
+    height = 50
+    n = 3
+    symmetry = 8
+</pre>
+    <p>And, as with the emoji version, you can now just paste this anywhere in your code to generate a pattern image:</p>
+<pre>
+\[patternMaker(patternOptions)\]
+</pre>
+  <p><a href="https://perchance.org/pattern-maker-plugin-example-data-url#edit" target="_blank">Here's a simple example generator</a> based on the above code to get you started.</p>
+  <p>If you're using <a href="https://photopea.com" target="_blank">Photopea</a> to create your input image, then click <code>File→New…</code> in the top menu and then create a small image, zoom in a lot with <code>View→Zoom in</code>, and switch from brush to <u>pencil</u> tool by right-clicking on the brush icon, and save/export it as a <b>png</b> when you're done.</p>
+  <p>Once you've made your image, you'll need to upload it to <a href="https://perchance.org/upload" target="_blank">perchance.org/upload</a> or <a href="https://imgur.com/upload" target="_blank">imgur.com/upload</a> <span style="opacity:0.7; color:red;">(<b>EDIT</b>: I no longer recommend uploading to Imgur, since <a href="https://www.reddit.com/r/TheoryOfReddit/comments/12tinfp/imgur_has_announced_that_they_will_be_removing/" target="_blank" style="color:inherit;">they've started deleting old images</a>. You should use <a href="https://perchance.org/upload" target="_blank" style="color:inherit;">perchance.org/upload</a> instead.)</span>. Just drag and drop your image on that page. Other image hosts probably won't work with this plugin for <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS" target="_blank">technical reasons</a>. Once it has uploaded, copy its URL. The URL should be a <i>direct</i> URL to the image - i.e. it should end in .png or .jpg rather than e.g. being a link to the Imgur page that has the image embedded in it. The URL should start with "https". If an Imgur URL starts with "blob" you need to wait a bit longer before right-clicking on the uploaded image.</p>
+  <p style="opacity:0.5; font-style:italic;">(Aside: If you want to create your image in an image editor like Photopea, but you want to embed your image file directly in your generator, rather than storing it on Imgur, keep reading. At the bottom of this page I've put a "Data URL" generator that'll convert your image into the <code>data:image/png;...</code> text storage format. This is useful if you want your generator to be able to work when you're offline.)</p>
+  <p>Once you've got your image URL, copy this "patternOptions" list into your generator's code, and replace the URL with your own image URL:</p>
+<pre>
+patternOptions
+  inputImage = https://i.imgur.com/V4trUZG.png
+  settings
+    width = 50
+    height = 50
+    n = 3
+    symmetry = 8
+</pre>
+  <p>And, as with the previous examples, you can now just paste this anywhere in your code:</p>
+<pre>
+\[patternMaker(patternOptions)\]
+</pre>
+  <p>The plugin will generate a pattern based on the example pattern that you provided. You can paste it in your HTML panel, or as part of a list in your Perchance lists panel. Again, <a href="https://perchance.org/pattern-maker-plugin-example#edit" target="_blank">here's a simple example generator</a> to get you started.</p>
+  <p>If you have this as your input image:</p>
+  <p style="text-align:center;"><img src="https://i.imgur.com/V4trUZG.png" style="image-rendering:pixelated; width:50px;"></p>
+  <p>Then it'll output something like this:</p>
+  <p id="exampleOutputCtn1" style="text-align:center;">[$output(patternOptions1)]</p>
+  <p style="text-align:center;"><button onclick="update(exampleOutputCtn1)">click me to regenerate</button></p>
+  <p>There are a bunch more settings for you to play around with:</p>
+<pre>
+patternOptions
+  inputImage = https://i.imgur.com/V4trUZG.png
+  settings
+    width = 50        <span style="opacity:0.5;">// The width of the output image in pixels. If you make this bigger than 100px it may be slow. The default value is 50.</span>
+    height = 50       <span style="opacity:0.5;">// The height of the output image in pixels. If you make this bigger than 100px it may be slow. The default value is 50.</span>
+    n = 3             <span style="opacity:0.5;">// Roughly speaking, this determines the size of the "chunks" of the input image that the input image will be chopped into - those chunks are then pieced together to generate the output image. Low values like 2, 3 and 4 are recommended.</span>
+    symmetry = 8      <span style="opacity:0.5;">// Roughly speaking, this determines whether the input chunks will be randomly rotated and flipped. Choose a value between 1 and 8, where 1 allows no rotation/flipping, and 8 allows every possible orientation/flip.</span>
+    magnify = 5       <span style="opacity:0.5;">// This just magnifies the displayed output size. E.g. if you set the width and height setting to 50px, and then set magnify to 2, the final output will have a width and height og 100px. The default value is 5 for inputImage (meaning 1 pixel is magnified up to 5 pixels) and 0.6 for inputTextGrid (meaning 60% of the normal text size).</span>
+    periodic = 0      <span style="opacity:0.5;">// Set to 1 if the output should be a repeatable pattern - i.e. the edges join up if you repeat it.</span>
+    periodicInput = 0 <span style="opacity:0.5;">// Set to 1 if the input is a repeatable pattern - i.e. the edges join up if you repeat it.</span>
+    ground = 0        <span style="opacity:0.5;">// Specifically for if your input image has a "ground"/"floor" that should be at the bottom of the output image. I'm not exactly sure how to use it yet - it's explained here: <a style="color:white;" href="https://github.com/mxgmn/WaveFunctionCollapse/issues/3#issuecomment-250995366" target="_blank">https://github.com/mxgmn/WaveFunctionCollapse/issues/3#issuecomment-250995366</a></span>
+</pre>
+  <p>The most important options to play around with are <code><b>n</b></code> and <code><b>symmetry</b></code>. These two can <u>dramatically</u> affect how good the output looks. As mentioned above, try values between 2 and 4 for <code>n</code>, and between 1 and 8 for <code>symmetry</code>.</p>
+  <p>If you're having trouble with Imgur, or would just prefer not to use it (e.g. so you can download your generator and use it without an internet connection), then upload your image below and it'll get converted into a Data URL which you can use in place of the Imgur URL.</p>
+  <div style="background:lightgrey; padding:1rem;">
+    <input style="margin-bottom:0.5rem;" type="file" accept="image/*" onchange="imageToDataUrlHandler(this.files[0])">
+    <br>Data URL: <input id="dataUrlOutputEl" placeholder="Data URL will appear here"> <button onclick="navigator.clipboard.writeText(dataUrlOutputEl.value); this.innerHTML='copied!'; setTimeout(() => this.innerHTML='copy', 2000);">copy</button>
+  </div>
+  <script>
+    async function imageToDataUrlHandler(blob) {
+      let dataUrl = await new Promise(resolve => {
+        let reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      });
+      dataUrlOutputEl.value = dataUrl;
+    }
+  </script>
+  <p>So if you use the above tool to create a Data URL out of your image, then your <code>patternOptions</code> list will look something like this:</p>
+<pre>
+patternOptions
+  inputImage = data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA8AAAAXCAIAAABbMYLrAAAACXBIWXMAAAsSAAALEgHS3X78AAAAwUlEQVQ4jY2SsRHCMAxFZR1ViszCBFzo2IAJWIhpQpUcEzAGtYsUNFDoTshfPwFV9veX9KSkTM8qf4fCfeh66jNdQSojSXC9AMnQ9fNC2ExHkjJyYtPRLSLHO5K4otJONh0qJNjZdM2T2UMMV3Re6vskcbIfJHkyK2YNI5tCth8i4ZckXuJAmVDiBqPVwgkbbjflbUAVzQ9r1sadv0tu2NSGhNwK/xO6n1X3hpW7N/bDa6/F7nW9EHkvVOe1b48z1T+2Qmo2rMjyHQAAAABJRU5ErkJggg==
+  settings
+    width = 50
+    height = 50
+    n = 3
+    symmetry = 2
+</pre>
+	<br>
+	<p><b>Notes:</b></p>
+	<ul>
+		<li><a href="https://perchance.org/pattern-maker-plugin-example#edit" target="_blank">Here's a basic example</a> to get you started.</li>
+		<li><a href="https://perchance.org/pattern-maker-plugin-emoji-example#edit" target="_blank">Here's an example</a> that uses a grid to emojis to define the "input".</li>
+		<li>You can call the <code>patternOptions</code> list whatever you want. If your pattern options list was called <code>mazePattern</code> then you'd write <code>\[patternMaker(mazePattern)\]</code> to generate the output image. You can have many pattern options lists in one generator.</li>
+		<li>This plugin uses a <a href="https://github.com/kchapelier/wavefunctioncollapse" target="_blank">JavaScript port</a> of the so called "<a href="https://github.com/mxgmn/WaveFunctionCollapse" target="_blank">Wave Function Collapse</a>" algorithm. All credit for this plugin goes to <a href="https://github.com/kchapelier" target="_blank">@kchapelier</a> and <a href="https://github.com/mxgmn" target="_blank">@mxgmn</a>!</li>
+		<li>Check out more plugins at <a href="/plugins">perchance.org/plugins</a></li>
+	</ul>
+</div>
+<p style="text-align:center; font-size:200%; opacity:0.2; margin-top:0.5em;"><span>⚄&#xFE0E;</span></p>
+<br><br><br>
+
+<style>
+	body {
+			background:#eee;
+	}
+	code {
+		background-color:#eee;
+		padding:0.13em 0.2em
+	}
+	ul li { margin-top:0.4em; }
+  	code {
+		background-color:#eee;
+		padding: 0 0.2em;
+	}
+	pre {
+		text-align:left;
+		background: #333;
+    color: white;
+    padding: 1em;
+    border-radius: 2px;
+		tab-size: 2;
+		-moz-tab-size: 2;
+		-o-tab-size: 2;
+		-webkit-tab-size: 2;
+	}
+</style>
+

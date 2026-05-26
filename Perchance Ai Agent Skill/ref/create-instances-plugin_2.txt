@@ -1,0 +1,63 @@
+<h1>Create Instances Plugin</h1> 
+
+<div style="margin:0 auto;width:100%;max-width:760px;background:white;border-radius:2px;padding:1em; box-sizing:border-box; text-align:left;">
+	<p style="margin-top:0;">This is a version of the <a href="https://perchance.org/create-instance-plugin" target="_blank">create-instance-plugin</a> that allows you to create a <b>list</b> of instances of a particular blueprint. Have a look at this example:</p>
+<pre>
+createInstances = \{import:create-instances-plugin\}
+
+character
+  name = \{Molly|Anita|Murphy\}
+	age = \{18-90\}
+	...
+  
+output
+  \[cs = createInstances(character, 5), ""\]
+</pre>
+  <p>Here I use the variable name <code>cs</code> to represent the list of 5 generated characters (but you can call it whatever you want). You can access the first character by writing <code>cs\[0\]</code>, and the second by writing <code>cs\[1\]</code>, and the third by writing <code>cs\[2\]</code>, and so on. Why does it start at zero and not at one? Because JavaScript (the language on which Perchance is based) uses <a href="https://en.wikipedia.org/wiki/Zero-based_numbering" target="_blank">zero-based numbering</a>.</p>
+  <p>So we could list the names of the 5 characters like this:</p>
+<pre>
+output
+  \[cs = createInstances(character, 5), ""\] \[cs\[0\].name\] \[cs\[1\].name\] \[cs\[2\].name\] \[cs\[3\].name\] \[cs\[4\].name\]
+</pre>
+  <p>And here's how you'd reference the first character using a new variable:</p>
+<pre>
+output
+  \[cs = createInstances(character, 5), firstChar = cs\[0\], ""\] The first character's name is \[firstChar.name\].
+</pre>
+  <p>You can treat <code>cs</code> just like any other list, so you can, for example, draw a random character from it like so: <code>\[char = cs.selectOne\]</code>.</p>
+  <p>To use "deep" mode, as explained on the <a href="https://perchance.org/create-instance-plugin" target="_blank">create-instance-plugin</a> page, you'd write this:
+<pre>
+output
+  \[cs = createInstances(character, 5, "deep"), ""\] ......
+</pre>
+  <br>
+	<p><b>Notes:</b></p>
+	<ul>
+		<li>You'll want to read how to use the <a href="https://perchance.org/create-instance-plugin" target="_blank">create-instance-plugin</a> before trying to use this plugin.</li>
+		<li><a href="https://perchance.org/create-instances-plugin-example#edit">Here's a simple example</a> showing how to use this plugin.</li>
+		<li>Check out more plugins at <a href="/plugins">perchance.org/plugins</a></li>
+	</ul>
+</div>
+<br><br><br>
+
+<style>
+	body {
+			background:#eee;
+	}
+	code {
+		background-color:#eee;
+		padding:0em 0.1em;
+	}
+	pre {
+		text-align:left;
+		background: #333;
+    color: white;
+    padding: 1em;
+    border-radius: 2px;
+		tab-size: 2;
+		-moz-tab-size: 2;
+		-o-tab-size: 2;
+		-webkit-tab-size: 2;
+	}
+	ul li { margin-top:0.4em; }
+</style>

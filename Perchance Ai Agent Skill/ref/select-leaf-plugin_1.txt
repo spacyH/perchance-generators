@@ -1,0 +1,17 @@
+$output (list) =>
+  if(!list) return "(no list given to selectLeaf plugin)";
+	let leaf = list;
+	let i = 0;
+	let result;
+	while(1) {
+		i++;
+		if(i > 10000) {
+      return "(error in select-leaf-plugin: infinite loop encountered?)";
+    }
+		result = leaf.selectOne;
+		if(typeof result === "string" || Object.keys(result).length === 0) { // typeof result === "string" is for case where input list was actually just a 'property' like foo={a|b|c}
+			//if(!result) debugger;
+			return result;
+		}
+		leaf = result;
+	}

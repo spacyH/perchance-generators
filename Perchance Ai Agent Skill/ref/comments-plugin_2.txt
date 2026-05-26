@@ -1,0 +1,445 @@
+<div style="color:red; font-weight:bold;">[window.generatorName === "comments-plugin" ? "" : "Heads up! Unfortunately it's a really bad idea to fork this plugin, since its code is coupled with the server code, so if I need to change the server code, your version of this plugin will likely break. If you'd like new features, best to ask for them on the community forum so your generators don't randomly break in the future when I update the server code."]</div>
+
+<h1>💬 Comments Plugin 💬</h1>
+
+<main>
+  <p style="background:#ffe8b2; background:light-dark(#ffe8b2,#4e3600);padding:0.5rem;margin-top: 0;border-radius: 3px; text-align:left;"><b>New:</b> I've just added the ability to ban users. The new <b>bannedUsers</b> list is explained in the "Moderation" section, below.</p>
+  <p style="background:#a9dbff; background:light-dark(#a9dbff,#003256);padding:0.5rem;margin-top: 0;border-radius: 3px; text-align:left;"><b>New:</b> You can now add <b>slash commands</b> to your chat. <a href="https://perchance.org/comments-plugin-slash-commands-example#edit" target="_blank">Here's an example</a>.</p>
+  <p style="background:#c2ffa3; background:light-dark(#c2ffa3,#1d5700);padding:0.5rem;margin-top: 0;border-radius: 3px; text-align:left;"><b>New:</b> You can now add <b>custom emojis</b> to your chat. <a href="https://perchance.org/comments-plugin-custom-emojis-example#edit" target="_blank">Here's an example</a>.</p>
+	<p style="text-align:justify; margin-top:0;">This plugin allows you to embed a comments/feedback section on your generator's page. Just paste this in your Perchance code panel:</p>
+	 
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+commentsPlugin = \{import:comments-plugin\} 
+</pre>
+	
+  <p>and then write this in your HTML (bottom-right) panel:</p>
+	
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+\[commentsPlugin()\]
+</pre>
+
+	<p>and it'll output this:</p>
+	
+	<p style="text-align:center;">[$output()]</p> 
+	
+	<p>Feel free to test it out by adding a comment above!</p>
+	
+	<p>You can specify some options by writing this in your Perchance code panel:</p>
+	
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+commentOptions
+	width = 300
+	height = 350
+	commentPlaceholderText = Add a friendly comment.
+	submitButtonText = submit comment
+</pre>
+	
+  <p>and then write this in your HTML panel:</p>
+	
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+\[commentsPlugin(commentOptions)\]
+</pre>
+  
+  <p><a href="https://perchance.org/comments-plugin-example-1#edit" target="_blank">Here's a simple example generator</a> that uses this plugin.</p>
+	
+  <p>You can set the width to 100% to make it take up the width of the screen (or container):</p>
+	
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+commentOptions
+	width = 100%
+	...
+</pre>
+	
+  <p>You can also hide the comments so there's just the textarea and the button. In the example below we do that, and also set the height to 80 pixels:</p>
+	
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+commentOptions
+	hideComments = true
+	height = 80
+	... 
+</pre> 
+	
+	<p style="text-align:center;">[$output({height:80, hideComments:true, channel:"hidden-comments"})]</p>
+	
+	<p>But each time you want to view the comments you need to open up the edit panel and change <code>hideComments</code> to <code>false</code>. This might be worth it if you just want to use this as a feedback widget and you need your generator to be family-friendly/PG and can't risk having internet trolls getting past your banned-words list.</p>
+	<br><br>
+	<p>If you'd like to display the most recent comments at the top:</p>
+	
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+commentOptions
+	newestCommentsAtTop = true
+	... 
+</pre>
+	
+	<p style="text-align:center;">[$output({newestCommentsAtTop:true, channel:"new-comments-at-top"})]</p> 
+  <h2 style="margin-top:3rem;">Multiple "Channels"</h2>
+<p>If you want multiple different comment boxes in a single generator, use the <code>channel</code> option:</p>
+
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+generalChatOptions
+	channel = general-chat
+  ...
+  
+feedbackOptions
+	channel = feedback
+  ...
+</pre>
+  <p>Channel names can only contain lower-case letters, numbers and hyphens.</p>
+  
+  <p>Use <code>channelLabel = blah</code> to override how the channel name is displayed to users that have enabled notifications (with gear icon) without changing the actual channel itself. There are no restrictions on the characters you can use in <code>channelLabel</code> - e.g. you can use emojis.</p>
+  
+  <p>Here are two different comments boxes - notice that each comment box on this page has different comments - they all have a different <code>channel</code>.</p>
+  
+  <p style="text-align:center;">[$output({channel:"general-chat"})]</p>
+  <p style="text-align:center;">[$output({channel:"feedback"})]</p>
+  
+  <p><a href="https://perchance.org/multiple-comments-plugin-channels-in-same-generator#edit" target="_blank">Here's a simple example</a> of multiple comments boxes in a single generator.</p>
+  
+  <p>Note: By default comments areas aren't "updated"/randomized when the user clicks the "randomize" button. Instead the comments area will "stay there". If you actually want to display a random channel each time the user clicks a button, or you e.g. want to put a different comments box in each "room" within your <a href="https://perchance.org/goto-plugin" target="_blank">goto-plugin</a> adventure, then you need to add <code>replacedDuringUpdate=true</code> like in <a href="https://perchance.org/multiple-comments-boxes-randomized-example#edit" target="_blank">this example generator</a>. That ensures that the old comments section is "deleted" and replaced by a fresh one every time the page is updated/randomized.</p>
+	
+	<p>You can hide dates like this:</p>
+	
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+commentOptions
+	hideDates = true
+	... 
+</pre>
+	
+	<p style="text-align:center;">[$output({hideDates:true, channel:"hidden-dates"})]</p>
+
+  <h2 style="margin-top:3rem;"><img src="https://user.uploads.dev/file/a43d0b52d94c91dddb00cf157dd8c989.webp" style="height:20px;position:relative; bottom:-1px;"> Custom Emojis</h2>
+  <p>You can add custom emojis (including animated gif/png/webp) to your chat like this:</p>
+  
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+commentOptions
+  customEmojis
+    cat_jam = https://user.uploads.dev/file/a43d0b52d94c91dddb00cf157dd8c989.webp
+    crythumbsup = https://user.uploads.dev/file/14c78e8fbd9767e69a6b86d26817bacb.png 
+    surprise = ( ˶°ㅁ°) !!   <span style="opacity:0.5;">// can also use text (e.g. kaomojis, copypasta) instead of url</span>
+    kekw (tags:lol,lmao) = https://user.uploads.dev/file/ac26ce88558188d32dc08b2529a29a31.png
+    HUH = 45f7c9e776b916ec90f39949c06af5f5.webp <span style="opacity:0.5;">// if it ends in .webp, you don't need to add the https://... stuff at the start</span>
+</pre>
+  <p>Then just write <b>:catjam:</b> in your comment to show that emoji. <a href="https://perchance.org/comments-plugin-custom-emojis-example#edit" target="_blank">Here's an example generator</a> that uses the above code. Some notes:</p>
+  <p>If you want a huge list 80k+ emojis, and to also add some of your own ones, then you can use <code>\{import:huge-emoji-list\}</code> like so:</p>
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+commentOptions
+  customEmojis
+    @import = \{import:huge-emoji-list\} <span style="opacity:0.5;">// this line includes a huge list of emojis scraped from the internet</span>
+    cat_jam = https://user.uploads.dev/file/a43d0b52d94c91dddb00cf157dd8c989.webp
+    crythumbsup = https://user.uploads.dev/file/14c78e8fbd9767e69a6b86d26817bacb.png 
+    ... <span style="opacity:0.5;">// add more of your own custom ones here</span>
+</pre>
+  <ul>
+    <li>The emojis <b>must</b> be uploaded to <a href="https://perchance.org/upload" target="_blank">perchance.org/upload</a> - other URLs are not supported.</li>
+    <li>The emoji code/trigger words must only contain letters, numbers and underscores. You can use both lower case and upper case letters.</li>
+    <li>If you want <b>tens of thousands</b> of emojis, see <a href="https://perchance.org/80k-emojis-comments-plugin-example#edit" target="_blank">this example</a> which shows that you can set <code>customEmojis</code> to the URL of a text file that you've uploaded to <a href="https://perchance.org/upload" target="_blank">perchance.org/upload</a>. This is the only way to use more than about 10k emojis. If you want to include all the emoji lines from a big text file but <b>also</b> add some more lines on top of that using the normal method, then see <a href="https://perchance.org/comments-plugin-custom-emojis-import-url-example#edit" target="_blank">this example</a> which demonstrates the <code>@import = &lt;url&gt;</code> syntax. Note that only <u>one</u> <code>@import</code> URL is allowed in your <code>customEmojis</code> list.</li>
+    <li>Notice above that I've added 'lol' and 'lmao' as tags for the :kekw: emoji, so for example when you type ":lm" in the message box it will suggest the :kekw: emoji.</li>
+    <li>You can find a bunch of emojis on sites like <a href="https://emoji.gg/" target="_blank">emoji.gg</a> - just visit a page like <a href="https://emoji.gg/emoji/5163-95-crythumbsup" target="_blank">this</a>, click 128px, then right click on the image and download it, and then upload to <a href="https://perchance.org/upload" target="_blank">perchance.org/upload</a></li>
+    <li>I'd recommend keeping the image size under 128x128 pixels.</li>
+    <li>If a message only contains a single emoji, and nothing else, the emoji will be displayed a bit bigger than normal. The current multiplier is 1.8, but that may be tweaked a little. You can specify your own multiplier with <code>loneCustomEmojiSizeMultiplier = 3</code> (under <code>commentOptions</code>) to make a 'lone' emoji 3x the size of a normal one.</li>
+    <li>Animated gif files are horrendously inefficient compared to animated webp images (webp is a modern format which also support transparency + animations). A webp version of a gif can literally be a tenth of the size, and significantly less laggy on mobile devices for many images/animations showing at once. So if you expect to have lots of emojis in your chat, I'd really recommend using an online tool to convert your gifs to webp - just google "gif to webp converter".</li>
+  </ul>
+  <p>You can set a default size, and then a multiplier on top of that default size for each individual emoji. In this example, :crythumbsup: will produce an emoji that is 2x larger than normal (due to <code>customEmojiSize</code>), and catjam will be 4x larger than normal (due to starting at <code>customEmojiSize</code>, but then being specified as 2x larger than that).</p>
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+commentOptions
+  customEmojiSize = 2  <span style="opacity:0.5;">// this doubles the default custom emoji size</span>
+  customEmojis
+    crythumbsup = https://user.uploads.dev/file/14c78e8fbd9767e69a6b86d26817bacb.png
+    catjam (size:2) = https://user.uploads.dev/file/a43d0b52d94c91dddb00cf157dd8c989.webp
+    <span style="opacity:0.5;">// this ↑↑↑↑↑↑ makes :catjam: 2x bigger than your default (so 4x bigger in total)</span>
+</pre>
+  <p>You can add tags and size together like this:</p>
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+commentOptions
+  customEmojis
+    catjam (tags:cat,dance) (size:2) = https://user.uploads.dev/file/a43d0b52d94c91dddb00cf157dd8c989.webp
+</pre>
+
+  <h2 style="margin-top:3rem;">Slash Commands</h2>
+  <p>You can add custom slash commands to the chat like this:</p>
+  
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+commentOptions
+  slashCommands
+    emoji
+      output = \{import:emoji\}   <span style="opacity:0.5;">// when the user types '/emoji' it'll output a random emoji</span>
+    addemoji
+      output = \[this.input\] \{import:emoji\}   <span style="opacity:0.5;">// when the user types '/addemoji blahblah' it'll output 'blahblah &lt;emoji>'</span>
+    allcaps
+      output = \[this.input.upperCase\]   <span style="opacity:0.5;">// the message '/allcaps hello' will output 'HELLO'</span>
+</pre>
+  <p><a href="https://perchance.org/comments-plugin-slash-commands-example#edit" target="_blank">Here's an example generator</a> that uses the above code.</p>
+  
+  <h2 style="margin-top:3rem;">Visual Style</h2>
+  <p>By default the color scheme (dark mode vs light mode) will follow whatever the user's system mode is set to. You can override it like this:</p>
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+commentOptions
+	forceColorScheme = dark   <span style="opacity:0.5;">// or 'light'</span>
+	...
+</pre>
+	<p>If you know <a href="https://www.khanacademy.org/computing/computer-programming/html-css" target="_blank">CSS</a>, you can set a custom style on the container:</p>
+	
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+commentOptions
+	containerStyle = width:50%; height:200px; border:1px solid blue;   <span style="opacity:0.5;">// etc.</span>
+	...
+</pre>
+  
+	<p>If you want to change the style of the messages, input box, background, etc. you can do so like this:</p>
+	
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+commentOptions
+	messageBubbleStyle = background:pink; border:2px dotted red; color:black;
+  messageFeedStyle = background-image:url(https://user.uploads.dev/file/856ec8cf14a408f8fa94f57840443b32.jpg); background-size:cover;
+  inputAreaStyle = background:#fff391; <span style="opacity:0.5;">// get hex color codes here: google.com/search?q=hex+color+picker</span>
+	submitButtonStyle = background:#00b6ff; border:none;
+  ...
+</pre>
+  
+  <p style="text-align:center;">[$output({submitButtonStyle:"background:#00b6ff; border:none;", messageBubbleStyle:"background:pink;border: 2px dotted red; color:black;", messageFeedStyle:"background-image:url(https://user.uploads.dev/file/856ec8cf14a408f8fa94f57840443b32.jpg); background-size:cover;", inputAreaStyle:"background:#fff391;", channel:"styled"})]</p>
+  
+  <p><b>Note</b>: Instead of specifying colors like <code>color:black;</code> or <code>background:white;</code> or <code>border:2px dotted red;</code>, you should ideally specify two different colors: one for dark mode users, and one for light mode users. That's pretty easy to do - wherever you have a color like <code>white</code>, just swap it for <code>light-dark(white,black)</code> and now light mode users will see white, and dark mode users will see black. For example: <code>background:light-dark(white,black);</code> or <code>border:2px dotted light-dark(lightpink, pink);</code>. You can test that it's working by switching your device between dark/night and light/day mode in your OS settings.</p>
+  <p>You can also add <code>settingsButtonStyle</code>, <code>fullscreenButtonStyle</code>, <code>submitButtonSuccessText</code>, <code>hideSettingsButton</code>, <code>hideFullscreenButton</code>.</p>
+  <p>If you'd like to change the fonts, you need to include the name of one or more (comma-separated) fonts from <a href="https://fonts.google.com/" target="_blank">Google Fonts</a> in the <code>loadFonts</code> property, and then use the <code>font-family</code> style, like so:</p>
+  
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+commentOptions
+	loadFonts = Pacifico,DotGothic16,Syne Mono
+	submitButtonStyle = font-family:Pacifico; color:red;
+  messageBubbleStyle = font-family:DotGothic16;
+  inputAreaStyle = font-family:Syne Mono; color:orange;
+  ...
+</pre>
+  
+  <p style="text-align:center;">[$output({loadFonts:"Pacifico,DotGothic16,Syne Mono", inputAreaStyle: `font-family:Syne Mono; color:orange;`, submitButtonStyle:`font-family:"Pacifico"; color:red;`, messageBubbleStyle:`font-family:"DotGothic16";`, channel:"custom-fonts"})]</p>
+  <p>If you'd like to <b>completely</b> change how the comments are displayed (e.g. change message background images based on keywords in the message, or scatter messages all over the page, or pretty much anything else you can dream up), read the <code>onComment</code>/<code>onLoad</code> section on this page.</p>
+  
+  <h2 style="margin-top:3rem;">Moderation</h2>
+  <p>You can highlight your "admin" comments and delete other comments by adding this line:</p>
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+commentOptions
+	adminPasswordHash = REPLACE THIS TEXT WITH YOUR HASH (see below)
+	... 
+</pre>
+  <p><b>Important:</b> Make sure you write <code>\[commentsPlugin(commentOptions)\]</code> wherever you want your comments to be. You need to have <code>commentOptions</code> inside the brackets like that, otherwise the plugin won't "know about" the <code>adminPasswordHash</code> that you specified in your <code>commentOptions</code>.</p>
+  <p>The "hash" is kind of like an "encrypted" version of your password. You can generate a password and its associated hash by clicking the "generate" button below. It's okay for other people to see your <u>hash</u>, but obviously make sure you <b style="color:red;">don't put your <u>password</u> anywhere in your generator's code</b>, since other people can see it by just clicking the edit button on your generator. Keep your password hidden - e.g. send yourself an email, or put it in your notes app.</p>
+  <p style="text-align:center;">click 👉 <button onclick="passwordEl.value=new Array(7).fill(1).map(n => passwordWords[Math.floor(passwordWords.length*Math.random())]).map(w => w[0].toUpperCase()+w.slice(1)).join(''); updatePasswordHash(passwordEl.value);"><b>generate password and hash</b></button> 👈 click</p>
+  <p style="margin-bottom:0;text-align:center;">Your admin password: <input style="width:400px;" id="passwordEl" disabled> <button style="min-width:60px;" onclick="navigator.clipboard.writeText(passwordEl.value).then(r => this.innerHTML='✅'); setTimeout(() => this.innerHTML='copy', 2000);">copy</button></p>
+  <p style="margin-top:0; font-size:80%; opacity:0.7; text-align:center;">(<b>keep this private</b>, you <b>MUST NOT</b> put it in your perchance lists editor)</p>
+  <p id="passwordStatusEl" style="margin-top:0.25rem; font-size:75%;text-align:center;"></p>
+  <p style="margin-bottom:0;text-align:center;">Your admin password <b>hash</b>: <input style="width:400px;" id="pwHashEl" disabled> <button style="min-width:60px;" onclick="navigator.clipboard.writeText(pwHashEl.value).then(r => this.innerHTML='✅'); setTimeout(() => this.innerHTML='copy', 2000);">copy</button></p>
+  <p style="margin-top:0; font-size:80%; opacity:0.7; text-align:center;">(this is public - it's completely fine if other people see this)</p>
+  <p>Now, to make an admin comment, just click on your comments plugin embed, then press <kbd>Ctrl</kbd>+<kbd>L</kbd> (or <kbd>Cmd</kbd>+<kbd>L</kbd> on Mac). The "L" stands for "login". It'll show you an input to add your password. Then you'll see a little crown emoji and all comments that you make after that will be marked as admin comments.</p>
+  <p><a href="https://perchance.org/comments-plugin-admin-example#edit" target="_blank">Here's an example generator</a> with the password as "RelayBaskPleadDanceFrailProbeSnowy" - you can login as the admin and make a comment on it. (Obviously don't tell people your password like I just did...)</p>
+  <p>You can change your password at any time by using this page to generate a new hash, and then replacing the old hash with the newly generated one. <b>But</b> note that if you do that, you old admin comments won't be "highlighted" anymore, and you'll have to re-delete comments that you previously deleted. You've essentially created a new "admin" account for your comments section, so the old admin's actions aren't counted as coming from an admin anymore.</p>
+	<script>
+    let passwordWords = ["acid","acorn","acre","acts","afar","affix","aged","agent","agile","aging","agony","ahead","aide","aids","aim","ajar","alarm","alias","alibi","alien","alike","alive","aloe","aloft","aloha","alone","amend","amino","ample","amuse","angel","anger","angle","ankle","apple","april","apron","aqua","area","arena","argue","arise","armed","armor","army","aroma","array","arson","art","ashen","ashes","atlas","atom","attic","audio","avert","avoid","awake","award","awoke","axis","badge","bagel","baggy","baked","baker","balmy","banjo","barge","barn","bash","basil","bask","batch","bath","baton","bats","blade","blank","blast","blaze","bleak","blend","bless","blimp","blink","bloat","blob","blog","blot","blunt","blurt","blush","boast","boat","body","boil","bok","bolt","boned","boney","bonus","bony","book","booth","boots","boss","botch","both","boxer","breed","bribe","brick","bride","brim","bring","brink","brisk","broad","broil","broke","brook","broom","brush","buck","bud","buggy","bulge","bulk","bully","bunch","bunny","bunt","bush","bust","busy","buzz","cable","cache","cadet","cage","cake","calm","cameo","canal","candy","cane","canon","cape","card","cargo","carol","carry","carve","case","cash","cause","cedar","chain","chair","chant","chaos","charm","chase","cheek","cheer","chef","chess","chest","chew","chief","chili","chill","chip","chomp","chop","chow","chuck","chump","chunk","churn","chute","cider","cinch","city","civic","civil","clad","claim","clamp","clap","clash","clasp","class","claw","clay","clean","clear","cleat","cleft","clerk","click","cling","clink","clip","cloak","clock","clone","cloth","cloud","clump","coach","coast","coat","cod","coil","coke","cola","cold","colt","coma","come","comic","comma","cone","cope","copy","coral","cork","cost","cot","couch","cough","cover","cozy","craft","cramp","crane","crank","crate","crave","crawl","crazy","creme","crepe","crept","crib","cried","crisp","crook","crop","cross","crowd","crown","crumb","crush","crust","cub","cult","cupid","cure","curl","curry","curse","curve","curvy","cushy","cut","cycle","dab","dad","daily","dairy","daisy","dance","dandy","darn","dart","dash","data","date","dawn","deaf","deal","dean","debit","debt","debug","decaf","decal","decay","deck","decor","decoy","deed","delay","denim","dense","dent","depth","derby","desk","dial","diary","dice","dig","dill","dime","dimly","diner","dingy","disco","dish","disk","ditch","ditzy","dizzy","dock","dodge","doing","doll","dome","donor","donut","dose","dot","dove","down","dowry","doze","drab","drama","drank","draw","dress","dried","drift","drill","drive","drone","droop","drove","drown","drum","dry","duck","duct","dude","dug","duke","duo","dusk","dust","duty","dwarf","dwell","eagle","early","earth","easel","east","eaten","eats","ebay","ebony","ebook","echo","edge","eel","eject","elbow","elder","elf","elk","elm","elope","elude","elves","email","emit","empty","emu","enter","entry","envoy","equal","erase","error","erupt","essay","etch","evade","even","evict","evil","evoke","exact","exit","fable","faced","fact","fade","fall","false","fancy","fang","fax","feast","feed","femur","fence","fend","ferry","fetal","fetch","fever","fiber","fifth","fifty","film","filth","final","finch","fit","five","flag","flaky","flame","flap","flask","fled","flick","fling","flint","flip","flirt","float","flock","flop","floss","flyer","foam","foe","fog","foil","folic","folk","food","fool","found","fox","foyer","frail","frame","fray","fresh","fried","frill","frisk","from","front","frost","froth","frown","froze","fruit","gag","gains","gala","game","gap","gas","gave","gear","gecko","geek","gem","genre","gift","gig","gills","given","giver","glad","glass","glide","gloss","glove","glow","glue","goal","going","golf","gong","good","gooey","goofy","gore","gown","grab","grain","grant","grape","graph","grasp","grass","grave","gravy","gray","green","greet","grew","grid","grief","grill","grip","grit","groom","grope","growl","grub","grunt","guide","gulf","gulp","gummy","guru","gush","gut","guy","habit","half","halo","halt","happy","harm","hash","hasty","hatch","hate","haven","hazel","hazy","heap","heat","heave","hedge","hefty","help","herbs","hers","hub","hug","hula","hull","human","humid","hump","hung","hunk","hunt","hurry","hurt","hush","hut","ice","icing","icon","icy","igloo","image","ion","iron","islam","issue","item","ivory","ivy","jab","jam","jaws","jazz","jeep","jelly","jet","jiffy","job","jog","jolly","jolt","jot","joy","judge","juice","juicy","july","jumbo","jump","junky","juror","jury","keep","keg","kept","kick","kilt","king","kite","kitty","kiwi","knee","knelt","koala","kung","ladle","lady","lair","lake","lance","land","lapel","large","lash","lasso","last","latch","late","lazy","left","legal","lemon","lend","lens","lent","level","lever","lid","life","lift","lilac","lily","limb","limes","line","lint","lion","lip","list","lived","liver","lunar","lunch","lung","lurch","lure","lurk","lying","lyric","mace","maker","malt","mama","mango","manor","many","map","march","mardi","marry","mash","match","math","mocha","moist","mold","mom","moody","mop","morse","most","motor","motto","mount","mouse","mousy","mouth","move","movie","mower","mud","mug","mulch","mule","mull","mumbo","mummy","mural","muse","music","musky","mute","nacho","nag","nail","name","nanny","nap","navy","near","neat","neon","nerd","nest","net","next","niece","ninth","nutty","oak","oasis","oat","ocean","oil","old","olive","omen","onion","only","ooze","opal","open","opera","opt","otter","ouch","ounce","outer","oval","oven","owl","ozone","pace","pagan","pager","palm","panda","panic","pants","paper","park","party","pasta","patch","path","patio","payer","pecan","penny","pep","perch","perky","perm","pest","petal","petri","petty","photo","plank","plant","plaza","plead","plot","plow","pluck","plug","plus","poach","pod","poem","poet","pogo","point","poise","poker","polar","polio","polka","polo","pond","pony","poppy","pork","poser","pouch","pound","pout","power","prank","press","print","prior","prism","prize","probe","prong","proof","props","prude","prune","pry","pug","pull","pulp","pulse","puma","punch","punk","pupil","puppy","purr","purse","push","putt","quack","quake","query","quiet","quill","quilt","quit","quota","quote","rabid","race","rack","radar","radio","raft","rage","raid","rail","rake","rally","ramp","ranch","range","rank","rant","rash","raven","reach","react","ream","rebel","recap","relax","relay","relic","remix","repay","repel","reply","rerun","reset","rhyme","rice","rich","ride","rigid","rigor","rinse","riot","ripen","rise","risk","ritzy","rival","river","roast","robe","robin","rock","rogue","roman","romp","rope","rover","royal","ruby","rug","ruin","rule","runny","rush","rust","rut","sadly","sage","said","saint","salad","salon","salsa","salt","same","sandy","santa","satin","sauna","saved","savor","sax","say","scale","scam","scan","scare","scarf","scary","scoff","scold","scoop","scoot","scope","score","scorn","scout","scowl","scrap","scrub","scuba","scuff","sect","sedan","self","send","sepia","serve","set","seven","shack","shade","shady","shaft","shaky","sham","shape","share","sharp","shed","sheep","sheet","shelf","shell","shine","shiny","ship","shirt","shock","shop","shore","shout","shove","shown","showy","shred","shrug","shun","shush","shut","shy","sift","silk","silly","silo","sip","siren","sixth","size","skate","skew","skid","skier","skies","skip","skirt","skit","sky","slab","slack","slain","slam","slang","slash","slate","slaw","sled","sleek","sleep","sleet","slept","slice","slick","slimy","sling","slip","slit","slob","slot","slug","slum","slurp","slush","small","smash","smell","smile","smirk","smog","snack","snap","snare","snarl","sneak","sneer","sniff","snore","snort","snout","snowy","snub","snuff","speak","speed","spend","spent","spew","spied","spill","spiny","spoil","spoke","spoof","spool","spoon","sport","spot","spout","spray","spree","spur","squad","squat","squid","stack","staff","stage","stain","stall","stamp","stand","stank","stark","start","stash","state","stays","steam","steep","stem","step","stew","stick","sting","stir","stock","stole","stomp","stony","stood","stool","stoop","stop","storm","stout","stove","straw","stray","strut","stuck","stud","stuff","stump","stung","stunt","suds","sugar","sulk","surf","sushi","swab","swan","swarm","sway","swear","sweat","sweep","swell","swept","swim","swing","swipe","swirl","swoop","swore","syrup","tacky","taco","tag","take","tall","talon","tamer","tank","taper","taps","tarot","tart","task","taste","tasty","taunt","thank","thaw","theft","theme","thigh","thing","think","thong","thorn","those","throb","thud","thumb","thump","thus","tiara","tidal","tidy","tiger","tile","tilt","tint","tiny","trace","track","trade","train","trait","trap","trash","tray","treat","tree","trek","trend","trial","tribe","trick","trio","trout","truce","truck","trump","trunk","try","tug","tulip","tummy","turf","tusk","tutor","tutu","tux","tweak","tweet","twice","twine","twins","twirl","twist","uncle","uncut","undo","unify","union","unit","untie","upon","upper","urban","used","user","usher","utter","value","vapor","vegan","venue","verse","vest","veto","vice","video","view","viral","virus","visa","visor","vixen","vocal","voice","void","volt","voter","vowel","wad","wafer","wager","wages","wagon","wake","walk","wand","wasp","watch","water","wavy","wheat","whiff","whole","whoop","wick","widen","widow","width","wife","wifi","wilt","wimp","wind","wing","wink","wipe","wired","wiry","wise","wish","wispy","wok","wolf","womb","wool","woozy","word","work","worry","wound","woven","wrath","wreck","wrist","xerox","yahoo","yam","yard","year","yeast","yelp","yield","yo-yo","yodel","yoga","yoyo","yummy","zebra","zero","zesty","zippy","zone","zoom"];
+    async function updatePasswordHash(password) {
+      if(password.length < 10) {
+        passwordStatusEl.innerHTML = "Password should be <span style='color:red;'>at least 10 characters.</span>";
+        passwordStatusEl.style.display = "block";
+        pwHashEl.value = "";
+        return;
+      }
+      if(!/[A-Z]/.test(password)) {
+        passwordStatusEl.innerHTML = "Password should have <span style='color:red;'>at least one capital letter.</span>";
+        passwordStatusEl.style.display = "block";
+        pwHashEl.value = "";
+        return;
+      }
+      // if(!/[0-9]/.test(password)) {
+      //   passwordStatusEl.innerHTML = "Password should have <span style='color:red;'>at least one number.</span>";
+      //   passwordStatusEl.style.display = "block";
+      //   pwHashEl.value = "";
+      //   return;
+      // }
+      // if(!/[!@#$%^&*()\[\]{}|:;"'?/><,.~`\-_+=]/.test(password)) {
+      //   passwordStatusEl.innerHTML = "Password should have <span style='color:red;'>at least one symbol like ! @ # $ % etc.</span>";
+      //   passwordStatusEl.style.display = "block";
+      //   pwHashEl.value = "";
+      //   return;
+      // }
+      passwordStatusEl.style.display = "none";
+      let hash = await sha256('perchance-comments-plugin|'+password);
+      pwHashEl.value = hash;
+    }
+    async function sha256(text) {
+      const msgUint8 = new TextEncoder().encode(text);                          
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);          
+      const hashArray = Array.from(new Uint8Array(hashBuffer));                    
+      const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+      return hashHex;
+    }
+  </script>
+  <p>By default the your "admin flair" will show up as <code>👑 MOD</code> and the delete button on each comment (that only you can see) will be a trash emoji. But you can change both of these:</p>
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+commentOptions
+	adminFlair = 💎OWNER💎
+  deleteButtonIcon = ❌
+	... 
+</pre>
+  <h3>Banning Users</h3>
+  <p style="background:#c2ffa3; background:light-dark(#c2ffa3,#1d5700);padding:0.5rem;margin-top: 0;border-radius: 3px; text-align:left;"><b>New:</b> As an admin, you can now click the red flag on a user's message to ban them. You can still use the old <code>bannedUsers</code> approach, as described below.</p>
+  <p>You can ban users, which will mean that no one can see their messages. To do this, click their user ID token, and copy the "full" user ID into <code>bannedUsers</code> list like so:</p>
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+commentOptions
+	bannedUsers
+    91d6bc29a13cbc687e74
+    cbc687e74bc291d39a16
+  ...
+</pre>
+  <p>The messages of banned users will dissappear immediately for you, but other users will need to refresh the page for changes to take effect.</p>
+  <p>Note that a user's ID is based on their IP address, so you're actually banning a particular IP address. This is usually fine, but sometimes it can result in banning several people - e.g. if a school has a single IP address for all students, then everyone using that school's wifi will have the same user ID. You may want to have a separate comments area with no bannedUsers list for people that are requesting to be unbanned due to e.g. being at the same school as someone else who was previously banned.</p>
+  <p>If you have multiple comments areas, rather than copy-pasting the same bannedUsers list to each one, you could have a separate bannedUsers list that you reference from each comment options list, like this:</p>
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+commentOptions1
+	bannedUsers = \[edgelords\]
+  ...
+
+commentOptions2
+	bannedUsers = \[edgelords\]
+  ...
+  
+edgelords
+  91d6bc29a13cbc687e74
+  cbc687e74bc291d39a16
+</pre>
+  <h3>Banning Words/Phrases</h3>
+  <p>Words that are commonly used as racial/homophobic/transphobic/slut-shaming/etc. slurs are banned by default, but general profanity isn't banned, so you can also ban certain words or phrases by adding a comma-separated words or phrases using the <code>bannedWords</code> option like this:</p>
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+commentOptions
+	bannedWords = your,list,of,words,or phrases,to,ban
+	... 
+</pre>
+  <p>You can use <a target="_blank" href="https://regexone.com/">regex</a> patterns in your <code>bannedWords</code> list. Just wrap the pattern in slashes like this: <code>/your.*pattern/</code>. If you want to use commas within your regex, you need to specify one ban rule per line, like this:</p>
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+commentOptions
+	bannedWords
+    /your.*pattern, that has, commas/i
+    blah
+    a phrase
+	... 
+</pre>
+
+  
+<h3>Rate-limiting Comments</h3>
+  <p>You can limit the number of comments per minute/hour/etc. like this:</p>
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+commentOptions
+  rateLimits = 1 per minute
+</pre>
+  <p>You can put as many rules as you want, separated by commas. If someone hits *any* of the limits you specify here, their comment will be blocked/hidden.</p>
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+commentOptions
+  rateLimits = 1 per minute, 3 per 10 minutes
+</pre>
+  <p><a target="_blank" href="https://perchance.org/comments-plugin-rate-limiting-example#edit">Here's an example</a> that uses the above code.</p>
+
+  
+<h2>onComment/onLoad</h2> 
+  <p>You can access the comment stream in your code using the <code>onComment</code> and <code>onLoad</code> functions. <a href="https://perchance.org/simple-comments-plugin-oncomment-example#edit" target="_blank">Here's an example</a> where we always display the most recent comment in bold above the chatbox:</p>
+<pre style="margin:0; height:100%; box-sizing:border-box;">
+commentOptions
+  onLoad(comments) => <span style="opacity:0.5;">// when the page loads, it gives us the initial list of comments </span>
+    mostRecentCommentEl.textContent = comments.at(-1).message; <span style="opacity:0.5;">// we get the last item in `comments` with .at(-1) and then grab its `message` property, and we use that as the textContent of the `mostRecentCommentEl`</span>
+  onComment(comment) => <span style="opacity:0.5;">// every time someone adds a new comment, this function will get called with the data of that comment</span>
+    mostRecentCommentEl.textContent = comment.message; <span style="opacity:0.5;">// a new comment has arrived, so we update the `mostRecentCommentEl` with the comment's message text</span>
+</pre>
+  <p>Note that <code>mostRecentCommentEl</code> is the <code>id</code> of a HTML element that we're display the most recent comment in.</p>
+  <p>And <a target="_blank" href="https://perchance.org/comments-plugin-oncomment-example#edit">here's an example</a>, where we create a completely custom chat feed with extra features like making the background image of a chat message depend on the content, or whether the user is an admin, and so on.</p>
+  <p>You can take it a lot further than those two examples. You could even create a multiplayer game of tic-tac-toe or chess that people play via the comments, for example.</p>
+  <p>There's also the <code>onInputTextChange</code> option which, if set in your options as a function (like <code>onComment</code> and <code>onLoad</code>), will be executed every time the text in the input box changes (e.g. via user typing their comment, or pasting some text).</p>
+  <p>And if you add a <code>beforeSubmit</code> option (which must be a function, like <code>onComment</code> and <code>onLoad</code>), then it will be executed <i>just</i> before a comment is submitted. If <code>beforeSubmit</code> returns <code>null</code> then submission is cancelled. If it returns nothing (i.e. doesn't have a <code>return</code> statement, or has <code>return undefined</code>, or has <code>return;</code>), the submission will continue as normal. If it returns some text (i.e. called a "string" in programming lingo), then that's the text that will <i>actually</i> get submitted (i.e. it replaces what the user wrote). You could use it to, for example, create a more advanced version of the "slash commands" feature, by checking what the user wrote in the text box via <code>com.inputText</code> (explained below) and then alterling it based on more complex rules than what slash commands allow. <a href="https://perchance.org/beforesubmit-comments-plugin-example#edit" target="_blank">Here's a simple example</a> that uses <code>beforeSubmit</code>.</p>
+  
+<h2>Submitting Comments Via Code, and Getting/Setting Text Box Input</h2>
+  <p>You can submit comments on behalf of the user, or set/get the input text box contents. <a href="https://perchance.org/programmatic-get-set-submit-comments-plugin-example#edit" target="_blank">Here's an example</a> with a bunch of buttons that allow you to submit comments without actually typing into the comments plugin input box, or clicking the submit button.</p>
+  <p>Basically, instead of writing <code>\[commentsPlugin(options)\]</code> to initialize the comments plugin, you need to write <code>\[com = commentsPlugin(options)\]</code>. Note that 'com' is just a variable name - you can call it anything. Then you can write <code>\[com.submit("cool")\]</code> to submit a comment, or <code>\[com.inputText\]</code> to get the current text that's typed into the comments input box, or write <code>\[com.inputText="cool"\]</code> to change the current comments input box text to "cool". See the example linked above for more info.</p>
+  <p>There's also <code>com.setNicknameForNextComment('abc123')</code> and <code>com.setAvatarUrlForNextComment('https://user.uploads.dev/file/\[...\].jpg')</code>, both of which, as the names suggest, only apply for the next comment that the user makes, or that you programmatically submit on their behalf. So to 'simulate' a permanent change, you'd need to run the function before every comment that is submitted.</p>
+
+<h2>Misc</h2>
+  <ul>
+    <li>If you created the comments box like <code>\[com = commentsPlugin(options)\]</code>, then you can use <code>com.banUser('MW22-8e5123…')</code> and <code>com.unbanUser('MW22-8e5123…')</code> to ban/unban users live/dynamically.</li>
+    <li>If you put <code>+u:alice|bob</code> at the end of a channel name, then only the users with username 'alice' and 'bob' will be able to comment on that channel. You could add <code>+u:yourusernamehere</code> to the end of a special channel that you use as an admin notice board, or personal blog, for example. <a href="https://perchance.org/username-permissioned-channels-comments-plugin-example#edit" target="_blank">Here's an example</a> showing how to only allow specific users to comment, based on their username. <a href="https://perchance.org/live-moderator-commands-comments-plugin-example#edit" target="_blank">Here's an example of "live-moderator-commands"</a> based on that feature.</li>
+    <li>Usually when you comment on different channels within the same generator/page, you'll have the same user ID. If you want user IDs to be different for different channels, then you can add <code>+ids:channel</code> at the end of the channel name like <code>feedback+ids:channel</code>, then the user ids/tags will be unique to that channel, rather than being shared with all other channels on your page. <a href="https://perchance.org/comments-plugin-channel-scoped-ids-example#edit" target="_blank">Here's an example generator</a> that uses this feature.</li>
+    <li>You can combine the username and ID-scoping rules by adding a comma between them like this: <code>chat+ids:channel,u:alice|bob</code>. Note that if you change the order then it's a separate channel. So <code>chat+ids:channel,u:alice|bob</code> is a different channel to <code>chat+u:alice|bob,ids:channel</code>. And username order changes the channel too, so <code>chat+u:bob|alice,ids:channel</code> is a different channel again.</li>
+  </ul>
+	<br><br>
+	<p><b>Notes:</b></p>
+	<ul>
+		<li><a href="https://perchance.org/comments-plugin-example-1#edit">Here's a simple example</a> of a generator that uses this plugin.</li>
+		<li>You can hide all comments that occurred before a specific date with <code>hideCommentsBeforeDate = 28 August 2019</code>. Make sure you don't add "th" after the number. I.e. write "28" and <i>not</i> "28th".</li>
+		<li>Please note that if you embed this in your generator, anyone on the internet can comment, and so you may get trolls and terrible people posting bad comments.</li>
+    <!-- not working anymore for some reason: -->
+    <!-- 		<li><a href="https://www.reddit.com/u/memesformybutt">/u/memesformybutt</a> made <a href="https://perchance.org/comments-plugin-package">a cool plugin</a> that uses this plugin to display the comments in a little expandable tab that hugs the bottom of the screen.</li> -->
+		<li>Check out more plugins at <a href="/plugins">perchance.org/plugins</a></li>
+	</ul>
+</main>
+<br><br><br>
+
+<style>
+  h2, h3 {
+    text-align:center; 
+  }
+  h2 {
+    margin-top:4rem;
+  }
+  
+  html { color-scheme: dark light }
+  main {
+    text-align:left;
+		max-width:900px;
+		margin:0 auto;
+		background: #fff;
+		background: light-dark(#fff, #101010);
+		padding:1em;
+		border-radius:3px;
+		box-shadow: 0 0.5px 0 0 #ffffff inset, 0 1px 2px 0 #B3B3B3;
+		box-shadow: 0 0.5px 0 0 light-dark(#fff, #060606) inset, 0 1px 2px 0 light-dark(#B3B3B3, #2c2c2c);
+	}
+  main p:first-child {
+    margin-top:0;
+  }
+  ul li {
+		margin-top:0.5em;	
+	}
+	p {
+    line-height: 1.4em;
+  }
+	body {
+		background-color:#f6f6f6;	
+		background-color: light-dark(#f6f6f6, #000);
+    color: black;
+    color: light-dark(black, #d6d6d6);
+	}
+	pre {
+		text-align:left;
+		background: #333;
+    background: light-dark(#333, #212121);
+    color: #e2e2e2;
+    padding: 1em;
+    border-radius: 2px;
+		tab-size: 2;
+		-moz-tab-size: 2;
+		-o-tab-size: 2;
+		-webkit-tab-size: 2;
+	}
+	code {
+		background: #eff0f1;
+    background:  light-dark(#eff0f1, #272727);
+    padding: 1px 5px;	
+		white-space: nowrap;
+	}
+  kbd {
+    background-color: #eee;
+    border-radius: 3px;
+    border: 1px solid #b4b4b4;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, .2), 0 2px 0 0 rgba(255, 255, 255, .7) inset;
+    color: #333;
+    display: inline-block;
+    font-size: .85em;
+    font-weight: 700;
+    line-height: 1;
+    padding: 2px 4px;
+    white-space: nowrap;
+  }
+</style>

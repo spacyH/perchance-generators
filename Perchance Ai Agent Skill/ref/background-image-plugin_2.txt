@@ -1,0 +1,135 @@
+<h1>The Background Image Plugin</h1>
+<div style="margin:0 auto;width:100%;max-width:690px;background:white;border-radius:2px;padding:1em; box-sizing:border-box;">
+	<p>To add a background image to your generator, first put this in your Perchance code panel:</p>
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+background = \{import:background-image-plugin\}
+</pre>
+	<br>
+	<p>Then put this anywhere in your bottom-right (HTML) panel:</p>
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+\[background("https://i.imgur.com/64c6NnI.jpg")\]
+</pre>
+	<p>Change the image URL to one of your choosing. Just make sure to keep the quotation marks around it.</p>
+	<p>Also, make sure that it's a <b>direct</b> URL to your image (usually ending in <code>jpg</code> or <code>png</code> or <code>gif</code>, though not always). To get a direct link to an image, right-click on an image and select "Copy image address" or "Copy image location" or similar - depending on your web browser.</p>
+	<p><b style="color:red;">Important:</b> You should upload your image to somewhere like <a href="https://catbox.moe" target="_blank">catbox.moe</a> or <a href="https://perchance.org/upload" target="_blank">perchance.org/upload</a>. You <span style="color:red;">should not use an image link directly from a random website on the internet</span>, because it could get deleted/moved or the website could shut down, and then your background would no longer work. Instead, go to <a href="https://imgur.com/upload" target="_blank">perchance.org/upload</a> and drag-and-drop or paste the image (or the URL) there, and it'll upload, and then it'll give you the URL. That way your background image will last forever.</p>
+	<p style="color:red;">I previously recommended uploading to Imgur, but <a href="https://www.reddit.com/r/TheoryOfReddit/comments/12tinfp/imgur_has_announced_that_they_will_be_removing/" target="_blank" style="color:inherit;">they've started deleting old images</a>. Luckily we now have <a href="https://perchance.org/upload" target="_blank" style="color:inherit; font-weight:bold;">perchance.org/upload</a>, so use that instead.</p>
+  <p>Here's how we can set the image opacity (transparency) to <code>0.7</code> and blur to <code>5</code>px:</p>
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+\[background("https://i.imgur.com/64c6NnI.jpg", 0.7, 5)\]
+</pre>
+
+	<br>
+	<p>Or, if you need some fancy effects, pass in a <a href="https://perchance.org/css-filter-effects" target="_blank">CSS filter</a> string as the second parameter:</p>
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+\[background("https://i.imgur.com/64c6NnI.jpg", "blur(3px) hue-rotate(30deg) saturate(1.6)")\]
+</pre>
+  <p>You can see examples of CSS filters in use <a href="https://perchance.org/css-filter-effects" target="_blank">here</a>.</p>
+	<p>Note that you don't have to call it <code>background</code>:</p>
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+<span style="opacity:0.5;">// in lists editor:</span>
+backgroundImage = \{import:background-image-plugin\}
+<span style="opacity:0.5;">// in HTML editor:</span>
+\[backgroundImage("https://i.imgur.com/64c6NnI.jpg")\]
+</pre>
+  
+	<p>You can also randomize the image every time the randomize button is clicked by using code like this:</p>
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+<span style="opacity:0.5;">// in lists editor:</span>
+backgroundImage = \{import:background-image-plugin\}
+
+imageUrl
+  https://i.imgur.com/64c6NnI.jpg
+  https://i.imgur.com/Hvb6HTy.jpg
+  https://i.imgur.com/ecKzF9F.jpg
+  https://i.imgur.com/785rHFl.jpg
+  
+  
+<span style="opacity:0.5;">// in HTML editor:</span>
+\[backgroundImage(imageUrl)\]
+</pre>
+  
+	<p>Need more advanced features? Add this to your Perchance code panel:</p>
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+bgData
+  url = https://i.imgur.com/64c6NnI.jpg
+  size = cover
+  repeat = no-repeat
+	position = center
+	opacity = 0.8
+  filter = blur(10px)
+</pre>
+	<p>And then add this to your HTML code panel:</p>
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+\[background(bgData)\]
+</pre>
+	
+	<p>Learn more about each property in the <code>bgData</code> list above:</p>
+	<ul>
+		<li><b>size:</b> <code>cover</code> will ensure your image covers the whole page. <code>contain</code> will ensure your whole image fits within the page. <code>23px</code> will set the width of the image to 23 pixels (the height will adjust to maintain correct aspect ratio). <code>45px 78px</code> will set the width to 45 pixels and the height to 78 pixels.</li>
+		<li><b>position:</b> <code>center</code> will center your image on the page. <code>left</code> will align it left. Consult <a href="https://i.imgur.com/mLQFlON.png" target="_blank" rel="noopener">this image</a> for more details.</li>
+		<li><b>repeat:</b> <code>no-repeat</code> will prevent your image from being "tiled" multiple times across the page. Consult <a href="https://i.imgur.com/vbTwTuS.png" target="_blank" rel="noopener">this image</a> for more details.</li>
+		<li><b>filter:</b> allows you to add custom CSS filters to adjust your image - e.g. to make it greyscale or adjust the saturation. See <a href="https://perchance.org/css-filter-effects" target="_blank">this page</a> for examples.</li>
+		<li><b>opacity:</b> adjust the transparency of the background image with a value between 0 (fully transparent) and 1 (completely opaque).</li>
+	</ul>
+	<p>You don't have to use all the properties - just delete the ones you don't want and they'll use default values. <a href="https://perchance.org/advanced-background-image-example#edit" target="_blank">Here's an example generator</a> that uses these advanced features. Also note that you don't need to call the list <code>bgData</code> - you can call it whatever you want.</p>
+	
+  <p>Here are some backgrounds to try out:</p>
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+pastel tiles:       https://i.imgur.com/0CWEecq.jpg
+books:              https://i.imgur.com/Hvb6HTy.jpg
+pine forest:        https://i.imgur.com/ecKzF9F.jpg
+dark leaves:        https://i.imgur.com/785rHFl.jpg
+rocky coastline:    https://i.imgur.com/E4a7yi0.jpg
+night building:     https://i.imgur.com/9hrHir1.jpg
+jelly fish:         https://i.imgur.com/EyLiFMs.jpg
+cloud sunset:       https://i.imgur.com/M3wXrLE.jpg
+summer sunset:      https://i.imgur.com/YRUgc7j.jpg
+desert dunes:       https://i.imgur.com/P4FoRy2.jpg
+jagged mountains:   https://i.imgur.com/mSarpKO.jpg
+</pre>
+  
+	<br>
+	<p><b>Tips:</b></p>
+	<ul>
+		<li><a href="https://perchance.org/background-image-example#edit">Here's a simple example</a> generator that uses this plugin</li>
+		<li><a href="https://perchance.org/random-background-image-example#edit">Here's an example</a> with a random background image</li>
+		<li><a href="https://perchance.org/advanced-background-image-example#edit">Here's an example</a> that uses advanced features</li>
+		<li>Use images that you're legally allowed to use (<a href="https://unsplash.com/">Unsplash</a> is awesome - all the images are free)</li>
+		<li>Upload your image to a place where it wont be deleted (e.g. <a href="https://imgur.com/upload">Imgur</a>)</li>
+		<li>Your image url must end in <code>.jpg</code>, <code>.png</code>, etc. (i.e. must be a <b>direct</b> link - right-click on the image and click "Copy image address" or "Copy image location", depending on your browser)</li>
+		<li>Ideally your image would be at least 1500px wide</li>
+		<li>Lowering the opacity a bit and adding blur can help bring your content forward</li>
+		<li>Using images that aren't super bright and saturated also helps</li>
+		<li>Check out more plugins at <a href="/plugins">perchance.org/plugins</a></li>
+	</ul>
+</div>
+<br><br><br>
+
+[$output("https://i.imgur.com/64c6NnI.jpg", 0.7)]
+
+<style>
+	p { text-align:left; }
+	body {
+			background:#eee;
+	}
+	code {
+		background-color:#eee;
+		padding: 0 0.2em;
+		white-space:nowrap;
+	}
+	ul.dot-list li {
+	  margin-top:0.5em;	
+	} 
+	pre.custom {
+		text-align:left;
+		background: #333;
+    color: white;
+    padding: 1em;
+    border-radius: 2px;
+		tab-size: 2;
+		-moz-tab-size: 2;
+		-o-tab-size: 2;
+		-webkit-tab-size: 2;
+	}
+	ul li { margin-top:0.4em; }
+</style>

@@ -1,0 +1,95 @@
+{import:power-plugin-styler} [ico(""), ""] <!-- so the icons would load and display correctly -->
+<h1><i class="fas fa-[starticon]" style="margin-right: 16px; font-size: 32px"></i>[title]<i class="fas fa-[endicon]" style="margin-left: 16px; font-size: 32px"></i></h1>
+<div style="margin: 0 0 -16px; padding-top: 4px">[temps.credit(gName)]</div>
+<div style="padding: 16px">
+  <div style="overflow: auto">
+    [temps.commandBar("top")]
+  </div>
+  <div class="main">
+    <p>This is a plugin that can function either as a countdown or a "stopwatch", depending on the date and time set. This might be useful for creating generators that require some sort of scheduler, in other words, displaying outputs on a specific time.</p>
+    <p><b>Interesting fact:</b> This plugin is <b>live-updating</b>, which means the numbers on the timer will automatically update every second (or even <i>millisecond</i>) without the need to reload the generator!</p>
+    <p>To use this plugin, simply put this code into the list panel:</p>
+    <pre>timer = \{import:[generatorName]\}</pre>
+    <p>And then you can use the plugin like this:</p>
+    <pre>I joined Perchance \[t = timer("2022-03-24"), t.year\] year(s) and \[t.month\] month(s) ago</pre>
+    <p>And that will output this:</p>
+    <p class="center">I joined Perchance [t = $output("2022-03-24"), t.year] year(s) and [t.month] month(s) ago</p>
+    <p>You can even set the time to a specific hour, minute, second, or millisecond, like this:</p>
+    <pre>It's been \[t = $output("2023-12-15-21-53-46-894"), t.totalDays\] days, \[t.hour\] hour(s), \[t.minute\] minute(s), \[t.second\] second(s) and \[t.millisecond\] milliseconds since 15 December 2023, 21:53:46.894.</pre>
+    <p class="center">It's been [t02 = $output("2023-12-15-21-53-46-894"), t02.totalDays] days, [t02.hour] hour(s), [t02.minute] minute(s), [t02.second] second(s) and [t02.millisecond] milliseconds since 15 December 2023, 21:53:46.894.</p>
+    <p>You can make a simple new year countdown with this plugin, just put in some options:</p>
+    <pre>timerOptions
+  time = 2025-01-01
+  onTimeUp = passed since
+  onTimeDown = until</pre>
+    <p>And then write this code:</p>
+    <pre>\[t = timer(timerOptions), t.totalDays\] day(s), \[t.hour\] hour(s), \[t.minute\] minute(s) and \[t.second\] second(s) \[t.onTimeOutput()\] New Year 2025!</pre>
+    <p class="center">[t2 = $output(timerOptions), t2.totalDays] day(s), [t2.hour] hour(s), [t2.minute] minute(s) and [t2.second] second(s) [t2.onTimeOutput()] New Year 2025!</p>
+    <p>You'll soon notice in the above example that the text will change to something like this once the date reached past 1 January 2025:
+    <p class="center">0 day(s), 0 hour(s), 0 minute(s) and 0 second(s) passed since New Year 2025!</p>
+    <p>This is because of the <code>onTimeOutput()</code> subcommand, which gives us the value from the <code>onTimeUp</code> option already assigned in the options list if the current time has passed the scheduled time, otherwise the <code>onTimeDown</code> option.</p>
+    <p>Here's <a href="https://perchance.org/power-timer-plugin-countdown-example#edit" target="_blank">a simple example</a> using the above code so you can play with it (e.g., change the time to sometime in the very near future, and notice the change). And since this is <u>live-updating</u>, there is no need to refresh the page to see the change!</p>
+    <h2>Time Zones</h2>
+    <p>[temp("new")]You can create timers that will sync with the time on your time zone regardless of the time zone of other people that are seeing the timer (for example, if someone is from the West but you are from the East, the timer will time up for both as opposed to you then the person). Just put this in the options:</p>
+    <pre>timerOptions
+  time = 2024-04-12-04-32-15
+  onTimeUp = passed since
+  onTimeDown = until
+  timeZone = +4</pre>
+    <p class="center">[t4 = $output(timerOptionsTZ), t4.date] day(s), [t4.hour] hour(s), [t4.minute] minute(s) and [t4.second] second(s) [t4.onTimeOutput()] 12 April 2024, 04:32:15 UTC+4!</p>
+    <p>You can also do the same for timezones of western areas, such as UTC-3:</p>
+    <pre>timerOptions
+  ...
+  timeZone = -3</pre>
+    <p class="center">[t5 = $output(timerOptionsTZ2), t5.date] day(s), [t5.hour] hour(s), [t5.minute] minute(s) and [t5.second] second(s) [t5.onTimeOutput()] 12 April 2024, 04:32:15 UTC-3!</p>
+    <p>If you want the timer to be based on the UTC timezone, you can set the value to <code>+0</code>, with a plus next to the number.</p>
+    <h2>Disabling Live Updates</h2>
+    <p>Hence the live-updating feature, you can prevent the timer from updating automatically and keep the numbers static until the refresh of the page. To do this, simply put this into the options:</p>
+    <pre>timerOptions
+  time = 2025-01-01
+  onTimeUp = passed since
+  onTimeDown = until
+  disableUpdates = true</pre>
+    <p class="center">[t3 = $output(timerOptionsDU), t3.date] day(s), [t3.hour] hour(s), [t3.minute] minute(s) and [t3.second] second(s) [t3.onTimeOutput()] New Year 2025!</p>
+    <h2>Subcommands</h2>
+    <p>Here are the available subcommands that you can use:</p>
+    <ul>
+      <li><code><b>year</b></code> - outputs years.</li>
+      <li><code><b>month</b></code> - outputs months.</li>
+      <li><code><b>week</b></code> - outputs weeks in a year.</li>
+      <li><code><b>day</b></code> - outputs days.</li>
+      <li><code><b>date</b></code> - outputs the same as <code>day</code>, but in a month instead of in a week.</li>
+      <li><code><b>hour</b></code> - outputs hours.</li>
+      <li><code><b>minute</b></code> - outputs minutes.</li>
+      <li><code><b>second</b></code> - outputs seconds.</li>
+      <li><code><b>millisecond</b></code> - outputs milliseconds.</li>
+      <li><code><b>totalMonths</b></code> - outputs [_ss2 = (x) => "the total of " + x + " before/since the scheduled date", _ss2("months")].</li>
+      <li><code><b>totalWeeks</b></code> - outputs [_ss2("weeks")].</li>
+      <li><code><b>totalDays</b></code> - outputs [_ss2("days")].</li>
+      <li><code><b>totalHours</b></code> - outputs [_ss2("hours")].</li>
+      <li><code><b>totalMinutes</b></code> - outputs [_ss2("minutes")].</li>
+      <li><code><b>totalSeconds</b></code> - outputs [_ss2("seconds")].</li>
+      <li><code><b>totalMilliseconds</b></code> - outputs [_ss2("milliseconds")].</li>
+      <li>[temp("new")]<code><b>timeZone</b></code> - outputs the time zone set for the timer. If <code>timeZone</code> is not set in the options, then it'll simply return <code>null</code>.</li>
+      <li><code><b>onTimeOutput()</b></code> - outputs the value provided by the <code>onTimeUp</code> or the <code>onTimeDown</code> option.</li>
+      <li><code><b>dateObject</b></code> - outputs the <code>Date()</code> object provided with the scheduled time, useful for getting specific time periods (e.g., years, months, etc.) of the scheduled time.</li>
+    </ul>
+    
+    <h2>Notes</h2>
+    <ul>
+      <li>This plugin utilizes JavaScript's <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/Date"><code>Date()</code></a> constructor, which makes it a bit different from the <a href="date-plugin">date plugin</a> which uses the <a href="https://momentjs.com">moment.js</a> library.</li>
+      <li>[temps.suggestionfeedback]</li>
+      <li>[temps.maybefixed]</li>
+    </ul>
+  </div>
+  <div style="overflow: auto">
+    [temps.commandBar("bottom")]
+  </div>
+</div>
+
+[temps.comments(comm(temps.copt))]
+[temps.credit(gName)]
+
+<script>
+  let gName = "power-timer-plugin";
+</script>

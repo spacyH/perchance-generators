@@ -1,0 +1,27 @@
+// If `opacity` isn't a number, it's treated as a CSS filter string
+$output (url, opacity, blur) =>
+  
+  // if they passed a list of URLs, then select a random one:
+  if(url.getPropertyNames && url.getPropertyNames.length === 0) {
+    url = url.evaluateItem;
+  }
+
+  if(typeof url === "string") {
+		let filterString = `blur(${blur||0}px)`;
+		if(opacity && typeof opacity === 'string' && String(Number(opacity)) !== opacity) {
+			filterString = opacity;
+			opacity = 1;
+		}
+		return `<div style="z-index:-1000;position:fixed;top:0;left:0;bottom:0;right:0;background-image:url(${url});background-size:cover;background-position:center;opacity:${opacity||1};filter:${filterString};"></div>`;
+	} else {
+    // `url` parameter is actuall the bgData list
+    let data = url;
+    let propStr = `background-image:url(${data.url});`;
+    if(data.size) propStr += `background-size:${data.size};`;
+    if(data.repeat) propStr += `background-repeat:${data.repeat};`;
+    if(data.position) propStr += `background-position:${data.position};`;
+    //if(data.attachment) propStr += `background-attachment:${data.attachment};`;
+    if(data.filter) propStr += `filter:${data.filter};`;
+    if(data.opacity) propStr += `opacity:${opacity||1};`;
+    return `<div style="z-index:-1000;position:fixed;top:0;left:0;bottom:0;right:0;${propStr};"></div>`;
+	}

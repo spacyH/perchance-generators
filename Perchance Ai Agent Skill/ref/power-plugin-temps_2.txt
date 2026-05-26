@@ -1,0 +1,77 @@
+{import:power-plugin-styler} [ico(""), ""] <!-- so the icons would load and display correctly -->
+<h1><i class="fas fa-[starticon]" style="margin-right: 16px; font-size: 32px"></i>[title]<i class="fas fa-[endicon]" style="margin-left: 16px; font-size: 32px"></i></h1>
+<div style="padding: 16px">
+  <div style="overflow: auto">
+    [$output.commandBar("top")]
+  </div>
+  <div class="main">
+    <!--div class="new"><p><b>This is a new plugin!</b> New features might be added, and bugs may appear that are yet to be fixed. Feel free to give feedback and report bugs on the new feedback form! (Click the Feedback button above or past this page)</p></div-->
+    <p>This is a plugin that can function either as a countdown or as a "stopwatch", depending on the date and time set. This is a live-updated plugin, which means the timer will automatically update every second (or even millisecond) without the need to refresh the page. This might be useful for creating generators that require some sort of scheduler, in other words, displaying outputs on a specific time.</p>
+    <p>To use this plugin, simply put this code into the list panel:</p>
+    <pre>timer = \{import:[generatorName]\}
+    </pre>
+    <p>And then you can use the plugin like this:</p>
+    <pre>I joined Perchance \[t = timer("2022-03-24"), t.year\] year(s) and \[t.month\] month(s) ago
+    </pre>
+    <p>And that will output this:</p>
+    <p class="center">I joined Perchance [t = $output._aaa("2022-03-24"), t.year] year(s) and [t.month] month(s) ago</p>
+    <p>You can even set the time to a specific hour, minute, second, or even <i>millisecond</i>, like this:</p>
+    <pre>It's been \[t = $output._aaa("2023-12-15-21-53-46-894"), t.totalDays\] days, \[t.hour\] hour(s), \[t.minute\] minute(s), \[t.second\] second(s) and \[t.millisecond\] milliseconds since 15 December 2023, 21:53:46.894.
+    </pre>
+    <p class="center">It's been [t02 = $output._aaa("2023-12-15-21-53-46-894"), t02.totalDays] days, [t02.hour] hour(s), [t02.minute] minute(s), [t02.second] second(s) and [t02.millisecond] milliseconds since 15 December 2023, 21:53:46.894.</p>
+    <p>You can make a simple New Year countdown with this plugin, just put in some options:</p>
+    <pre>timerOptions
+  time = 2024-01-01
+  onTimeUp = passed since
+  onTimeDown = until
+    </pre>
+    <p>And then write this code:</p>
+    <pre>\[t = timer(timerOptions), t.day\] day(s), \[t.hour\] hour(s), \[t.minute\] minute(s) and \[t.second\] second(s) \[t.onTimeOutput()\] New Year 2024!
+    </pre>
+    <p class="center">[t2 = $output._aaa(timerOptions), t2.day] day(s), [t2.hour] hour(s), [t2.minute] minute(s) and [t2.second] second(s) [t2.onTimeOutput()] New Year 2024!</p>
+    <p>You'll soon notice in the above example that the text will change to something like this once the date reached past 1 January 2024:
+    <p class="center">0 day(s), 0 hour(s), 0 minute(s) and 0 second(s) passed since New Year 2024!</p>
+    <p>This is because the <code>onTimeOutput()</code> subcommand, which gives us the value from the <code>onTimeUp</code> option if the current time has passed the scheduled time, otherwise the <code>onTimeDown</code> option. And since this is live-updated, there is no need to refresh the page to see the change!</p>
+    <h2>Disabling Live Updates</h2>
+    <p>Hence the live-updating feature, you can prevent the timer from updating automatically and keep the numbers until the refresh of the page. To do this, simply put this into the options:</p>
+    <pre>timerOptions
+  time = 2024-01-01
+  onTimeUp = passed since
+  onTimeDown = until
+  disableUpdates = true
+    </pre>
+    <p class="center">[t3 = $output._aaa(timerOptionsDU), t3.day] day(s), [t3.hour] hour(s), [t3.minute] minute(s) and [t3.second] second(s) [t3.onTimeOutput()] New Year 2024!</p>
+    <h2>Subcommands</h2>
+    <p>Here are the available subcommands that you can use:</p>
+    <ul>
+      <li><code><b>year</b></code> - outputs years.</li>
+      <li><code><b>month</b></code> - outputs months.</li>
+      <li><code><b>week</b></code> - outputs weeks.</li>
+      <li><code><b>date</b></code> - outputs days.</li>
+      <li><code><b>hour</b></code> - outputs hours.</li>
+      <li><code><b>minute</b></code> - outputs minutes.</li>
+      <li><code><b>second</b></code> - outputs seconds.</li>
+      <li><code><b>millisecond</b></code> - outputs milliseconds.</li>
+      <li><code><b>totalMonths</b></code> - outputs [_ss2 = (x) => "the total of " + x + " before/since the scheduled date", _ss2("months")].</li>
+      <li><code><b>totalWeeks</b></code> - outputs [_ss2("weeks")].</li>
+      <li><code><b>totalDays</b></code> - outputs [_ss2("days")].</li>
+      <li><code><b>totalHours</b></code> - outputs [_ss2("hours")].</li>
+      <li><code><b>totalMinutes</b></code> - outputs [_ss2("minutes")].</li>
+      <li><code><b>totalSeconds</b></code> - outputs [_ss2("seconds")].</li>
+      <li><code><b>totalMilliseconds</b></code> - outputs [_ss2("milliseconds")].</li>
+      <li><code><b>onTimeOutput()</b></code> - outputs the value provided by the <code>onTimeUp</code> or the <code>onTimeDown</code> option.</li>
+      <li><code><b>dateObject</b></code> - outputs the <code>Date()</code> object provided with the scheduled time, useful for getting specific time periods (e.g., years, months, etc.) of the scheduled time.</li>
+    </ul>
+    
+    <p><b>Notes</b></p>
+    <ul>
+      <li>This plugin utilizes JavaScript's <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/Date"><code>Date()</code></a> constructor, which makes it a bit different from the official <a href="date-plugin">date plugin</a> which uses the <a href="https://momentjs.com">moment.js</a> library.</li>
+      <li>This plugin may be updated for additional features and bug fixes.</li>
+    </ul>
+  </div>
+  <div style="overflow: auto">
+    [$output.commandBar("bottom")]
+  </div>
+</div>
+
+[$output.comments(comm(comopt))]

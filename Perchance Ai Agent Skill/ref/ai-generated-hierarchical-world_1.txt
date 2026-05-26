@@ -1,0 +1,132 @@
+comments = {import:comments-plugin}
+ai = {import:ai-text-plugin}
+image = {import:text-to-image-plugin}
+literal = {import:literal-plugin}
+
+// this will get replaced with the actual intro during generation 
+worldIntro = ...  
+
+startInstruction
+  Your task as a creative world-building genius is to write a short description of an interesting new sci-fi/fantasy planet and then generate a bullet point list of 5 continents/oceans/regions/locations based on this description/instruction: [literal(worldInstructionsEl.value.trim()) || "Be creative!"]
+  Your response MUST follow this template:\n
+  ---
+  This planet is called <short high-level description of the planet>
+  1. <description of a continent/ocean/region/etc>
+  2. <description of another continent/ocean/region/etc>
+  3. <description of another continent/ocean/region/etc>
+  ...
+  ---\n
+  Write your response using the above template.
+  $output = [this.joinItems("\n")]
+
+subItemsInstruction
+  Your task as a creative world-building genius is to help me hierarchically break down a world into constituent parts, from continents, to countries, to cities and towns, to neighborhoods, to houses, and all the way down to atoms and beyond.
+  [""] // blank line
+  # Here's the instruction this world was based on:
+  [literal(worldInstructionsEl.value.trim()) || "Be creative!"]
+  [""]
+  # Here's a high-level description of the world that we're decomposing in this world building exercise:
+  [worldIntro]
+  ... and within that world is this:
+  [root.ancestorChainItemTexts.join("\n... and inside that is this:\n")]
+  ---
+  Your task is to write a bullet point list of things that are inside the final thing described above.
+  Each bullet point should be a single sentence (10-30 words).
+  To be clear, you must use your creative, world-building skills to invent a bullet point list of things that are INSIDE this: "[root.ancestorChainItemTexts.at(-1)]"
+  Your response should be a NUMBERED bullet-point list of up to 5 items.
+  $output = [this.joinItems("\n")]
+
+async startButtonClick() =>
+  startBtn.textContent = "⏳ loading...";
+  startBtn.disabled = true;
+  let generatedText = "";
+  let data = await ai({
+    instruction: startInstruction.evaluateItem, 
+    startWith: "This planet is called",
+    onChunk: (data) => {
+      generatedText += data.textChunk;
+      outputEl.innerHTML = generatedText;
+    },
+    onFinish: (data) => {
+      startBtn.disabled = false;
+      startBtn.textContent = "🗺️ regenerate";
+      generatedText = generatedText.replace(/((?:^|\n)[0-9]+\. [^\n]+:)\n/g, "$1 "); // in case it adds titles then *newline* then description
+      let generatedLines = generatedText.trim().split("\n").map(l => l.trim());
+      // the world intro should be the first line:
+      worldIntro = generatedLines[0];
+      // regions are lines that start with "<number>.":
+      let regions = generatedLines.filter(l => /^[0-9]+\./.test(l)).map(l => l.split(".").slice(1).join(".").trim());
+      outputEl.innerHTML = `
+        <div id="mainCtn">
+          <p style="margin:0;">${worldIntro}</p>
+          <p style="font-weight:bold; font-size:80%; margin:0;">Click a region to explore it:</p>
+          <ul style="margin-top:0;">${regions.map(p => `<li data-item-text="${p.replace(/"/g, '&quot;').replace(/</g, "&gt;")}" class="worldItem" onclick="generateSubItems(this); event.stopPropagation();"><span class="worldItemText">${p}</span></li>`).join("")}</ul>
+        </div>`.trim();
+    },
+  });
+  
+async generateSubItems(li) =>
+  if(li.querySelector(".loading-placeholder") || li.querySelector("ul")) return; // already loading/loaded
+  
+  // collect all ancestors of this item up to 'mainCtn'
+  root.ancestorChainItemTexts = [li.dataset.itemText];
+  let parent = li;
+  while(true) {
+    parent = parent.parentElement;
+    if(parent === mainCtn) break;
+    if(parent.classList.contains("worldItem")) {
+      root.ancestorChainItemTexts.unshift(parent.dataset.itemText); // `.unshift(blah)` means "put 'blah' at the start of the list/array"
+    }
+  }
+  
+  // generated images for the clicked world item:
+  if(generateImagesCheckbox.checked) {
+    let imagesHtml = "";
+    for(let i = 0; i < 3; i++) {
+      imagesHtml += image({
+        prompt: "award-winning art, trending on artstation, masterpiece digital art, "+root.ancestorChainItemTexts.at(-1),
+        negativePrompt: "bad art, low quality, worst quality, photo",
+        resolution: "768x512",
+        style: "height:100%;",
+      });
+    }
+    let imagesCtn = document.createElement("div");
+    imagesCtn.classList.add("imageCtn");
+    imagesCtn.style.cssText = "display:flex; overflow:auto; height:180px; scrollbar-width:none;";
+    imagesCtn.innerHTML = imagesHtml;
+    li.append(imagesCtn);
+  }
+  
+  // we put the generated text of the sub-items into a temporary div to start with, just so the user can see it being written, then we'll transfer it into proper bullet points in the `onFinish` function, below.
+  let tmp = document.createElement("div"); 
+  tmp.classList.add("loading-placeholder");
+  tmp.innerHTML = "<b>Loading...</b>";
+  tmp.style.cssText = "padding-left:1rem;";
+  li.append(tmp);
+  
+  // start the generation process:
+  let generatedText = "";
+  let data = await ai({
+    instruction: subItemsInstruction.evaluateItem,
+    startWith: "1.",
+    onChunk: (data) => {
+      generatedText += data.textChunk;
+      tmp.innerHTML = generatedText;
+    },
+    onFinish: (data) => {
+      let generatedLines = generatedText.trim().split("\n").map(l => l.trim());
+      let regions = generatedLines.filter(l => /^[0-9]+\./.test(l)).map(l => l.split(".").slice(1).join(".").trim());
+      tmp.outerHTML = `<ul>${regions.map(p => `<li data-item-text="${p.replace(/"/g, '&quot;').replace(/</g, "&gt;")}" class="worldItem" onclick="generateSubItems(this); event.stopPropagation();"><span class="worldItemText">${p}</span></li>`).join("")}</ul>`;
+    },
+  });
+  
+  
+commentsOptions
+  width = min(750px, 100%)
+  height = min(70vh, 600px)
+  commentPlaceholderText = Add a friendly comment...
+  forceColorScheme = [localStorage.forceColorScheme || null]
+  bannedUsers
+    2673d50c80d5474d2d1b
+    783183d5c46e51d2deff
+    f4be3be9e03921c3f5e2

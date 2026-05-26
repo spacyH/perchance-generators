@@ -1,0 +1,110 @@
+<h1>💾 Remember Plugin 💾</h1>
+
+<p style="font-size:80%; text-align:center;">Thanks to <a href="https://perchance.org/vionet20-gens" target="_blank">Vionet20</a> for their help with building this plugin.</p>
+
+<div style="margin:0 auto;width:100%;max-width:800px;background:white;border-radius:2px;padding:1em; box-sizing:border-box;">
+	<p style="text-align:justify; margin-top:0;">This plugin allows you to make it so certain variables are "remembered" even if you refresh the page. For example, if you were building a random text adventure game using the <a href="/goto-plugin" target="_blank">goto plugin</a>, you could use this plugin to "remember" the player's hit points, experience points, etc. so that your players don't lose their progress if they close the browser tab or refresh it (I've linked an example of this at the bottom of this page).</p>
+	
+<p>To use this plugin, put this code in your Perchance code panel (the main editor on the left-hand side):</p>
+	 
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+remember = \{import:remember-plugin\}
+</pre>
+	
+  <p>and then write this <b style="color:red">at the top</b> of your HTML panel (the bottom-right editor):</p>
+	
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+\[remember(root, "a,b,c")\]
+</pre>
+
+	<p>and now the variables <code>a</code>, <code>b</code> and <code>c</code> will be remembered even after the page is reloaded. You can change <code>a</code>, <code>b</code> and <code>c</code> to whatever you want, and you can add as many of them as you want - just separate the variable names with commas like I've shown above.</p> 
+
+	<p>As an example, imagine that we had some code like this in our Perchance code panel:</p>
+	
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+num = \{1-10\}
+output
+  \[if (a == undefined) \{a = num.selectOne\} else \{a\}\]
+</pre>
+	
+	<p>And this code is at the top of our HTML code panel:</p>
+	
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+\[remember(root, "a")\]
+\[output\]
+</pre>
+	
+	<p>So now when you first load the page, <code>a == undefined</code> will evaluate to <code>true</code> and so the <code>a = num.selectOne</code> code will get executed, and thus a random number will get output. But if you refresh the page, then <code>a == undefined</code> is no longer true because the <code>\[remember(root, "a")\]</code> code has loaded the <code>a</code> variable from last time, and so the old value of <code>a</code> gets output every time we reload the page.</p>
+	
+	<p>If you want to clear all the saved data, then just execute this code: <code>\[remember(root, "@forget")\]</code>. But note that this will <b>reload</b> the page as well. So, if you wanted to make a button that clears all the user's saved data, then you'd put this in your HTML panel:</p>
+	
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+&lt;button onclick="<span style="opacity:0.6">remember(root, '@forget')</span>"&gt;clear data&lt;/button&gt;
+</pre>
+	
+	<p>Note that you don't need to put square brackets around code in HTML <code>onclick</code> attributes. Also note that you need to use single quotation marks (<code>'</code>) around <code>@forget</code> since HTML attributes (like <code>onclick</code>) use double quotation marks to mark their start and end.</p>
+  
+  <p>You can also use this plugin to remember the values in text inputs, drop-down menus, and other types of user inputs. You can learn how to add user inputs in the "User Inputs" section at <a href="https://perchance.org/examples" target="_blank">perchance.org/examples</a>. Here's how you can remember user inputs:</p>
+	
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+\[remember(root, "@inputs")\]
+</pre>
+  
+  <p>And you can remember both variables and user inputs like this:</p>
+  
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+\[remember(root, "@inputs,myVariable,myOtherVariable")\]
+</pre>
+  
+  <p>And, by the way, you can add spaces between the variable names if you prefer. Just make sure there are commas between them:</p>
+  
+<pre class="custom" style="margin:0; height:100%; box-sizing:border-box;">
+\[remember(root, "@inputs, myVariable, myOtherVariable")\]
+</pre>
+  
+	<br><br>
+	<p><b>Notes:</b></p>
+	<ul class="dot-list">
+		<li><a href="https://perchance.org/remember-plugin-example-1#edit">Here's a very simple example</a> of how to use it.</li>
+		<li><a href="https://perchance.org/remember-plugin-example-2#edit">Here's an example</a> that includes some buttons to change the variable that's being remembered.</li>
+		<li><a href="https://perchance.org/remember-user-inputs-basic-example#edit" target="_blank">Here's a basic example</a> showing how to remember a variety of user inputs</li>
+		<li><a href="https://perchance.org/remember-user-inputs-example#edit" target="_blank">Here's an example</a> of how to remember user <b>text inputs</b></li>
+		<li><a href="https://perchance.org/remember-user-inputs-slider-example#edit" target="_blank">Here's an example</a> of how to remember user <b>range slider</b> inputs</li>
+		<li><a href="https://perchance.org/remember-user-inputs-checkbox-example#edit" target="_blank">Here's an example</a> of how to remember user <b>checkbox</b> inputs</li>
+		<li><a href="https://perchance.org/remember-user-inputs-radio-example#edit" target="_blank">Here's an example</a> of how to remember user <b>'radio'</b> inputs</li>
+		<li><a href="https://perchance.org/goto-and-remember-plugins-example#edit" target="_blank">Here's an example</a> of how to use the remember and goto plugins together to people can save the current state in their text adventure and come back to it later</li>
+		<li><a href="https://perchance.org/remembering-arrays-with-the-remember-plugin#edit" target="_blank">Here's an example</a> of how to "remember" arrays/lists of items (advanced, ask on <a href="https://reddit.com/r/perchance" target="_blank">the forum</a> if you need help)</li>
+    <li>Another way to 'remember' stuff even after the page is refreshed is to simply write <code>\[localStorage.blah="abc123"\]</code> and then when you refresh the page <code>\[localStorage.blah\]</code> will still output <code>"abc123"</code>. This plugin actually just uses <code>localStorage</code> "behind the scenes". Note that you can <i>only</i> store text in <code>localStorage</code> - if you try to store a number, it'll get sneakily converted into the "text" form of that number when you put it in localStorage. So, for example, if you write <code>\[localStorage.blah=1, localStorage.blah+2\]</code> it'll output "12" instead of "3". Quite annoying. So you need to write <code>\[localStorage.blah=1, Number(localStorage.blah)+2\]</code></li>
+		<li>If you change the URL of your generator, the remembered data will be lost. You can change the URL back to the orignal version to recover the data.</li>
+		<li>Check out more plugins at <a href="/plugins">perchance.org/plugins</a></li>
+	</ul>
+</div>
+<br><br><br>
+
+<style>
+	body {
+		background:#eee;
+	}
+	p {
+		text-align:left;
+	}
+	code {
+		background-color:#eee;
+		padding: 0 0.2em;
+		white-space:nowrap;
+	}
+	ul.dot-list li {
+	  margin-top:0.5em;	
+	} 
+	pre.custom {
+		text-align:left;
+		background: #333;
+    color: white;
+    padding: 1em;
+    border-radius: 2px;
+		tab-size: 2;
+		-moz-tab-size: 2;
+		-o-tab-size: 2;
+		-webkit-tab-size: 2;
+	}
+</style>

@@ -1,0 +1,133 @@
+$output(node) =>
+  window["nested_plugin_function_global_ref_98679"] = headerElementClickHandler;
+	window["nested_plugin_root_node_global_ref_822467"] = node.getParent;
+	if(!window.alreadyAddedDefaultNestedPluginCSS_346543) {
+    addDefaultPluginCSS();
+    window.alreadyAddedDefaultNestedPluginCSS_346543 = true;
+  }
+	return ` 
+	<div id="nested-plugin-container" style="text-align:left;">
+	  ${generateItem(node.getName)}
+	</div>
+	`;
+
+headerElementClickHandler(headerEl) =>
+  let rootNode = window["nested_plugin_root_node_global_ref_822467"];
+	let isLeaf = !rootNode[headerEl.dataset.archetypeId];
+	if(isLeaf) return;
+  let wrapperEl = headerEl.closest('.item-wrapper');
+  let bodyEl = wrapperEl.querySelector(".item-body");
+	let marginEl = wrapperEl.querySelector('.item-margin');
+	if(bodyEl) {
+	  let marginEl = wrapperEl.querySelector('.item-margin');
+	  if(bodyEl.style.display === "") { bodyEl.style.display = "none"; marginEl.innerHTML = "➕&#xFE0E;"; }
+		else if(bodyEl.style.display === "none") { bodyEl.style.display = ""; marginEl.innerHTML = "➖&#xFE0E;"; }
+	} else {
+		let tmp = document.createElement('div');
+		tmp.innerHTML = generateItemBody(headerEl.dataset.archetypeId);
+		let bodyEl = tmp.firstChild;
+		wrapperEl.querySelector('.item-main').appendChild(bodyEl);
+		marginEl.innerHTML = "➖&#xFE0E;";
+	}
+
+
+generateItemBody(archetypeId) => 
+  let rootNode = window["nested_plugin_root_node_global_ref_822467"];
+	let isLeaf = !rootNode[archetypeId] || rootNode[archetypeId].selectAll.length === 0;
+	if(isLeaf && rootNode[archetypeId].description) return `<div class='item-body'>${rootNode[archetypeId].description}</div>`;
+	if(isLeaf) return `<div class='item-body'></div>`;
+	let node = rootNode[archetypeId];
+  node = node.getSelf;
+	let specifiedOverallCount = Number(node.n) || null;
+	let bodyText = "";
+	let currentOverallCount = 0;
+	let children = node.selectAll;
+	let finishedChildNames = new Set();
+	for(let child of children) {
+		let [name, quantity] = child.evaluateItem.trim().replace(/\s+/," ").split(" ").slice(0, 2);
+		if(!quantity) continue;
+		for(let i = 0; i < Number(quantity); i++) {
+	    bodyText += generateItem(name);
+			currentOverallCount++;
+		}
+		finishedChildNames.add(name);
+	}
+	if(specifiedOverallCount && finishedChildNames.size < children.length && currentOverallCount < specifiedOverallCount) {
+		for(let i = 0; i < 10000; i++) {
+			let name = node.selectOne.evaluateItem.trim().replace(/\s+/," ").split(" ")[0];
+			if(finishedChildNames.has(name)) continue;
+			else {
+				bodyText += generateItem(name);
+				currentOverallCount++;
+				if(currentOverallCount >= specifiedOverallCount) break;
+			}
+		}
+	}
+	if(currentOverallCount === 0) { // they didn't specify an overall count or individual counts, so we grab 5-10 random items as a sane default
+		let defaultQuantity = 5+Math.round(Math.random()*5);
+		for(let i = 0; i < defaultQuantity; i++) {
+		  let name = node.selectOne.evaluateItem.trim().replace(/\s+/," ").split(" ")[0];
+	    bodyText += generateItem(name);
+		}
+	}
+  return `<div class='item-body'>${bodyText}</div>`;
+
+generateItemHeader(archetypeId) => 
+  let rootNode = window["nested_plugin_root_node_global_ref_822467"];
+	let isLeaf = !rootNode[archetypeId] || rootNode[archetypeId].selectAll.length === 0;
+  return `<div data-archetype-id="${archetypeId}" class='item-header' title="${rootNode[archetypeId] ? (rootNode[archetypeId].description || "").evaluateItem.replace(/"/g,"'") : ""}" onclick="window.nested_plugin_function_global_ref_98679(this)" style="${isLeaf ? "opacity:0.6;" : ""}${isLeaf && !(rootNode[archetypeId] || {}).description ? "" : "cursor:pointer;"}">${isLeaf ? archetypeId.replace(/_/g," ") : rootNode[archetypeId].name || archetypeId.replace(/_/g," ")}</div>`;
+	
+generateItem(archetypeId) => 
+  let rootNode = window["nested_plugin_root_node_global_ref_822467"];
+	let isLeaf = !rootNode[archetypeId] || rootNode[archetypeId].selectAll.length === 0;
+  return `
+	<div class='item-wrapper' style="border:1px solid #c1c1c1; display:flex;">
+	  <div class="item-margin ${isLeaf ? "leaf-item" : ""}" onclick="this.parentNode.querySelector('.item-header').click()" style="padding:0 0.1em; ${isLeaf && !(rootNode[archetypeId] || {}).description ? "opacity:0;" : "opacity:0.3; cursor:pointer;"}">➕&#xFE0E;</div>
+		<div class="item-main" style="width:100%;">
+	  ${generateItemHeader(archetypeId)}
+		</div>
+	</div>
+	`;
+  
+addDefaultPluginCSS() =>
+  let style = document.createElement('style'); 
+  style.type = 'text/css';
+  style.innerHTML = ``;
+  document.head.appendChild(style);
+	
+world
+  n = {5-10} // the overall min and max number of children
+  continent
+	ocean
+	archipelago^0.2 // normal odds notation for general likelihood
+
+continent
+  n = {3-5}
+  desert_region
+	mountain_range {1-3} // min of 1, max of 3 - for *this specific item*
+	forested_region
+	
+desert_region // use under-scores for names
+  n = {3-5}
+	name = {rocky ^0.2|sandy |}desert region // optionally specify alternative names
+	village
+	sand
+
+mountain_range
+	description = A {snowy|dry|massive} range of mountains, stretching up to {1000-9000} metres at its tallest.
+	mountain
+	alpine_forest
+	
+alpine_forest
+	description = There are trees, and it's quite {cold|snowy}. About -{3-30} degrees Celsius. <br><img src="https://i.imgur.com/0Xy40ze.png" style="width:200px;">
+
+//getFullPath(node) =>
+//  let n = node.getSelf;
+//  let path = [];
+//  while(n !== null) {
+//    path.push(n.getName);
+//    n = n.getParent;
+//  }
+//  path.pop(); //remove root
+//  path.reverse();
+//  return path.map((p,i) => i === 0 ? p : `["${p}"]`).join("");

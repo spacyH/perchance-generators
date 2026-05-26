@@ -1,0 +1,87 @@
+<h1>DIY Perchance API</h1>
+<main>
+	<p style="margin-top:0;">Since Perchance doesn't currently have an API, I've made a Node.js script that acts as a Do-It-Yourself API. If you'd like to create a <b>Discord bot</b>, then there's <a href="/perchance-discord-bot" target="_blank">a separate tutorial for that</a>. The tutorial below uses Glitch.com because it's free, but you can copy the code and use it on repl.it or wherever you want.</p>
+  <p>You don't need coding skills to follow this tutorial - you just need to create a Glitch account and then duplicate the server template that I've created.</p>
+  <p>You can test out a working version of the API here: <a href="https://diy-perchance-api.glitch.me" target="_blank">https://diy-perchance-api.glitch.me</a></p>
+  
+  <p style="background:#ffe58f; border-radius:3px; padding:0.5rem;"><b>Note</b>: As of writing there are two Perchance plugins which require ads to fund them: <a href="/text-to-image-plugin" target="_blank">text-to-image-plugin</a> and <a href="/ai-text-plugin" target="_blank">ai-text-plugin</a>. See those plugin pages for more details on why ads are needed (basically, AI stuff requires GPU servers which are too expensive for me to personally cover). So <b>these plugins won't work</b> if you try to run them from your own server, since there's no way to display the ads that are needed to fund them. In other words, those two plugins can only be used on the Perchance site itself.</p>
+	
+	<h2>Setting Up Your Server:</h2>
+	<ol style="text-align:left;">
+	  <li>Sign up for <a href="https://glitch.com" target="_blank">Glitch.com</a> if you haven't already. It allows you to play around with <a href="https://en.wikipedia.org/wiki/Node.js" target="_blank">Node.js</a> servers for free.</li>
+	  <li>Visit <a href="https://glitch.com/edit/#!/diy-perchance-api" target="_blank">glitch.com/edit/#!/diy-perchance-api</a>.</li>
+		<li>Look for a "Remix" button, and click it. The interface may have changed a bit since I wrote this, but it shouldn't be too hard to find. As of writing, you can click the drop-down menu in the top-right, and then click "Remix Project".</li>
+	  <li>It'll redirect you to a new copy of the project with a randomly generated name like "cool-moose-forest" (look in the URL).</li>
+		<li>Assuming your project name is "cool-moose-forest", visit <code>https://cool-moose-forest.glitch.me</code></li>
+		<li>Try visiting <code>cool-moose-forest.glitch.me/api?generator=animal-sentence&amp;list=output</code></li>
+		<li>Change <code>animal-sentence</code> to the name of your generator (the "name" of your generator is the part that comes after <code>perchance.org/</code> in your generator's URL) and change <code>output</code> to the name of the list that you want to generate an item from.</li>
+		<li>That's it!</li>
+	</ol>
+  
+  <h2>Simple Code Example</h2>
+  <p>If, instead of a full API server, you just want a simple code example for programatically geting results from your generator, below is the important/relevant part of the above API server's code. This example shows that you just need to download your generator's HTML, load it with <a href="https://github.com/jsdom/jsdom" target="_blank">JSDOM</a>, and then you can use <code>window.root.yourListName</code> to access your lists.</p>
+<pre>
+const \{ JSDOM \} = require("jsdom"); // v16.4.0
+const fetch = require("node-fetch");  // v2.6.1
+
+let generatorName = "animal-sentence"; // &lt;-- change this to your generator name
+let html = await fetch(`https://perchance.org/api/downloadGenerator?generatorName=$\{generatorName\}&amp;__cacheBust=$\{Math.random()\}`).then(r => r.text());
+const \{ window \} = new JSDOM(html, \{runScripts: "dangerously"\});
+
+// now you can use the `window` object of your generator like this:
+console.log(window.root.output.toString());
+console.log(window.root.yourListName.toString());
+window.root.character.hitpoints = 10;
+let charDesc = window.root.character.description.evaluateItem;
+window.update();
+</pre>
+	
+	<h2>Notes:</h2>
+	<ol style="text-align:left;">
+	  <li>The first request to your generator will take longer than subsequent requests because the browser needs to load the generator into the cache.</li>
+	  <li>If you run into an troubles trying to get your own API server working, make a post on <a href="https://lemmy.world/c/perchance" target="_blank">our community forum</a> and hopefully someone will be able to help you out.</li>
+	  <li>If you just want to build a Twitter/Tumblr bot, and you don't have much programming experience, it may be easier to follow these tutorials: <a href="https://perchance.org/create-a-twitter-bot" target="_blank">Twitter</a> / <a href="https://perchance.org/create-a-tumblr-bot" target="_blank">Tumblr</a>.</li>
+	</ol>
+	
+</main>
+<p style="text-align:center; font-size:200%; opacity:0.2; margin-top:0.5em;"><span>⚄&#xFE0E;</span></p>
+<br/>
+
+<style>
+	li {
+	  margin-top: 0.5rem;	
+	}
+	ul {
+		margin-top:0.5em;	
+	}
+	main {
+		max-width:900px;
+		margin:0 auto;
+		background:#fff;
+		padding:1.5em;
+		border-radius:3px;
+		box-shadow: 0 0.5px 0 0 #ffffff inset, 0 1px 2px 0 #B3B3B3;
+	}
+	p { text-align:left; line-height: 1.4em; }
+	body {
+		background-color:#f6f6f6;	
+	}
+	pre {
+		text-align:left;
+		background: #333;
+    color: white;
+    padding: 1em;
+    border-radius: 2px;
+		tab-size: 2;
+		-moz-tab-size: 2;
+		-o-tab-size: 2;
+		-webkit-tab-size: 2;
+	}
+	code {
+		background: #eff0f1;
+    padding: 1px 5px;	
+	}
+	h2 {
+		margin-top: 1.5em;	
+	}
+</style>

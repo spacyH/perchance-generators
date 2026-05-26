@@ -1,0 +1,954 @@
+// Note: Text that comes after "//" is ignored, which allows
+// you to write notes - like the one you're reading now!
+title
+  Perchance Callouts
+
+callout = {import:perchance-callouts}
+md = {import:markdown-plugin}
+
+$meta
+  title = Perchance Callouts
+  description = Obsidian Callout inspired Callouts for your generators!
+  // image = https://i.imgur.com/7xvFrP5.png
+
+text
+  ## Introduction
+  These are HTML and CSS based callouts derived and inspired by the [Obsidian Callouts](https://help.obsidian.md/Editing+and+formatting/Callouts). This uses the `<details>` and `<summary>` HTML tags for collapsibles, and an ordinary `<div>` for the non-collapsible. (**Background Colors** and **Borders** are <mark>***Transparent***</mark>, if you want a solid color refer to the *Styled Callouts* section). 
+  \s
+  Here is an example of a callout:
+  [callout()]
+  ## How to Use
+  To use the callouts copy and paste the following in your Perchance Code Panel.
+  ```
+  callout = \{import:perchance-callouts\}
+  \s
+  exampleNote
+    type \= note
+    header \= This is an example callout
+    data \= This is the text inside the callout
+    collapsible
+      state \= open
+    
+  ```
+  > Note
+  > The options can also be in a Object form (i.e. `\{type: "note", header: "Header", data: "content", collapsible: \{ open: "open" \} \}`)
+  \s
+  Then at the HTML Code Panel, paste the following.
+  ```
+  \[callout(exampleNote)\]
+  ```
+  \s
+  And it will output:
+  [callout(exampleNote)]
+  ## Parameters
+  Here are the following descriptions of each paramter for the callouts
+  \s
+  Parameter | Description | Default | Values
+  -|-|-|-
+  `type` | This is the callout type, this determines the color and the icon the callout has. Some types are aliases of the others. | `note` | `note`<br>`info`<br> `abstract`,`summary`,`tldr`<br>`todo`<br>`tip`, `hint`, `important`<br>`done`, `check`, `success`, `correct`<br>`faq`, `help`, `question`<br>`warning`, `caution`, `attention`<br>`fail`, `failure`, `missing`, `incorrect`<br>`danger`, `error`<br>`bug`<br>`example`<br>`quote`,`cite`
+  `header` | This is the title or header of the callout. | "Callout Header" | Any HTML/String
+  `data` | This is the content inside the callout. | "Callout Content" | Any HTML/String
+  `collapsible` | This states if the callout is collapsible or not. | `none` | `state` (see below)
+  `collapsible: state` | This states the collapsible callout's current state. | `close` | `open`, `close`
+  `style` | This is an option to directly change the style of the collapsible, header, and content containers. | `none` | `icon`, `callout`, `header`, `content` (see below)
+  `style: icon` | This is an option to change the icon (uses Bootstrap Icons) | `none` | `name`, `style` (see below)
+  `icon: name` | This is the icon name (see Bootstrap Icons for icon names) | `none` | Any Bootstrap Icon Name
+  `icon: style` | This is the style for the icon | `none` | Any CSS
+  `style: callout` | This is the style for the callout's container | `none` | Any CSS 
+  `style: header` | This is the style for the header's container | `none` | Any CSS 
+  `style: content` | This is the style for the content's container | `none` | Any CSS 
+  \s
+  ```
+  example
+    type = ...
+    header = ...
+    data = ...
+    collapsible
+      state = ...
+    style
+      icon
+        name = ...
+        style = ...
+      callout = ...
+      header = ...
+      content = ...
+  \s
+  or
+  \s
+  example = \{ type: ..., header: ..., data: ..., collapsible: \{ state: ... \}, style: \{ icon: \{ name: ..., style: ... \}, callout: ..., header: ..., content: ... \} \}
+  ```
+  \s
+  ## Showcase
+  ### Further Examples
+  ```
+  nonCollapse
+    type \= fail
+    header \= Non Collapsible
+    data \= This callout is non-collapsible.
+  \s
+  collapse
+    type \= done
+    header \= Collapsible
+    data \= This callout is collapsible and initially open.
+    collapsible
+      state \= open
+  \s
+  collapseClose
+    type \= warning
+    header \= Collapsible Closed Initially
+    data \= This callout is collapsible but initially closed.
+    collapsible
+      state \= close
+  ```
+  \s
+  [callout(nonCollapse)][callout(collapse)][callout(collapseClose)]
+  ### All Types
+  [callout(exampleNote2)][callout(exampleAbstract)][callout(exampleInfo)][callout(exampleTodo)] [callout(exampleTip)][callout(exampleDone)][callout(exampleFaq)][callout(exampleWarning)][callout(exampleFail)][callout(exampleError)][callout(exampleBug)][callout(exampleExample)][callout(exampleCite)]
+  \s
+  ### Other HTML inside the callout
+  [callout(mdPluginInCallout)]
+  \s
+  [callout(htmlCallout)]
+  \s
+  ### Styled Callouts
+  ```
+  styledCalloutOne
+  type = note
+  header = Styled Callout One
+  data = \[data\]
+  collapsible
+    state = open
+  style
+    icon 
+      name = peace-fill
+      style = font-size: 2rem; color: white;
+    callout = background-color: rgb(0,0,0); color: white; border: 0px; border-radius: 0px;
+    header = color: cyan; border-radius: 0px; text-shadow: 2px 2px 10px white; font-family: monospace; font-variant: small-caps; font-size: xx-large;
+    content = font-family: monospace; color: cyan; border-top: 1px solid white;
+    
+  \s
+  \s
+  styledCalloutTwo
+    type = danger
+    header = Styled Callout Two
+    data = \[data\]
+    collapsible
+      state = open
+    style
+      icon 
+        name = hearts
+        style = font-size: 2rem; color: red;
+      callout = color: white; border: 0px; border-top-left-radius: 50px;border-top-right-radius: 50px; max-width: 400px; 
+      header = font-size: x-large; justify-content:center; width:100%; font-family: decorative; color: red; border: 3px solid pink; border-top-right-radius: 50px; border-top-left-radius: 50px; text-shadow: 2px 2px 20px pink; background-color: white;
+      content = font-size: 1.125rem; background-color: rgba(255,220, 220, 0.10) ; font-family: decorative; color: red; width: 100%; margin: 0em auto; border: 3px solid pink; border-top: none;
+  \s
+  \s
+  styledCalloutThree
+    type = note
+    header = <span style="font-size: medium;">Styled </span><span style="font-size: large;">Callout </span><span style="font-size: x-large;">Three</span>
+    data = \[data\]
+    style
+      icon
+        name = badge-vr
+        style = font-size: 1.5rem;
+      callout = background: none; border: none;
+      header = background: none; border: 1px solid blue; color: blue; font-variant: small-caps; 
+      content = border: 1px solid blue;border-top: none; color: blue; border-bottom-right-radius: 10px; border-bottom-left-radius: 10px; font-variant: small-caps;
+  ```
+  [callout(styledCalloutOne)][callout(styledCalloutTwo)][callout(styledCalloutThree)]
+  ### Nested Callouts
+  ```
+  aCallout
+    type = note
+    header = Another Callout
+    data = \[callout(bCallout)\]
+    collapsible
+      state = open
+  \s
+  \s
+  bCallout
+    type = example
+    header = The last Callout
+    data = This is the last callout
+    collapsible
+      state = open
+  \s
+  \s
+  \[callout(\{type:"question", header: "Main Callout", data: \[callout(aCallout)\], collapsible:\{ state: "open" \}\})\]
+
+  ```
+  [callout(\{type:\"question\", header: \"Main Callout\", data: \[callout(aCallout)\], collapsible: { state: \"open\" }\})] // Needed backslashed since it is in the Markdown parser.
+  \s
+  ### Random Text in Callouts
+  ```
+  calloutWithHTML
+    type = tip
+    header = \[adjective\]
+    data = \[generatorInCallout()\]
+    collapsible
+      state = open
+  \s  
+  generatorInCallout() \=> /* This returns HTML elements */
+    return `
+    <div>
+      $\{output\} /* Calling the 'output' list */
+    </div>
+    <br>
+    <button onclick\="update(output1)">
+      Randomize
+    </button> /* This updates 'output1' */
+    `;
+  \s
+  @ HTML
+  <div id\="output1">\[callout(calloutWithHTML)\]</div> /* Added 'id' to the div */
+  ```
+  [callout(ccc)]
+  
+text2
+  ## Notes
+  * [Example Generator](https://perchance.org/perchance-callouts-demo) using the callouts.
+  * All credits to the designer of callouts in Obsidian.
+  * Icons used are Bootstrap Icons, [here](https://icons.getbootstrap.com/) is their website.
+  * This is made by **[/u/Vionet20](https://www.reddit.com/user/VioneT20)**, here is a [link to my generators](https://perchance.org/vionet20-gens).
+
+$output(list) =>
+  (list == undefined) ? list = {} : list;
+  let type = list.type ? list.type : "note";
+  
+  let header = list.header ? list.header : "Callout Header";
+  
+  let data = list.data ? list.data == "none" ? '' : list.data : "Callout Content";
+  
+  let collapsible = list.collapsible ? list.collapsible : "no";
+  let state = collapsible != "no" ? list.collapsible.state ? list.collapsible.state : "" : "open";
+  
+  let iconList = calloutIcons.getChildNames;
+  let index;
+  iconList.forEach((a,i) => a.split(", ").includes(type) ? index = i : "");
+  let iconName = calloutIcons.selectAll[index]
+  
+  let style = list.style ? list.style : "no";
+  let calloutIcon = style != "no" ? list.style.icon ? list.style.icon : "" : "";
+  iconName = calloutIcon ? list.style.icon.name ? list.style.icon.name : iconName : iconName;
+  let calloutIconStyle = calloutIcon ?  list.style.icon.style ? list.style.icon.style : "" : "";
+  let calloutStyle = style != "no" ? list.style.callout ? list.style.callout : "" : "";
+  let calloutHeaderStyle = style != "no" ? list.style.header ? list.style.header : "" : "";
+  let calloutContentStyle = style != "no" ? list.style.content ? list.style.content : "" : "";
+
+
+  
+
+  if(!window.__alreadyAddedCalloutsCSS12mskaf) {
+    let style = document.createElement('style'); 
+    style.type = 'text/css';
+    style.innerHTML = getCalloutCSS();
+    document.head.appendChild(style);
+    window.__alreadyAddedCalloutsCSS12mskaf = true;
+  }
+
+  let html = ``;
+  if(collapsible != "no") {
+    html += `
+    <details class="callout" data-callout="${type}" ${state} style="${calloutStyle}">
+      <summary class="callout-title" style="${calloutHeaderStyle}">
+        <div class="callout-icon">
+          <i class="bi-${iconName}" style="${calloutIconStyle}"></i>
+        </div>
+        <div class="callout-header">
+          ${header}
+        </div>
+      </summary>
+      ${data == "none" ? ``: `<div class="callout-content" style="${calloutContentStyle}">${data}</div>`}
+    </details>
+    `;
+  } else {
+    html += `
+    <div class="callout" data-callout="${type}" ${state} style="${calloutStyle}">
+      <summary class="callout-title" style="${calloutHeaderStyle}">
+        <div class="callout-icon">
+          <i class="bi-${iconName}" style="${calloutIconStyle}"></i>
+        </div>
+        <div class="callout-header">
+          ${header}
+        </div>
+      </summary>
+      ${data == '' ? ``: `<div class="callout-content" style="${calloutContentStyle}">${data}</div>`}
+    </div>
+    `;
+  }
+  return html;
+
+getCalloutCSS() => 
+  return `
+  @import url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css");
+  :root {
+    interpolate-size: allow-keywords;
+  }
+  body {
+    --color-gray-rgb: 128, 128, 128;
+    --color-red-rgb: 233, 49, 71;
+    --color-orange-rgb: 236, 117, 0;
+    --color-yellow-rgb: 224, 172, 0;
+    --color-green-rgb: 8, 185, 78;
+    --color-cyan-rgb: 0, 191, 188;
+    --color-blue-rgb: 8, 109, 221;
+    --color-purple-rgb: 120, 82, 238;
+    --color-pink-rgb: 213, 57, 132;
+  }
+  
+  .callout {
+    max-width: 700px;
+    margin: 1em auto;
+    border: 2px solid var(--callout-color-border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  
+  .callout > * {
+    padding: 1rem;
+  }
+
+  .callout > .callout-title {
+    list-style: none;
+    // font-family: 'Noto Sans', sans-serif;
+  }
+  .callout-title::-webkit-details-marker {
+    display: none;
+  }
+
+  .callout-title:after {
+    content: "►";
+    font-family: sans-serif;
+    font-size: medium !important;
+    margin-left: 10px;
+    transform: rotate(0deg);
+    transition: 0.15s transform ease-in-out;
+  }
+  
+  .callout[open] > .callout-title::after {
+    transform: rotate(90deg);
+  }
+  
+
+  .callout > .callout-title {
+    display: flex;
+    font-size: medium;
+    // font-weight: bold;
+    align-items: center;
+    color: var(--callout-color);
+    background-color: var(--callout-color-bg);
+    cursor: pointer;
+    text-align: left;
+    transition: 0.25s background-color ease-out;
+    border-top-right-radius: 8px;
+    border-top-left-radius: 8px;
+    border-bottom: 0px solid var(--callout-color-border);
+    border-bottom-right-radius: 8px;
+    border-bottom-left-radius: 8px;
+  }
+  div.callout > .callout-title {
+    cursor: default;
+  }
+  div.callout > .callout-title:after {
+    content: "";
+  }
+  
+  // .callout > .callout-title:hover {
+  //   background-color: var(--callout-color-border);
+  // }
+  
+  .callout[open] > .callout-title {
+    border-bottom-right-radius: 0px;
+    border-bottom-left-radius: 0px;
+    border-bottom: 2px solid var(--callout-color-border);
+  }
+
+  
+  // .callout-header {
+  //   font-size: medium;
+  //   font-weight: bold;
+  // }
+
+  .callout-title > .callout-icon {
+    // font-size: medium;
+    font-weight: 800;
+    margin-right: 10px;
+  }
+
+  .callout > .callout-content {
+    text-align: left;
+    // border: 1px solid var(--callout-color-border);
+  }
+  .callout::details-content {
+    block-size: 0;
+    transition: all .2s;
+    transition-behavior: allow-discrete;
+  }
+  .callout[open]::details-content {
+    block-size: auto;
+  }
+  
+  
+
+  .callout[data-callout="note"] {
+    --callout-color: rgba(var(--color-blue-rgb), 1);
+    --callout-color-bg: rgba(var(--color-blue-rgb), 0.1);
+    --callout-color-border: rgba(var(--color-blue-rgb), 0.25);
+  }
+
+  .callout[data-callout="abstract"],
+  .callout[data-callout="summary"],
+  .callout[data-callout="tldr"] {
+    --callout-color: rgba(var(--color-cyan-rgb), 1);
+    --callout-color-bg: rgba(var(--color-cyan-rgb), 0.1);
+    --callout-color-border: rgba(var(--color-cyan-rgb), 0.25);
+  }
+
+  .callout[data-callout="info"] {
+    --callout-color: rgba(var(--color-blue-rgb), 1);
+    --callout-color-bg: rgba(var(--color-blue-rgb), 0.1);
+    --callout-color-border: rgba(var(--color-blue-rgb), 0.25);
+  }
+
+  .callout[data-callout="todo"] {
+    --callout-color: rgba(var(--color-blue-rgb), 1);
+    --callout-color-bg: rgba(var(--color-blue-rgb), 0.1);
+    --callout-color-border: rgba(var(--color-blue-rgb), 0.25);
+  }
+
+  .callout[data-callout="important"],
+  .callout[data-callout="tip"],
+  .callout[data-callout="hint"] {
+    --callout-color: rgba(var(--color-cyan-rgb), 1);
+    --callout-color-bg: rgba(var(--color-cyan-rgb), 0.1);
+    --callout-color-border: rgba(var(--color-cyan-rgb), 0.25);
+  }
+
+  .callout[data-callout="success"],
+  .callout[data-callout="check"],
+  .callout[data-callout="done"],
+  .callout[data-callout="correct"] {
+    --callout-color: rgba(var(--color-green-rgb), 1);
+    --callout-color-bg: rgba(var(--color-green-rgb), 0.1);
+    --callout-color-border: rgba(var(--color-green-rgb), 0.25);
+  }
+
+  .callout[data-callout="question"],
+  .callout[data-callout="help"],
+  .callout[data-callout="faq"] {
+    --callout-color: rgba(var(--color-yellow-rgb), 1);
+    --callout-color-bg: rgba(var(--color-yellow-rgb), 0.1);
+    --callout-color-border: rgba(var(--color-yellow-rgb), 0.25);
+  }
+
+  .callout[data-callout="warning"],
+  .callout[data-callout="caution"],
+  .callout[data-callout="attention"] {
+    --callout-color: rgba(var(--color-orange-rgb), 1);
+    --callout-color-bg: rgba(var(--color-orange-rgb), 0.1);
+    --callout-color-border: rgba(var(--color-orange-rgb), 0.25);
+  }
+
+  .callout[data-callout="failure"],
+  .callout[data-callout="fail"],
+  .callout[data-callout="incorrect"], 
+  .callout[data-callout="missing"] {
+    --callout-color: rgba(var(--color-red-rgb), 1);
+    --callout-color-bg: rgba(var(--color-red-rgb), 0.1);
+    --callout-color-border: rgba(var(--color-red-rgb), 0.25);
+  }
+
+  .callout[data-callout="danger"],
+  .callout[data-callout="error"] {
+    --callout-color: rgba(var(--color-red-rgb), 1);
+    --callout-color-bg: rgba(var(--color-red-rgb), 0.1);
+    --callout-color-border: rgba(var(--color-red-rgb), 0.25);
+  }
+
+  .callout[data-callout="bug"] {
+    --callout-color: rgba(var(--color-red-rgb), 1);
+    --callout-color-bg: rgba(var(--color-red-rgb), 0.1);
+    --callout-color-border: rgba(var(--color-red-rgb), 0.25);
+  }
+
+  .callout[data-callout="example"] {
+    --callout-color: rgba(var(--color-purple-rgb), 1);
+    --callout-color-bg: rgba(var(--color-purple-rgb), 0.1);
+    --callout-color-border: rgba(var(--color-purple-rgb), 0.25);
+  }
+
+  .callout[data-callout="quote"],
+  .callout[data-callout="cite"] {
+    --callout-color: rgba(var(--color-gray-rgb), 1);
+    --callout-color-bg: rgba(var(--color-gray-rgb), 0.1);
+    --callout-color-border: rgba(var(--color-gray-rgb), 0.25);
+  }`;
+
+calloutIcons
+  note
+    pencil
+  abstract, summary, tldr
+    card-text
+  info
+    info-circle
+  todo
+    check2-square
+  tip, hint, important
+    fire
+  success, check, done, correct
+    check-lg
+  question, help, faq
+    question-circle
+  warning, caution, attention
+    exclamation-triangle
+  failure, fail, missing, incorrect
+    x-lg
+  danger, error
+    lightning-charge
+  bug
+    bug
+  example
+    list-ul
+  quote, cite
+    quote
+
+data
+  Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut sit amet quam faucibus, aliquam urna pulvinar, pharetra lorem. Mauris egestas aliquam lacus, sed iaculis lacus. Suspendisse sodales sagittis nunc, vitae varius leo lacinia quis. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Maecenas feugiat nulla in dolor vulputate tincidunt. Curabitur convallis sodales magna. Donec interdum, odio sit amet rhoncus interdum, velit augue porta quam, vel mollis nisi arcu vel neque. Fusce quis placerat lacus, eget cursus lacus. Aenean eu lectus vitae dolor imperdiet imperdiet. Nunc nisl justo, malesuada in arcu non, maximus scelerisque magna. Curabitur.
+
+styledCalloutOne
+  type = note
+  header = Styled Callout One
+  data = [data]
+  collapsible
+    state = open
+  style
+    icon 
+      name = peace-fill
+      style = font-size: 2rem; color: white;
+    callout = background-color: rgb(0,0,0); color: white; border: 0px; border-radius: 0px;
+    header = color: cyan; border-radius: 0px; text-shadow: 2px 2px 10px white; font-family: monospace; font-variant: small-caps; font-size: xx-large;
+    content = font-family: monospace; color: cyan; border-top: 1px solid white;
+    
+
+styledCalloutTwo
+  type = danger
+  header = Styled Callout Two
+  data = [data]
+  collapsible
+    state = open
+  style
+    icon 
+      name = hearts
+      style = font-size: 2rem; color: red;
+    callout = color: white; border: 0px; border-top-left-radius: 50px;border-top-right-radius: 50px; max-width: 400px; 
+    header = font-size: x-large; justify-content:center; width: 100%; font-family: decorative; color: red; border: 3px solid pink; border-top-right-radius: 50px; border-top-left-radius: 50px; text-shadow: 2px 2px 20px pink; background-color: white;
+    content = font-size: 1.125rem; background-color: rgba(255,220, 220, 0.10) ; font-family: decorative; color: red; width: 100%; margin: 0em auto; border: 3px solid pink; border-top: none;
+
+styledCalloutThree
+  type = note
+  header = <span style="font-size: medium;">Styled </span><span style="font-size: large;">Callout </span><span style="font-size: x-large;">Three</span>
+  data = [data]
+  style
+    icon
+      name = badge-vr
+      style = font-size: 1.5rem;
+    callout = background: none; border: none;
+    header = background: none; border: 1px solid blue; color: blue; font-variant: small-caps; 
+    content = border: 1px solid blue;border-top: none; color: blue; border-bottom-right-radius: 10px; border-bottom-left-radius: 10px; font-variant: small-caps;
+
+nonCollapse
+  type = fail
+  header = Non Collapsible
+  data = This callout is non-collapsible.
+
+collapse
+  type = done
+  header = Collapsible
+  data = This callout is collapsible and initially open.
+  collapsible
+    state = open
+
+collapseClose
+  type = warning
+  header = Collapsible Closed Initially
+  data = This callout is collapsible but initially closed.
+  collapsible
+
+ccc
+  type = info
+  header = Creating HTML
+  data = Creating HTML with return functions <code>function() \=> return `html here`;</code> is much better since using the multiline string, or using backticks <code>``</code>, or also called as <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals" target="_blank">Template Literals</a> you can create a template for your HTML.
+
+calloutWithHTML
+  type = tip
+  header = [adjective]
+  data = [generatorInCallout()]
+  collapsible
+    state = open
+
+generatorInCallout() =>
+  return `
+  <div>
+    ${output}
+  </div>
+  <br>
+  <button onclick="update(output1)">
+    Randomize
+  </button>
+  `;
+
+aCallout
+  type = note
+  header = Another Callout
+  data = [callout(bCallout)]
+  collapsible
+    state = open
+
+bCallout
+  type = example
+  header = The last Callout
+  data = This is the last callout
+  collapsible
+    state = open
+
+htmlCallout
+  type = success
+  header = HTML in Callout
+  data = [htmlInCallout()]
+
+
+htmlInCallout() =>
+  return `
+  <h1>HTML Cheat Sheet</h1>
+  <body>
+  <hr />
+  <!-- Headings -->
+  <h1>Heading One</h1>
+  <h2>Heading Two</h2>
+  <h3>Heading Three</h3>
+  <h4>Heading Four</h4>
+  <h5>Heading Five</h5>
+  <h6>Heading Six</h6>
+
+  <!-- Paragraph -->
+  <p>
+    Lorem ipsum dolor sit amet consectetur adipisicing elit. Excepturi
+    <strong>doloremque illo nostrum, aperiam commodi debitis molestiae </strong
+    >reiciendis, exercitationem beatae obcaecati
+    <em>atque quasi dolorem minus </em>vero adipisci suscipit aspernatur ipsa
+    laborum.
+  </p>
+  <p>
+    Lorem ipsum dolor sit amet consectetur adipisicing elit. Excepturi
+    doloremque
+    <a href="https://www.youtube.com/" target="_blank"
+      >illo nostrum, aperiam commodi debitis molestiae </a
+    >reiciendis, exercitationem beatae obcaecati atque quasi dolorem minus vero
+    adipisci suscipit aspernatur ipsa laborum.
+  </p>
+
+  <!-- Lists -->
+  <ul>
+    <li>List Item 1</li>
+    <li>List Item 2</li>
+    <li>List Item 3</li>
+    <li>List Item 4</li>
+  </ul>
+
+  <ol>
+    <li>List Item 1</li>
+    <li>List Item 2</li>
+    <li>List Item 3</li>
+    <li>List Item 4</li>
+  </ol>
+
+  <!-- Table -->
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>E-mail</th>
+        <th>Age</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Jacob Weber</td>
+        <td>jacob.weber@stu.boone.kyschools.us</td>
+        <td>13</td>
+      </tr>
+      <tr>
+        <td>John Doe</td>
+        <td>jdoe@something.com</td>
+        <td>45</td>
+      </tr>
+      <tr>
+        <td>Sara Williams</td>
+        <td>sara@something.com</td>
+        <td>25</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <br />
+  <hr />
+  <br />
+
+  <!-- Forms-->
+  <form action="process.php" method="POST">
+    <div>
+      <label>First Name</label>
+      <input type="text" name="firstName" placeholder="Enter first name" />
+    </div>
+    <br />
+    <div>
+      <label>Last Name</label>
+      <input type="text" name="lastName" />
+    </div>
+    <br />
+    <div>
+      <label>Email</label>
+      <input type="email" name="email" />
+    </div>
+    <br />
+    <div>
+      <label>Message</label>
+      <textarea name="message"></textarea>
+    </div>
+    <br />
+    <div>
+      <label>Gender</label>
+      <select name="gender">
+        <option value="male">Male</option>
+        <option value="female">Female</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+    <br />
+    <div>
+      <label>Age:</label>
+      <input type="number" name="age" value="13" />
+    </div>
+    <br />
+    <div>
+      <label>Birthday:</label>
+      <input type="date" name="birthday" />
+    </div>
+    <br />
+    <input type="submit" name="submit" value="Submit" />
+  </form>
+
+  <!-- Button -->
+  <button>Click Me!!</button>
+
+  <!-- Image -->
+  <img src="download.jpeg" alt="" />
+
+  <div style="margin-top: 100px"></div>
+  `;
+
+
+exampleNote
+  type = note
+  header = This is an example callout
+  data = This is the text inside the callout
+  collapsible
+    state = open
+  
+exampleNote2
+  type = note
+  header = Callout ( type = note )
+  data = [data]
+  collapsible
+    state = close
+
+exampleAbstract
+  type = abstract
+  header = Callout ( type = abstract, summary, tldr )
+  data = [data]
+  collapsible
+    state = close
+
+exampleInfo
+  type = info
+  header = Callout ( type = info )
+  data = [data]
+  collapsible
+    state = close
+
+exampleTodo
+  type = todo
+  header = Callout ( type = todo )
+  data = [data]
+  collapsible
+    state = close
+  
+exampleTip
+  type = tip
+  header = Callout ( type = tip, hint, important )
+  data = [data]
+  collapsible
+    state = close
+
+exampleDone
+  type = correct
+  header = Callout ( type = done, check, success, correct )
+  data = [data]
+  collapsible
+    state = close
+  
+exampleFaq
+  type = faq
+  header = Callout ( type = faq, help, question )
+  data = [data]
+  collapsible
+    state = close
+  
+exampleWarning
+  type = warning
+  header = Callout ( type = warning, caution, attention )
+  data = [data]
+  collapsible
+    state = close
+
+exampleFail
+  type = incorrect
+  header = Callout ( type = fail, failure, missing, incorrect )
+  data = [data]
+  collapsible
+    state = close
+
+exampleError
+  type = error
+  header = Callout ( type = danger, error )
+  data = [data]
+  collapsible
+    state = close
+
+exampleBug
+  type = bug
+  header = Callout ( type = bug )
+  data = [data]
+  collapsible
+    state = close
+  
+exampleExample
+  type = example
+  header = Callout ( type = example )
+  data = [data]
+  collapsible
+    state = close
+  
+exampleCite
+  type = cite
+  header = Callout ( type = quote, cite )
+  data = [data]
+  collapsible
+    state = close
+
+mdPluginInCallout
+  type = tip
+  header = <code>markdown-plugin</code> in Callout
+  data = [md(Testtext)]
+
+
+Testtext
+  # My title
+  The first line of my first paragraph.
+  Second line of first paragraph.
+  \s // <-- paragraph break
+  You can *italicize* or **bold** your text easily.
+  
+  ## Sub-header
+  Here's a list of items:
+    * Bullet point 1
+    * Bullet point 2
+    * Bullet point 3
+      * Sub-bullet-point
+    * Bullet point 4
+  \s  // <-- end lists like this too
+  And we can do numbered lists too:
+    1. First item
+    2. Second item
+    3. ~~Scratch this~~
+  \s
+  Adding a [link](https://dillinger.io) is easy with markdown.
+  Images are easy too:
+  \s
+  ![image hover text](https://web.archive.org/web/20091018220201/http://www.geocities.com/roqofages/Rainbowflagwaving.gif)
+  \s
+  And you can still put HTML code in if needed:
+  \s
+  <video controls src\="https://i.imgur.com/26DZgXM.mp4"></a>
+  ```
+  You can do code-blcks like this.
+  Second line of code.
+    Third line of code (indented)
+  ```
+  > And quoted text like this. Quotes automatically wrap: foo bar foo bar foo bar foo bar foo bar foo bar foo bar foo bar foo bar foo bar foo bar foo bar foo bar foo bar foo bar foo bar foo bar foo bar foo bar foo bar.
+  \s
+  > Break quotes up into paragraphs using the \s trick.
+  \s
+  Header  | Header
+  --------|---------
+  You     | Can
+  Make    | Neat
+  Little  | Tables
+  Too     | !
+  \s
+  So that's a brief intro to some of markdown's basic features!
+
+output
+  {This|That} [animal] is so [adjective]!
+  I wish I could [verb] that [animal].
+  Aren't [animal.pluralForm] just so [adjective]?
+  There must be at least {1-10} [animal]{s} [location]!
+  THE [animal.upperCase]! It's eating the {import:common-noun}!
+  {A} [animal] is a bit like {a} {import:common-noun}. // {A} and {a} will automatically choose "a" and "an" as appropriate
+
+animal
+  pig
+  cow
+  chicken
+  zebra
+  crayfish
+  jellyfish^0.5  // this item is HALF as likely as the others
+  worm^2         // this item is TWICE as likely as the others
+  
+adjective
+  small
+  big
+  cute
+  sneaky
+  unusual
+  helpful
+  mean
+  
+verb
+  pat
+  befriend
+  help
+  
+location
+  on {the|this|that} island
+  in {the|this|that} valley
+  {around|in} here
+  over there
+  under this {thing^2|thingie}
+
+// Tips:
+//  - Highlight multiple lines and press Tab or Shift+Tab to indent and un-indent them all an once
+//  - You can change the URL of your generator by clicking the "settings" button in the top-right
+//  - Use this template if you want your generator to be vertically centered on the page:  perchance.org/centered-minimal#edit
+//  - Add background images, fonts, and other stuff with plugins: perchance.org/plugins
+//  - Here are some templates that you can use to create nice-looking generators without learning HTML and CSS:  perchance.org/templates
+//  - Use the "layout maker" plugin to create complex layouts without learning how to code:  perchance.org/layout-maker-plugin
+//  - Here are some generators you might like to import:  perchance.org/useful-generators
+//  - Read this page after reading the tutorial:  perchance.org/examples
+//  - There's a "wrap" button in the top-right if your lines are really long. If you add   $output=[this.joinItems(" ")]   as the first item in your list, then writing [yourListName] will magically output all of the items joined together, rather than a random item from the "yourListName" list.
+//  - Ask our friendly community members if you need help:  reddit.com/r/perchance
+// \( ﾟヮﾟ)/
+
+
+
+

@@ -1,0 +1,1429 @@
+<h1>Perchance Example Generators</h1>  
+<main>
+
+	<p style="margin-top:0;">This is a growing page of examples to help you learn about various perchance features and techniques to build certain types of generators. Remember to join the community over at <a href="https://lemmy.world/c/perchance">lemmy.world/c/perchance</a> and ask any questions if you're having trouble or would like something explained.</p>
+
+	<h2 id="storing_selections" style="text-align:left;">Storing Selections</h2>
+	<p>You'll often want to select a random item from a list and print it out, <i>but also remember the selected item</i> so that you can use it again later. <a href="/storing-selections-example-1#edit">Here's a simple generator</a> which shows us how to do this:</p>
+<pre>
+output
+	I can never remember what \[w = word.selectOne\] means. Do you know what \[w\] means?
+
+word
+  benighted
+	emeritus
+	vole
+	ex gratia
+	bissextile
+</pre>
+	<p>If we've got a list called <code>word</code> that outputs a random word, then (as we already know) we can use it by writing <code>\[word\]</code>. To select a word and remember it for later, we write the following: <code>\[w = word.selectOne\]</code>. In plain English that says "Select one item from the <code>word</code> list and store it in a new variable called <code>w</code> (and also print out the selected word)". So now when we write <code>\[w\]</code> it'll output the word that was selected earlier.</p>
+	<p>Notice that when we evaluate <code>\[w = word.selectOne\]</code>, it selects a random word, stores it in <code>w</code>, but <b>also</b> prints out the selected word in place of the square block. What if we don't want it to print out our selection? Well, in that case we'd write <code>\[w = word.selectOne, ""\]</code>. We can string together as many commands as we want within a single square-bracket block (separated by commas), but only the last command is printed out. So here we've added another command to the block, but that command is an "empty string". When we're within a square block we use quotation marks to indicate that we're writing literal text and not referring to the name of a list. In this case the literal text that we're referring to is nothingness! If we wrote instead wrote <code>\[w = word.selectOne, "apple"\]</code>, then that command would print out "apple" in place of the square-bracket block. Note that if we didn't put the quotation marks around "apple", then it'd look for a list called apple (and give us an error if it wasn't found).</p>
+	<p>It's worth noting that <code>w</code> acts just like a normal variable/list. For example, you can write <code>\[w.upperCase\]</code> to write the selected word in upper case letters, or <code>\[w.pastTense\]</code> to get its past tense equivalent (if your word list contains only verbs). <a href="/storing-selections-example-2#edit">Here's an example</a> where we store a word and then reference a "child property" called <code>definition</code>.</p>
+	
+	<h2 id="execution_order" style="text-align:left;">Execution Order</h2>
+	<p>Can you see something wrong with this example?</p>
+<pre>
+name = \{import:common-first-name\}
+
+output
+	\[n\] said "My name is \[n = name.selectOne\]" and then \{ran away|just stood there\}.
+</pre>
+  <p>The Perchance engine "reads" the code in a left-to-right order. So the problem is that Perchance reads <code>\[n\]</code> before we've created the <code>n</code> variable. As you can see in <a href="https://perchance.org/quug0pp21x#edit" target="_blank">this example generator</a>, Perchance gives us an error telling us that <code>\[n\]</code> returned "undefined", meaning that there was no value stored in the <code>n</code> variable when we tried to access it to generate the start of our sentence.</p>
+  <p>Here's a fixed version of the <code>output</code> list:</p>
+<pre>
+output
+	\[n = name.selectOne\] said "My name is \[n\]" and then \{ran away|just stood there\}.
+</pre>
+  <p>Let's look at a slightly more complicated version where we've made the same mistake as the original example:</p>
+<pre>
+name = \{import:common-first-name\}
+
+output
+  \[n\] said "\[say\]" and then \{ran away|just stood there\}.
+
+say
+  My name is \[n = name.selectOne\].
+</pre>
+  <p>It's really the same example, except that we've pulled the "My name is..." out into its own list - maybe because in the future we want to have multiple different <code>say</code> possibilities. But as I mentioned, we've made the same mistake as before: We've written <code>\[n\]</code> right at the start of the <code>output</code> line - before we've defined what <code>n</code> actually is.</p>
+  <p>So here's a fixed version:</p>
+<pre>
+name = \{import:common-first-name\}
+
+output
+  \[n = name.selectOne\] said "\[say\]" and then \{ran away|just stood there\}.
+
+say
+  My name is \[n\].
+</pre>
+  <p>We put a name in the <code>n</code> variable before it gets used by the <code>\[say\]</code> block. The code now works <a href="https://perchance.org/quug0pp21x#edit" target="_blank">just like we want it to</a>.</p>
+  <p>This is a good opportunity to learn about an important aspect of the Perchance engine: If you create a variable in one list, then you can access it from <u>any</u> other list, so long as that other list is "read" by the Perchance engine <u>after</u> you've created the variable.</p>
+  <p>Let's look at an example:</p>
+<pre>
+name = \{import:common-first-name\}
+noun = \{import:concrete-noun\}
+
+output
+  \[n = name.selectOne\] said "\[say\]" They then pulled several \[things\] out of their bag.
+
+say
+  My name is \[n\]. I like \[things = noun.selectOne.pluralForm\].
+</pre>
+  <p>Notice that we've created a variable in the <code>say</code> list, but then used it in the <code>output</code> list. That's perfectly fine, since we've written <code>\[thing\]</code> <u>after</u> creating the <code>thing</code> variable. Remember, the Perchance engine reads from left-to-right, so we know that it has already read the <code>\[say\]</code> part of the <code>output</code> line (which is where <code>thing</code> is created) before it gets to the <code>\[thing\]</code> part of the <code>output</code> line.</p>
+  <p>If that sounds complicated, just read your code like you would normal text, and mentally substitute square blocks with random items from the relevant list. If you see a variable used before it has actually been created, then you know you've got a problem.</p>
+  <p>One final note: The text in the HTML panel is also "read" by the Perchance engine from left-to-right, top-to-bottom - just like a book (an English book, at least). So let's say your HTML editor panel contained this code:</p>
+<pre>
+&lt;h1&gt;\[title\]&lt;/h1&gt;
+&lt;p&gt;\[output1\]&lt;/p&gt;
+&lt;p&gt;\[output2\]&lt;/p&gt;
+&lt;button onclick="update()"&gt;\[buttonText\]&lt;/button&gt;
+</pre>
+  <p>In this case the Perchance engine would first pull a random item from the <code>title</code> list, and then "read" it, and then do the same for <code>output1</code>, then for <code>output2</code>, and then for <code>buttonText</code>. So if you define a variable in <code>output2</code>, you won't be able to use it in the items of your <code>output1</code> list. In other words, the same ordering rules apply for the HTML panel too.</p>
+  
+	<h2 id="importing_exporting" style="text-align:left;">Importing and Exporting</h2>
+	<p>You've likely seen how we can import other generators into our generator:</p>
+<pre>
+sentence
+	Don't worry, I'll just \{import:verb\} the \{import:noun\} ... \{import:ascii-face\}
+</pre>
+	<p>There are a bunch of generators listed <a href="/useful-generators">here</a> that you can try importing into your own generator.</p>
+	<p>So that seems easy enough, but before we move on to exporting, what if you wanted to pluralise the result of <code>\{import:noun\}</code>? To do this, we need to "properly" import the <code>noun</code> generator like this:</p>
+<pre>
+noun = \{import:noun\}
+
+sentence
+	Don't worry, I'll just \{import:verb\} the \[noun.pluralForm\] ... \{import:ascii-face\}
+</pre>
+	<p>Once we've imported it and given it a name (<code>noun</code> in this case, but we could have called it anything), then we can treat it like a normal list and use <code>\[noun.pluralForm\]</code>, <code>\[noun.upperCase\]</code>, <code>\[noun.titleCase\]</code>, and so on. <a href="/import-example#edit">Here's a link</a> to an example generator based on the above code.</p>
+	<p>Cool. Now let's talk about <b>exporting</b>. Let's say we've created a random generator for our favourite books:</p>
+<pre>
+book
+	The Very Hungry Caterpillar
+	Goodnight Moon
+	Oh, The Places You'll Go!
+	...
+</pre>
+	<p>You can click "settings" in the top-right corner of the screen (when editing your generator) to change your generator's url. Let's change its name to <code>fav-book</code> so we can access it from "perchance.org/fav-book": <a href="/fav-book">Here's a link</a> to our brand new generator.</p>
+	<p>Now let's say we're in the process of making <i>another</i> generator and we realise that we need a list of our favourite books again. We could just go to our <code>fav-book</code> generator and copy the list into our new generator, and if the list is short that might be a good idea, but let's see how we can edit our <code>fav-book</code> generator so that it "exports" the book list:</p>
+<pre>
+$output = \[book\]
+
+book
+	The Very Hungry Caterpillar
+	Goodnight Moon
+	Green Eggs and Ham
+	...
+</pre>
+	<p>You can see we've made a special variable called <code>$output</code> and set it equal to our book list. Now, whenever anyone uses <code>\{import:fav-book\}</code> they're get one of your favourite books! Pretty neat.</p>
+	
+	
+	
+	<h2 id="dynamic_odds" style="text-align:left;">Dynamic Odds</h2>
+	<p>Sometimes you might sometimes want to change the odds of certain items in a list based on what item was previously randomly selected from another list. For example, let's say you're randomly selecting a character, and then randomly selecting a fruit that they're eating. But you've got some characters that don't eat certain fruits, so you want to make sure you don't randomly select fruits that they wouldn't enjoy, or are allergic to. So let's say that Jamie is allergic to blueberries, but all of the other characters can eat any fruit. Here's how we'd prevent blueberries from being chosen if the chosen character was Jamie:</p>
+	
+<pre>
+output
+  \[c = character.selectOne\] was eating \[fruit\]
+	
+character
+  Adela
+	Aisha
+	Jamie
+	Bob
+	
+fruit
+  an apple
+	some blueberries ^\[c != "Jamie"\]  <span style="opacity:0.5">// only selectable if c is NOT equal to "Jamie"</span>
+	a slice of watermelon
+</pre>
+	
+	<p>What we're doing here is using a square block <b>within an odds declaration</b>. So instead of "static" odds like <code>^4</code> or <code>^0.3</code>, we're using a square block in place of 4 or 0.3 to <i>generate</i> the odds each time we randomly select an item from that list. In this case, we've got a "logical" statement inside the square block: <code>c != "Jamie"</code>. This means: <code>c</code> <i>is not equal to</i> <code>"Jamie"</code>. Is that logical statement true, or false? Well, we don't know yet! It depends on what the <code>c</code> variable contains and that only gets decided when we actually run the generator. We do know that <code>c</code> will contain a character name, but we don't know which one yet.</p>
+  <p>Okay, so if we run the generator and "Jamie" is selected by the <code>\[c = character.selectOne\]</code> block, then <code>c</code> <i>does</i> contain "Jamie" and so <code>c != "Jamie"</code> is <b>false</b>. So the odds declaration essentially changes from <code>^\[c != "Jamie"\]</code> to <code>^false</code> in that case. Now, it turns out that <code>^false</code> is exactly equivalent to <code>^0</code> - they mean the same thing. So what we've done is set the odds of the "some blueberries" item to <b>zero</b> whenever <code>c</code> contains "Jamie".</p>
+  <p>Does that make sense? If not, that's okay! This is complicated stuff if you're new to coding. Try re-reading the above carefully, and if you're still confused, read below, because there's another way to do this which might make more sense to you (and remember, you can always ask for help <a href="https://lemmy.world/c/perchance" target="_blank">on the forum</a>).</p>
+	
+	<p>You might not have come across it in your Perchance adventures yet, but you can make a square block output two (or more) different things based on a "question" that you ask Perchance, otherwise known as an "if/else" or "conditional" statement (<code>if x then y, otherwise z</code>):</p>
+
+<pre>
+number = \{1-6\}
+output
+  You rolled a \[n = number.selectOne\]. \[if (n &lt; 4) \{"Too bad"\} else \{"Cool"\}\].
+</pre>
+	
+	<p>What's going on here? Let me explain: This stuff is called "if/else" syntax, and it's quite common in the programming world. In general, if/else statements say: <b>if this_thing is true, output something, otherwise output other_thing</b>. So "else" really means "otherwise" In the above example, we're saying "If <code>n</code> is less than <code>4</code>, output <code>"Too bad"</code>, otherwise output <code>"Cool"</code>.</p>
+	
+	<p>So we can use if/else to write our previous character/fruit example in another way:</p>
+	
+<pre>
+fruit
+  an apple
+	some blueberries ^\[if (c == "Jamie") \{0\} else \{1\}\]
+	a slice of watermelon
+</pre>
+	
+	<p>That's a bit longer to write, but it might make it a bit easier to understand what's going on. If <code>c</code> equals <code>"Jamie"</code>, then we output <code>0</code> as the odds of "some blueberries", otherwise we output <code>1</code>.</p>
+	
+	<p>Side note: Notice that we've been putting <code>Jamie</code> inside quotation marks in our dynamic odds and if/else notation? That's important because if we wrote <code>if (c == Jamie) ...</code> then Perchance would interpret that as "if <code>c</code> is equal to the <code>Jamie</code> list or variable" rather than comparing <code>c</code> to the literal text "Jamie".</p>
+	
+	<p>Let's go through another example of some dynamic odds. See if you can work out what's going on:</p>
+<pre>
+temp = \{0-45\}
+
+output
+	Today it was \[t = temp.selectOne\] degrees Celcius, \[comment\]
+	
+comment
+	so we had to wear warm coats. ^\[t &lt; 15\]
+	so we went to the pool. ^\[t &gt; 30\]
+	so we just wore shorts and t-shirts. ^\[t &gt;= 15 &amp;&amp; t &lt;=30\]
+</pre>
+	<p>Again, notice that in the <code>comment</code> list the "odds" of each item isn't a number? It is instead a logical statement, (aka, a <a href="https://en.wikipedia.org/wiki/Boolean_expression">boolean expression</a>). The "expression" <code>t &lt; 15</code> means "<code>t</code> is greater than <code>15</code>". If this expression is true, then it evaluates to <code>1</code>, otherwise it evaluates to <code>0</code>. So, for example, if <code>t</code> were <code>23</code>, then <code>^\[t &lt; 15\]</code> would "evaluate" to <code>^1</code> (the default likelihood), otherwise it would evaluate to <code>^0</code> (which means it is impossible - zero probability). Here are some "operators" that you can use in dynamic odds expressions:</p>
+	<ul style="text-align:left;">
+		<li><code>&lt;</code> means <b>is less than</b></li>
+		<li><code>&gt;</code> means <b>is greater than</b></li>
+		<li><code>&lt;=</code> means <b>is less than or equal to</b></li>
+		<li><code>&gt;=</code> means <b>is greater than or equal to</b></li>
+		<li><code>==</code> means <b>is equal to</b></li>
+		<li><code>!=</code> means <b>is not equal to</b></li>
+	</ul>
+	<p>Also notice that last item in the <code>comment</code> list uses <code>&amp;&amp;</code> which means "and". So <code>^\[t &gt;= 15 &amp;&amp; t &lt;=30\]</code> will evaluate to <code>^1</code> only if <code>t</code> is greater than or equal to <code>15</code> AND <code>t</code> is less than or equal to <code>30</code>, otherwise it will evaluate to <code>^0</code>. You can also use "or" in your expressions by writing <code>||</code>.</p>
+	
+  <p>Let's quickly jump back to our Jamie/blueberries example to show how we'd make it so Aisha is also allergic to blueberries:</p>
+	
+<pre>
+fruit
+  an apple
+	some blueberries ^\[c != "Jamie" &amp;&amp; c != "Aisha"\]  <span style="opacity:0.5">// only if (c is NOT equal to "Jamie") AND (c is NOT equal to "Aisha")</span>
+	a slice of watermelon
+</pre>
+	
+	<p>What if, for example, you wanted to give an item an odds of <code>^8</code> if a certain boolean expression was true? Here's how you could do that:</p>
+<pre>
+comment
+  ...
+	what a perfect day! ^\[(t == 24)*8\]
+</pre>
+	<p>That works because <code>true</code> is "arithmetically" equivalent to <code>1</code> and <code>false</code> is "arithmetically" equivalent to <code>0</code>. <a href="https://www.reddit.com/r/perchance/comments/gqshq1/change_probability_based_on_variables_and_percent/fs4yvlo/" target="_blank">Here's a post</a> from the forum that explains this further in case you're interested.</p>
+	<p>But we're getting into more complex territory where it may be easier to just use an if/else statement:</p>
+<pre>
+comment
+  ...
+	what a perfect day! ^\[if (t == 24) \{8\} else \{0\}\]
+</pre>
+	<p>That means "if the temperature is 24, the odds will be 8, otherwise they'll be 0". As I mentioned earlier, the syntax/format is:</p>
+<pre>
+if (<b>this_is_true</b>) \{<b>then_output_this</b>\} else \{<b>output_this</b>\}
+</pre>
+	<p>The word "<b>else</b>" just means "<b>otherwise</b>" in this context. As explained earlier, you can use if/else statements anywhere in your Perchance code - not just in dynamic odds. So, for example, this code works as you'd expect:</p>
+<pre>
+comment
+	what a \[if (t == 24) \{"perfect"\} else \{"terrible"\}\] day!
+</pre>
+	<p>And again, as a reminder, notice that we need to put quotes around "perfect" and "terrible" - otherwise Perchance would think we were referring to lists or variables with the names <code>perfect</code> and <code>terrible</code>. Here's an example where we don't add quotes becasue we do actually want to refer to lists:</p>
+<pre>
+comment
+	what a \[if (t == 24) \{goodAjective\} else \{badAjective\}\] day!
+
+goodAdjective
+  perfect
+	happy
+	...
+	
+badAdjective
+  terrible
+	sad
+	...
+</pre>
+	<p>Since we're not using quotes around <code>goodAdjective</code> and <code>badAdjective</code>, Perchance knows that we're referring to lists that have those names, rather than the literal text "goodAdjective" and "badAjective". Note that you can also "chain" the if/else statements like so:</p>
+<pre>
+comment
+  ...
+	what a perfect day! ^\[if (t == 24) \{8\} else if (t &lt; 24) \{4\} else \{1\}\]
+</pre>
+	<p>Okay, back to dynamic odds. Let's throw an "or" operator in our previous example to make it so <code>23</code> degrees also causes the "what a perfect day!" comment with a high probability:</p>
+<pre>
+comment
+  ...
+	what a perfect day! ^\[if (t == 24 || t == 23) \{8\} else \{1\}\]
+</pre>
+	<p>Brackets become very important in boolean expressions when they start to become complex and include both "and" and "or" operators. Do you remember "<a href="https://en.wikipedia.org/wiki/Order_of_operations">order of operations</a>" from primary school? They might have taught you a term like "BIMDAS" to help you remember which operations come first. Boolean expressions also have an order of operations:</p>
+	<ol style="text-align:left;">
+		<li>Brackets</li>
+		<li>Less-than / greater-than</li>
+		<li>Equals-to / not-equal-to</li>
+		<li>And</li>
+		<li>Or</li>
+	</ol>
+	<p>So you'll need to use brackets to create complex expressions like this, for example:</p>
+<pre>
+... ^\[x > 10 &amp;&amp; (y &lt; 12 || z == 1)\]
+</pre>
+	<p>As hinted at in the <code>*8</code> example above, you can also use arithmetic expressions in dynamic odds, just like you can in normal square bracket blocks. Let's start with a simple example using subtraction inside square brackets:</p>
+<pre>
+temp = \{0-45\}
+
+output
+	Today it was \[t = temp.selectOne\] which is 7 degrees greater than yesterday, when it was \[t-7\] degrees.
+</pre>
+	<p>We can "randomize" the number <code>7</code> in the above example like this:</p>
+<pre>
+temp = \{0-45\}
+diff = \{5-10\}
+
+output
+	Today it was \[t = temp.selectOne\] which is \[d = diff.selectOne\] degrees greater than yesterday, when it was \[t-d\] degrees.
+</pre>
+	<p>And here's a "contrived" example that uses some arithmetic inside dynamic odds notation (since, at the moment, I can't think of a <i>simple</i> "real-world" example where this would be useful):</p>
+<pre>
+num = \{1-6\}
+
+output
+	I rolled a \[n1 = num.selectOne\] and a \[n2 = num.selectOne\]. \[comment\]
+	
+comment
+	 Multiply. ^\[n1 * n2\]
+	 Add. ^\[n1 + n2\]
+	 Divide. ^\[n1 / n2\]
+	 More complex. ^\[n1 + n2 * n1\]
+	 More complex, plus re-ordering. ^\[(n1 + n2) * n1\]
+</pre>
+	
+  
+  
+  
+  
+	<h2 id="if_else" style="text-align:left;"><code>if</code>/<code>else</code> Statements</h2>
+	<p>In Perchance it's possible to make a square block output two <i>different</i> things depending on whether the answer to a "question" is true or false. Below is a simple example where we:</p>
+  <ol style="text-align:left;">
+    <li>Select a random number and put it in the "variable" called <code>n</code> (so we can use that number later)</li>
+    <li>Check if that number less than 4</li>
+    <li>If it is, then we output a random item from the <code>sad</code> list</li>
+    <li>Otherwise ("else") we output an item from the <code>happy</code> list</li>
+  </ol>
+<pre>
+number = \{1-6\}
+
+output
+  You rolled a \[n = number.selectOne\]. \[if (n &lt; 4) \{sad\} else \{happy\}\].
+
+sad
+  Too bad
+  Oh well
+
+happy
+  Cool
+  Nice
+</pre>
+  <p><a href="https://perchance.org/simple-if-else-example#edit" target="_blank">Here's an example generator</a> with the above code for you to play around with. You should think of the word <code>else</code> as being equivalent to the word "otherwise". So if/else statements are written in the following form:</p>
+<pre>
+if (thisIsTrue) \{outputThis\} else \{outputThisOtherThing\}
+</pre>
+  <p>Which just means:</p>
+<pre>
+if <b>thisIsTrue</b> then <b>outputThis</b>, otherwise <b>outputThisOtherThing</b>
+</pre>
+  <details style="padding:1rem;">
+  <summary style="cursor:pointer;">Side Note <span style="opacity:0.5;">(click me)</span></summary>
+<p>There is a "short-hand" version of if/else statements that looks like this:</p>
+<pre>\[ifThisIsTrue ? outputThis : outputThis\]</pre>
+  <p>So here's what the above dice example would look like:</p>
+<pre>
+You rolled a \[n = number.selectOne\]. \[n &lt; 4 ? sad : happy\].
+</pre>
+  <p>I'll explain this short-hand version properly towards the end of this section. Keep reading until the end to learn more about this syntax.</p>
+  <p>The curly brackets of the long-hand if statement can be confusing, because they're completely different to the normal curly brackets in Perchance. That's because everything that you write inside square brackets is actually JavaScript, and so the meanings of different special characters aren't the same as in regular Perchance code (when you're writing outside square brackets, that is). Luckily, in JavaScript, you can also write if/else statements like this:</p>
+<pre>
+if (thisIsTrue) outputThis ;else outputThisOtherThing
+</pre>
+  <p>So the above sad/happy sad/happy example would look like this:</p>
+<pre>
+You rolled a \[n = number.selectOne\]. \[if(n &lt; 4) sad ;else happy\].
+</pre>
+    <p>Feel free to use this approach if it looks nicer to you.</p>
+</details>
+  <p>Notice that we don't need to put square brackets around <code>sad</code> and <code>happy</code> in the if/else statement? That's because whenever you're writing stuff inside square brackets you can (and should) refer to lists/variables without square brackets around their name. So, to be clear:</p>
+<pre>
+<span style="color:#fd4949">\[if (n &lt; 4) \{\[sad\]\} else \{\[happy\]\}\]</span> <span style="opacity:0.5">    // incorrect!</span>
+<span style="color:#fd4949">\[if (\[n\] &lt; 4) \{sad\} else \{happy\}\]</span> <span style="opacity:0.5">      // incorrect</span>
+<span style="color:#00d800">\[if (n &lt; 4) \{sad\} else \{happy\}\]</span> <span style="opacity:0.5">        // correct</span> 😌
+</pre>
+  <p>If instead of having lists for sad and happy results, we just wanted to output some literal text depending on what <code>n</code> was, then we surround the stuff that's within the curly brackets in quotation marks, and that tells Perchance to output the literal text in the quotes rather than looking for lists with those names:</p>
+<pre>
+number = \{1-6\}
+
+output
+  You rolled a \[n = number.selectOne\]. \[if (n &lt; 4) \{"Too bad"\} else \{"Cool"\}\].
+</pre>
+  <p>But so far we've only learned how to test if n is <i>less than</i> 4. Here's how we'd test other types of conditions:</p>
+  <ul style="text-align:left;">
+		<li><code>if (n &gt; 4) ...</code> means: if <code>n</code> <b>is greater than</b> 4</li>
+		<li><code>if (n &lt;= 4) ...</code> means: if <code>n</code> <b>is less than or equal to</b> 4</li>
+		<li><code>if (n &gt;= 4) ...</code> means: if <code>n</code> <b>is greater than or equal to</b> 4</li>
+		<li><code>if (n == 4) ...</code> means: if <code>n</code> <b>is equal to</b> 4</li>
+		<li><code>if (n != 4) ...</code> means: if <code>n</code> <b>is not equal to</b> 4</li>
+	</ul>
+  <p>And here's an example where we test if <code>f</code> is equal to "banana":</p>
+<pre>
+fruit
+  apple
+  banana
+  peach
+
+output
+  Did you know that a \[f = fruit.selectOne\] is \[if (f == "banana") \{"not spherical"\} else \{"spherical"\}\]?
+</pre>
+  <p><a href="https://perchance.org/simple-if-else-example-3#edit" target="_blank">Here's an example generator</a> using the above code. Notice that we write <code>if (f == "banana")</code> and not <code>if (f == banana)</code>. That's because the latter one would actually look for a list called <code>banana</code> instead of comparing <code>f</code> to the literal text "banana". It's easy to accidentally forget those quotes, so watch out for that.</p>
+  <p>You can also compare two variables with one another like so:</p>
+<pre>
+fruit
+  apple
+  banana
+  peach
+
+output
+  \[f1 = fruit.selectOne\] and \[f2 = fruit.selectOne\] are \[if (f1 == f2) \{"the same"\} else \{"different"\}\] fruits.
+</pre>
+  <p><a href="https://perchance.org/simple-if-else-example-2#edit" target="_blank">Here's an example generator</a> using the above code.</p>
+  <p>If you'd like an "if" <i>without</i> an "else", then you can just use empty quotes for the "else":</p>
+<pre>
+if (a == 4) \{outputThis\} else \{""\}
+</pre>
+  <p>If you want to <i>do</i> something in an if/else statement, but not output anything, then use the normal <code>, ""</code> approach like this (here we add 3 to <code>a</code> if it's equal to 4):</p>
+<pre>
+if (a == 4) \{a=a+3, ""\} else \{""\}
+</pre>
+  <p>If you want your outputs to contain regular text <i>and also square/curly blocks</i>, then you should wrap all the output text in quotes:</p>
+<pre>
+if (b &gt; 0) \{"There are a few \[animal.pluralForm\] here."\} else \{"There are \{not any|no\} animals here."\}
+</pre>
+  <br>
+  <p>So far, we've been writing if/else statements of the following form:</p>
+<pre>
+if (thisIsTrue) \{outputThis\} else \{outputThisOtherThing\}
+</pre>
+  <p>But we can actually add more "conditions" that output different things, like so:</p>
+<pre>
+if (thisIsTrue) \{outputThis\} else if (thisOtherThingIsTrue) \{outputThisOtherThing\} else \{outputThisAsABackup\}
+</pre>
+  <p>And we can "chain" as many of these <code>else if</code>s together as we want. Here's an example:</p>
+<pre>
+number = \{1-6\}
+
+output
+  You rolled a \[n = number.selectOne\]. \[if (n &lt; 3) \{"Ouch."\} else if (n &lt; 5) \{"Not too bad."\} else \{"Woo hoo!"\}\]
+</pre>
+  <p><a href="https://perchance.org/simple-if-else-example-4#edit" target="_blank">Here's an example generator</a> using the above code. As you can see, we're outputting "Ouch." if they rolled less than 3, otherwise if they rolled less than 5 we output "Not too bad.", and if neither of those conditions (<code>n &lt; 3</code> and <code>n &lt; 5</code>) were true, then we output "Woo hoo!" because that must mean they rolled either a 5 or a 6.</p>
+  <p>As I said, we can have as many <code>else if</code>s as we like, so we could have one for every number:</p>
+<pre>
+You rolled a \[n = number.selectOne\]. \[if (n == 1) \{"Ouch."\} else if (n == 2) \{"Dang."\} else if(n == 3) \{"Not great."\} else if (n == 4) \{"Not bad."\} else if (n == 5) \{"Pretty good!"\} else \{"Woo hoo!"\}\]
+</pre>
+  <p>But for that sort of thing we'd be better off using dynamic odds (read the "Dynamic Odds" section on this page to learn about this):</p>
+<pre>
+number = \{1-6\}
+
+output
+  You rolled a \[n = number.selectOne\]. \[comment\]
+
+comment
+  Ouch. ^\[n == 1\]
+  Dang. ^\[n == 2\]
+  Not great. ^\[n == 3\]
+  Not bad. ^\[n == 4\]
+  Pretty good! ^\[n == 5\]
+  Woo hoo! ^\[n == 6\]
+</pre>
+  <p>There's one more feature of if/else that might come in handy for you. Sometimes instead of simple conditions like "if <code>n</code> is greater than 2", you want something a bit more complicated like "if <code>n</code> is greater than 2 <b>and</b> <code>n</code> is less than 5". Here's how we'd write that:</p>
+<pre>
+if (n &gt; 2 &amp;&amp; n &lt; 5) ...
+</pre>
+  <p>So as you can see, <code>&amp;&amp;</code> means "<b>and</b>". Here's how you can use "<b>or</b>" in your conditions:</p>
+<pre>
+if (n == 1 || n == 6) ...
+</pre>
+  <p>That means "if <code>n</code> is equal to 1 <b>or</b> <code>n</code> is equal to 6".</p>
+  <p><b>Side note:</b> It's very easy to accidentally write a single equals sign in your conditions like this: <code>if (n = 1) ...</code>. That actually sets <code>n</code> equal to 1 rather than checks whether it's equal to 1. So if you're getting weird behavior with your if/else statements, just double-check that you're using double-equals to check equality rather than a single equals sign.</p>
+<pre>
+if (n &gt; 2 &amp;&amp; f != "banana" ) ...
+</pre>
+  <p>That means "if <code>n</code> is greater than to 2 <b>and</b> <code>f</code> is not equal to <code>"banana"</code>".</p>
+  <p>If you need <i>really</i> complex conditions, then you will need to use brackets to properly "group" them so they get executed in the correct order, like so:</p>
+<pre>
+if(x &gt; 10 &amp;&amp; (y &lt; 12 || z == 1)) ...
+</pre>
+  <p>There is actually another "short-hand" way to write if/else statements. The following two lines of code are equivalent:</p>
+<pre>
+\[if (n &lt; 3) \{"Not great."\} else \{"Cool!"\}\]
+
+\[n &lt; 3 ? "Not great." : "Cool!"\]
+</pre>
+  <p>As you can see, the latter code is a bit shorter, but perhaps a bit harder to read. The general format of the short-hand if/else statement is:</p>
+<pre>
+\[ifThisIsTrue ? outputThis : otherwiseOutputThis\]
+</pre>
+  <p>And you can use it exactly like the previous approach. Here's an example with 2 conditions:</p>
+<pre>
+\[n == 5 || n == 6 ? "Great!" : ":("\]
+</pre>
+  <p>And here's an example with chained <code>else if</code>s:</p>
+<pre>
+\[n == 1 ? "Ouch" : n == 2 ? "Dang" : "Not terrible"\]
+</pre>
+  <p>And here's a longer chain:</p>
+<pre>
+\[n == 1 ? "Ouch" : n == 2 ? "Dang" : n == 3 ? "Not great" : n == 4 ? "Not too bad" : n == 5 ? "Great!" : "Woo hoo"\]
+</pre>
+  <p>So as you can see the pattern for chaining else/ifs with the short-hand method is:</p>
+<pre>
+\[condition1 ? result1 : condition2 ? result2 : condition3 ? result3 : backupResult\]
+</pre>
+  <p>And you can bunch the condition/results together to make it easier to read if you want:</p>
+<pre>
+\[condition1?result1 : condition2?result2 : condition3?result3 : backupResult\]
+</pre>
+  <br>
+  <p>There are cases where if/else statements aren't the best solution to the problem, even though they seem like the most obvious one. Here's an example:</p>
+<pre>
+output
+  \[r = race.selectOne, ""\] Their name is \[r == "human" ? name.human : r == "orc" ? name.orc : r == "elf" ? name.elf : "name/race error"\] and their race is \[r\].
+
+name
+  human = \{kate|bob\}
+  orc = \{gruan|tsarok\}
+  elf = \{gaia|filae\}
+
+race
+  human
+  orc
+  elf
+</pre>
+  <p>This example can be improved a lot by using "dynamic sub-list referencing", which is explained in another section on the page you're reading right now. Here's the simplified version that uses dynamic sub-list referencing:</p>
+<pre>
+output
+  \[r = race.selectOne, ""\] Their name is \[name\[r\]\] and their race is \[r\].
+
+name
+  human = \{kate|bob\}
+  orc = \{gruan|tsarok\}
+  elf = \{gaia|filae\}
+
+race
+  human
+  orc
+  elf
+</pre>
+  <p>You should read the dynamic sub-list referencing section to understand the above code properly, but the basic gist is that <code>\[name\[r\]\]</code> gets the sub-list (or "sub-property") that has the same name as the value that's stored in the <code>r</code> variable. So if <code>r</code> contains "elf", then <code>\[name\[r\]\]</code> is the same as writing <code>\[name.elf\]</code>.</p>
+  <p>If/else statements are very useful, but if you're starting to write really complex chains of <code>else if</code>s, then you should question whether you're doing it in the most efficient way. Often times there's a neater solution using hierarchical lists and dynamic sub-list referencing.</p>
+  <p>Another way to make complex if/else statements neater is to use <b>functions</b>, which are explained in a later section on this page. I'll give you the basic gist of it now, but read the functions section to learn more. Let's say we've got <a href="https://perchance.org/simple-critical-hit-example#edit" target="_blank">a generator</a> where we roll a dice and then we want to double it if it's greater than or equal to 5:</p>
+<pre>
+dice = \{1-6\}
+
+output
+  \[d = dice.selectOne, ""\]\[if(d >= 5) \{d = d*2, ""\} else \{""\}\]Your calculated damage is \[d\].
+</pre>
+  <p>We could encapsulate all the damage calculations into a simple function <a href="https://perchance.org/simple-critical-hit-example-with-function#edit" target="_blank">like this</a>:</p>
+<pre>
+output
+  Your calculated damage is \[calculateDamage()\].
+  
+dice = \{1-6\}
+
+calculateDamage() =>
+  d = dice.selectOne
+  if(d >= 5) \{
+    d = d * 2
+  \}
+  return d
+</pre>
+  <p>The nice thing about functions is that we don't need to scatter lots of <code>, ""</code> throughout our code, because the only thing that gets output by a function is the thing that we put after the <code>return</code> statement (which in this case is <code>d</code>).</p>
+  <p>The other nice thing is that complex if/else statements (especially <i>nested</i> ones) are much more readable when you can put them on multiple lines:</p>
+<pre>
+calculateDamage() =>
+  d = dice.selectOne
+  if(d >= 5) \{
+    d = d*2
+  \} else if(d == 4) \{
+    d = d + 2
+  \} else \{
+    d = d + 1
+    if(d == 2) \{
+      d = 1
+    \}
+  \}
+  return d
+</pre>
+  <p>That still looks complicated, but it's much better than having it in a single line! You can treat the output of a function just like you would the output of any other command/plugin/etc in Perchance, so, for example, we can store the output of <code>calculateDamage()</code> and use it later:</p>
+<pre>
+output
+  \[d1 = calculateDamage(), d2 = calculateDamage(), ""\]Your calculated damage is \[d1\] with a bonus of \[d2\] damage if it's a full moon.
+</pre>
+  
+  
+	<h2 id="multiline_output_formatting" style="text-align:left;">Multi-Line Output &amp; Formatting</h2>
+	<p>What if we want to output text that isn't just on one long line, but is instead broken into multiple lines? We can do this by inserting <code>&lt;br&gt;</code> wherever we want to start a new line (a line <b>br</b>eak). For an example, let's say we're making a random character creator:</p>
+<pre>
+output = Character &lt;br&gt; Name: \[name\] &lt;br&gt; Eye color: \[eyeColor\] &lt;br&gt; Height: \[height\]
+
+name = \{import:chocobo-name\}
+eyeColor = \{green|brown|red|black|blue|purple\}
+height = \{100-300\}cm
+...
+</pre>
+	<p>Checkout the result of that <a href="/multiline-example#edit">here</a>. So we've got multiple lines happening, but it could do with a bit of formatting. Let's bold the "Character" title:</p>
+<pre>
+output = &lt;b&gt;Character&lt;/b&gt; &lt;br&gt; Name: \[name\] &lt;br&gt; Eye color: \[eyeColor\] &lt;br&gt; Height: \[height\]
+</pre>
+	<p>See what we've done there? We've wrapped "Character" in the <code>b</code> tag: <code>&lt;b&gt;Character&lt;/b&gt; = <b>Character</b></code>. If we wrap text with the <code>i</code> tag, we can make text italic: <code>&lt;i&gt;Character&lt;/i&gt; = <i>Character</i></code>. You can underline text by wrapping it in these tags: <code>&lt;u&gt;Character&lt;/u&gt; = <u>Character</u></code>. These "tags" are just a couple of the many HTML tags that you can use to format the output of your generator. In <a href="format-text-example#edit">this example</a> I've made "Character" bold and made the <code>name</code>, <code>eyeColor</code> and <code>height</code> values italic.</p>
+	<p>Side note: If you want to take your Perchance skills to the next level, you should learn about <code>$output</code> (it's not just for exporting!), the <code>this</code> keyword, and special properties like <code>joinItems</code>. These are outside the scope of this simple guide, but if you learn them, you can create multi-line stuff <a href="/multiline-pro-example#edit">like a pro</a> (here's a <a href="/multiline-pro-simple-example#edit">simplified version</a> of that).</p>	
+	<p>If you'd like to have your generator output in a neat table format, then check out <a href="/html-table-example#edit">this HTML table example</a>. If you stare at the code in the HTML panel for a bit, you should be able to see how you can add extra rows and columns to the table. The general idea is that each row must start with <code>&lt;tr&gt;</code> and end with <code>&lt;tr/&gt;</code>. Within each row you can add column values that must be wrapped in <code>&lt;td&gt;</code> and <code>&lt;td/&gt;</code> like so: <code>&lt;td&gt;hello&lt;td/&gt;</code>.</p>
+	
+	
+	<h2 id="user_input" style="text-align:left;">User Input</h2>
+	<p>Sometimes you'll want to accept input from people who use your generator - perhaps their character's name, their age, or something like that. Let's go through some examples of different input types that we might want in our generator.</p>
+	
+	<p>First up, is a simple text input form, like this: <input placeholder="Please enter your name..."/>. Let's say we wanted to make it so whenever they type into that input, it puts the text that they've typed into a variable called <code>\[name\]</code>. We can then use this <code>\[name\]</code> variable wherever we want in our code. To do this, you simply need to paste the following code in the bottom-right panel of the editor (the HTML panel):</p>
+	
+<pre>
+&lt;input oninput="name = this.value" placeholder="Please enter your name..."/&gt;
+</pre>
+	<p>Now whenever they type some text into that input form, the text will immediately be put into the <code>\[name\]</code> variable. All the magic is happening in this part of the above snippet: <code>oninput="name = this.value"</code>. That just means "Whenever the value in the input form changes, set the <code>\[name\]</code> variable to the text that's in the input form". If you don't fully understand how it works, that's fine - you can copy and paste this without really needing to know what's happening there.</p>
+	
+	<p>You can change <code>name</code> to <code>age</code> or to anything else you desire so long as it doesn't have any spaces. I recommend using capital letters like this <code>myVariable</code> or <code>MyVariable</code> to help you separate words and make them more readable, or you can use underscores like this: <code>my_variable</code>. <a href="/input-example#edit">Here's a minimal example</a> that uses the above code. If you'd like it to update as the user types (so they don't have to click a "generate" button), have a look at <a href="/input-autoupdate-example#edit">this auto-updating input example</a>.</p>
+	
+	<p>Notice in those examples that I've written <code>name = Default Name</code> in the Perchance code panel (the main editor on the left-hand side). We need to add a default name otherwise we'll get an error because we'd be using a variable before it actually exists (it would only come into existence once they start typing for the first time).</p>
+	
+  <p><b>Important note:</b> If you're taking a number as user input (such as an age, or height, etc.), you should write this instead:</p>
+<pre>
+&lt;input oninput="num = Number(this.value)" placeholder="Please type a number..."/&gt;
+</pre>
+  <p>If you don't do that, it may still work, but certain advanced features (like using the variable in "dynamic odds" statements) will behave weirdly because the engine treats the input as text rather than as a number. The <code>Number(...)</code> function converts text to a number.</p>
+	
+	<p>If you need a larger text box input, have a look at <a href="https://perchance.org/textarea-example#edit">this minimal textarea example</a>, and <a href="/newspaper-column-creator#edit">this</a> more complex example. If you'd like users of your generator to be able to input <b>their own lists</b>, have a look at <a href="https://perchance.org/user-input-list-example#edit">this example</a>.</p>
+	
+	<p>Next up is a drop-down list, like this: <select oninput="country = this.value"><option value="Mexico">Mexico</option><option value="Germany">Germany</option><option value="Britain">Britain</option></select>. To create a drop-down list like this, you'll need to paste the following code in your HTML panel:</p>
+<pre>
+&lt;select oninput="country = this.value"&gt;
+	&lt;option value="Mexico">Mexico&lt;/option&gt;
+	&lt;option value="Germany">Germany&lt;/option&gt;
+	&lt;option value="Britain">Britain&lt;/option&gt;
+&lt;/select&gt;
+</pre>
+	<p>Now whenever they select a different item in that drop-down menu, the <code>\[country\]</code> variable will be set to whatever is in the <code>value</code> attribute of the <code>&lt;option&gt;...&lt;/option&gt;</code> that they selected. So if they click an option like this: <code>&lt;option value="veg">Vegetables&lt;/option&gt;</code>, then the variable would be set to <code>"veg"</code>. The "Vegetables" part is just what gets actually displayed in the drop-down menu.</p>
+	
+  <p>If we were making a name generator where we let the user choose the nationality of the name to be generated (Mexican, German, or British), then our Perchance code might look something like this:</p>
+	
+<pre>
+output
+	\[BritishName\] ^\[country == "Britain"\]
+	\[MexicanName\] ^\[country == "Mexico"\]
+	\[GermanName\] ^\[country == "Germany"\]
+</pre>
+	
+	<p>If you're confused about what's going on there, read the "Dynamic Odds" section that's on this page (scroll up). Here's <a href="/drop-down-list-example#edit">a drop-down list example</a> using the above code. Just as in the previous text-input example, if we change <code>country = this.value</code> to <code>country = this.value, update()</code>, then it will re-randomize the output automatically when they change their drop-down selection (so they don't need to click randomize after changing the drop-down). Here's an example of <a href="https://perchance.org/multiple-drop-down-lists-example#edit" target="_blank">multiple drop-down lists</a>. And <a href="https://perchance.org/dynamic-drop-down-list-example#edit" target="_blank">here's an example</a> of a drop-down list where its items are dyamically generated from one of your Perchance lists (<a href="https://www.reddit.com/r/perchance/comments/f4fja3/dynamic_dropdown_menu/" target="_blank">explained here</a>).</p>
+	
+	<p>Another common input type is a checkbox: <input type="checkbox">. Users can toggle this on and off by clicking it, and you can use its state (checked or unchecked) to change the odds of certain items in your lists (or, more commonly, to completely disable an item if a checkbox isn't checked). To add a checkbox to your generator, just add the following code to your HTML panel:</p>
+	
+<pre>
+&lt;input type="checkbox" id="thingy"/&gt;
+</pre>
+	
+	<p>In this example we've set the <code>id</code> of the checkbox to <code>thingy</code>, but you can call it whatever you want. You use the <code>id</code> to determine whether it's checked or not, like this: <code>\[thing.checked\]</code>. That will evaluate to <code>true</code> if it is checked, or <code>false</code> if it's not. So let's say you have these in your HTML panel:</p>
+	
+<pre>
+&lt;input type="checkbox" id="animalBox"/&gt;
+&lt;input type="checkbox" id="plantBox"/&gt;
+</pre>
+	
+	<p>and this in your Perchance code panel:</p>
+	
+<pre>
+animal = \{import:animal\}
+plant = \{import:plant-species\}
+
+output
+  \[animal\] ^\[animalBox.checked\]
+  \[plant\]  ^\[plantBox.checked\]
+</pre>
+	
+	<p>And now the <code>\[output\]</code> list will only output an animal if the <code>animalBox</code> checkbox is checked, and it will only output a plant if the <code>plantBox</code> checkbox is checked. <a href="https://perchance.org/simple-checkbox-example#edit" target="_blank">Here's an example generator</a> based on the above code. Note that the checkbox <code>id</code>s must not have the same name as any of your lists or variables, so the above example wouldn't work if we used <code>id="animal"</code>. If you want your checkbox to be checked by default, just add the <code>checked</code> attribute to your checkbox HTML like so:</p>
+	
+<pre>
+&lt;input type="checkbox" id="animalBox" checked/&gt;
+</pre>
+	
+	<p>If you want the generator to re-randomize automatically when they click the checkbox, then add then you can add the <code>oninput</code> attribute like this:</p>
+	
+<pre>
+&lt;input type="checkbox" id="animalBox" oninput="update()"/&gt;
+</pre>
+	
+	<p><a href="https://perchance.org/checkbox-checklist-example#edit">Here's another simple check-box example</a>.</p>
+	
+	<p>There are lots of other types of inputs in HTML, for example you can make a <a href="https://perchance.org/color-picker-example#edit" target="_blank">color picker</a>, a <a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/date" target="_blank">date picker</a>, a <a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/range" target="_blank">sliding range</a>, and more. Learning some basic <a href="https://www.khanacademy.org/computing/computer-programming/html-css" target="_blank">HTML</a> and <a href="https://www.khanacademy.org/computing/computer-programming/programming">JavaScript</a> will help you if you want to make generators that rely heavily on inputs. It's hard work (especially JavaScript), but it's worth it!</p>
+	
+	
+	
+	<h2 id="hierarchical_lists" style="text-align:left;">Hierarchical Lists</h2>
+	<p>Say you wanted to generate a random character of a certain fantasy race (elf, orc, human, etc.). Each of these different races have different probabilities of having different characteristics. For example, perhaps elves have a greater chance of having green eyes than the other races. And perhaps orcs can have red eyes, whereas the other races can't. So how do we create a random character while being able to control the probabilities of their characteristics based on their race?</p>
+	<p>There are multiple ways of doing this, but one way is to use "hierarchical lists": lists of lists of lists, as many levels deep as we desire. Have a look at <a href="/hierarchy-example#edit">this generator</a> and try to get a rough sense of what's happening.</p>
+	<p>Assuming you've done that, let's break it down by first looking at the <code>race</code> list (the only list other than <code>output</code> in this generator):</p>
+<pre>
+race
+	elf
+		name = elvish
+		eyeColor
+			green
+			emerald
+	human
+		name = human
+		eyeColor
+			blue
+			brown
+	...
+</pre>
+	<p>You can see it has 3 items: <code>elf</code>, <code>human</code> and <code>orc</code>. Only the first two are shown here for brevity. Each of these items are themselves a list containing <code>name</code> and <code>eyeColor</code>. And finally, <code>eyeColor</code> is a list containing the possible eye colors for that race.</p>
+	<p>So what would happen if we evaluated <code>\[race\]</code>? It'd just print out "elf", "human" or "orc", each with 33% probability. You can test that out by typing "\[race\]" into the bottom-left panel in the editor.</p>
+	<p>But how would we create a sentence like "She was an orcish warrior with red eyes."? We'd need to write something like <code>She was a \[race\] warrior with ??? eyes.</code>, but as indicated by the question marks, how do we know which race was selected? We need to somehow <i>store</i> our previously selected race and then use it to randomly select a valid eye colour for that race.</p>
+	<p><a href="/storing-selections-example-1#edit">Here's a generator</a> that shows how we store something so that we can use it again later, and <a href="/storing-selections-example-2#edit">here's another</a> that shows us how to grab properties of the remembered item. In the first example you can see this line:</p>
+<pre>
+I can never remember what \[w = word.selectOne\] means. Do you know what \[w\] means?
+</pre>
+	<p>Put simply, we're selecting one item from the <code>word</code> list and putting it in a new variable called <code>w</code>. Fun fact: When you write <code>\[word\]</code>, the perchance engine assumes that you wanted to select one item from the <code>word</code> list and print it out. However, when assigning a specific item to our new <code>w</code> variable, we need to explicitly tell perchance that we want <code>w</code> to be a single item from the <code>word</code> list. If we just wrote <code>\[w = word\]</code>, then we'd be assigning the <i>whole</i> <code>word</code> list to <code>w</code>, and so <code>w</code> would just become an alias (another name) for <code>word</code>.</p>
+	<p>This "aliasing" or "nicknaming" can come in handy to shorten long list names:
+<pre>
+\[b = universe.middleEarth.shire.bilbo\] ... \[b.hitPoints\] ... \[b.mood\]
+</pre>
+	<p>The final thing left unexplained is the fact that we can put multiple commands within a square-bracket block. We separate them with a comma like so: <code>\[b.hitPoints += 10, b.name\]</code>. Here we've added 10 hitpoints to bilbo, and then called the <code>name</code> subproperty of bilbo. Perchance only displays the last item in a list of commands. This is handy when you've got commands that you want to execute, but you don't want them to print out anything.</p>
+	<p>In that last example we increased bilbo's hit points by 10 and then printed out his name. What if you don't want to print anything out at all? In that case you can do this: <code>\[b.hitPoints += 10, ""\]</code>. Notice that the second command is just a pair of quotation marks with nothing between them. That's equivalent to saying "print nothing". If there was something between the quotation marks, it would print that.</p>
+	<p><a href="https://perchance.org/hierarchy-example-2#edit">Here's another example generator</a> that uses a hierarchy in a similar manner to the original example in this section.</p>
+	
+	<h2 id="functions" style="text-align:left;">Functions</h2>
+  <p>Let's say you've got <a href="https://perchance.org/critical-hit-if-condition-is-met#edit" target="_blank">a generator</a> where you're rolling some dice and then adding them together, and then selecting a name from a list, and dice sum the if we pick a certain name:</p>
+<pre>
+dice = \{1-6\}
+name = \{Gim|Jin|Sae\}
+
+output
+  \[d = dice.selectOne, n = name.selectOne, ""\]\[if(name == "Sae") \{d = d*2, ""\} else \{""\}\]\[name\] attacked and dealt \[d\] damage.
+</pre>
+  <p>Now, that's a fairly simple example (so long as you've read the "if/else Statements" section on this page), but you can see how that one output line could get quite long and messy if you've got slightly more complex requirements. It becomes hard to read and hard to fix when you have bugs. So one way to fix this is to use the special <code>$output</code> property that overrides the default output of a list, such that we can spread our code across several lines:</p>
+<pre>
+output
+  $output = \[this.joinItems("")\]
+  \[d = dice.selectOne, n = name.selectOne, ""\]
+  \[if(name == "Sae") \{d = d*2, ""\} else \{""\}\]
+  \[name\] attacked and dealt \[d\] damage.
+</pre>
+  <p><a href="https://perchance.org/critical-hit-if-condition-is-met-multi-line#edit" target="_blank">That's a bit better</a>, but it's still a little hard to read, and would be even harder with a "real world" example that is a bit more complex. So in these cases it might be worth encapsulating your code <a href="https://perchance.org/critical-hit-if-condition-is-met-with-function#edit" target="_blank">into a function</a>:</p>
+<pre>
+output
+  \[n = name.selectOne\] attacked and dealt \[calculateDamage()\] damage.
+  
+calculateDamage() =>
+  d = dice.selectOne
+  if(n == "Sae") \{
+    d = d*2
+  \}
+  return d
+</pre>
+  <p>With functions we can neatly put each statement on a separate line, but we also don't need to scatter those pesky <code>, ""</code> things all around our code, because the only thing that gets output by a function is the thing after the <code>return</code> statement (in this case, <code>d</code>). In other words, all statements are hidden by default, and a function will output whatever comes after <code>return</code>.</p>
+  <p><b>Side note:</b> The example that I've used so far isn't great, since it would make more sense to implement this sort of thing like this:</p>
+<pre>
+dice = \{import:dice-plugin\}
+character
+  Gim
+    dmg = \[dice("1d6")\]
+  Jin
+    dmg = \[dice("1d6")\]
+  Sae
+    dmg = \[dice("2d6")\]
+
+output
+  \[c = character.selectOne, c.getName\] attacked and dealt \[c.dmg\] damage.
+  <span style="opacity:0.5">// note: the .getName command gets the "name" of the item that it is applied to</span>
+</pre>
+  <p>But with functions we can do really complex things that would be hard to write and read with most other approaches:</p>
+<pre>
+calculateDamage() =>
+  d = dice.selectOne
+  if(n == "Sae") \{
+    d = d * 2
+  \} else if(n == "Jin" &amp;&amp; d &lt;= 2) \{
+    d = d + 2
+  \} else if(n == "Gim") \{
+    d = d + 1
+    if(d == 2) \{
+      d = d * 4
+      n = "Super Saiyan" + n
+    \}
+  \}
+  return d
+</pre>
+  <p>You can treat the output of a function just like you would the output of any other command/plugin/etc in Perchance, so, for example, we can store the output of <code>calculateDamage()</code> and use it later:</p>
+<pre>
+output
+  \[n = name.selectOne\] attacked and dealt \[d = calculateDamage()\] damage, which is \[d > 5 ? "high" : "low"\].
+</pre>
+  <p>The other cool thing we can do with functions is give them <b>inputs</b> which affect their output. Here's an example of a function that accepts a number as an input, and returns that number of animals, all joined together into one bit of text:</p>
+<pre>
+output
+  Here are 3 animals: \[getAnimals(3)\], and here are 2 more: \[getAnimals(2)\].
+
+animal = \{import:animal\}
+
+getAnimals(num) =>
+  return animal.selectMany(num).joinItems(" ")
+</pre>
+  <p>And a function can have multiple inputs by separating them with commas:</p>
+<pre>
+output
+  Here are 3 animals joined with hyphens: \[getAnimals(3, "-")\], and here are 2 more joined with dollar signs: \[getAnimals(2, "$")\].
+
+animal = \{import:animal\}
+
+getAnimals(num, joiner) =>
+  return animal.selectMany(num).joinItems(joiner)
+</pre>
+  <p><a href="https://perchance.org/function-with-2-inputs-example#edit" target="_blank">Here's an example generator</a> with that code.</p>
+  <p>We haven't even scratched the surface of what's possible with functions, but hopefully this is enough to get you started. Feel free to ask questions on the <a href="https://lemmy.world/c/perchance" target="_blank">forum</a>!</p>
+  <p>Note that the Perchance engine is based on JavaScript, so all JavaScript code is valid in Perchance functions (and also in square blocks). This is handy to know because you can search through JavaScript tutorials and cheatsheets if there's not much info on how to do something in Perchance (but always feel free to ask on the Perchance forum).</p>
+  
+	<h2 id="plugins" style="text-align:left;">Plugins</h2>
+	
+	<p>You may have seen the <a href="plugins">plugins</a> page already. This is just a list of handy "generators" (that aren't actually generators in the normal sense of the word) which you can import into your generator. Let's have a look at the <a href="dice-plugin">dice-plugin</a>, in particular. This plugin allows you to generate dice rolls with standard dice notation. Here's how we could use it:</p>
+<pre>
+dice = \{import:dice-plugin\}
+output
+	You rolled a \[dice("1d6")\].
+</pre>
+	
+	<p>We could make the output even better by assigning it to a variable and using some dynamic odds notation:</p>
+	
+<pre>
+output
+  You rolled a \[n = dice("1d6")\].\[response\]
+
+response
+	Congratulations! ^\[n == 6\]
+	Oh well. ^\[n &lt; 3\]
+	Cool. ^\[n &gt;=4 &amp;&amp; n &lt;= 5\]
+</pre>
+	
+	<p>Regarding the <code>response</code> list, if you haven't learned about dynamic odds notation yet, that basically means: If <code>n</code> equals 6, output "Congratulations!" or if <code>n</code> is less than 3, output "Oh well." or if <code>n</code> is greater than or equal to 4 <b>and</b> less than or equal to 5, output "Cool.". The <code>&amp;&amp;</code> means "and".</p>
+	
+	<p>There are a bunch of potentially useful plugins over on the <a href="plugins">plugins page</a> that you should check out. If you need someone to write you a plugin, feel free to ask on the <a href="https://lemmy.world/c/perchance">forum</a>.</p>
+	
+  
+	<h2 id="hiding_square_block_outputs" style="text-align:left;">Executing &amp; Hiding the Result</h2>
+  
+	<p>Let's say you've got some code like this:</p>
+<pre>
+dice = \{import:dice-plugin\}
+
+output
+  \[a=dice("1d6"), b=dice("1d6"), c=dice("1d6"), ""\]If a+b+c is \[a+b+c\], and a is \[a\], and b is \[b\], then what is c? (Answer: \[c\])
+</pre>
+  
+  <p>Here we're importing the dice plugin, using it to initialize some variables (but hiding them by adding <code>,""</code> at the end of the initialisation block), and then using those variables in the output text.</p>
+  
+  <p>But It's a little bit messy having all our variable initalizations at the start of our output, what what if we pull them out into their own list and reference them like this?
+    
+<pre>
+init
+  \[a=dice("1d6"), b=dice("1d6"), c=dice("1d6")\]
+
+output
+  \[init, ""\]If a+b+c is \[a+b+c\], and a is \[a\], and b is \[b\], then what is c? (Answer: \[c\])
+</pre>
+  
+  <p>Will that work? It <i>looks</i> like it will work, but it actually won't. Let's think about what's happening here. When we write <code>\[init, ""\]</code> we're not actually "doing" anything with the <code>init</code> list. We're just "mentioning" it. We're not "executing" it - that is, we're not selecting an item from it and evaluating the square and curly blocks to produce some text. <i>Nothing</i> at all happens if you just "mention" a list name like that.</p>
+  <p>But you're probably thinking: Wait, but when we write <code>\[animal\]</code> to get a random item from our (hypothetical) <code>animal</code> list, then we're just "mentioning" the animal list, right? And that type of mention <i>does</i> "execute" the list (i.e. it selects an item and converts it to plain text by evaluating square and curly blocks). Yes! That is correct. But it only does this because the last thing in that <code>\[animal\]</code> square block (and of course the <i>only</i> thing in it) is a list, and so that's what is actually going to get output, and so it needs to be converted into some text, so the Perchance engine "realizes" this and automatically executes the <code>.evaluateItem</code> command on the <code>animal</code> list, which triggers <code>selectOne</code> and then evaluates all the square and curly blocks in the resulting item.</p>
+  
+  <p>Okay, that was a bit of a mouthful. In summary: If the final thing in a square block is a list, then Perchance does some ✨magical✨ stuff behind the scenes to convert that list into plain text (which of course involves evaluation of square/curly blocks).</p>
+  
+  <p>If we want a list to be executed that's <b>not</b> the final thing in a square block, then we need to handle that ourself. Here's one way to fix the above example:</p>
+  
+<pre>
+init
+  \[a=dice("1d6"), b=dice("1d6"), c=dice("1d6")\]
+
+output
+  \[init.evaluateItem, ""\]If a+b+c is \[a+b+c\], and a is \[a\], and b is \[b\], then what is c? (Answer: \[c\])
+</pre>
+  
+  <p>As you can see, we can use the <code>.evaluateItem</code> command on any lists that we want to "execute" behind the scenes. <a href="https://perchance.org/executing-and-hiding-result-example#edit" target="_blank">Here's an example generator</a> based on that code.</p>
+  
+  <p>The important thing to remember here is that if a list isn't the last thing in a square block, it won't get "executed" automatically. "Mentioning" a list name doesn't do anything. Use <code>.evaluateItem</code> to manually "execute" the list as needed.</p>
+  
+  <p>Here's another way to solve it:</p>
+  
+<pre>
+init
+  \[a=dice("1d6"), b=dice("1d6"), c=dice("1d6"), ""\]
+
+output
+  \[init\]If a+b+c is \[a+b+c\], and a is \[a\], and b is \[b\], then what is c? (Answer: \[c\])
+</pre>
+  
+	<p>Since the block at the start of our <code>output</code> now has the <code>init</code> list as the <i>final</i> item, it will be magically executed "behind the scenes".</p>
+  
+	<p>There is another way to solve this that you probably didn't expect. It involves a fairly subtle feature of Perchance that is worth understanding if you're building complex generators.</p>
+  
+<pre>
+init = \[a=dice("1d6"), b=dice("1d6"), c=dice("1d6")\]
+
+output
+  \[init, ""\]If a+b+c is \[a+b+c\], and a is \[a\], and b is \[b\], then what is c? (Answer: \[c\])
+</pre>
+  
+  <p>You're probably looking at that and saying "But isn't that just the same as the first example? Using the equals sign like that is just a short-hand for a single-item list, right?" Well, most of the time, yes, but if the "single item" of this "list" is a <b><i>single</i> square block</b> (like it is in this case), then mentioning the name of this "list" will trigger an execution of that square block.</p>
+  <p>So, really, if you use the "equals" single-item short-hand with an item that is just one square block, then you're creating what might be called a "random variable" or "dynamic variable" rather than a "list". So whenever you "mention" this variable, a new dynamic value is generated. That's why the above example works.</p>
+	
+	<h2 id="the_this_keyword" style="text-align:left;">The <code>this</code> Keyword</h2>
+	<p>Have a look at this example:</p>
+<pre>
+personHeight = \{100-200\}
+personEyeColor = \{brown^3|blue|grey^0.2|green^0.3\}
+personDescription = The person is \[personHeight\]cm tall and has \[personEyeColor\] eyes.
+</pre>
+	<p>There's nothing wrong with this example, but we could use a hierarchy to clean it up a bit and make it more "modular":</p>
+<pre>
+person
+	height = \{100-200\}
+	eyeColor = \{brown^3|blue|grey^0.2|green^0.3\}
+	description = The person is \[person.height\]cm tall and has \[person.eyeColor\] eyes.
+</pre>
+  <p>That's much nicer because now all the person-related things are all nested under one label: <code>person</code>. Now, instead of writing <code>\[personDescription\]</code>, we'd write <code>\[person.description\]</code>. This organisational "nesting" would be especially helpful if we had a fairly complex generator with lots of things to keep track of. Writing neat code allows us to create more complex generators with less effort.</p>
+	<p>But we can actually make one final tweak which makes <code>person</code> just a little bit neater and more self-contained:</p>
+<pre>
+person
+	height = \{100-200\}
+	eyeColor = \{brown^3|blue|grey^0.2|green^0.3\}
+	description = The person is \[this.height\]cm tall and has \[this.eyeColor\] eyes.
+</pre>
+	<p>Notice how we've written <code>this.height</code> instead of <code>person.height</code>? That's because the special <code>this</code> keyword always refers to the "parent" of the item that it is written in. In this case the "parent" of <code>description</code> is <code>person</code>, so writing <code>this</code> is the same as writing <code>person</code>.</p>
+	<p>If we use <code>this</code>, instead of <code>person</code>, then our code is more "modular" or "self-contained", because, for example, the <code>description</code> doesn't care what its parent is called - we could rename <code>person</code> to <code>human</code> and it would still do its job correctly without worrying about looking for all the times we mentioned <code>person</code> and changing them to <code>human</code>.</p>
+	
+	<p>The <code>this</code> keyword is also useful when you've got a very "deep" hierarchy:</p>
+	
+<pre>
+race
+	humanoid
+		elf
+			height = \{10-20\}0cm
+			description = It's an Elf that's about \[this.height\]cm tall.
+			...
+		orc
+			...
+				...
+		...
+	...
+</pre>
+	
+	<p>See how we can use <code>this.height</code> instead of <code>race.humanoid.elf.height</code>? It's neater and more self-contained.</p>
+		
+	<p>So the <code>this</code> keyword allows us to access the parent of the current item, but what if we want to access the <i>parent's parent</i>? This is where we use the <code>getParent</code> property. While the <code>selectOne</code> property allows us to move <i>down</i> the hierarchy by selecting a random child, the <code>getParent</code> property allows us to move <i>up</i> the hierarchy by getting an item's parent.</p>
+	
+<pre>
+cake
+	flavor = \{strawberry|dark chocolate|vanilla\}
+	description
+		A tasty \[this.getParent.flavor\] cake.
+		A \[this.getParent.flavor\] cake that is tasty.
+</pre>
+	
+	<p>See how that works? The <code>this</code> keyword always refers to the item's parent - <code>description</code>, in this case. We add <code>.getParent</code> after <code>this</code> because we want to get the parent of <code>description</code> (which is <code>cake</code>). Finally, we add <code>.flavor</code> because we want to get the flavor property of <code>cake</code>.</p>
+	
+	<p>Now that you understand <code>this</code> and <code>.getParent</code> you can go up and down the hierarchy as you please! 🎉</p>
+  
+  <p>One final tip: To get the name of a list, you can use <code>.getName</code>, and this can be "chained" with <code>.getParent</code> like so:</p>
+	
+<pre>
+output
+  \[animal.selectOne.selectOne.description\]
+  
+animal
+	mammal
+    mouse
+      description = a \[this.getName\] is a type of \[this.getParent.getName\]
+    kangaroo
+      description = a \[this.getName\] is a type of \[this.getParent.getName\]
+	reptile
+    lizard
+      description = a \[this.getName\] is a type of \[this.getParent.getName\]
+    turtle
+      description = a \[this.getName\] is a type of \[this.getParent.getName\]
+</pre>
+  <p>So that'll output something like "a turtle is a type of reptile" as you can see in <a href="https://perchance.org/getparent-getname-example#edit" target="_blank">this example generator</a>. That's probably not the neatest way to achieve it (due to lots of repetition), but it gets the point across :)</p>
+	
+	
+	
+	<h2 id="createInstance_plugin" style="text-align:left;">The <code>createInstance</code> Plugin</h2>
+	<p><b>Note:</b> This section was written before the createInstance plugin page had a decent explanation on it. There's a good explanation over there now, so if you head over to <a href="https://perchance.org/create-instance-plugin">the plugin page</a> and read it first, it may be easier to understand, since it starts off with a more simple example.</p>
+	<p>Let's create a simple <code>person</code> "list":</p>
+	
+<pre>
+person
+	height = \{10-20\}0
+	eyeColor = \{brown^3|blue|grey^0.2|green^0.3\}
+	sex = \{male|female\}
+	pronoun
+		she ^\[this.getParent.sex == "female"\]
+		he ^\[this.getParent.sex == "male"\]
+
+</pre>
+	
+	<p>The above <code>person</code> "list" not really a list, because it doesn't have any items - it only has "properties", and a sub-list. So we can write <code>person.eyeColor</code> and we'll get a random eye color, or <code>person.height</code>, and we'll get a random person height.</p>
+	<p>As a side node: Notice that we're using <i>dynamic</i> odds to determine the probability of each pronoun. If you haven't learned about dynamic odds notation yet, you can scroll up the the Dynamic Odds section on this page to learn about it. The special <code>this</code> keyword always refers to the item's parent. So this this case <code>this</code> refers to the <code>pronoun</code> item. So <code>this.getParent</code> refers to the parent of the <code>pronoun</code> item: <code>person</code>. If this all sounds too complicated, don't worry too much about that for now - you don't need to know this stuff to use the plugin. Just know that the odds of each item in the <code>person.pronoun</code> list depends on what <code>person.sex</code> evaluates to.</p>
+	<p>Okay, so what if we wanted to use this <code>person</code> "list" as a sort of "blueprint" to generate a random person that we could store in a variable and reference multiple times? So if we could create a particular random "instance" of this <code>person</code> blueprint, and store it in a variable <code>p</code>, then each time we evaluate <code>p.eyeColor</code> we should get the <i>same</i> eye color, and each time we evaluate <code>p.name</code> we should get the <i>same</i> name.</p>
+	<p>To do this, we need to use the <code><a href="create-instance-plugin">createInstance</a></code> plugin, and we'd use it like so:</p>
+	
+<pre>
+createInstance = \{import:create-instance-plugin\}
+
+person
+	height = \{10-20\}0
+	eyeColor = \{brown^3|blue|grey^0.2|green^0.3\}
+	sex = \{male|female\}
+	pronoun
+		she ^\[this.getParent.sex == "female"\]
+		he ^\[this.getParent.sex == "male"\]
+
+output
+	\[p = createInstance(person), ""\]If I recall correctly \[p.pronoun\] was about \[p.height\]cm tall. Yes, and \[p.pronoun\] definitely had \[p.eyeColor\] eyes.
+</pre>
+	
+	<p>You can create as many instances of the <code>person</code> blueprint as you want, and just store them in separate variables like so:</p>
+
+<pre>
+\[p1 = createInstance(person), p2 = createInstance(person), ""\]
+</pre>
+
+	<p>Each instance will have its own set of randomly selected values. The <code>createInstance</code> plugin essentially runs <code>selectOne</code> on each of the properties of the list that you pass it, and then "fixes" those values in place. But note that it doesn't change the original list in any way - it creates a completely new one each time.</p>
+	
+	<p>Check out <a href="create-instance-plugin-example#edit">this generator</a> for another example of how to use the <code>createInstance</code> plugin.</p>
+	
+	
+	
+	
+	<h2 id="dynamic_sublist_referencing" style="text-align:left;">Dynamic Sub-list Referencing</h2>
+	
+	<p>Have a look at this simple generator:</p>
+	
+<pre>
+output
+	My gender is \[g = gender.selectOne\] and my name is \[names.<span style="color:red">g</span>.selectOne\].
+
+gender = \{female|male|non-binary^0.1\}
+
+names
+	female
+		Anita
+		Jessica
+	male
+		Kalid
+		Bob
+	non-binary
+		Airlie
+		Riley
+</pre>
+	
+	<p>But there's something wrong with this generator - I've marked it red. What I wanted to do here is use the correct sublist of <code>names</code> depending on what is stored in the <code>g</code> variable. As it currently stands, this generator would throw us an error because there's no "g" sublist in the <code>names</code> names list; <code>names.g</code> doesn't exist.</p>
+	<p>So how do we do this? We just want to get sublist of <code>names</code> that has the same name as the value stored in the <code>g</code> variable. Before I present the solution, I want to re-iterate something that you learned in the basic tutorial: Square brackets have a completely different meaning when they're used <i>inside</i> square brackets. When you're inside square brackets you can refer to variables and lists directly by their names, so:</p>
+	<ul>
+		<li>This is <b style="color:red">wrong</b>: \[a = \[animal\].selectOne\]</li>
+		<li>This is right: \[a = animal.selectOne\]</li>
+	</ul>
+	<p>Makes sense? We don't need to use square brackets to refer to lists and variables when we're already inside square brackets.</p>
+	<p>The reason I wanted to re-iterate that is because you're about to learn one of the <i>actual uses</i> of square brackets <i>inside</i> square brackets. Without further ado, here's the solution to our previous problem:</p>
+
+<pre>
+output
+	My gender is \[g = gender.selectOne\] and my name is \[names<span style="color:#00cc00">\[g\]</span>.selectOne\].
+</pre>
+	
+	<p>So we've replaced <code><span style="color:red">.g</span></code> with <code><span style="color:green">\[g\]</span></code>. This tells the Perchance engine to use the <i>value</i> stored in <code>g</code> as the name of the sublist, rather than using the literal character "g". So if the value in <code>g</code> was "other", then writing <code>name\[g\]</code> would be the same as writing <code>name.other</code>.</p>
+	<p>Remember, these square brackets are part of a special notation that is completely different to normal usage of square brackets.</p>
+	<p>Often we need to "chain" sub-property names together to go down a hierarchy: <code>world.continent.country.state.city</code> - and we can do the same thing with our dynamic notation: <code>world\[a\]\[b\]\[c\]\[d\]</code>, and we can mix and match normal and dynamic notations: <code>world\[a\].country\[b\]\[c\].town</code>.</p>
+	<p>Sometimes you may find that you need to combine variables to create your property names. You can do that like so: <code>thing\[a+b\]</code>. That will join <code>a</code> and <code>b</code> together, and then get the sublist of <code>thing</code> with that name (if it exists). You can also combine variables with literal strings like this: <code>thing\[a+"blah"\]</code>. So if the value of <code>a</code> was "foo", then that would be the same as writing <code>thing\["fooblah"\]</code>, which would be the same as writing <code>thing.fooblah</code>.</p>
+	<p><a href="https://perchance.org/dynamic-sublist-referencing-example#edit" target="_blank">Here's a simple generator</a> that selects a random gender and then uses that to select an appropriate appearance for a character. And <a href="https://perchance.org/matching-pronouns-with-genders-example#edit" target="_blank">here's another</a> that matches genders with the correct pronouns. <a href="https://perchance.org/dynamic-sub-list-referencing-example#edit" target="_blank">And here's</a> a very simple example.</p>
+	
+	
+	
+	<h2 id="$output" style="text-align:left;">The <code>$output</code> Keyword</h2>
+	<p>We can use the <code>$output</code> keyword to "export" a specific list within our generator:</p>
+<pre>
+$output = \[material\]
+
+material
+	wood
+	metal
+	plastic
+	...
+</pre>
+	<p>So now when people "import" your generator with <code>\{import:your-generators-name\}</code>, they'll get a random item from the <code>material</code> list.</p>
+	<p>But we can also use the <code>$output</code> keyword <i>within lists</i> so the list "exports" something when we evaluate it. Here's a simple usage example:</p>
+<pre>
+person
+	age = 68
+	name = Anita
+	$output = My name is \[this.name\] and I'm \[this.age\]
+</pre>
+	<p>Now when you write <code>\[person\]</code> it'll output <code>My name is Anita and I'm 68</code>. <a href="/output-keyword-example#edit">Try it out</a>. See how it works? We can use <code>$output</code> to <i>change</i> what a list outputs! Note that we can still write <code>\[person.age\]</code> and <code>\[person.name\]</code> to get "68" and "Anita", respectively.</p>
+	<p>If you think about it, when we use <code>$output</code> for exporting a certain list (so people can <code>import</code> it) we're doing the same thing, except we're changing what the <i>whole generator</i> outputs.</p>
+	<p>You might be thinking: "Is <code>$output</code> <i>really</i> necessary in the above example?" And you're right - we could have just wrote this:</p>
+<pre>
+person
+	age = 68
+	name = Anita
+	description = My name is \[this.name\] and I'm \[this.age\]
+</pre>
+	<p>And then used <code>\[person.description\]</code> instead. It's a bit longer than just writing <code>\[person\]</code>, but at least we don't need to use quirky and potentially confusing features. But <code>$output</code> actually turns out to be really helpful for some more advanced techniques. For example, we normally use the <code>&lt;br&gt;</code> tag to insert a new line in our text (to generate multi-line content), but that can get a little messy because you can end up with really long lines. Using <code>$output</code> we can automatically <a href="/multiline-pro-simple-example#edit">combine all the items in a list</a> together, rather than selecting a random one. <a href="https://www.reddit.com/r/perchance/comments/fo3ige/make_a_large_multiline_output_lots_of_brs_easier/" target="_blank">Here's an explanation</a> of how that works.</p>
+	<p>As you start to learn these more advanced features, you'll do well to think of your generator as a <b>hierarchy</b>, rather than just a bunch of lists. Perchance allows you to go as many levels deep as you want, and you can alter the <code>$output</code>s at each level.</p>
+
+	
+	
+	
+	
+	<h2 id="multiple_independent_outputs" style="text-align:left;">Multiple Independent Outputs</h2>
+	<p>Sometimes you'll want to have two different "randomized" outputs that are randomized via <b>separate</b> buttons. So, for example, you may be generating a random book title and author name, but you want separate buttons to randomize each of those, rather than a single button that does both. I'll explain this below, but to achieve this, you need to add an <code>id="blahblah"</code> attribute to the HTML element that contains your different <code>\[output\]</code> blocks. You can set each <code>id</code> to any name you like so long as it starts with a letter and doesn't contain any spaces. We'll reference these <code>id</code>s later to tell the Perchance engine which elements to update when a particular button is pressed. Here's an example of two elements we could have in our HTML panel:</p>
+<pre>
+&lt;p&gt;\[output1\]&lt;/p&gt;
+&lt;p&gt;\[output2\]&lt;/p&gt;
+</pre>
+	<p>Now, let's add <code>id</code> attributes to these elements so we can reference them later. We'll call them <code>out1</code> and <code>out2</code>:</p>
+<pre>
+&lt;p id="out1"&gt;\[output1\]&lt;/p&gt;
+&lt;p id="out2"&gt;\[output2\]&lt;/p&gt;
+</pre>
+	<p>And now you'll want to create a "randomize" button for each of those two elements, rather than a single randomize button that updates both. First, here's how we'd create a normal randomize button that updates both at the same time:</p>
+<pre>
+&lt;button onclick="update()"&gt;randomize&lt;/button&gt;
+</pre>
+	<p>And now here's how we create two different buttons which update our <code>out1</code> and <code>out2</code> elements separately:</p>
+<pre>
+&lt;button onclick="update(out1)"&gt;randomize&lt;/button&gt;
+&lt;button onclick="update(out2)"&gt;randomize&lt;/button&gt;
+</pre>
+	<p>Notice that we simply put the <code>id</code> of the element that we want to update inside the brackets of the <code>update</code> function. The full explanation of this is outside the scope of this tutorial, but if you learn some JavaScript, you'll see that there's nothing too complicated happening here. So here's the full code that you'd put in your HTML panel:</p>
+<pre>
+&lt;p id="out1"&gt;\[output1\]&lt;/p&gt;
+&lt;button onclick="update(out1)"&gt;randomize&lt;/button&gt;
+
+&lt;p id="out2"&gt;\[output2\]&lt;/p&gt;
+&lt;button onclick="update(out2)"&gt;randomize&lt;/button&gt;
+</pre>
+  <p>And your Perchance code panel might look like this:</p>
+<pre>
+output1
+  mouse
+	frog
+	moose
+	
+output2
+  broccoli
+	cabbage
+	spinach
+</pre>
+	<p>So now, when the user clicks the top button, only the top (<code>out1</code>) element will be updated, and when they click the bottom button, the bottom element (<code>out2</code>) will be updated. <a href="https://perchance.org/multiple-independent-outputs-example#edit" target="_blank">Here's an example generator</a> that puts all this stuff together. And <a href="https://perchance.org/multiple-independent-outputs-example-2#edit" target="_blank">here's another</a>.</p>
+	<p>Note that you can add the <code>id</code> attribute alongside any existing attributes like <code>style</code> that you may already have:</p>
+<pre>
+&lt;p style="color:blue;" id="out1"&gt;\[output1\]&lt;/p&gt;
+</pre>
+	<p>If you'd like multiple buttons, but for them to output to the <i>same spot</i> (so only one output shows up at a time), then check out <a href="https://perchance.org/multiple-buttons-same-output#edit" target="_blank">this example</a>. What we're doing in that example is setting a <code>clicked</code> variable whenever the user clicks one of the buttons. If they click the plant button, we set it to "plant", and if they click the animal button we set it to "animal". Then we check the value of the <code>clicked</code> variable in our output list using "dynamic odds".</p>
+	
+	<h2 id="battle_simulator" style="text-align:left;">Battle Simulator</h2>
+	<p>The <a href="/battle-simulator-example#edit">battle-simulator-example</a> uses a few sneaky Perchance features. Let's have a look at the <code>turn</code> list:</p>
+<pre>
+turn
+	\[character.hp -= 5, ""\]You were hit in the torso with a stone.
+	\[character.hp += 20, ""\]A nearby priest heals your wounds. ^0.1
+	...
+</pre>
+	<p>See how each item has something like <code>\[character.hp -= 5, ""\]</code> before it? What's happening here? Well, <code>-= 5</code> just means "subtract five from this variable". So we're just decreasing the character's hitpoints by 5 each time that first item is randomly selected and consequently "evaluated".</p>
+	<p>Now, to understand the comma and double quotation marks, we need to understand some fundamental stuff about Perchance: You can put multiple commands/variables inside square brackets so long as you separate them by a comma - and importantly <i>Perchance will only print out the result of the <b>last</b> command</i>. So it executes all the commands, but only prints out the last one. Here our last command was an "empty" command. We're just telling it to print out nothing. If we'd written <code>\[character.hp -= 5, "apple"\]</code>, then it'd print out the text "apple" in the place of that square block. If we wrote <code>\[character.hp -= 5, character.name\]</code>, then it'd print out the character's name. You'll use the <code>\[command, ""\]</code> pattern a lot in your Perchance travels to sneakily execute commands behind the scenes without actually outputting anything.</p>
+	<p>Our next lesson from this generator is the dynamic odds notation <code>^\[character.hp &gt; 0\]</code>. Here we're using what are called "<a href="https://en.wikipedia.org/wiki/Boolean_expression">boolean expressions</a>". The expression <code>1 &gt; 100</code> means "1 is greater than 100" - which is false. One is definitely not greater than one hundred. So this expression evaluates to "false", which is equivalent to the number 0 in Perchance odds notation. So if you wrote <code>^\[1 &gt; 100\]</code> after an item, it'd always get a weight of 0 - which means it's impossible. There's no use in even having an item with those odds in the list! On the other hand, if you wrote <code>^\[1 &lt; 100\]</code>, then the statement is "1 is less than 100" which evaluates to true, which is equivalent to 1. So you might as well just write <code>^1</code> - but that's the default value anyway! As you can see, dynamic odds notation is not so useful unless you're using "variables" (things that can vary) like <code>character.hp</code>.</p>
+	<p>So if the expression after <code>^</code> is true, it gets a weight of one. Conversely if the expression is false, it gets a weight of zero (equivalent to writing <code>^0</code> after the item). There are 4 different boolean "operators" of the greater/less than variety:</p>
+	<ul style="text-align:left;">
+		<li><code>&lt;</code> means less than</li>
+		<li><code>&gt;</code> means greater than</li>
+		<li><code>&lt;=</code> means less than or equal to</li>
+		<li><code>&gt;=</code> means greater than or equal to</li>
+	</ul>
+	<p>So coming back to our original expression: <code>^\[character.hp &gt; 0\]</code>, this just means "give this item a weight of 1 if <code>character.hp</code> is greater than one, otherwise give it a weight of 0". Remember that dynamic weights don't have to be boolean expressions. They can just be references to other variables like <code>^\[character.age\]</code> or something like that.</p>
+	<p>There is one final pro technique used in this generator. Can you see what it is? Notice that the first item in the <code>battle</code> list contains a reference to the <code>battle</code> list itself!</p>
+
+<pre>
+battle
+	\[turn\]&lt;br&gt;\[status\]&lt;br&gt;\[battle\] ^\[character.hp &gt; 0\]
+	It's over. ^\[character.hp &lt;= 0\]
+</pre>
+
+	<p>What on earth is going on there?! Well, firstly, <code>&lt;br&gt;</code> is just how you output a "line <b>br</b>eak" (new line) in HTML. That ensures that each step of the battle is printed on it's own line. Secondly, the "self-referential" behaviour of this <code>battle</code> list isn't too hard to understand once we put it in plain English: "Keep doing the battle until the character's health is zero or lower, then output <code>It's over.</code>". So we evaulate <code>\[battle\]</code> <i>once</i> and it will select the first item because the character's <code>hp</code> is above zero, then it executes a <code>\[turn\]</code>, then prints the <code>\[status\]</code>, then calls <code>\[battle\]</code> which repeats the process again. This keeps happening until the character's health falls below zero - at which point the second item, <code>It's over.</code> is chosen and the loop stops. Pretty neat, huh? <a href="https://www.reddit.com/r/perchance/comments/8rrnwd/is_it_possible_to_set_items_to_have_values_and/">Here's another example</a> where you might want to use loops (see @syrupyeti's reply).</p>
+	
+	<p>Note that when you're creating "loops" like this, its easy to accidentally create an "infinite loop", which may freeze up the browser tab. It freezes up the browser tab because the infinite loop is trying to execute the loop millions of times, and potentially trying to output way too much text. This won't harm your computer (you can just close the tab), but if you're not saving often, you may lose some work because you can't save a generator while it's in this "frozen" state. So make sure you're saving often. If you do accidentally freeze up your generator, but you've saved it with the infinite loop code (so everytime you visit the page it immediately freezes up) then you can prevent your code from executing by putting <code>#debugFreeze</code> at the end of your generator's URL. For example:</p>
+	
+<pre>https://perchance.org/your-generators-name#debugFreeze</pre>
+	
+  <p>This will open up the editor panel and prevent it from executing your code, so you've got a chance to make the required edits to stop the infinte loop, and then you can save it.</p>
+
+	
+	<h2 id="more_examples" style="text-align:left;">More Examples</h2>
+	<ul>
+    <li><a href="https://perchance.org/tags-and-header-meta-data-example">Use <code>$meta</code> to hide the Perchance header bar, or change its color/background</li>
+    <li><a href="https://perchance.org/selectmany-sumitems-example"><code>selectMany</code> dice based on previous roll and use <code>sumItems</code> to get sum</a></li>
+    <li><a href="https://perchance.org/roll-number-of-dice-based-on-previous-roll#edit">Roll number of dice based on previous roll</a></li>
+		<li><a href="https://perchance.org/draw-a-river-example#edit">Draw a spatial grid/map with emojis</a></li>
+		<li><a href="https://perchance.org/add-up-randomly-generated-numbers-example#edit">Add up randomly generated numbers</a></li>
+		<li><a href="https://perchance.org/choose-a-list-based-on-a-selected-number#edit">Choose a list based on a randomly selected number</a></li>
+		<li><a href="https://perchance.org/append-items-when-click-example#edit">Append items to list when button is clicked</a></li>
+		<li><a href="https://perchance.org/output-history-example#edit">Prepend generated items to a "history" box</a></li>
+		<li><a href="https://perchance.org/hide-output-until-click-example#edit">Hide the output until the user clicks a button</a> (<a href="https://www.reddit.com/r/perchance/comments/9mhnf1/generator_with_nothing/">explanation</a>)</li>
+		<li><a href="https://perchance.org/select-leaf-plugin-example#edit">selectLeaf plugin</a></li>
+		<li><a href="https://perchance.org/consumable-leaf-list-plugin-example#edit">"consumable" hierarchies</a></li>
+		<li><a href="https://perchance.org/matching-pronouns-with-genders-example#edit">Matching pronouns based on gender</a>. The "Dynamic Sublist Referencing" section (above) explains this.</li>
+		<li><a href="https://perchance.org/dice-game-example#edit">Dice game thing that uses an if/else block</a></li>
+		<li><a href="https://perchance.org/passing-variables-to-lists-example#edit">Passing variables into lists</a> (<a href="https://www.reddit.com/r/perchance/comments/bgphrz/how_do_i_pass_variablesreferences_to_imported/elsgw5z" target="_blank">explanation</a>)</li>
+		<li><a href="https://perchance.org/consumable-list-with-dynamic-odds-example#edit">Consumable List with Dynamic Odds</a> (<a href="https://www.reddit.com/r/perchance/comments/bhm9el/if_first_result_is_a_how_to_exclude_b_from_second/elu8uax" target="_blank">explanation</a>)</li>
+		<li><a href="https://perchance.org/indented-html-in-your-lists-example#edit">Write list items with indented HTML</a></li>
+		<li><a href="https://perchance.org/character-role-consumable-example#edit">Assign "roles" to a bunch of characters with a consumable list</a></li>
+		<li><a href="https://perchance.org/consumable-list-with-nested-properties#edit">Using a consumable list with a list of items that have nested properties/lists (i.e. a hierarchy)</a></li>
+		<li><a href="https://perchance.org/three-percentages-example#edit">Generate three numbers which all add up to 100</a></li>
+		<li><a href="https://perchance.org/click-to-hide-show-text-example#edit">Click to unhide some hidden text (useful to show extra details)</a></li>
+		<li><a href="https://perchance.org/custom-cursor-example#edit">Custom mouse cursor</a></li>
+		<li><a href="https://perchance.org/counting-item-selections-example#edit">Counting the selections that are made from a list</a></li>
+		<li><a href="https://perchance.org/simple-random-images-example#edit">Display a random image, given a list of URLs</a></li>
+		<li><a href="https://perchance.org/simple-random-image-example-cropped#edit">Display a random image, cropped to 200x200 pixels, given a list of URLs</a></li>
+		<li><a href="https://perchance.org/add-images-to-output#edit">Add an image to each list item so the image gets output alongside the text</a></li>
+		<li><a href="https://perchance.org/random-image-with-name-example#edit">Display a random image along with your random text</a></li>
+		<li><a href="https://perchance.org/random-images-example#edit">Display a random image along with your random text (a bit more complicated than the above example)</a></li>
+		<li><a href="https://perchance.org/acronym-from-words-example#edit">Generate acronyms from words using a custom function</a></li>
+		<li><a href="https://perchance.org/p5js-basic-example">A basic p5.js example (the JavaScript "library" taught on Khan Academy)</a></li>
+		<li><a href="https://perchance.org/permutations-counter-example#edit">Calculate and display the total number of possible permutations/results that your generator has</a></li>
+		<li><a href="https://perchance.org/income-by-city-example#edit">Use dynamic sub-list referencing to generate random incomes based on a randomly selected city</a></li>
+		<li><a href="https://perchance.org/randomize-at-regular-intervals-example#edit">Randomize automatically at regular time intervals</a></li>
+		<li><a href="https://perchance.org/future-presidents-example#edit">Generate sequential presidents with random terms (4 or 8 years) such that the years don't overlap</a></li>
+		<li><a href="https://perchance.org/if-else-in-dynamic-odds-example#edit">Using If/Else within dynamic odds statements</a></li>
+		<li><a href="https://perchance.org/generate-based-on-seed-keyword#edit">Always generate the same thing based on a particular "seed" keyword (uses seeder-plugin)</a></li>
+		<li><a href="https://perchance.org/multiple-outputs-random-number-of-items-example#edit">Multiple independent outputs with random numbers of items generated in each</a></li>
+		<li><a href="https://perchance.org/lineage-of-kings-example#edit">Generate a lineage of kings with correctly-sequential roman numeral names</a></li>
+		<li><a href="https://perchance.org/color-picker-example#edit">Basic example using a color picker input</a></li>
+		<li><a href="https://perchance.org/fuel-consumption-distance#edit">Use inputs to calculate distance traveled based on fuel remaining and fuel consumption rate</a></li>
+		<li><a href="https://www.reddit.com/r/perchance/comments/f8dau1/fahrenheit_to_celcius/fimoau9/">Convert Fahrenheit to Celcius, and vice versa. Also, miles to kilometers and vice versa.</a></li>
+		<li><a href="https://www.reddit.com/r/perchance/comments/fognc2/how_to_pick_a_sublist_and_continue_to_draw_from_it/">Select a sublist from a list, and then get that sublist's "name" using sublist.getName</a></li>
+		<li><a href="https://perchance.org/commas-in-numbers-example#edit">Display numbers with commas - like 974,384,837 instead of 974384837</a></li>
+		<li><a href="https://perchance.org/exclude-item-based-on-previous-selection#edit">Exclude an item from a list based on a previous selection</a></li>
+		<li><a href="https://perchance.org/change-item-odds-based-on-selections-parent#edit">Change the odds of an item based on a previous selection's parent</a></li>
+		<li><a href="https://www.reddit.com/r/perchance/comments/g2uwh1/can_i_add_a_button_to_clear_generated_text_can/fo1ghye">Make output text editable (e.g. so users of your generator can customize before screenshotting)</a></li>
+		<li><a href="https://perchance.org/change-output-based-on-screen-size-example#edit">Change output based on user's screen size</a></li>
+		<li><a href="https://perchance.org/bingo-table-example#edit">Bingo table example using make-table-plugin</a></li>
+		<li><a href="https://www.reddit.com/r/perchance/comments/gffusa/replace_certain_strings/">Find and replace text using regex</a></li>
+    <li><a href="https://www.reddit.com/r/perchance/comments/sytskh/renaming_a_specific_set_of_events/">Replacing/renaming certain combinations of outputs with some new text</a></li>
+		<li><a href="https://www.reddit.com/r/perchance/comments/gjevx1/text_orientation/">Use CSS to change make the text align left instead of center</a></li>
+		<li><a href="https://perchance.org/get-median-of-numbers-example#edit">Get the median of some randomly generated numbers</a></li>
+		<li><a href="https://perchance.org/filter-exclude-item-from-list#edit">Filter/exclude an item from a list</a></li>
+		<li><a href="https://perchance.org/seed-from-url-example#edit">Embed a randomness "seed" in the URL of your generator</a></li>
+		<li><a href="https://perchance.org/pass-variable-via-url-example?type=veg">Pass a variable to your generator via the URL</a></li>
+		<li><a href="https://perchance.org/user-controls-how-many-outputs-example#edit">Add a input box that allows the user to choose how many outputs they get</a></li>
+		<li><a href="https://www.reddit.com/r/perchance/comments/ihwsx9/how_do_i_make_it_so_there_are_multiple_outputs/">Another example of an input box that lets you choose how many items to output</a></li>
+		<li><a href="https://perchance.org/remember-user-inputs-basic-example#edit">Remember the user inputs (drop-downs, text boxes, etc.) so you can close the tab or refresh it and it keeps the values</a></li>
+		<li><a href="https://perchance.org/click-counter#edit">A simple click counter</a></li>
+		<li><a href="https://perchance.org/click-counter-2#edit">Another simple click counter approach</a></li>
+		<li><a href="https://perchance.org/increment-counter-when-specific-items-is-selected-example#edit">Increment a counter when a specific items is selected</a></li>
+		<li><a href="https://perchance.org/increment-counter-caves-example#edit">Increment a counter to label each generated item with a number</a></li>
+		<li><a href="https://perchance.org/generate-colored-text-example#edit">Generate colored text</a></li>
+		<li><a href="https://perchance.org/custom-image-button-example#edit">Use a custom image as a button</a></li>
+		<li><a href="https://perchance.org/custom-image-button-with-hover-example#edit">Use an image as a button and change the button when they hover and click</a> (And <a href="https://perchance.org/simple-mouse-hover-image-change-example#edit" target="_blank">here's a simpler version</a> with only a hover effect)</li>
+		<li><a href="https://perchance.org/metadata-example#edit">Add a title, description and image to your generator so that when you share it as a link on social media, it has a nice link preview</a></li>
+		<li><a href="https://perchance.org/different-result-on-first-load#edit">Display a specific result (rather than a random one) when the page is loaded</a></li>
+    <li><a href="https://perchance.org/different-items-depending-on-num-clicks#edit">Display different results depending on how many times they've clicked the "randomize" button</a></li>
+    <li><a href="https://perchance.org/show-specific-text-on-first-load#edit">Show a message that only comes up when the page first loads</a></li>
+		<li><a href="https://perchance.org/persistent-consumable-list-example#edit">A consumableList that doesn't get "reset" each time the randomize button is clicked</a></li>
+		<li><a href="https://perchance.org/add-items-to-list-example#edit">Add items to a list when a button is clicked</a></li>
+		<li><a href="https://perchance.org/map-example#edit">Use .map to convert a whole list of items into their sub-properties/items</a></li>
+		<li><a href="https://perchance.org/multiple-output-results-option#edit">Add an input box that lets you choose a specific number of items to output</a></li>
+		<li><a href="https://perchance.org/tap-image-to-randomize#edit">Combining the tap-plugin and random-image-plugin to make an image randomize when you tap it</a></li>
+		<li><a href="https://perchance.org/first-n-items-of-random-sub-list#edit">Select a random sub-list and then get the first N items of that sub-list, where N is a randomly chosen number</a></li>
+		<li><a href="https://perchance.org/consumable-list-that-stays-consumed-until-refresh#edit">Draw from a deck of cards with a button and use another button to reshuffle the deck when all cards have been drawn</a></li>
+		<li><a href="https://perchance.org/numbered-outputs-example-manual#edit">Sequentially numbered outputs</a></li>
+		<li><a href="https://perchance.org/numbered-outputs-with-html-ol#edit">Another sequentially numbered outputs example, but using HTML's <code>ol</code> tag</a></li>
+		<li><a href="https://perchance.org/text-contains-text-example#edit">Check if some text contains some other text and change the probability of an item based on whether it does</a></li>
+		<li><a href="https://perchance.org/add-user-inputs-to-list-example#edit">Add two user inputs to a list</a></li>
+		<li><a href="https://perchance.org/user-input-list-append-example#edit">Add many user inputs to a list</a></li>
+		<li><a href="https://perchance.org/user-input-list-example#edit">Allow the user to create a new list with their inputs</a></li>
+		<li><a href="https://perchance.org/update-dynamically-generated-elements-example#edit"><code>update()</code>ing dynamically generated elements</a></li>
+		<li><a href="https://perchance.org/image-layer-combiner-thumbnail-generator-example#edit">Use the image-layer-combiner-plugin to generate random video thumbnails based on a generated video title</a></li>
+		<li><a href="https://perchance.org/using-name-of-selected-sublist-example#edit">Selecting a sublist and using its name, and then selecting an item from that sublist</a></li>
+		<li><a href="https://perchance.org/changing-drop-down-without-user-click-example#edit">Changing a drop-down list's current value without the user clicking it</a></li>
+		<li><a href="https://perchance.org/multi-dropdown-user-provided-pattern#edit">Use multiple drop-down lists to allow the user to define a pattern that is used to generate the output</a></li>
+		<li><a href="https://perchance.org/generate-drop-down-input-from-hierarchical-list#edit">Generate a drop-down user input from a hierarchical list</a></li>
+		<li><a href="https://perchance.org/use-seeder-plugin-for-one-import-only-example#edit">Use the seeder plugin for one import or list only (the others stay completely random)</a></li>
+		<li><a href="https://perchance.org/dynamically-creating-a-list-and-adding-items-to-it#edit">Dynamically creating a list and adding items to it</a></li>
+		<li><a href="https://perchance.org/filter-list-based-on-instance-properties-example#edit">Filter a list based on generated instance properties</a></li>
+		<li><a href="https://perchance.org/filter-a-list-of-generated-instances-example#edit">Generate a list of instances and then filter them based on their properties</a></li>
+		<li><a href="https://perchance.org/damage-roll-function-example#edit">Use a simple custom function to roll a dice and calculate damage, and count the number of rolls above 3</a></li>
+		<li><a href="https://perchance.org/randomize-on-tap-with-optional-subtap#edit">Tap some text to randomize only that text (similar to tap-plugin), but a tappable sub-item appears sometimes.</a></li>
+		<li><a href="https://perchance.org/combine-multiple-lists-into-one-consumable-list#edit">Combine multiple lists into a single consumable list</a></li>
+		<li><a href="https://perchance.org/list-method-with-createinstance-example#edit">Add a function within a list and create an instance of that list</a></li>
+		<li><a href="https://perchance.org/combining-list-that-contain-duplicates-without-selecting-duplicates#edit">Combining list that contain duplicates without selecting duplicates</a></li>
+		<li><a href="https://perchance.org/question-and-answer-example#edit">User inputs text in a text box to see if their answer to the question is correct</a></li>
+		<li><a href="https://perchance.org/select-the-highest-number#edit">Select the highest number from a set of randomly generated numbers</a></li>
+		<li><a href="https://perchance.org/curly-brackets-within-square-brackets-alternatives-example#edit">Using curly brackets inside square brackets</a></li>
+		<li><a href="https://perchance.org/array-of-instances-within-instance-example#edit">An array of instances within a single instance using the createInstance and createInstance<b>s</b> plugins</a></li>
+    <li><a href="https://perchance.org/sequential-pages-example#edit">Sequential "pages" example. Clicking a button brings you to the next page of content.</a></li>
+    <li><a href="https://www.reddit.com/r/perchance/comments/sdlgzf/comment/huf9ov2/">selectMany/selectAll, and then transform all the selected list items using a simple instruction like <code>item => item.upperCase</code></a></li>
+    <li><a href="https://perchance.org/randomize-image-color-example#edit">Randomize the colors of an image using a CSS filter</a></li>
+    <li><a href="https://perchance.org/curly-blocks-inside-square-blocks#edit">Using curly blocks (e.g. <code>\{1-5\}</code>) inside square blocks</a></li>
+    <li><a href="https://www.reddit.com/r/perchance/comments/v5p525/comment/ibm6j1m">HTML for generating bullet-point lists</a></li>
+    <li><a href="https://perchance.org/prevent-randomization-of-list-except-at-page-reload#edit">Prevent randomization of list except at page reload</a></li>
+    <li><a href="https://perchance.org/track-selections-display-other-properties-of-selected-items-later#edit">Track selections &amp; display other properties of selected items later</a></li>
+    <li><a href="https://perchance.org/spoiler-hidden-unfold-html-example#edit">Show some text only after something has been clicked ("spoiler" / "unfold content")</a></li>
+    <li><a href="https://perchance.org/comments-plugin-goto-plugin-example#edit">Combine the goto plugin with the comments plugin to create "rooms" that have their own comments box</a></li>
+    <li><a href="https://perchance.org/pure-css-html-plugin-template#edit">A template for a plugin that just returns some CSS and HTML</a></li>
+    <li><a href="https://perchance.org/select-item-from-same-index-position-in-two-lists#edit">Select item from same index/position in two lists</a></li>
+    <li><a href="https://perchance.org/adjustable-vertical-split-example#edit">Resizable vertical split screen</a></li>
+	</ul>
+
+</main>
+<p style="text-align:center; font-size:200%; opacity:0.2; margin-top:0.5em;"><span>⚄&#xFE0E;</span></p>
+<br/>
+
+<style>
+	ul li {
+		margin-top:0.5em;	
+	}
+	main {
+		max-width:800px;
+		margin:0 auto;
+		background: #fff;
+		background: light-dark(#fff, #101010);
+		padding:1em;
+		border-radius:3px;
+		box-shadow: 0 0.5px 0 0 #ffffff inset, 0 1px 2px 0 #B3B3B3;
+		box-shadow: 0 0.5px 0 0 light-dark(#fff, #060606) inset, 0 1px 2px 0 light-dark(#B3B3B3, #2c2c2c);
+	}
+	p { text-align:left; line-height: 1.4em; }
+  main p:first-child {
+    margin-top:0;
+  }
+	body {
+		background-color:#f6f6f6;	
+		background-color: light-dark(#f6f6f6, #000);
+    color: black;
+    color: light-dark(black, #d6d6d6);
+	}
+	pre {
+		text-align:left;
+		background: #333;
+    background: light-dark(#333, #212121);
+    color: #e2e2e2;
+    padding: 1em;
+    border-radius: 2px;
+		tab-size: 2;
+		-moz-tab-size: 2;
+		-o-tab-size: 2;
+		-webkit-tab-size: 2;
+	}
+	code {
+		background: #eff0f1;
+    background:  light-dark(#eff0f1, #272727);
+    padding: 1px 5px;	
+		white-space: nowrap;
+	}
+  details {
+    background:#efefef;
+    background:light-dark(#efefef, #212121);
+  }
+	details code {
+	  background: #d9d9d9;
+	  background: light-dark(#d9d9d9, #5a5a5a);
+	}
+	details p:last-child {
+	  margin-bottom:0;	
+	}
+	h2 {
+		margin-top: 1.5em;	
+	}
+</style>
+
+
+
+
+
+<style>
+	#contentsCtn {
+	  position:fixed;
+		top: 50%;
+		transform: translate(0.5rem, -50%);
+		background:white;
+    background: light-dark(white, #222);
+		text-align:left;
+		padding:1rem;
+		border-radius:3px;
+		box-shadow: 0 0.5px 0 0 #ffffff inset, 0 1px 2px 0 #B3B3B3;
+		box-shadow: 0 0.5px 0 0 light-dark(#ffffff, #000000) inset, 0 1px 2px 0 light-dark(#B3B3B3, #000000);
+	}
+	.contents-item {
+		cursor: pointer;
+		padding:0.25rem;
+    font-size: 0.85rem;
+	}
+	.contents-item:hover {
+	  background:#efefef;	
+	  background:light-dark(#efefef, #444);	
+	}
+	@media screen and (max-width: 1200px) {
+		#contentsCtn {
+			display:none;
+		}
+	}
+  html { color-scheme: light dark; }
+</style>
+<div id="contentsCtn">
+  <div style="font-weight:bold; padding:0.25rem;">Contents</div>
+</div>
+<script>
+  let maxtContentsItemTitleLength = 20;
+  if(window.innerWidth > 1300) maxtContentsItemTitleLength = 40;
+  
+  let headerEls = [...document.querySelectorAll("h2")]
+	let contentsItems = [];
+	for(let el of headerEls) {
+	  let item = createContentsItem(el);
+		contentsItems.push(item);
+		contentsCtn.appendChild(item);
+	}
+  
+	function createContentsItem(el) {
+	  let div = document.createElement("div");
+		div.innerHTML = `
+		  <div class="contents-item" data-title="${el.textContent.replace(/"/g, "&quot;")}">${el.textContent.length > maxtContentsItemTitleLength ? el.textContent.slice(0, maxtContentsItemTitleLength-1)+"…" : el.textContent}</div>
+		`;
+		let item = div.firstElementChild;
+		item.onclick = function() {
+		  el.scrollIntoView();
+      window.scrollBy(0, -20);
+      window.location.hash = el.id ? "#"+el.id : "";
+		};
+		return item;
+	}
+	let contentsTitleHighlighterDebounceTimeout = null;
+	window.addEventListener("scroll", function() {
+		clearTimeout(contentsTitleHighlighterDebounceTimeout);
+		contentsTitleHighlighterDebounceTimeout = setTimeout(() => {
+			let h2s = Array.from(document.querySelectorAll("h2"));
+			let closestEl = null;
+			let closestDist = null;
+			for(let h2 of h2s) {
+				let rect = h2.getBoundingClientRect();
+				if(rect.top > window.innerHeight/2) continue;
+				if(closestEl === null || Math.abs(rect.top) < closestDist) {
+					closestDist = Math.abs(rect.top);
+					closestEl = h2;
+				}
+			}
+			contentsCtn.querySelectorAll(`.contents-item`).forEach(el => el.style.background = "");
+			if(closestEl) {
+        let closestTitle = closestEl.textContent;
+  			contentsCtn.querySelector(`.contents-item[data-title="${closestTitle.replace(/"/g, '\\"')}"]`).style.background = CSS.supports("color", "light-dark(#fff,#000)") ? "light-dark(#efefef,#444)" : "#efefef";
+      }
+		}, 200);
+	});
+</script>

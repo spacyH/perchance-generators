@@ -1,0 +1,53 @@
+// Note: Text that comes after "//" is ignored, which allows
+// you to write notes - like the one you're reading now!
+
+$output (src, w, h) =>
+  if (!src) return "Oh no! You didn't give me a url for the image, so I can't find it D:";
+  w = w ? w+"px" : "auto";
+  h = h ? h+"px" : "auto";
+  return `<img src="${src}" style="width:${w}; height:${h}">`;
+  
+
+nl = <br> // Use [nl] to make a new line anywhere! It stands for "new line".
+nothing = [""]
+
+title
+  Image Plugin
+  emoji = 🖼
+
+body
+  [code("image = \\{import:image-plugin\\}")]
+  and you can now display an image like this:
+  [code('\\[image("https://i.imgur.com/1qFNMXG.jpg")\\]')]
+  And that will produce this:
+  [$output("https://i.imgur.com/1qFNMXG.jpg")]
+  Is that a bit too tall for your liking? Stay tuned for info on how to change the height and width - but first, a quick side note:
+  If you wanted to insert the above image "manually" (i.e. not using this plugin) your <a href\="https://www.khanacademy.org/computing/computer-programming/html-css" target\="_blank">HTML</a> code would look like this:
+  [code('&lt;img src\\\\="https://i.imgur.com/1qFNMXG.jpg"/>')]
+  If you'd prefer not to use this plugin, you can instead copy and paste the above HTML code and just change the URL. Note that there's a backslash before the equals sign (after <code>src</code>) which isn't normal in <a href\="https://www.khanacademy.org/computing/computer-programming/html-css" target\="_blank">HTML</a>. This backslash is needed if you're using the code in your Perchance lists editor since otherwise Perchance interprets the equals sign as a "special" character. The equals sign has a special meaning when used in Perchance lists, and the backslash tells Perchance "treat the next character as just a normal non-special character please".
+  <b style\="color:red;">Important:</b> You should upload your images to <a href\="https://perchance.org/upload" target\="_blank">perchance.org/upload</a> rather than linking directly to images that you find on the internet. This is important because the average lifespan of a URL on the internet is only a few years (due to the way modern web applications work - CDNs, caching, etc) so if you use an image URL from somewhere on the internet (like on wikis, pinterest, etc), then your generator will likely break after a few years. By uploading images to Perchance, your images will stay online forever.
+  You can also set the width of the image like this:
+  [code('\\[image("https://i.imgur.com/1qFNMXG.jpg", 50)\\]')]
+  [$output("https://i.imgur.com/1qFNMXG.jpg", 50)]
+  That sets the width to 50 pixels as shown above, and the height will automatically adjust so the width/height ratio stays the same.
+  You can set both the width and the height like this:
+  [code('\\[image("https://i.imgur.com/1qFNMXG.jpg", 100, 100)\\]')]
+  [$output("https://i.imgur.com/1qFNMXG.jpg", 100, 100)]
+  But notice that this stretches the image out of proportion. If you only want to set the height, and you want the width to be automatically adjusted, then you should write <b>null</b> for the width, like this:
+  [code('\\[image("https://i.imgur.com/1qFNMXG.jpg", null, 100)\\]')]
+  [$output("https://i.imgur.com/1qFNMXG.jpg", null, 100)]
+  So now the image has a height of 100 pixels, and the width is adjusted automatically to keep the original proportions.
+  So in general, the format is:
+  [code('\\[image(url, width, height)\\]')]
+  where [inline_code("url")] is the URL of the image (the only input you actually <b>must</b> give),
+  [inline_code("width")] is the width (in pixels) of the image (optional), 
+  and [inline_code("height")] is the height of the image in pixels (optional). 
+  <hr>
+  Note that if you're using "raw" HTML (instead of this plugin), you can change the height and width like this:
+  [code('&lt;img src\\\\="https://i.imgur.com/1qFNMXG.jpg" style\\\\="height:100px; width:200px;"/>')]
+  If you omit a height value, then the width is automatically adjusted, and vice versa.
+
+notes
+  This plugin was made by <a href\="https://www.reddit.com/user/Kyllingene/">u/Kyllingene</a> and <a href\="https://www.reddit.com/r/perchance/comments/lln4zy/image_display_plugin/">donated</a> to the admin account :)
+  Photo by <a href\="https://unsplash.com/@matreding?utm_source\=unsplash&amp;utm_medium\=referral&amp;utm_content\=creditCopyText">Mat Reding</a> on <a href\="https://unsplash.com/images/nature/flower?utm_source\=unsplash&amp;utm_medium\=referral&amp;utm_content\=creditCopyText">Unsplash</a>
+  Check out more plugins at [link("https://perchance.org/plugins","perchance.org/plugins")]

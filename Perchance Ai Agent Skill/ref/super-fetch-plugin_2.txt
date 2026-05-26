@@ -1,0 +1,59 @@
+<div style="display:[window.generatorName === 'super-fetch-plugin' ? 'none' : 'block'];color:red; font-weight:bold; padding:3rem;">Heads up! This is a fork/remix of the <a href="/super-fetch-plugin" target="_blank">super-fetch-plugin</a>, but unfortunately it's a really bad idea to fork this plugin, since its code is 'coupled' with the server code, so if I need to change the server code, your version of this plugin will likely break. If you'd like new features, best to ask for them on the community forum so your generators don't randomly break in the future when I update the server code. Alternatively, you can create a new plugin that <u>imports this plugin</u> - basically create a "wrapper" plugin that changes/expands on this plugin's behavior.</div>
+
+<h1>Super Fetch Plugin</h1>
+
+<div style="margin:0 auto;width:100%;max-width:800px;background:white;border-radius:2px;padding:1em; box-sizing:border-box; text-align:left;">
+  
+  <p style="margin-top:0">This plugin is for a more technical audience. It's an exact duplicate of the browser's built-in <code>fetch</code> function <b>except</b> that it bypasses CORs issues - meaning that you can make web requests to download the content at <u>any</u> URL.</p>
+  <p>Just add this line to your Perchance code editor:</p>
+<pre>
+superFetch = \{import:super-fetch-plugin\}
+</pre>
+  <p>And now you can use <code>superFetch</code> in place of <a href="https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch" target="_blank">regular <code>fetch</code></a> - just like normal:</p>
+<pre>
+async start() =>
+  document.body.innerHTML = await superFetch("https://example.com").then(r => r.text());
+</pre>
+  <p><a href="https://perchance.org/super-fetch-plugin-example" target="_blank">Here's an example</a> with the above code.</p>
+  <p>The reason this plugin is needed is because most websites don't allow client-side JavaScript (i.e. JavaScript code running in a web browser) to make requests to get the content of their pages/APIs/etc. So this plugin proxies the request to a server which grabs the content for us, and then returns it with the appropriate headers which allow us to read that content from our client-side code. You can do a web search for "CORs headers explained" if you want to learn more.</p>
+  <p>To give you an idea of what this could be used for:</p>
+  <ul>
+    <li>A tool which uses this plugin and the <a href="/ai-text-plugin" target="_blank">ai-text-plugin</a> (and probably <a href="https://github.com/mozilla/readability" target="_blank">readability.js</a> for cleaning the text) to summarize a webpage, given a user-provided URL.</li>
+    <li>A web crawler thing that randomly hops onto a page, picks a random link and then hops again, exploring around the internet as you watch.</li>
+    <li>A tool which recursively searches a website for all image URLs.</li>
+    <li>A tool which creates an offline archive of a webpage with help from the <a href="/upload-plugin" target="_blank">upload plugin</a></li>
+	</ul>
+	<p><b>Notes:</b></p>
+	<ul>
+    <li>Check out more plugins at <a href="/plugins">perchance.org/plugins</a></li>
+	</ul>
+</div>
+<p style="text-align:center; font-size:200%; opacity:0.2; margin-top:0.5em;"><span>⚄&#xFE0E;</span></p>
+<br><br><br>
+
+<style>
+	body {
+			background:#eee;
+	}
+	code {
+		background-color:#eee;
+		padding:0.13em 0.2em
+	}
+	ul li { margin-top:0.4em; }
+  	code {
+		background-color:#eee;
+		padding: 0 0.2em;
+	}
+	pre {
+		text-align:left;
+		background: #333;
+    color: white;
+    padding: 1em;
+    border-radius: 2px;
+		tab-size: 2;
+		-moz-tab-size: 2;
+		-o-tab-size: 2;
+		-webkit-tab-size: 2;
+	}
+</style>
+

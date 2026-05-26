@@ -1,0 +1,1138 @@
+Standalone custom version of <br>beautiful-people gen by Allo.<br>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body {
+    background-color: #121212 !important;
+    margin: 2px;
+    padding: 2px;
+    color: #e0e0e0;
+    font-size: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    text-align: center;
+  }
+
+  .main-card {
+    background-color: #1e1e1e;
+    max-width: 850px;
+    width: 95%;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    border: 1px solid #333;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin: 0 auto;
+    box-sizing: border-box;
+  }
+
+  a {
+    color: #3498db;
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+
+  a:hover {
+    color: #5dade2;
+    text-decoration: underline;
+  }
+
+  h1, h2, h3 {
+    font-weight: 600;
+    margin: 0;
+    color: #fff;
+    font-size: 1.1rem;
+  }
+
+  p, label {
+    line-height: 1.5;
+  }
+  
+  textarea, input, select {
+    background-color: #2a2a2a !important;
+    color: #fff !important;
+    border: 1px solid #444 !important;
+    border-radius: 6px !important;
+    padding: 8px !important;
+    width: 100%;
+    box-sizing: border-box;
+    font-family: inherit;
+    font-size: 13px;
+    transition: border-color 0.2s;
+    outline: none;
+  }
+  
+  textarea:focus, input:focus, select:focus {
+    border-color: #3498db !important;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+  }
+
+  .btn-3d, .btn-edit, .backup-button, .button, #storybuttons button, .pill-button, .btn-show-more {
+    font-family: inherit;
+    font-size: 13px;
+    color: #e0e0e0;
+    background: #333;
+    border: 1px solid #444;
+    border-bottom: 3px solid #222;
+    border-radius: 6px;
+    padding: 8px 5px;
+    width: 100%;
+    cursor: pointer;
+    transition: all 0.1s ease-out;
+    box-sizing: border-box;
+    font-weight: 500;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .btn-3d:active, .btn-edit:active, .backup-button:active, .button:active, #storybuttons button:active, .pill-button:active, .btn-show-more:active {
+    transform: translateY(2px);
+    border-bottom-width: 1px;
+    margin-top: 2px;
+  }
+
+  .pill-button {
+    border-radius: 50px;
+    background: #2d3748;
+    color: #81e6d9;
+    border-color: #38b2ac;
+    width: auto;
+    padding: 8px 20px;
+  }
+
+  .btn-show-more {
+    background: #222;
+    color: #aaa;
+    margin-top: 15px;
+  }
+  
+  .header-section {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  #main-buttons, #hidden-buttons, .grid-buttons {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 10px;
+    width: 100%;
+    margin-top: 10px;
+  }
+
+  #main-buttons {
+    display: grid;
+  }
+
+  @media (max-width: 400px) {
+    #main-buttons, #hidden-buttons, .grid-buttons {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+  }
+
+  .custom-button-container {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+  }
+
+  .image-container-custom {
+      position: relative;
+      width: 100%;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+      margin-bottom: 10px;
+  }
+
+  .image-container-custom img {
+      display: block;
+      width: 100%;
+      height: auto;
+  }
+
+  .refine-button-overlay {
+      position: absolute;
+      bottom: 5px;
+      right: 5px;
+      width: 30px;
+      height: 30px;
+      background-color: rgba(0, 0, 0, 0.7);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 50%;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+  }
+
+  .refine-button-overlay:hover {
+      background-color: rgba(0,0,0,0.9);
+  }
+
+  .settings-panel, .makeastyle-panel {
+    background-color: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.2);
+    margin: 10px 0;
+    text-align: left;
+    position: relative; 
+  }
+
+  .panel-exit-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: auto;
+    padding: 4px 10px;
+    font-size: 11px;
+    background: #c0392b;
+    border-color: #922b21;
+  }
+
+  #safety-warning {
+    display: none;
+    background: #742a2a;
+    color: #fff;
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+    border: 1px solid #ff4d4d;
+    font-weight: bold;
+  }
+
+  footer {
+    margin-top: 30px;
+    font-size: 12px;
+    color: #777;
+    width: 100%;
+    text-align: center;
+  }
+  
+  body.bg-white {
+    background-color: #121212 !important;
+  }
+</style>
+YouMake.Ai fork from <a href="https://perchance.org/beautiful-people" target="_blank"> /beautiful-people</a><br />
+<div class="main-card">
+<div class="header-section">
+<a href="https://youmake.ai/" rel="noopener noreferrer" target="_blank"><img src="https://user.uploads.dev/file/70dfe7ce091d76eb5518348042c97291.jpg" width="120px" style="border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);"></a>
+<div style="font-size: 0.85rem; color: #888;">
+<div>⚖️ <a href="https://poe.com/s/FCFHKtkp9Cn67SNTQEFf" rel="noopener noreferrer" target="_blank"><u>AI Imagery Rules</u></a> 👮‍♂️</div>
+✅ Usage at your own discretion
+</div>
+      <button onclick="window.open('https://candyai.gg/home2?via=youmakeai-friend', '_blank')" style="background: linear-gradient(135deg, #4a5568, #2d3748); color: white; border: none; border-radius: 50px; padding: 10px 30px; cursor: pointer; margin-top: 10px; font-weight: bold; width: auto;">
+🗨️ Candy Friend Affiliate 🔗
+      </button>
+  </div>
+  <hr style="border: 0; border-top: 1px solid #333; width: 100%;">
+  <div id="safety-warning"></div>
+
+  <div class="controls-section">
+    <label style="display:block; margin-bottom: 8px; font-weight: bold; color: #ccc;">
+🪟 Square version → <a href="https://perchance.org/ymai-fork">/ymai-fork</a><br /><br />
+Portrait (9:16) Prompt:</label>
+<div id="customStylePanelsContainer"></div>
+<div id="story" style="display:none;" class="settings-panel">
+Story Prompt:
+<span id="storyPromptContainer"></span>
+<div class="scrollable-x">
+<div id="storybuttons" style="display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px;">
+            <button id="s2" style="color:rgb(247,247,25);border-color:rgb(250,250,127);" onclick="genstoryExpressive()">Expressive</button>
+            <button id="s4" style="color:rgb(145,7,224);border-color:rgb(197,97,255);" onclick="genstorymlp()">Pony</button>
+            <button id="s5" style="color:rgb(19,215,237);border-color:rgb(130,242,255);" onclick="genstoryanime()">Anime</button>
+            <button id="s6" style="color:rgb(212,17,17);border-color:rgb(242,99,99);" onclick="genstoryboss()">Cooler</button>
+            <button id="s7" style="color:rgb(111,0,255);border-color:rgb(179,120,255);" onclick="genstorymagic()">Magic</button>
+            <button id="s8" style="color:rgb(255,85,0);border-color:rgb(255,150,97);" onclick="genstoryaction()">Action</button>
+            <button id="s9" style="color:rgb(0,16,237);border-color:rgb(107,117,255);" onclick="genstorycharacter()">Character</button>
+            <button id="s10" style="color:rgb(255,234,0);border-color:rgb(255,240,71);" onclick="genstorysteam()">Steam</button>
+            <button id="s12" style="color:rgb(0,255,42);border-color:rgb(120,255,142);" onclick="genstoryfey()">Fey</button>
+          </div>
+        </div>
+        <div id="storyplace" style="margin-top:15px;padding:10px;border:1px solid #444;border-radius:5px;min-height:50px;background-color:#111;"></div>
+        <button class="panel-exit-btn" onclick="unstory()">Exit</button>
+    </div>
+
+    <div id="help" style="display:none;" class="settings-panel">
+        <button class="panel-exit-btn" onclick="unhelp()">Exit</button>
+        <ul><li></li><li></li><li></li></ul>
+        <div style="margin-top:20px;"><label for="hemsuntani">Page Title:</label><textarea id="hemsuntani" oninput="kohemsuntani()" style="width:100%;"></textarea></div>
+        <div style="margin-top:10px;"><label for="hemaeraeren">Prompt Entry Size:</label><select id="hemaeraeren" oninput="kohemaeraeren()"><option>Small</option><option selected>Normal</option><option>Large</option><option>Larger</option><option>GINORMOUS</option><option>EVEN MORE GINORMOUS</option></select></div>
+        <div style="margin-top:10px;"><button id="hieu" onclick="hieu()" class="btn-3d" style="width: auto;">Toggle UI</button></div>
+    </div>
+
+    <div id="perfectdiv" style="display:none" class="settings-panel">
+        <button class="panel-exit-btn" onclick="unrefine()">Exit</button>
+        <div style="display:none">Initial Prompt: <div id="initialPromptHolder"></div><br>Initial AntiPrompt: <div id="initialAntiPromptHolder"></div><br>Resolution: <div id="initialResolution"></div><br></div>
+
+        <span id="initialSeedContainer"></span><br><span id="guidanceScaleXxContainer"></span><br>
+        <p id="thing4" style="user-select:none;"></p>
+        Prompt: <span id="promptXContainer"></span><br>Anti-prompt: <span id="antipromptXContainer"></span><br>
+        <button onclick="genimgsperfectX()" class="btn-3d" style="margin-top: 10px;">Refine</button>
+        <div id="imagesPerfectX" style="margin-top:15px;display:flex;flex-wrap:wrap;justify-content:center; gap: 10px;"></div>
+        <p id="viewscroller" style="color:rgb(242,255,0)"></p>
+    </div>
+
+    <div id="basediv">
+        <h1 id="alltitle" style="user-select:none; white-space:nowrap; font-size: 1.5rem; text-align: center;"></h1>
+        
+        <div id="p" style="margin-bottom:10px;"><span id="promptContainer"></span></div>
+
+        <div style="display: flex; justify-content: center; margin-bottom: 15px;">
+            <button class="pill-button" style="width: auto; padding-left: 20px; padding-right: 20px;" onclick="let el=document.getElementById('mewkittyxtreme2');el.style.display=(el.style.display==='none'||el.style.display==='')?'block':'none';this.style.borderColor=el.style.display==='block'?'rgb(150,164,255)':'rgb(108,79,255)';">⚙️ Settings & Anti-Prompt</button>
+        </div>
+↓ Tap a button below to make AI imagery. 🖱️
+        <div style="display:none" id="mewkittyxtreme2" class="settings-panel">
+            <div><span id="hresolutionContainer" hidden></span></div>
+            <div><span id="amountofimagesContainer"></span></div>
+            <br>
+            <button onclick="let el=document.getElementById('customnegative_panel');el.style.display=(el.style.display==='none'||el.style.display==='')?'block':'none';this.style.color=el.style.display==='block'?'rgb(0,255,0)':'rgb(255,255,255)';" class="btn-3d" style="width: auto;">Negative Prompt</button>
+            <div style="display:none;margin-top:10px;padding:10px;border:1px solid #333;border-radius:5px; background: #222;" id="customnegative_panel">
+                <p>➖ Negative Prompt:</p><span id="customnegativeContainer" hidden></span>
+                <p style="margin-top:10px;">Anti-words (comma separated):</p><span id="addtonegativeContainer"></span>
+            </div>
+        </div>
+
+        <div style="margin-top:20px;">
+            <div id="promptto" style="margin-top:15px;font-style:italic; color: #888;"></div>
+
+            <div id="buttons"></div>
+
+            <div id="img1" style="margin-top:20px; display:grid; grid-template-columns: 1fr; gap: 20px;"></div>
+
+            <div style="display:none;" id="mewkittyxtreme" class="settings-panel">
+            </div>
+
+            <div style="display:flex;justify-content:center;align-items:center;"><div style="display:none;max-width:100%;" id="commentsmohka"><span id="commentsContainer1"></span></div></div>
+            <div style="display:flex;justify-content:center;align-items:center;"><div style="display:none;max-width:100%;" id="commentsmohkansfw"><span id="commentsContainer2"></span></div></div>
+            <div style="display:flex;justify-content:center;align-items:center;"><div style="display:none;max-width:100%;" id="commentsmohkagallery"><div id="gallerya"></div></div></div>
+        </div>
+    </div>
+  </div> 
+</div> 
+<footer>
+  <center>
+    <div class="footer-link-group">
+      <a href="https://poe.com/youmakeai" style="background:#4299E1; color:white; padding: 8px 12px; border-radius:4px; text-decoration:none; font-size: 12px; font-weight: bold;" rel="noopener noreferrer" target="_blank">WWW•YOUMAKE•AI</a>
+    </div><br>
+    <hr style="border-color: #444;"><br>
+    <button type="button" style="background-color: #38A169; color: white; padding: 12px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 12px;">
+        <a href="https://poe.com/Future-HTML" style="color: white; text-decoration: none;" rel="noopener noreferrer" target="_blank">Future-HTML Coder Assistant</a>
+    </button>
+    <br><br>
+    <strong>Not Getting The AI Art You Wanted?</strong><br>
+    Try the Prompt support on our <a href="https://poe.com/youmakeai" rel="noopener noreferrer" target="_blank"><strong><u>POE</u></strong></a>
+    <br><br>
+    <sub style="color: #999;">This is an AI fan site; we are NOT endorsed by,<br>NOR affiliated with any of the following companies:</sub>
+    <h4 style="font-size: 12px; font-weight: normal; margin-top: 1rem; color: #999;">
+        <a href="https://perchance.org/privacy-policy" rel="noopener noreferrer" target="_blank">Perchance Privacy</a> |
+        <a href="https://poe.com/pages/privacy" rel="noopener noreferrer" target="_blank">Poe Privacy</a><br>
+        <a href="https://facebook.com/policies_center/" rel="noopener noreferrer" target="_blank">Meta TOS</a> |     <a href="https://openai.com/policies/terms-of-use/" rel="noopener noreferrer" target="_blank">OpenAI TOS</a> |
+        <a href="https://stability.ai/tos-api-ds" rel="noopener noreferrer" target="_blank">Stability AI TOS</a><br>
+        <a href="https://bfl.ai/legal/terms-of-service" rel="noopener noreferrer" target="_blank">BFL/Flux TOS</a>
+    </h4>
+    <hr style="border-color: #444; margin-top: 1rem;">
+    <p style="color: #999;">🌑cc0 - Policy→\{<a href="https://youmake.ai/" rel="noopener noreferrer" target="_blank">YouMake.Ai</a>\}←Opensource</p>
+  </center>
+</footer>
+
+
+
+
+<!-- WARNING, BANNED WORDS BELOW, TURN BACK TO AVOID SEEING VULGARITY! -->
+
+
+
+
+
+<script>
+  const RISK_PARTIALS = ['child', 'teen', 'kid', 'baby', 'toddler', 'minor', 'infant', 'puberty', 'underage', 'youngest'];
+  const RISK_PHRASES = ['under the age', 'less than 18', 'below 18', 'not 18', 'not of age'];
+  const REPLACEMENT_MAP = {
+      'nsfw': 'safe_for_work', 'nude': 'fully_clothed', 'naked': 'wearing_outfit',
+      'undressed': 'wearing_full_outfit', 'stripped': 'wearing_clothes', 'bare': 'covered',
+      'explicit': 'clean_content', 'uncensored': 'standard_view', 'xxx': 'artistic', 
+      'porn': 'cinematic_lighting', 'hentai': 'anime_art', 'sex': 'holding_hands',
+      'nipples': 'covered_chest', 'breasts': 'upper_body', 'boobs': 'chest',
+      'cleavage': 'high_collar', 'vagina': 'wearing_skirt', 'pussy': 'wearing_skirt', 
+      'dick': 'wearing_pants', 'cock': 'wearing_pants', 'ass': 'back_view', 
+      'butt': 'hips', 'anal': 'back_view', 'cum': 'water', 'stripping': 'dancing'
+  };
+
+  function sanitizeInput(text) {
+      if (!text) return { text: "", modified: false, alertType: null };
+      let safeText = text.toLowerCase();
+      let originalText = text;
+      let wasModified = false;
+      let alertType = null;
+      for (const word of RISK_PARTIALS) {
+          if (safeText.includes(word)) {
+              originalText = originalText.replace(new RegExp(word, 'gi'), "adult person");
+              wasModified = true;
+              alertType = "AGE_RESTRICTED";
+          }
+      }
+      for (const phrase of RISK_PHRASES) {
+          if (safeText.includes(phrase)) {
+              originalText = originalText.replace(new RegExp(phrase, 'gi'), "adult");
+              wasModified = true;
+              alertType = "AGE_RESTRICTED";
+          }
+      }
+      for (const [unsafe, safe] of Object.entries(REPLACEMENT_MAP)) {
+          const regex = new RegExp(`\\b${unsafe}\\b`, 'gi');
+          if (regex.test(originalText)) {
+              originalText = originalText.replace(regex, safe);
+              wasModified = true;
+              if(!alertType) alertType = "LEWD_CONTENT";
+          }
+      }
+      return { text: originalText, modified: wasModified, alertType: alertType };
+  }
+
+  window.seall = function(d, c) {
+  try {
+    localStorage.setItem(c, d);
+  } catch(a) {
+    console.error("localStorage.setItem failed: ", a);
+  }
+};
+
+window.lseall = function(c) {
+  try {
+    let d = localStorage.getItem(c);
+    return d == null ? "" : d;
+  } catch(a) {
+    console.error("localStorage.getItem failed: ", a);
+    return "";
+  }
+};
+
+window.varia = (d, c = "") => 
+  `<textarea class="form-input" id="${d}ControllerTextarea" placeholder="${c || d}" oninput="window.${d}=this.value;seall(this.value,'loveandlight${d}')">${lseall("loveandlight" + d)}</textarea>`;
+
+window.variasen = (f, e, c = 1, b = 10, a = "") => {
+  let d = lseall("allovariasen" + f) || a || c;
+  return `<label for="${f}ControllerSlider">${e}: </label><input type="range" id="${f}ControllerSlider" min="${c}" max="${b}" value="${d}" oninput="document.getElementById('${f}ControllerValue').textContent=this.value;window.${f}=this.value;seall(this.value,'allovariasen${f}')"><span id="${f}ControllerValue">${d}</span>`;
+};
+
+window.variakk = (e, d = [], c = "") => {
+  let b = lseall("allovariakk" + e) || c || (d.length > 0 ? d[0] : "");
+  let a = d.map(f => `<option value="${f}" ${f === b ? "selected" : ""}>${f}</option>`).join("");
+  return `<select class="form-input" id="${e}ControllerSelect" oninput="window.${e}=this.value;seall(this.value,'allovariakk${e}')">${a}</select>`;
+};
+
+if (typeof window.image === 'undefined') {
+    window.image = b => {
+        if (b.gallery) {
+            return {
+                evaluateItem: `<div style="padding:20px;border:1px dashed #555;margin:10px auto;text-align:center;width:100%;">Mock Gallery (sort: ${b.sort || "newest"})</div>`
+            };
+        }
+        const c = b.seed || Math.floor(Math.random() * 1E6);
+        const d = `Placeholder Image: ${b.resolution || "512x768"} Seed: ${c}`;
+        const [e, a] = (b.resolution || "512x768").split("x");
+        return {
+            evaluateItem: `<img src="https://placehold.co/${e}x${a}/333/eee?text=${encodeURIComponent(d)}" alt="${d}" style="width:100%; display:block; border-radius: 4px;">`
+        };
+    };
+}
+
+window.aitext = a => `Mock AI Story generated for prompt: "${a.instruction}"`;
+
+window.comments = a => `<div style="border:1px dashed #555;padding:10px;margin:10px auto;text-align:center;width:100%;">Mock Comments Area (ID: ${a.id || "general"})</div>`;
+
+var bannedUsers = [];
+var commentOptions = {id: "aiimagegeneratorcomments", forceColorScheme: "dark", bannedUsers: bannedUsers};
+var commentOptionsnsfw = {id: "aiimagegeneratorcomments_alt", forceColorScheme: "dark", bannedUsers: bannedUsers};
+var prompt = "", storyprompt = "";
+var bosswords = ["epic", "legendary"], magicword = ["enchanting", "mystical"], actionword = ["dynamic", "explosive"];
+var typeofperson = ["brave", "wise"], steamWords = ["gears", "clockwork"], feyWords = ["ethereal", "ancient"];
+var races = "elf", haircolor = "silver", eyecolor = "blue";
+var placeadj = "ancient", places = "forest", species = "everyday";
+var mannames = "adam", womannames = "eve";
+var everyday = {negative: "", guide: "14"};
+var customnegative = "", addtonegative = "", brightup = "2";
+
+window.guidanceScaleXx = parseInt(lseall("allovariasen" + "guidanceScaleXx") || "14");
+window.hresolution = "512x768";
+window.amountofimages = parseInt(lseall("allovariasen" + "amountofimages") || "4");
+window.initialSeed = parseInt(lseall("allovariasen" + "initialSeed") || "4");
+
+function genstoryExpressive() {
+  storyprompt = document.getElementById("storypromptControllerTextarea") ? document.getElementById("storypromptControllerTextarea").value : "";
+  document.getElementById("storyplace").innerHTML = aitext({instruction: "please type a everyday, extremely expressive story of '" + storyprompt + "'"});
+}
+function genstorymlp() {
+  storyprompt = document.getElementById("storypromptControllerTextarea") ? document.getElementById("storypromptControllerTextarea").value : "";
+  document.getElementById("storyplace").innerHTML = aitext({instruction: "please type a everyday My Little Pony Friendship is Magic episode about '" + storyprompt + "'"});
+}
+function genstoryanime() {
+  storyprompt = document.getElementById("storypromptControllerTextarea") ? document.getElementById("storypromptControllerTextarea").value : "";
+  document.getElementById("storyplace").innerHTML = aitext({instruction: "please type a everyday, brilliant and clever story about '" + storyprompt + "'"});
+}
+function genstoryboss() {
+  storyprompt = document.getElementById("storypromptControllerTextarea") ? document.getElementById("storypromptControllerTextarea").value : "";
+  document.getElementById("storyplace").innerHTML = aitext({instruction: "please type a everyday, " + bosswords.join(", ") + " story about '" + storyprompt + "'"});
+}
+function genstorymagic() {
+  storyprompt = document.getElementById("storypromptControllerTextarea") ? document.getElementById("storypromptControllerTextarea").value : "";
+  document.getElementById("storyplace").innerHTML = aitext({instruction: "please type a everyday, extremely magical story bringing to mind the concepts of: " + magicword.join(", ") + ", and primarily about '" + storyprompt + "'"});
+}
+function genstoryaction() {
+  storyprompt = document.getElementById("storypromptControllerTextarea") ? document.getElementById("storypromptControllerTextarea").value : "";
+  document.getElementById("storyplace").innerHTML = aitext({instruction: "please type a everyday, extremely action-packed story bringing to mind the concepts of: " + actionword.join(", ") + ", and primarily about '" + storyprompt + "'"});
+}
+function genstorycharacter() {
+  storyprompt = document.getElementById("storypromptControllerTextarea") ? document.getElementById("storypromptControllerTextarea").value : "";
+  document.getElementById("storyplace").innerHTML = aitext({instruction: "please type a everyday, present tense, vivid detailing of a character who is " + typeofperson.join(", ") + ", and summarized by '" + storyprompt + "'"});
+}
+function genstorysteam() {
+  storyprompt = document.getElementById("storypromptControllerTextarea") ? document.getElementById("storypromptControllerTextarea").value : "";
+  document.getElementById("storyplace").innerHTML = aitext({instruction: "please type a everyday, extremely steampunk story bringing to mind the concepts of: " + steamWords.join(", ") + ", and primarily about '" + storyprompt + "'"});
+}
+function genstoryfey() {
+  storyprompt = document.getElementById("storypromptControllerTextarea") ? document.getElementById("storypromptControllerTextarea").value : "";
+  document.getElementById("storyplace").innerHTML = aitext({instruction: "please type a everyday, extremely fae story bringing to mind the concepts of: " + feyWords.join(", ") + ", and primarily about '" + storyprompt + "'"});
+}
+
+function extremetize(f) {
+  let d = "", c = "";
+  if (f.indexOf("in the styles of ") != -1) {
+    d = f.substring(0, f.indexOf("in the styles of "));
+    c = f.substring(f.indexOf("in the styles of "), f.length);
+  } else d = f;
+  let a = d.trim().split("");
+  if (a.length === 0 || a.length === 1 && a[0] === "") return f;
+  let e = fate(a.length), b = "";
+  for (let g = 0; g < a.length; g++) {
+    if (e == g) {
+      if (a[g].substring(0, 2) == "((" || a[g].substring(a[g].length - 2, a[g].length) == "))") {
+        e = (e + 1) % a.length;
+        b += "" + a[g];
+      } else {
+        b += " (" + a[g] + ")";
+      }
+    } else {
+      b += "" + a[g];
+    }
+  }
+  return b.trim() + c;
+}
+
+function fate(a) { return Math.floor(Math.random() * a); }
+function generateSeed() { return Math.floor(Math.random() * 4294967295) + 1; }
+
+function getnegativeprompt() {
+  customnegative = document.getElementById("customnegativeControllerTextarea") ? document.getElementById("customnegativeControllerTextarea").value : "";
+  addtonegative = document.getElementById("addtonegativeControllerTextarea") ? document.getElementById("addtonegativeControllerTextarea").value : "";
+  let a = everyday.negative || "";
+  if (customnegative !== "") a = customnegative;
+  return (addtonegative + "--no_(fake)!important" + a).trim();
+}
+
+function getTimestamp() {
+  const now = new Date();
+  return now.toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
+}
+
+function downloadPromptAsFile(promptText, filename) {
+  const blob = new Blob([promptText], {type: 'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function restorePromptFromFile(index) {
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = '.txt';
+  fileInput.style.display = 'none';
+  document.body.appendChild(fileInput);
+  
+  fileInput.addEventListener('change', function() {
+    const file = fileInput.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const contents = e.target.result;
+        const textarea = document.getElementById(`Custom${index}PromptWordsAlwaysInControllerTextarea`);
+        if (textarea) {
+          textarea.value = contents;
+          const event = new Event('input', { bubbles: true });
+          textarea.dispatchEvent(event);
+        }
+      };
+      reader.readAsText(file);
+    }
+    document.body.removeChild(fileInput);
+  });
+  
+  fileInput.click();
+}
+
+let imgprompts = [];
+window.extrememode = "0";
+
+function refine(b) {
+  if (imgprompts[b]) {
+    document.getElementById("imagesPerfectX").innerHTML = "";
+    document.getElementById("initialPromptHolder").textContent = imgprompts[b].prompt;
+    document.getElementById("initialAntiPromptHolder").textContent = imgprompts[b].negativePrompt;
+    document.getElementById("guidanceScaleXxControllerSlider").value = imgprompts[b].guidanceScale;
+    document.getElementById("guidanceScaleXxControllerValue").textContent = imgprompts[b].guidanceScale;
+    window.guidanceScaleXx = imgprompts[b].guidanceScale;
+    document.getElementById("initialSeedControllerSlider").value = imgprompts[b].seed;
+    document.getElementById("initialSeedControllerValue").textContent = imgprompts[b].seed;
+    window.initialSeed = imgprompts[b].seed;
+    document.getElementById("initialResolution").textContent = imgprompts[b].resolution;
+    document.getElementById("basediv").style.display = "none";
+    document.getElementById("perfectdiv").style.display = "block";
+    document.getElementById("promptXControllerTextarea").value = imgprompts[b].prompt;
+    window.promptX = imgprompts[b].prompt;
+    document.getElementById("antipromptXControllerTextarea").value = imgprompts[b].negativePrompt;
+    window.antipromptX = imgprompts[b].negativePrompt;
+    genimgsperfectX();
+  } else {
+    console.error("Image prompt data not found for index: ", b);
+  }
+}
+
+function unrefine() {
+  document.getElementById("basediv").style.display = "block";
+  document.getElementById("perfectdiv").style.display = "none";
+}
+
+function ultragen(h) {
+  const warnBox = document.getElementById("safety-warning");
+  if(warnBox) warnBox.style.display = "none";
+  let raw = document.getElementById("promptControllerTextarea") ? document.getElementById("promptControllerTextarea").value : "";
+  const filtered = sanitizeInput(raw);
+  if (filtered.modified) {
+      if(warnBox) {
+          warnBox.style.display = "block";
+          warnBox.textContent = filtered.alertType === "AGE_RESTRICTED" 
+            ? "⚠️ POLICY VIOLATION: Underage references are strictly filtered." 
+            : "⚠️ NOTICE: Inappropriate terms have been auto-corrected.";
+      }
+      const pt = document.getElementById("promptControllerTextarea");
+      if(pt) pt.value = filtered.text;
+      raw = filtered.text;
+  }
+  document.getElementById("promptto").innerHTML = "";
+  document.getElementById("img1").innerHTML = "";
+  let e = "";
+  imgprompts = [];
+  prompt = raw;
+  for (let k = 0; k < window.amountofimages; k++) {
+    let c = parseInt(everyday.guide) + parseInt(brightup) + 0;
+    let f = generateSeed();
+    let b = h.textContent.trim(); 
+    let g = "(REALISTIC flash photography scene; (" + prompt + ").";    if (window.extrememode === "o") g = extremetize(g);
+  
+    let m = lseall("species"), l = lseall("person"), n = lseall("place");
+    let d = "", a = "";
+    if (m === "o") a = "(" + species + ") ";
+    if (l === "o") d = "((" + races + " with " + haircolor + " hair and " + eyecolor + " eyes)) ";
+    if (n === "o") d += " ((" + placeadj + "" + placeadj + "" + places + ")) ";
+    let j = typeof root !== "undefined" && root[b] ? root[b] : "";
+    g = a + g + d + "" + j;
+    let o = "";
+    if (b === "Photography") o = "";
+    if (b === "Photography") o = "";
+    let p = "512x768";
+    let timestamp = getTimestamp();
+    let i = {
+      prompt: g.trim() + "--dressed in full outfit attire.",
+      negativePrompt: (o + getnegativeprompt()).trim(),
+      resolution: p,
+      guidanceScale: c,
+      seed: f,
+      timestamp: timestamp
+    };
+    
+    imgprompts[k] = i;
+    e += `<div class="image-container-custom">
+            ${image(i).evaluateItem}
+            <button class='refine-button-overlay' onclick='refine(${k})'>🪟</button>
+          </div>`;
+  }
+  
+  document.getElementById("img1").innerHTML = e;
+  const r = document.getElementById("p");
+  if (r) r.scrollIntoView({behavior: "smooth"});
+}
+
+function touchbutton(c) {
+  document.querySelectorAll('#main-buttons .btn-3d, #hidden-buttons .btn-3d').forEach(btn => {
+      btn.style.backgroundColor = ''; 
+  });
+  c.style.backgroundColor = "rgba(255,255,255,0.1)"; 
+}
+
+function genimgsperfectX() {
+  const warnBox = document.getElementById("safety-warning");
+  if(warnBox) warnBox.style.display = "none";
+  let eRaw = document.getElementById("promptXControllerTextarea") ? document.getElementById("promptXControllerTextarea").value : window.promptX;
+  const filtered = sanitizeInput(eRaw);
+  if (filtered.modified) {
+      if(warnBox) {
+          warnBox.style.display = "block";
+          warnBox.textContent = filtered.alertType === "AGE_RESTRICTED" 
+            ? "⚠️ POLICY VIOLATION: Underage references are strictly filtered." 
+            : "⚠️ NOTICE: Inappropriate terms have been auto-corrected.";
+      }
+      const pX = document.getElementById("promptXControllerTextarea");
+      if(pX) pX.value = filtered.text;
+      eRaw = filtered.text;
+  }
+  document.getElementById("imagesPerfectX").innerHTML = "";
+  
+  let e = eRaw;
+  let f = document.getElementById("antipromptXControllerTextarea") ? document.getElementById("antipromptXControllerTextarea").value : window.antipromptX;
+  let g = document.getElementById("initialSeedControllerSlider") ? document.getElementById("initialSeedControllerSlider").value : window.initialSeed;
+  let h = document.getElementById("guidanceScaleXxControllerSlider") ? document.getElementById("guidanceScaleXxControllerSlider").value : window.guidanceScaleXx;
+  let i = "512x768";
+  let b = "";
+  
+  for (let c = 0; c < 4; c++) {
+    let timestamp = getTimestamp();
+    let a = {
+      prompt: e + "--dressed in full outfit attire.",
+      negativePrompt: f,
+      resolution: i,
+      guidanceScale: parseInt(h),
+      seed: parseInt(g) + c,
+      timestamp: timestamp
+    };
+    b += `<div class="image-container-custom">${image(a).evaluateItem}</div>`;
+  }
+  
+  document.getElementById("imagesPerfectX").innerHTML = b;
+  const j = document.getElementById("viewscroller");
+  if (j) j.scrollIntoView({behavior: "smooth"});
+}
+
+function genCustom(f, btn) { 
+  const warnBox = document.getElementById("safety-warning");
+  if(warnBox) warnBox.style.display = "none";
+  let raw = document.getElementById("promptControllerTextarea") ? document.getElementById("promptControllerTextarea").value : "";
+  const filtered = sanitizeInput(raw);
+  if (filtered.modified) {
+      if(warnBox) {
+          warnBox.style.display = "block";
+          warnBox.textContent = filtered.alertType === "AGE_RESTRICTED" 
+            ? "⚠️ POLICY VIOLATION: Underage references are strictly filtered." 
+            : "⚠️ NOTICE: Inappropriate terms have been auto-corrected.";
+      }
+      const pt = document.getElementById("promptControllerTextarea");
+      if(pt) pt.value = filtered.text;
+      raw = filtered.text;
+  }
+  document.getElementById("promptto").innerHTML = "";
+  document.getElementById("img1").innerHTML = "";
+  
+  imgprompts = [];
+  prompt = raw;
+  
+  let h = prompt, e = "";
+  let c = lseall("loveandlight" + "Custom" + f + "ArtistLists");
+  let i = lseall("loveandlight" + "Custom" + f + "PromptWordsAlwaysIn");
+  let j = lseall("loveandlight" + "Custom" + f + "PromptWords");
+  let k = lseall("allovariasen" + "Custom" + f + "PromptWordsAmount") || "0";
+  let l = lseall("loveandlight" + "Custom" + f + "Anti-Prompt");
+  
+  for (let p = 0; p < window.amountofimages; p++) {
+    let b = h, m = lseall("person"), d = "";
+    
+    if (m === "o") d = "(" + races + " with " + haircolor + " hair and " + eyecolor + " eyes)";
+    if (window.extrememode === "o") b = extremetize(b);
+    b += "" + d;
+    
+    let n = "";
+    if (c.includes("\n")) {
+      let q = c.split("\n").filter(a => a.trim() !== "");
+      if (q.length > 0) n = q[fate(q.length)];
+    } else if (c.trim() !== "") {
+      n = c.trim();
+    }
+    
+    let o = i ? i.trim() : "";
+    let r = parseInt(k);
+    
+    if (j.includes("\n") && r > 0) {
+      let s = j.split("\n").filter(a => a.trim() !== "");
+      if (s.length > 0) {
+        for (let t = 0; t < r; t++) o += "" + s[fate(s.length)];
+      }
+    } else if (j.trim() !== "" && r > 0) {
+      o += "" + j.trim();
+    }
+    
+    o += "" + n;
+    b = b.trim() + "" + o.trim();
+    
+    let u = parseInt(everyday.guide) + parseInt(brightup || 0);
+    let v = "512x768"; 
+    let x = generateSeed();
+    let timestamp = getTimestamp();
+    let y = (l || "") + "" + getnegativeprompt().trim();
+    
+    let a = {
+      prompt: b.trim() + "--dressed in full outfit attire.",
+      negativePrompt: y,
+      resolution: v,
+      guidanceScale: u,
+      seed: x,
+      timestamp: timestamp
+    };
+    
+    imgprompts[p] = a;
+    e += `<div class="image-container-custom">
+            ${image(a).evaluateItem}
+            <button class='refine-button-overlay' onclick='refine(${p})'>🪟</button>
+          </div>`;
+  }
+  
+  document.getElementById("img1").innerHTML = e;
+  touchbutton(btn); 
+  const g = document.getElementById("p");
+  if (g) g.scrollIntoView({behavior: "smooth"});
+}
+
+function CustomNameInput(b) {
+  const c = document.getElementById(`Custom${b}Name`);
+  if (!c) return;
+  const a = c.value;
+  seall(a, `Custom${b}Name`);
+  const d = document.getElementById(`custom${b}buttonp`);
+  if (d) d.textContent = a || `Custom ${b}`;
+}
+
+function unmakeastyle(b) {
+  const a = document.getElementById(`makeastyle${b}`);
+  if (a) a.style.display = "none";
+  const c = document.getElementById("basediv");
+  if (c) c.style.display = "block";
+}
+
+function unhelp() {
+  const b = document.getElementById("help");
+  if (b) b.style.display = "none";
+  const a = document.getElementById("basediv");
+  if (a) a.style.display = "block";
+}
+
+function unstory() {
+  const b = document.getElementById("story");
+  if (b) b.style.display = "none";
+  const a = document.getElementById("basediv");
+  if (a) a.style.display = "block";
+}
+
+function kohemsuntani() {
+  const c = document.getElementById("hemsuntani");
+  const b = document.getElementById("alltitle");
+  if (!c || !b) return;
+  let a = c.value;
+  seall(a, "alltitle");
+  b.textContent = a;
+}
+
+function kohemaeraeren() {
+  const c = document.getElementById("hemaeraeren");
+  if (!c) return;
+  let b = c.value;
+  seall(b, "sunhemaeraeren");
+  const a = document.getElementById("promptControllerTextarea");
+  if (!a) return;
+  const d = {
+    "Small": "50px", "Normal": "100px", "Large": "200px",
+    "Larger": "300px", "GINORMOUS": "400px", "EVEN GINORMOUSER": "500px"
+  };
+  a.style.height = d[b] || "100px";
+}
+
+function hieu() {
+  let b = lseall("hieu_texts_hidden");
+  const c = document.getElementById("hieu");
+  const a = ["alltitle"];
+  seall(b === "" || b === "l" ? "o" : "l", "hieu_texts_hidden");
+  if (c) c.style.borderColor = b === "" || b === "l" ? "rgb(0,255,0)" : "rgb(255,255,255)";
+  a.forEach(d => {
+    const e = document.getElementById(d);
+    if (e) e.style.display = b === "" || b === "l" ? "none" : "block";
+  });
+}
+
+var root = root || {Anime: "anime"};
+
+document.addEventListener('DOMContentLoaded', function() {
+  let customPanelsHTML = '';
+  for (let i = 1; i <= 20; i++) {
+    customPanelsHTML +=
+      '<div id="makeastyle' + i + '" style="display:none;background-color:rgb(0,0,0)" class="makeastyle-panel">' +
+        '<button class="panel-exit-btn" onclick="unmakeastyle(' + i + ')">Exit</button>' +
+        '<h3>Customize Style ' + i + ': <span id="custom' + i + 'NameDisplay">' + (lseall('Custom'+i+'Name') || `Custom ${i}`) + '</span></h3>' +
+        'Custom style prompt keywords and phrases: (all on one line or multiple sentences.):<br>' + 
+        window.varia(`Custom${i}PromptWordsAlwaysIn`, "e.g., ultra detailed, 8k") + '<br>' + '<br>' +
+        'Button Name:<br>' + 
+        '<textarea id="Custom' + i + 'Name" placeholder="Style Name" oninput="CustomNameInput(' + i + ')">' + 
+        lseall('Custom'+i+'Name') + '</textarea><br>' +
+        'Button text color: <input id="b' + i + 'textcolor" value="' + (lseall('b'+i+'textcolor') || '#ffffff') + 
+        '" type="color" oninput="const bp=document.getElementById(\'custom' + i + 'buttonp\'); if(bp) bp.style.color = this.value; const bcl=document.getElementById(\'custom' + i + 'customizeli\'); if(bcl) bcl.style.color = this.value; seall(this.value, \'b' + i + 'textcolor\')"><br>' +
+        'Button border color: <input id="b' + i + 'bordercolor" value="' + (lseall('b'+i+'bordercolor') || '#ffffff') + 
+        '" type="color" oninput="const cb=document.getElementById(\'custom' + i + 'button\'); if(cb) cb.style.borderColor = this.value; const bcl=document.getElementById(\'custom' + i + 'customizeli\'); if(bcl) bcl.style.borderColor = this.value; seall(this.value, \'b' + i + 'bordercolor\')"><br>' +
+        '<div style="display: flex; justify-content: space-between; margin: 5px 0;">' +
+          '<button class="backup-button" onclick="downloadPromptAsFile(document.getElementById(\'Custom' + i + 'PromptWordsAlwaysInControllerTextarea\').value, \'prompt' + i + '.txt\')">Backup Prompt</button>' +
+          '<button class="backup-button" style="background: linear-gradient(135deg, #336699, #665599);" onclick="restorePromptFromFile(' + i + ')">Restore Prompt</button>' +
+        '</div>' +
+      '</div>';
+  }
+  
+  const customStylePanelsContainer = document.getElementById('customStylePanelsContainer');
+  if (customStylePanelsContainer) customStylePanelsContainer.innerHTML = customPanelsHTML;
+
+  if (document.getElementById("storyPromptContainer")) 
+    document.getElementById("storyPromptContainer").innerHTML = window.varia("storyprompt", "Enter your story idea here...");
+  
+  if (document.getElementById("initialSeedContainer")) 
+    document.getElementById("initialSeedContainer").innerHTML = window.variasen("initialSeed", "Seed", 1, 4294967295, Math.floor(Math.random() * 4294967295) + 1);
+  
+  if (document.getElementById("guidanceScaleXxContainer")) 
+    document.getElementById("guidanceScaleXxContainer").innerHTML = window.variasen("guidanceScaleXx", "Guidance Scale", 1, 30, 4);
+  
+  if (document.getElementById("promptXContainer")) 
+    document.getElementById("promptXContainer").innerHTML = window.varia("promptX", "Refine your prompt here...");
+  
+  if (document.getElementById("antipromptXContainer")) 
+    document.getElementById("antipromptXContainer").innerHTML = window.varia("antipromptX", "Refine your anti-prompt here...");
+  
+  if (document.getElementById("promptContainer")) 
+    document.getElementById("promptContainer").innerHTML = window.varia("prompt", "Enter your image prompt here...");
+  
+  if (document.getElementById("hresolutionContainer")) 
+    document.getElementById("hresolutionContainer").innerHTML = window.variakk("hresolution", ["512x768"], "512x768");
+  
+  if (document.getElementById("amountofimagesContainer")) 
+    document.getElementById("amountofimagesContainer").innerHTML = window.variasen("amountofimages", "Amount of Images", 1, 8, 4);
+
+  if (document.getElementById("customnegativeContainer")) 
+    document.getElementById("customnegativeContainer").innerHTML = window.varia("customnegative", "negative keywords");
+  
+  if (document.getElementById("addtonegativeContainer")) 
+    document.getElementById("addtonegativeContainer").innerHTML = window.varia("addtonegative", "e.g., extra limbs, poorly drawn hands");
+  
+  if (document.getElementById("commentsContainer1")) 
+    document.getElementById("commentsContainer1").innerHTML = window.comments(commentOptions);
+  
+  if (document.getElementById("commentsContainer2")) 
+    document.getElementById("commentsContainer2").innerHTML = window.comments(commentOptionsnsfw);
+
+  ['promptX', 'antipromptX', 'customnegative', 'addtonegative', 'storyprompt'].forEach(id => {
+      const el = document.getElementById(`${id}ControllerTextarea`);
+      if (el) {
+          window[id] = lseall(`loveandlight${id}`);
+          el.value = window[id];
+      }
+  });
+
+  for (let a = 1; a <= 20; a++) {
+    const c = ["PromptWordsAmount", "PromptWords", "PromptWordsAlwaysIn", "ArtistLists", "AntiPrompt", "Name"];
+    c.forEach(g => {
+      const f = `Custom${a}${g}`;
+      const e = g === "PromptWordsAmount" ? `allovariasen${f}` : `loveandlight${f}`;
+      const d = lseall(e);
+      
+      if (d) {
+        const b = document.getElementById(`${f}ControllerTextarea`) || document.getElementById(f);
+        if (b) {
+          b.value = d;
+          if (g === "Name") CustomNameInput(a);
+        }
+        
+        if (g === "PromptWordsAmount") {
+          const i = document.getElementById(`${f}ControllerSlider`);
+          const h = document.getElementById(`${f}ControllerValue`);
+          if (i) i.value = d;
+          if (h) h.textContent = d;
+        }
+      }
+    });
+    
+    let d = lseall(`b${a}textcolor`);
+    const btcEl = document.getElementById(`b${a}textcolor`);
+    if (d && btcEl) {
+      btcEl.value = d;
+      const bp = document.getElementById(`custom${a}buttonp`);
+      if (bp) bp.style.color = d;
+      const bcl = document.getElementById(`custom${a}customizeli`);
+      if (bcl) bcl.style.color = d;
+    }
+    
+    let e = lseall(`b${a}bordercolor`);
+    const bbcEl = document.getElementById(`b${a}bordercolor`);
+    if (e && bbcEl) {
+      bbcEl.value = e;
+      const cb = document.getElementById(`custom${a}button`);
+      if (cb) cb.style.borderColor = e;
+      const bcl = document.getElementById(`custom${a}customizeli`);
+      if (bcl) bcl.style.borderColor = e;
+    }
+  }
+  
+  const buttonsDiv = document.getElementById("buttons");
+  if (buttonsDiv) {
+    buttonsDiv.innerHTML = ''; 
+    
+    const mainButtons = document.createElement('div');
+    mainButtons.id = 'main-buttons';
+    mainButtons.className = 'grid-buttons';
+    buttonsDiv.appendChild(mainButtons);
+
+    const showMoreBtn = document.createElement('button');
+    showMoreBtn.id = 'show-more-btn';
+    showMoreBtn.textContent = 'Show More Styles...';
+    showMoreBtn.className = 'btn-show-more';
+    buttonsDiv.appendChild(showMoreBtn);
+
+    const hiddenButtons = document.createElement('div');
+    hiddenButtons.id = 'hidden-buttons';
+    hiddenButtons.className = 'grid-buttons';
+    hiddenButtons.style.display = 'none';
+    buttonsDiv.appendChild(hiddenButtons);
+
+    showMoreBtn.onclick = () => {
+        const isHidden = hiddenButtons.style.display === 'none';
+        hiddenButtons.style.display = isHidden ? 'grid' : 'none';
+        showMoreBtn.textContent = isHidden ? 'Show Less Styles...' : 'Show More Styles...';
+    };
+
+    const animeContainer = document.createElement('div');
+    animeContainer.className = 'custom-button-container';
+    const animeBtn = document.createElement('button');
+    animeBtn.className = 'btn-3d'; 
+    animeBtn.style.color = 'rgb(19,215,237)';
+    animeBtn.innerHTML = 'Realistic';
+    animeBtn.onclick = function() { ultragen(this); touchbutton(this); };
+    animeContainer.appendChild(animeBtn);
+    mainButtons.appendChild(animeContainer);
+
+    for (let a = 1; a <= 20; a++) {
+      createCustomButton(a);
+    }
+    
+    function createCustomButton(a) {
+      const f = document.createElement("div");
+      f.className = "custom-button-container";
+      
+      const g = document.createElement("button");
+      g.id = `custom${a}customizeli`;
+      g.className = 'btn-edit'; 
+      g.style.color = lseall(`b${a}textcolor`) || "#ffffff";
+      g.textContent = "📖 Edit";
+      g.onclick = () => {
+        const c = document.getElementById(`makeastyle${a}`);
+        if (c) c.style.display = "block";
+        const d = document.getElementById("basediv");
+        if (d) d.style.display = "none";
+      };
+      
+      const b = document.createElement("button");
+      b.id = `custom${a}button`;
+      b.className = 'btn-3d'; 
+      b.style.borderColor = lseall(`b${a}bordercolor`) || "#ffffff"; 
+      b.onclick = () => {genCustom(a, b)}; 
+      
+      const c = document.createElement("span");
+      c.id = `custom${a}buttonp`;
+      c.style.color = lseall(`b${a}textcolor`) || "#ffffff";
+      c.textContent = lseall(`Custom${a}Name`) || `Custom ${a}`;
+      
+      b.appendChild(c);
+      f.appendChild(g);
+      f.appendChild(b);
+      
+      if (a <= 2) {
+        mainButtons.appendChild(f);
+      } else {
+        hiddenButtons.appendChild(f);
+      }
+    }
+  }
+
+  let galleria = {gallery: true, sort: "recent", adaptiveHeight: true, style: "background-color:rgba(0,0,0,0)", forceColorScheme: "dark", bannedUsers: bannedUsers};
+  const galleryAEl = document.getElementById("gallerya");
+  if (galleryAEl) galleryAEl.innerHTML = image(galleria).evaluateItem;
+  
+  setTimeout(function() {
+    let a = lseall("msg3_safe");
+    if (a === null) {
+      const b = document.createElement("div");
+      b.className = "notification-banner"; 
+      b.style.cssText = "position: fixed; bottom: 10px; left: 10px; right: 10px; background-color: #333; color: white; padding: 15px; border-radius: 8px; z-index: 1001; display: flex; justify-content: space-between; align-items: center; border: 1px solid #555;"
+      b.innerHTML = `<p style="margin: 0;">Prompts may sometimes generate unintended content.</p><button onclick="this.parentElement.remove();seall('o','msg3_safe');" style="padding:8px 15px;background-color:#555;border:none;border-radius:5px;cursor:pointer;">OK</button>`;
+      document.body.appendChild(b);
+
+      setTimeout(() => {
+        if (document.body.contains(b)) {
+          b.style.transition = "opacity 1s ease-out";
+          b.style.opacity = "0";
+          setTimeout(() => {
+            if (document.body.contains(b)) {
+              b.remove();
+              seall('o', 'msg3_safe');
+            }
+          }, 1000);
+        }
+      }, 5000);
+    }
+  }, 2000);
+  
+  document.documentElement.style.colorScheme = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  
+  let initialTitle = lseall("alltitle");
+  const hemsuntaniEl = document.getElementById("hemsuntani");
+  const alltitleEl = document.getElementById("alltitle");
+  
+  if (initialTitle !== "" && hemsuntaniEl && alltitleEl) {
+    hemsuntaniEl.value = initialTitle;
+    alltitleEl.textContent = initialTitle;
+  }
+  
+  let hemaeraerenVal = lseall("sunhemaeraeren");
+  const hemaeraerenEl = document.getElementById("hemaeraeren");
+  
+  if (hemaeraerenVal !== "" && hemaeraerenEl) {
+    hemaeraerenEl.value = hemaeraerenVal;
+    kohemaeraeren();
+  } else if (hemaeraerenEl) {
+    hemaeraerenEl.value = "Normal";
+    kohemaeraeren();
+  }
+
+});
+</script>
+<a href="https://app.youmake.ai/report" 
+   target="_blank" 
+   class="fixed z-50 flex items-center justify-center w-6 h-6 bg-slate-500 hover:bg-slate-600 text-white text-xs font-bold rounded-full shadow hover:shadow-md transition-all no-underline leading-none" 
+   style="top: 116px; right: 26px;" 
+   aria-label="Report">❗</a>

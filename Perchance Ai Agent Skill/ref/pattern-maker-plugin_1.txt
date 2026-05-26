@@ -1,0 +1,293 @@
+$output(opts) =>
+  if(!opts) {
+    return "(pattern-maker-plugin error: you must provide pattern options. please see the plugin page for details: perchance.org/pattern-maker-plugin)"
+  }
+  if(!opts.settings) opts.settings = {};
+  
+  let settings = {};  
+  for(let k of defaultPatternSettings.getPropertyKeys) {
+    settings[k] = opts.settings[k] ?? defaultPatternSettings[k];
+    settings[k] = settings[k].evaluateItem;
+  }
+  
+  if(!settings.magnify) { 
+    if(opts.inputImage) settings.magnify = 5;
+    if(opts.inputTextGrid) settings.magnify = 0.6;
+  }
+  
+  
+  let inputImage; 
+  let charToNumberMap;
+  if(opts.inputImage) {
+    inputImage = opts.inputImage.evaluateItem;
+  } else if(opts.inputTextGrid) {
+    charToNumberMap = {};
+    let grid = opts.inputTextGrid.selectAll.map(line => [...line.evaluateItem]);
+    if(new Set(grid.map(l => l.length)).size > 1) {
+      return "(pattern-maker-plugin error: you gave a text grid with lines that have different lengths. all lines must have the same length)";
+    }
+    let i = 0;
+    for(let char of new Set(grid.flat())) {
+      charToNumberMap[char] = i++;
+    }
+    let canvas = document.createElement("canvas");
+    canvas.width = grid[0].length;
+    canvas.height = grid.length;
+    let ctx = canvas.getContext("2d");
+    let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    let data = new Uint32Array(imageData.data.buffer);
+    for(let y = 0; y < grid.length; y++) {
+      for(let x = 0; x < grid[0].length; x++) {
+        let i = y * canvas.width + x;
+        let char = grid[y][x];
+        let colorNum = charToNumberMap[char];
+        data[i] = colorNum;
+        imageData.data[i*4 + 3] = 255; // set alpha to 255
+      }
+    }
+    ctx.putImageData(imageData, 0, 0)
+    inputImage = canvas.toDataURL();
+  }
+  
+  if(!window.patternMakerPluginWorkers758374629) {
+    let style = document.createElement('style');
+    style.innerHTML = `@keyframes patternMakerPluginSpin { to { transform: rotate(360deg); } }`;
+    document.head.appendChild(style);
+  
+    let workerScriptBlob = new Blob([`
+      // Copied from repo on May 19th 2022: https://github.com/kchapelier/wavefunctioncollapse
+      function randomIndice(t,i){let e=0,s=0,o=0;for(;o<t.length;o++)e+=t[o];for(o=0,i*=e;i&&o<t.length;){if(i<=(s+=t[o]))return o;o++}return 0}const Model=function(){};Model.prototype.FMX=0,Model.prototype.FMY=0,Model.prototype.FMXxFMY=0,Model.prototype.T=0,Model.prototype.N=0,Model.prototype.initiliazedField=!1,Model.prototype.generationComplete=!1,Model.prototype.wave=null,Model.prototype.compatible=null,Model.prototype.weightLogWeights=null,Model.prototype.sumOfWeights=0,Model.prototype.sumOfWeightLogWeights=0,Model.prototype.startingEntropy=0,Model.prototype.sumsOfOnes=null,Model.prototype.sumsOfWeights=null,Model.prototype.sumsOfWeightLogWeights=null,Model.prototype.entropies=null,Model.prototype.propagator=null,Model.prototype.observed=null,Model.prototype.distribution=null,Model.prototype.stack=null,Model.prototype.stackSize=0,Model.prototype.DX=[-1,0,1,0],Model.prototype.DY=[0,1,0,-1],Model.prototype.opposite=[2,3,0,1],Model.prototype.initialize=function(){this.distribution=new Array(this.T),this.wave=new Array(this.FMXxFMY),this.compatible=new Array(this.FMXxFMY);for(let t=0;t<this.FMXxFMY;t++){this.wave[t]=new Array(this.T),this.compatible[t]=new Array(this.T);for(let i=0;i<this.T;i++)this.compatible[t][i]=[0,0,0,0]}this.weightLogWeights=new Array(this.T),this.sumOfWeights=0,this.sumOfWeightLogWeights=0;for(let t=0;t<this.T;t++)this.weightLogWeights[t]=this.weights[t]*Math.log(this.weights[t]),this.sumOfWeights+=this.weights[t],this.sumOfWeightLogWeights+=this.weightLogWeights[t];this.startingEntropy=Math.log(this.sumOfWeights)-this.sumOfWeightLogWeights/this.sumOfWeights,this.sumsOfOnes=new Array(this.FMXxFMY),this.sumsOfWeights=new Array(this.FMXxFMY),this.sumsOfWeightLogWeights=new Array(this.FMXxFMY),this.entropies=new Array(this.FMXxFMY),this.stack=new Array(this.FMXxFMY*this.T),this.stackSize=0},Model.prototype.observe=function(t){let i=1e3,e=-1;for(let s=0;s<this.FMXxFMY;s++){if(this.onBoundary(s%this.FMX,s/this.FMX|0))continue;const o=this.sumsOfOnes[s];if(0===o)return!1;const h=this.entropies[s];if(o>1&&h<=i){const o=1e-6*t();h+o<i&&(i=h+o,e=s)}}if(-1===e){this.observed=new Array(this.FMXxFMY);for(let t=0;t<this.FMXxFMY;t++)for(let i=0;i<this.T;i++)if(this.wave[t][i]){this.observed[t]=i;break}return!0}for(let t=0;t<this.T;t++)this.distribution[t]=this.wave[e][t]?this.weights[t]:0;const s=randomIndice(this.distribution,t()),o=this.wave[e];for(let t=0;t<this.T;t++)o[t]!==(t===s)&&this.ban(e,t);return null},Model.prototype.propagate=function(){for(;this.stackSize>0;){const t=this.stack[this.stackSize-1];this.stackSize--;const i=t[0],e=i%this.FMX,s=i/this.FMX|0;for(let i=0;i<4;i++){let o=e+this.DX[i],h=s+this.DY[i];if(this.onBoundary(o,h))continue;o<0?o+=this.FMX:o>=this.FMX&&(o-=this.FMX),h<0?h+=this.FMY:h>=this.FMY&&(h-=this.FMY);const r=o+h*this.FMX,n=this.propagator[i][t[1]],l=this.compatible[r];for(let t=0;t<n.length;t++){const e=n[t],s=l[e];s[i]--,0==s[i]&&this.ban(r,e)}}}},Model.prototype.singleIteration=function(t){const i=this.observe(t);return null!==i?(this.generationComplete=i,!!i):(this.propagate(),null)},Model.prototype.iterate=function(t,i){this.wave||this.initialize(),this.initiliazedField||this.clear(),t=t||0,i=i||Math.random;for(let e=0;e<t||0===t;e++){const t=this.singleIteration(i);if(null!==t)return!!t}return!0},Model.prototype.generate=function(t){for(t=t||Math.random,this.wave||this.initialize(),this.clear();;){const i=this.singleIteration(t);if(null!==i)return!!i}},Model.prototype.isGenerationComplete=function(){return this.generationComplete},Model.prototype.ban=function(t,i){const e=this.compatible[t][i];for(let t=0;t<4;t++)e[t]=0;this.wave[t][i]=!1,this.stack[this.stackSize]=[t,i],this.stackSize++,this.sumsOfOnes[t]-=1,this.sumsOfWeights[t]-=this.weights[i],this.sumsOfWeightLogWeights[t]-=this.weightLogWeights[i];const s=this.sumsOfWeights[t];this.entropies[t]=Math.log(s)-this.sumsOfWeightLogWeights[t]/s},Model.prototype.clear=function(){for(let t=0;t<this.FMXxFMY;t++){for(let i=0;i<this.T;i++){this.wave[t][i]=!0;for(let e=0;e<4;e++)this.compatible[t][i][e]=this.propagator[this.opposite[e]][i].length}this.sumsOfOnes[t]=this.weights.length,this.sumsOfWeights[t]=this.sumOfWeights,this.sumsOfWeightLogWeights[t]=this.sumOfWeightLogWeights,this.entropies[t]=this.startingEntropy}this.initiliazedField=!0,this.generationComplete=!1};const OverlappingModel=function(t,i,e,s,o,h,r,n,l,p){p=p||0,this.N=s,this.FMX=o,this.FMY=h,this.FMXxFMY=o*h,this.periodic=n;const a=i,M=new Array(a);for(let t=0;t<a;t++)M[t]=new Array(e);this.colors=[];const g={};for(let s=0;s<e;s++)for(let e=0;e<i;e++){const o=4*(s*i+e),h=[t[o],t[o+1],t[o+2],t[o+3]],r=h.join("-");g.hasOwnProperty(r)||(g[r]=this.colors.length,this.colors.push(h)),M[e][s]=g[r]}const f=this.colors.length,u=Math.pow(f,s*s),c=function(t){let i=new Array(s*s);for(let e=0;e<s;e++)for(let o=0;o<s;o++)i[o+e*s]=t(o,e);return i},d=function(t,s){return c(function(o,h){return M[(t+o)%i][(s+h)%e]})},y=function(t){return c(function(i,e){return t[s-1-e+i*s]})},F=function(t){return c(function(i,e){return t[s-1-i+e*s]})},w=function(t){let i=0,e=1;for(let s=0;s<t.length;s++)i+=t[t.length-1-s]*e,e*=f;return i},m=function(t){let i=t,e=u;const o=new Array(s*s);for(let t=0;t<o.length;t++){e/=f;let s=0;for(;i>=e;)i-=e,s++;o[t]=s}return o},O={},X=[];for(let t=0;t<(r?e:e-s+1);t++)for(let e=0;e<(r?i:i-s+1);e++){const i=new Array(8);i[0]=d(e,t),i[1]=F(i[0]),i[2]=y(i[0]),i[3]=F(i[2]),i[4]=y(i[2]),i[5]=F(i[4]),i[6]=y(i[4]),i[7]=F(i[6]);for(let t=0;t<l;t++){const e=w(i[t]);O[e]?O[e]++:(X.push(e),O[e]=1)}}this.T=X.length,this.ground=(p+this.T)%this.T,this.patterns=new Array(this.T),this.weights=new Array(this.T);for(let t=0;t<this.T;t++){const i=parseInt(X[t],10);this.patterns[t]=m(i),this.weights[t]=O[i]}const W=function(t,i,e,o){const h=e<0?0:e,r=e<0?e+s:s,n=o<0?o+s:s;for(let l=o<0?0:o;l<n;l++)for(let n=h;n<r;n++)if(t[n+s*l]!=i[n-e+s*(l-o)])return!1;return!0};this.propagator=new Array(4);for(let t=0;t<4;t++){this.propagator[t]=new Array(this.T);for(let i=0;i<this.T;i++){const e=[];for(let s=0;s<this.T;s++)W(this.patterns[i],this.patterns[s],this.DX[t],this.DY[t])&&e.push(s);this.propagator[t][i]=e}}};(OverlappingModel.prototype=Object.create(Model.prototype)).constructor=OverlappingModel,OverlappingModel.prototype.onBoundary=function(t,i){return!this.periodic&&(t+this.N>this.FMX||i+this.N>this.FMY||t<0||i<0)},OverlappingModel.prototype.clear=function(){if(Model.prototype.clear.call(this),0!==this.ground){for(let t=0;t<this.FMX;t++){for(let i=0;i<this.T;i++)i!==this.ground&&this.ban(t+(this.FMY-1)*this.FMX,i);for(let i=0;i<this.FMY-1;i++)this.ban(t+i*this.FMX,this.ground)}this.propagate()}},OverlappingModel.prototype.graphics=function(t){return t=t||new Uint8Array(4*this.FMXxFMY),this.isGenerationComplete()?this.graphicsComplete(t):this.graphicsIncomplete(t),t},OverlappingModel.prototype.graphicsComplete=function(t){for(let i=0;i<this.FMY;i++){const e=i<this.FMY-this.N+1?0:this.N-1;for(let s=0;s<this.FMX;s++){const o=s<this.FMX-this.N+1?0:this.N-1,h=4*(i*this.FMX+s),r=this.colors[this.patterns[this.observed[s-o+(i-e)*this.FMX]][o+e*this.N]];t[h]=r[0],t[h+1]=r[1],t[h+2]=r[2],t[h+3]=r[3]}}},OverlappingModel.prototype.graphicsIncomplete=function(t){for(let i=0;i<this.FMXxFMY;i++){const e=i%this.FMX,s=i/this.FMX|0;let o=0,h=0,r=0,n=0,l=0;for(let t=0;t<this.N;t++)for(let i=0;i<this.N;i++){let p=e-i;p<0&&(p+=this.FMX);let a=s-t;if(a<0&&(a+=this.FMY),this.onBoundary(p,a))continue;const M=p+a*this.FMX;for(let e=0;e<this.T;e++)if(this.wave[M][e]){o++;const s=this.colors[this.patterns[e][i+t*this.N]];h+=s[0],r+=s[1],n+=s[2],l+=s[3]}}const p=4*i;t[p]=h/o,t[p+1]=r/o,t[p+2]=n/o,t[p+3]=l/o}};
+      
+      let requestsIdsToStop = new Set();
+      onmessage = async function(e) {
+        if(e.data.stopRequestId) {
+          console.log("Worker recieved stopRequestId:", e.data.stopRequestId);
+          requestsIdsToStop.add(e.data.stopRequestId);
+          return;
+        }
+        postMessage({type:'message', message: '> WebWorker recieved message'});
+
+        let tries = 0;
+        let instance = new OverlappingModel(new Uint8Array(e.data.sampleData), e.data.sampleWidth, e.data.sampleHeight, e.data.n, e.data.width, e.data.height, e.data.periodicInput, e.data.periodic, e.data.symmetry, e.data.ground);
+
+        postMessage({type:'message', message: '> Instanciated OverlappingModel'});
+
+        let finished = false;
+        let time;
+        
+        function sendResult() {
+          let messageObject = {
+            type: 'data',
+            // data: finished ? instance.graphics(new Uint8Array(e.data.outputData)).buffer : e.data.outputData,
+            data: instance.graphics(new Uint8Array(e.data.outputData)).buffer.slice(0),
+            width: e.data.width,
+            height: e.data.height,
+            finished: finished,
+            requestId: e.data.requestId,
+          };
+          postMessage(messageObject, [messageObject.data]);
+        }
+        
+        let maxTries = 4;
+        do {
+          tries++;
+          postMessage({type:'message', message: \`> Generation attempt #\${tries} ut of \${maxTries}\`});
+          time = Date.now();
+          finished = instance.generate(); // if you want to "animate" it you could replace this with the contents of the generate function and then call sendResult every N iterations: https://github.com/kchapelier/wavefunctioncollapse/blob/f1374ee2c04d197afe6d01652f87663a68cbf6a5/model.js#L242
+          postMessage({type:'message', message: \`> Generation \${finished ? 'successful' : 'UNsuccessful'} - took \${Date.now() - time} ms\`});
+          
+          if(!finished) {
+            await new Promise(r => setTimeout(r, 50)); // wait a tiny bit for stopRequestId messages to arrive
+            if(requestsIdsToStop.has(e.data.requestId)) return;
+          }
+        } while (tries < maxTries && !finished);
+        
+        sendResult();
+        
+      };
+    `], { type: "text/javascript" })
+    
+    window.patternMakerPluginRequestIdToFailCount = {};
+    
+    let workers = [];
+    let workerCount = 5;
+    for(let i = 0; i < workerCount; i++) { // NOTE: if you change the number of workers, you should probably change the number of `tries` per worker to maintain an overall of number of tries
+      let worker = new Worker(window.URL.createObjectURL(workerScriptBlob));
+
+      worker.onmessage = function (e) {
+        if(e.data.type === 'message') {
+          console.log("Worker message:", e.data.message);
+        } else {
+          let requestData = window.patternMakerPluginActiveRequestData79294762[e.data.requestId];
+          if(!requestData) return; // <-- means we've already got a successful result from another worker
+          
+          if(e.data.finished) {
+            let outEl = document.querySelector(`#patternMakerPluginOutput_${e.data.requestId}`);
+            let outputImageData = new ImageData(new Uint8ClampedArray(e.data.data), e.data.width, e.data.height);
+            renderImageDataToOutputElement(outputImageData, outEl);
+            delete window.patternMakerPluginActiveRequestData79294762[e.data.requestId];
+            for(let worker of workers) {
+              worker.postMessage({stopRequestId: e.data.requestId});
+            }
+
+            let loadingMessageEl = document.querySelector(`#patternMakerPluginOutput_${e.data.requestId}_loadingMessage`);
+            if(loadingMessageEl) loadingMessageEl.remove();
+          } else {
+            window.patternMakerPluginRequestIdToFailCount[e.data.requestId] = (window.patternMakerPluginRequestIdToFailCount[e.data.requestId] || 0) + 1;
+            console.log(`pattern-maker-plugin window.patternMakerPluginRequestIdToFailCount["${e.data.requestId}"]:`, window.patternMakerPluginRequestIdToFailCount[e.data.requestId]);
+            if(window.patternMakerPluginRequestIdToFailCount[e.data.requestId] === workerCount) {
+              let loadingMessageEl = document.querySelector(`#patternMakerPluginOutput_${e.data.requestId}_loadingMessage`);
+              let message = `<span>Failed. Please try again.</span>`;
+              if(window.location.hash === "#edit") message = `<span style="font-size:85%;">Failed. Please try again. If this happens often you may want to try adjusting the <b>n</b> or <b>symmetry</b> values. See the <a href="https://perchance.org/pattern-maker-plugin" target="_blank">plugin page</a> for details.</span>`;
+              if(loadingMessageEl) loadingMessageEl.innerHTML = message;
+            }
+          }
+        }
+      };
+      workers.push(worker);
+    }
+    
+    window.patternMakerPluginActiveRequestData79294762 = {};
+    
+    window.patternMakerPluginWorkers758374629 = workers;
+  }
+  let workers = window.patternMakerPluginWorkers758374629;
+  let activeRequestData = window.patternMakerPluginActiveRequestData79294762;
+  
+  let requestId = Math.random().toString().replace(".", "");
+
+  async function start() {
+    let sampleDataUrl = inputImage;
+    if(sampleDataUrl.startsWith("http")) {
+      let blob = await fetch(sampleDataUrl, {referrer:""}).then(r => r.blob()).catch(e => false);
+      if(blob === false) {
+        alert("You've input an unsupported URL. Please upload your image to imgur.com/upload, or convert the image to a Data URL using the converter at the bottom of the plugin page: perchance.org/pattern-maker-page");
+        return;
+      }
+      let dataUrl = await new Promise(resolve => {
+        let reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      });
+      sampleDataUrl = dataUrl;
+    }
+    let sampleData = await (async () => {
+      let img = new Image();
+      await new Promise(r => img.onload=r, img.src=sampleDataUrl);
+      let width = Math.min(50, img.width);
+      let height = Math.min(50, img.height);
+      let canvas = document.createElement("canvas");
+      let ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+      return ctx.getImageData(0, 0, width, height);
+    })();
+    let outputData = (() => { // the algorithm outputs data into this buffer
+      let canvas = document.createElement("canvas");
+      let ctx = canvas.getContext("2d");
+      return ctx.createImageData(settings.width, settings.height);
+    })();
+    
+    activeRequestData[requestId] = {};
+    
+    // run several attempts in parallel and use the first successful result:
+    for(let worker of workers) {
+      let message = {
+        outputData: outputData.data.buffer.slice(0),
+        sampleData: sampleData.data.buffer.slice(0),
+        sampleWidth: sampleData.width,
+        sampleHeight: sampleData.height,
+        n: settings.n,
+        width: settings.width,
+        height: settings.height,
+        periodicInput: settings.periodicInput,
+        periodic: settings.periodic,
+        symmetry: settings.symmetry,
+        ground: settings.ground,
+        requestId,
+      };
+      // we slightly randomize the timing so that if they have several calls to this plugin within a single `update()`, then the one that happens to start a millisecond before the others doesn't hog all the workers to itself
+      setTimeout(() => {
+        worker.postMessage(message, [message.outputData]);
+      }, Math.round(Math.random()*10));
+    }
+  };
+  start();
+  
+  setTimeout(() => {
+    // Clean up when element is removed:
+    let outEl = document.querySelector(`#patternMakerPluginOutput_${requestId}`);
+    onElementRemoved(outEl, function() {
+      console.log("outEl was removed - sending stopRequestId signal to workers");
+      for(let worker of workers) {
+        worker.postMessage({stopRequestId: requestId});
+      }
+      let loadingMessageEl = document.querySelector(`#patternMakerPluginOutput_${requestId}_loadingMessage`);
+      if(loadingMessageEl) loadingMessageEl.remove();
+    });
+    // Add "loading" message over the top:
+    let div = document.createElement("div");
+    let top = outEl.offsetTop;
+    let left = outEl.offsetLeft;
+    let width = outEl.offsetWidth;
+    let height = outEl.offsetHeight;
+    div.innerHTML = `<div class="patternMakerPluginSpinner" style="display: inline-block; width: 20px; height: 20px; border: 2px solid rgba(190,190,190,1); border-radius: 50%; border-top-color: #000; animation: patternMakerPluginSpin 1s ease-in-out infinite;"></div>`;
+    document.body.appendChild(div);
+    div.id = outEl.id+"_loadingMessage";
+    // let spinnerWidth = div.querySelector(".patternMakerPluginSpinner").offsetWidth;
+    // let spinnerHeight = div.querySelector(".patternMakerPluginSpinner").offsetHeight;
+    div.style.cssText = `display:flex; align-items:center; justify-content:center; position:absolute; top:${top}px; left:${left}px; width:${width}px; height:${height}px;`;
+  }, 50);
+  
+  if(charToNumberMap) {
+    let dummyChar = `<span style="opacity:0;">${Object.keys(charToNumberMap)[0]}</span>`;
+    let grid = new Array(settings.height).fill(0).map(_ => new Array(settings.width).fill(dummyChar));
+    let html = grid.map(line => line.join("")).join("\n");
+    return `<div data-type="text" data-char-to-number-map="${encodeURIComponent(JSON.stringify(charToNumberMap))}" id="patternMakerPluginOutput_${requestId}" style="display:inline-block; white-space:pre; font-size:${100*settings.magnify}%;">${html}</div>`;
+  } else {
+    return `<canvas data-type="image" id="patternMakerPluginOutput_${requestId}" width="${settings.width}" height="${settings.height}" style="width:${settings.width*settings.magnify}px; image-rendering:pixelated;"></canvas>`;
+  }
+  
+renderImageDataToOutputElement(imageData, outEl) =>
+  if(outEl.dataset.type === "text") {
+    let numberToCharMap = Object.fromEntries(Object.entries(JSON.parse(decodeURIComponent(outEl.dataset.charToNumberMap))).map(e => [e[1], e[0]]));
+    let grid = new Array(imageData.height).fill(0).map(_ => new Array(imageData.width).fill("0"));
+    let data = new Uint32Array(imageData.data.buffer);
+    for(let y = 0; y < imageData.height; y++) {
+      for(let x = 0; x < imageData.width; x++) {
+        let i = y * imageData.width + x;
+        imageData.data[i*4 + 3] = 0; // set alpha to 0
+        let num = data[i];
+        let char = numberToCharMap[num];
+        grid[y][x] = char;
+      }
+    }
+    outEl.innerHTML = grid.map(line => line.join("")).join("\n");
+  } else {
+    let ctx = outEl.getContext("2d");
+    ctx.putImageData(imageData, 0, 0);
+  }
+
+onElementRemoved(element, callback) =>
+  new MutationObserver(function(mutations) {
+    if(!document.body.contains(element)) {
+      callback();
+      this.disconnect();
+    }
+  }).observe(element.parentElement, {childList: true});
+
+
+defaultPatternSettings
+  n = 3 // [2, 4]
+  symmetry = 8 // [1, 8]
+  ground = 0 // [-16, 102]
+  periodic = 0 // [0, 1]
+  periodicInput = 1 // [0, 1]
+  width = 50 // [8, 96]
+  height = 50 // [8, 96]
+  
+patternOptions1
+  inputImage = https://i.imgur.com/V4trUZG.png //https://i.imgur.com/9A0FSw0.png
+  settings
+    n = 3
+    symmetry = 2
+    

@@ -1,0 +1,72 @@
+<h1>🗣 Text to Speech Plugin</h1>
+
+[$output("This is the perchance text to speech plugin")]
+
+<div style="margin:0 auto;width:100%;max-width:780px;background:white;border-radius:2px;padding:1em; box-sizing:border-box;">
+	<p>Put this in your Perchance code panel:</p>
+	<p><code>speak = \{import:text-to-speech-plugin\}</code></p>
+	<br>
+	<p>Now you can use text-to-speech:</p>
+	<p><code>\[speak("This is the perchance text to speech plugin")\]</code></p>
+  <p><code>\[speak(yourListName)\]</code></p>
+	<br>
+	<p>You can alter the pitch, speed and delay by adding some extra inputs:</p>
+	<p><code>\[speak(sentence, voice, pitch, speed, delay)\]</code></p>
+	<br>
+  <p>The valid language codes available for <code>voice</code> in your current browser are: <span id="lang-codes"></span></p>
+	<br>
+	<p>This will speak "hello" in Russian at normal pitch and 2 times normal speed:</p>
+	<p><code>\[speak("Здравствуйте", "ru-RU", 1, 2)\]</code></p>
+	<br>
+	<p>This will speak "hello" at normal pitch and normal speed after <b>5</b> seconds:</p>
+	<p><code>\[speak("hello", "en-US", 1, 1, 5)\]</code></p>
+  	<br>
+	<p>This will speak a random item from your 'animal' list when the user clicks the button:</p>
+	<p><code>&lt;button onclick="speak(animal)"&gt;click me&lt;/button&gt;</code></p> 
+	<br>
+	<p><b>Notes:</b></p>
+	<ul>
+		<li><a href="/text-to-speech-example#edit">Here's a simple example</a> generator that uses this plugin</li>
+		<li>Each browser has its own set of voices (so, for example, <code>en-US</code> will likely sound different on Chrome vs Firefox)</li> 
+		<li>Different browsers have different <b>default</b> voices</li>
+		<li>The default pitch and speed are <code>1</code></li>
+		<li>Since this is a new browser technology, not all languages will be available.</li> 
+		<li>Remember that you can disable auto-reload using the check-box next to the reload button</li> 
+		<li>For JavaScript devs:
+      <ul>
+        <li>The <code>speak(...)</code> returns a Promise, so you can <code>await</code> it. The returned Promise also has a <code>stop</code> method attached to it, so if you start some speech like this: <code>p=speak('hello')</code> then you can stop the speech prematurely like this: <code>p.stop()</code>. <a href="https://perchance.org/ai-text-plugin-text-to-speech-example#edit" target="_blank">Here's an example</a> which uses this functionality. Also, note that the promise resolves to an object with a <code>spokenText</code> property, which will be the text that has been spoken so far (it will be the whole input text if you didn't call <code>.stop()</code>)</li>
+        <li>You can pass an object in like this: <code>speak(\{text, voice, pitch, speed, delay, onSpoken\})</code> - and as you can see this allows you to specify the <code>onSpoken</code> param, which should be a function, and that function will get called every time a chunk of text has finished being spoken. The size of the chunk of text that you recieve via this callback can vary - e.g. it can be a sentence, or part of a sentence, or a few sentences.</li>
+        <li>You can also pass text as the first arg, and then an object as the second: <code>speak(text, \{voice, pitch, speed, delay, onSpoken\})</code></li>
+        <li>As well as supporting a language code for the <code>lang</code>, it also supports using a <code>voiceURI</code>. This is useful in cases where there are multiple voices per language (e.g. masculine + feminine). But note that different browsers have completely different <code>voiceURI</code>s - e.g. Chrome has <code>voiceURI</code>s like "Google UK English Female", but non-Chrome browsers don't have that voice. So you need to use <code>window.speechSynthesis.getVoices()</code> to get the <code>voiceURI</code>s of the voices that the user has available to them.</li>
+      </ul>
+    </li>
+		<li>Check out more plugins at <a href="/plugins">perchance.org/plugins</a></li>
+	</ul>
+</div>
+
+<script>
+	window.speechSynthesis.onvoiceschanged = updateVoiceList;
+	function updateVoiceList() {
+		let voices = window.speechSynthesis.getVoices();
+		let langCodes = new Set();
+		for(let v of voices) {
+			langCodes.add(v.lang);
+		}
+		document.querySelector("#lang-codes").innerHTML = "<code>"+[...langCodes].join("</code>, <code>")+"</code>";
+	}
+	updateVoiceList();
+</script>
+
+<style>
+	body {
+			background:#eee;
+	}
+	code {
+		background-color:#eee;
+		padding:0.1em;
+    white-space:pre;
+	}
+	ul li {
+		margin-top:0.5em;
+	}
+</style>

@@ -1,0 +1,62 @@
+upload = {import:upload-plugin}
+
+
+
+////////////////////////
+//       UPLOAD       //
+////////////////////////
+async handleUploadClick() => 
+  uploadButtonEl.disabled = true;
+  uploadButtonEl.textContent = "uploading...";
+  
+  // get the text that we want to compress and upload:
+  let text = inputTextEl.value;
+  
+  // first we convert the text into a 'blob' (i.e. a 'file' that can be uploaded)
+  // we use `fetch` to do this since it's fast and easy:
+  let blob = await fetch("data:text/plain;charset=utf-8,"+text.replace(/#/g, "%23")).then(res => res.blob());
+  
+  // compress the blob:
+  let compressedBlob = await compressBlobWithGzip(blob);
+  
+  sizeChangeOutputEl.innerHTML = `original: ${blob.size} bytes<br>compressed: ${compressedBlob.size} bytes`;
+  
+  let { url, size } = await upload(compressedBlob);
+  urlOutputEl.innerHTML = `<a href="${url}" target="_blank">${url}</a> (${(size/1024).toFixed(2)} kilobytes)`;
+  
+  uploadButtonEl.textContent = "upload text";
+  uploadButtonEl.disabled = false;
+
+
+async compressBlobWithGzip(blob) =>
+  const compressedStream = blob.stream().pipeThrough(new CompressionStream('gzip'));
+  let outputBlob = await new Response(compressedStream).blob();
+  return new Blob([outputBlob], { type: "application/gzip" }); // <-- to add the correct mime type
+  
+async decompressBlobWithGzip(blob) =>
+  const decompressedStream = blob.stream().pipeThrough(new DecompressionStream("gzip"));
+  return await new Response(decompressedStream).blob();
+
+
+
+////////////////////////
+//      DOWNLOAD      //
+////////////////////////
+async handleDownloadClick() => 
+  downloadButtonEl.disabled = true;
+  downloadButtonEl.textContent = "downloading...";
+  
+  // get the URL for the file we want to download and decompress:
+  let fileUrl = downloadUrlInputEl.value.trim();
+  
+  // download file:
+  let blob = await fetch(fileUrl).then(res => res.blob());
+  
+  // decompress it:
+  let decompressedBlob = await decompressBlobWithGzip(blob);
+  
+  // display it:
+  downloadOutputEl.value = await decompressedBlob.text();
+  
+  downloadButtonEl.textContent = "download and decompress";
+  downloadButtonEl.disabled = false;

@@ -1,0 +1,43 @@
+
+title
+  Power Scroll Remember Plugin
+
+// temp = {import:power-plugin-template}
+temps = {import:power-plugin-temps}
+
+comm = {import:comments-plugin}
+ico = {import:icon-plugin}
+
+starticon = save
+endicon = sort
+
+$output(com) =>
+  let prefix = "__powerScrollRemember_lastScrollPos_";
+  if (com == "clearData") {
+    window.localStorage.setItem("__powerScrollRemember_resetScrollPos", 1);
+    window.sessionStorage.setItem("__powerScrollRemember_resetScrollPos", 1);
+    window.localStorage.removeItem(prefix + generatorName);
+    window.sessionStorage.removeItem(prefix + generatorName);
+    window.location.reload();
+  } else {
+    window.localStorage.setItem("__powerScrollRemember_resetScrollPos", 0);
+    window.sessionStorage.setItem("__powerScrollRemember_resetScrollPos", 0);
+  }
+  if (com == "tabSessionOnly") {
+    if (window.sessionStorage.__powerScrollRemember_resetScrollPos == 1) document.body.parentElement.scrollTop = "";
+    else {
+      window.localStorage.removeItem(prefix + generatorName);
+      setTimeout(function() {document.body.parentElement.scrollTop = window.sessionStorage[prefix + generatorName] || 0}, 40);
+      document.body.onscroll = function() {window.sessionStorage.setItem(prefix + generatorName, document.body.parentElement.scrollTop);}
+    }
+  } else {
+    if (window.localStorage.__powerScrollRemember_resetScrollPos == 1) document.body.parentElement.scrollTop = "";
+    else {
+      console.log("Remembering");
+      window.sessionStorage.removeItem(prefix + generatorName);
+      setTimeout(function() {document.body.parentElement.scrollTop = window.localStorage[prefix + generatorName] || 0}, 40);
+      document.body.onscroll = function() {window.localStorage.setItem(prefix + generatorName, document.body.parentElement.scrollTop);}
+    }
+  }
+  return "";
+

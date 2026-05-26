@@ -1,0 +1,75 @@
+<h1>nested plugin</h1>
+
+<div style="margin:0 auto;width:100%;max-width:750px;background:white;border-radius:2px;padding:1em; box-sizing:border-box;">
+	<p style="text-align:justify;"><a href="/nested-plugin-example#edit">Here's an example generator</a> showing how you can use this plugin. It allows you to create "hierarchical worlds" like you might have seen in <a href="http://orteil.dashnet.org/nested" target="_blank">Orteil's Nested</a> program. I thought it would be cool to allow people to create their own "worlds" in Perchance for others to explore. Here's how you can get a simple example up and running:</p>
+	<p>Put this in your Perchance code panel:</p>
+<pre>
+nested = \{import:nested-plugin\}
+
+world
+  n = \{5-10\} <span style="opacity:0.4">// the overall min and max number of children</span>
+  continent
+	ocean
+	archipelago^0.2 <span style="opacity:0.4">// normal odds notation for general likelihood of each item</span>
+
+continent
+  n = \{3-5\}
+  desert_region
+	mountain_range \{1-3\} <span style="opacity:0.4">// desired quantity for *this specific item*</span>
+	forested_region
+	
+desert_region <span style="opacity:0.4">// use under-scores for names</span>
+  n = \{3-5\}
+	name = \{rocky ^0.2|sandy |\}desert region <span style="opacity:0.4">// optionally specify alternative names</span>
+	village
+	sand
+	
+<span style="opacity:0.4">// add descriptions which will appear when you hover your mouse over the item:</span>
+mountain_range
+	description = A \{snowy|dry|massive\} range of mountains, stretching up to \{1000-9000\} metres at its tallest.
+	mountain
+	alpine_forest
+
+<span style="opacity:0.4">// items that only have a description will show that description when you "unfold" them.</span>
+alpine_forest
+	description = There are trees, and it's quite \{cold|snowy\}. About -\{3-30\} degrees Celsius. &lt;br&gt;&lt;img src\\="https://i.imgur.com/B34FLcF.jpg" style\\="width:200px;"&gt;
+</pre>
+	<p>And put this in your HTML panel:</p>
+<pre>
+\[nested(world)\]
+</pre>
+	<p>And here's what you get (try clicking it):</p>
+		<div>[$output(world)]</div>
+	<p><b>Notes:</b></p>
+	<ul>
+		<li>This is an experimental plugin so there will likely be bugs and problems (sorry!).</li>
+    <li><a href="https://www.reddit.com/user/rsek/" target="_blank">u/rsek</a> created <a href="https://perchance.org/nested-plugin-v2" target="_blank">another version</a> of this plugin that is more visually customizable (explained <a href="https://www.reddit.com/r/perchance/comments/qnfcfy/is_it_possible_to_edit_the_formatting_of_the/" target="_blank">here</a>).</li>
+		<li>The default overall maximum and minimum is <code>n = \{5-10\}</code>.</li>
+		<li>The items with specified quantities are added first, and then if there's any room left (with regard to the overall min and max), items will randomly be chosen from the set of items without individually specified quantities.</li>
+		<li>Have a look at the HTML panel in the example above to see how to edit the default styling and coloring.</li>
+		<li>Check out more plugins at <a href="/plugins">perchance.org/plugins</a></li>
+	</ul>
+</div>
+<br><br><br>
+
+<style>
+	body {
+			background:#eee;
+	}
+	code {
+		background-color:#eee;
+		padding:0.2em
+	}
+	pre {
+		text-align:left;
+		background: #333;
+    color: white;
+    padding: 1em;
+    border-radius: 2px;
+		tab-size: 2;
+		-moz-tab-size: 2;
+		-o-tab-size: 2;
+		-webkit-tab-size: 2;
+	}
+	ul li { margin-top:0.4em; }
+</style>

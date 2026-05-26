@@ -1,0 +1,8 @@
+$output(text, opts) =>
+  let out = text.replace(/(\\)*([\[\]{}])/g, function(m, p1, p2) {
+    return (p1 ? "\\"+p1 : "") + "\\"+p2; // if there's a backslash (or group of backslashes) already before the square/curly bracket, then we need to add an extra backslash before that
+  });
+  if(opts === "+html") {
+    out = out.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+  }
+  return out;
