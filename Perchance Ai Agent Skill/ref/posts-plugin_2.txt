@@ -1,0 +1,111 @@
+<div style="display:[window.generatorName === 'posts-plugin' ? 'none' : 'block'];color:red; font-weight:bold; padding:3rem;">Heads up! This is a fork/remix of the <a href="/text-to-image-plugin" target="_blank">posts-plugin</a>, but unfortunately it's a really bad idea to fork this particular plugin, since its code is 'coupled' with the server code, so if I need to change the server code, your version of this plugin will likely break. If you'd like new features, best to ask for them on the community forum so your generators don't randomly break in the future when I update the server code. Alternatively, you can create a new plugin that <u>imports this plugin</u> - basically create a "wrapper" plugin that changes/expands on this plugin's behavior.</div>
+
+<h1>Posts Plugin (WIP - not working yet)</h1>
+
+<main>
+  <p>This plugin allows you to do stuff like create your own comments plugin, or create a site that's like Lemmy/Facebook/Tumblr/Messenger/etc. You basically have access to a full 'database' that you can add stuff to, with support for voting, sorting by newest, or score, adding and filtering by tags, etc.</p>  
+  <p>To use this plugin, you'll first need to import it by adding this line to your lists editor:</p>
+<pre>
+posts = \{import:posts-plugin\}
+</pre>
+  <p>And now try putting this in your lists editor:</p>
+<pre>
+article
+  title = \[titleEl.value\]
+  content = \[contentEl.value\]
+  foo = 123
+</pre> 
+  <p>And put this in the HTML panel:</p>
+<pre>
+&lt;input id="titleEl"&gt;
+&lt;textarea id="contentEl">&lt;/textarea&gt;
+&lt;button onclick="posts.blog.add(article)"&gt;submit&lt;/button&gt;
+&lt;div&gt;\[$once:posts.blog.feed(\{sort:"trending", period:"week"\})\]&lt;/div&gt;
+</pre> 
+  <p><a href="https://perchance.org/posts-plugin-example-1#edit" target="_blank">Here's an example generator</a> that uses the above code.</p>
+  
+  <p>Check out some of these example generators to see different ways to use this plugin, and learn about some advanced features:</p>
+	<ul>
+  		<li><a style="font-weight:bold;" href="https://perchance.org/#edit" target="_blank"></a> - </li>
+  		<li><a style="font-weight:bold;" href="https://perchance.org/#edit" target="_blank"></a> - </li>
+  		<li><a style="font-weight:bold;" href="https://perchance.org/#edit" target="_blank"></a> - </li>
+  		<li><a style="font-weight:bold;" href="https://perchance.org/#edit" target="_blank"></a> - </li>
+	</ul>
+  
+  
+  <p><b>Post Options:</b></p>
+  <p>You can see a bunch of the options below at play in the example generators listed above.</p>
+	<ul>
+    <li><code style="font-weight:bold;"></code> - </li>
+    <li><code style="font-weight:bold;"></code> - </li>
+    <li><code style="font-weight:bold;"></code> - </li>
+    <li><code style="font-weight:bold;"></code> - </li>
+    <li><code style="font-weight:bold;"></code> - </li>
+	</ul>
+  <p>Here's an example of using it in JavaScript function where we add a post, and then <code>console.log</code> it once it has been added:</p>
+<pre>
+async start() =>
+  let result = await posts.blog.add(\{
+    title: titleEl.value,
+    content: contentEl.value,
+    foo: 123
+  \});
+  console.log(result);
+</pre>
+   
+	<p><b>Notes:</b></p>
+	<ul>
+    <li>Check out more plugins at <a href="/plugins">perchance.org/plugins</a></li>
+	</ul>
+</main>
+<p style="text-align:center; font-size:200%; opacity:0.2; margin-top:0.5em;"><span>⚄&#xFE0E;</span></p>
+<br><br><br>
+
+<style>
+  html { color-scheme: dark light }
+  main {
+    text-align:left;
+		max-width:900px;
+		margin:0 auto;
+		background: #fff;
+		background: light-dark(#fff, #101010);
+		padding:1em;
+		border-radius:3px;
+		box-shadow: 0 0.5px 0 0 #ffffff inset, 0 1px 2px 0 #B3B3B3;
+		box-shadow: 0 0.5px 0 0 light-dark(#fff, #060606) inset, 0 1px 2px 0 light-dark(#B3B3B3, #2c2c2c);
+	}
+  main p:first-child {
+    margin-top:0;
+  }
+  ul li {
+		margin-top:0.5em;	
+	}
+	p {
+    line-height: 1.4em;
+  }
+	body {
+		background-color:#f6f6f6;	
+		background-color: light-dark(#f6f6f6, #000);
+    color: black;
+    color: light-dark(black, #d6d6d6);
+	}
+	pre {
+		text-align:left;
+		background: #333;
+    background: light-dark(#333, #212121);
+    color: #e2e2e2;
+    padding: 1em;
+    border-radius: 2px;
+		tab-size: 2;
+		-moz-tab-size: 2;
+		-o-tab-size: 2;
+		-webkit-tab-size: 2;
+	}
+	code {
+		background: #eff0f1;
+    background:  light-dark(#eff0f1, #272727);
+    padding: 1px 5px;	
+		white-space: nowrap;
+	}
+</style>
+

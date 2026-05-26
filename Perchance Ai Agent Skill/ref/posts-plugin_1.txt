@@ -1,0 +1,137 @@
+
+
+posts = {import:posts-plugin}
+postsConfig
+  LiveModVotes
+    increment = 1 // means each 'count' increases by this amount
+    decay = 10 // each vote decays the existing sum to ensure it says below 10 at all times, meaning all keys have *relative* scores
+    canList = true // means that a list of keys/entries is accessible/enumerable
+  ImportantVotes
+    increment = userTrustScore // means each 'count' increases by a value between 0 and 1 based on how likely they are to be a bot/troll/whatever
+    publicValues = false // can't see actual values (e.g. to reduce chance of gaming) but can still sort by counts (approximately, not live-updated, again to reduce gaming)
+  Cool
+    max = 10 // each key cannot have more than 10 votes
+  LiveModVotesBetter
+    decay = 2*last10MinsUniqueUserCount // make values relative to the number of unique users who voted in the last 10 minutes
+  DirectMessages
+    readKeyMapper = Ed25519
+    
+
+
+// TODO:
+//  - [$once:post.blog.form(spec)]  - creates a nice submission form based on the given spec - example: https://coding-for-kids.upvoty.com/b/feature-requests/
+//  - reactions
+//  - comments (could be implemented via this plugin, but they're commonly enough used that it's worth it - plus you e.g. get 'numComments' on the post object)
+//  - way to only allow admins to add certain tags (e.g. "planned", "in progress", "wontfix", etc.)
+//  - for `post.foo.feed()`, option for several different 'views' of the same data - e.g. infinite scroll vs kanban vs calendar vs etc
+
+$output = [getPluginObj()]
+
+getPluginObj() =>
+  if(window.__postsPluginObj18474921) return window.__postsPluginObj18474921;
+  
+  let iframe = document.createElement("iframe");
+  iframe.src = "https://posts-plugin.perchance.org/embed";
+  iframe.style.display = "none";
+  document.head.append(iframe);
+  
+  let requestIdToResolver = {};
+  iframe.contentWindow.addEventListener("message", function(e) {
+    if(requestIdToResolver[e.data.requestId]) {
+      requestIdToResolver[e.data.requestId](e.data.response);
+      delete requestIdToResolver[e.data.requestId]();
+    }
+  });
+  
+  window.__postsPluginObj18474921 = {
+    add: async function(postObj) {
+      let requestId = Math.random().toString()+Math.random().toString();
+      iframe.contentWindow.postMessage({requestId, type:"add", params:{postObj}});
+      return new Promise(r => requestIdToResolver[requestId]=r);
+    },
+    addMany: async function(postObjs) {
+      let requestId = Math.random().toString()+Math.random().toString();
+      iframe.contentWindow.postMessage({requestId, type:"addMany", params:{postObjs}});
+      return new Promise(r => requestIdToResolver[requestId]=r);
+    },
+    get: async function(id) {
+      let requestId = Math.random().toString()+Math.random().toString();
+      iframe.contentWindow.postMessage({requestId, type:"get", params:{id}});
+      return new Promise(r => requestIdToResolver[requestId]=r);
+    },
+    getMany: async function(ids) {
+      let requestId = Math.random().toString()+Math.random().toString();
+      iframe.contentWindow.postMessage({requestId, type:"getMany", params:{ids}});
+      return new Promise(r => requestIdToResolver[requestId]=r);
+    },
+    query: async function(query) {
+      let requestId = Math.random().toString()+Math.random().toString();
+      iframe.contentWindow.postMessage({requestId, type:"query", params:{query}});
+      return new Promise(r => requestIdToResolver[requestId]=r);
+    },
+    stream: async function(query) {
+      let requestId = Math.random().toString()+Math.random().toString();
+      iframe.contentWindow.postMessage({requestId, type:"stream", params:{query}});
+      let promise = new Promise(r => requestIdToResolver[requestId]=r);
+      promise.toString = function() {
+        // TODO: add this as a property like '.html'? [$once:posts.stream({channel:'blog'}).html]
+        return ""; // TODO: use renderPost/renderFeed/etc. in their config, or sane defaults.
+      };
+      return promise;
+    },
+  };
+  
+  return window.__postsPluginObj18474921;
+  
+  
+async test() =>
+  await posts.add({
+    content: "this will have a _channel of '' (empty string) and a randomly generated `id` ",
+  });
+  
+  let result = await posts.blog.add({
+    id: "abc",
+    tags: ["cool", "okay"],
+    title: 123,
+    content: "here's the content",
+  });
+  
+  let id = "abc";
+  let post = await posts.blog.get(id);
+  console.log("got post:", post);
+  
+  await posts.blog.vote(id, 1); // value between -1 and 1
+  await posts.blog.vote(id, 1); // value between -1 and 1
+  await posts.blog.seen(id);
+  await posts.blog.seen(id);
+  
+  await posts.blog.update("abc", { tags: ["cool"] });
+  await posts.blog.replace("abc", {
+    tags: ["cool", "okay"],
+    title: 123,
+    content: "here's the new content",
+  });
+  
+  // let post = await posts.query({sort:"new", tags:["cool"]});
+  // let post = await posts.query({sort:"best", tags:["cool"], after:Date.now()-1000*60*60, limit:10});
+  // let post = await posts.query({sort:"trending", tags:["cool"], after:Date.now()-1000*60*60, limit:10});
+  // let post = await posts.query({sort:"value", tags:["cool"], after:Date.now()-1000*60*60, limit:10});
+  
+  
+PostsPluginConfig
+  blogPosts // config can be used to auto-create a submission form and feed elements
+    title
+      type = text
+      maxLength = 100
+    content
+      type = text
+      maxLength = 1000
+    image
+      type = image
+      
+      
+  
+// let { publicKey, privateKey } = await crypto.subtle.generateKey("Ed25519", true, ["sign", "verify"]);
+// let signed123 = await crypto.subtle.sign("Ed25519", privateKey, new Uint8Array([1,2,3]));
+// let publicKeyBuffer = await crypto.subtle.exportKey("raw", publicKey);
+// let publicKeyBase64 = btoa(String.fromCharCode(...new Uint8Array(publicKeyBuffer)));

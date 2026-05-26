@@ -1,0 +1,615 @@
+$output = [getServerObj()]
+
+getServerObj() =>
+  const DEFAULT_EMBED_ORIGIN = "https://server-plugin.perchance.org";
+  const WORLD_EMBED_RE = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+  const PING_INTERVAL_MS = 500;
+  
+  let manager = null;
+  
+  function getEmbedOrigin() {
+    if (typeof window !== "undefined") {
+      const override = window.__SERVER_PLUGIN_EMBED_ORIGIN__;
+      if (override) return String(override);
+    }
+    return DEFAULT_EMBED_ORIGIN;
+  }
+  
+  function getUniverse() {
+    if (typeof window !== "undefined") {
+      if (window.generatorPublicId) return String(window.generatorPublicId);
+      const override = window.__SERVER_PLUGIN_UNIVERSE__;
+      if (override) return String(override);
+    }
+    return null;
+  }
+  
+  function shouldForceWebSocket() {
+    if (typeof window === "undefined") return false;
+    try {
+      const hash = window.location?.hash || "";
+      if (!hash) return false;
+      const params = new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : hash);
+      return params.get("forceUseWS") === "1";
+    } catch {
+      return false;
+    }
+  }
+  
+  function normalizeWorld(input) {
+    if (typeof input !== "string") {
+      throw new Error("World name must be a string");
+    }
+    const prop = input.trim();
+    if (!WORLD_EMBED_RE.test(prop)) {
+      throw new Error(`Invalid world name: ${input}`);
+    }
+    return prop;
+  }
+  
+  function getManager() {
+    if (!manager) {
+      manager = createManager({ embedOrigin: getEmbedOrigin(), universe: getUniverse() });
+    }
+    return manager;
+  }
+  
+  const WS_FRAME_DATAGRAM = 1;
+  const WS_FRAME_STREAM_OPEN_BI = 2;
+  const WS_FRAME_STREAM_OPEN_UNI = 3;
+  const WS_FRAME_STREAM_DATA = 4;
+  const WS_FRAME_STREAM_FIN = 5;
+  const WS_FRAME_CONTROL = 6;
+  const WS_FRAME_CLOSE = 7;
+  
+  function encodeU32(value) {
+    const out = new Uint8Array(4);
+    out[0] = (value >>> 24) & 0xff;
+    out[1] = (value >>> 16) & 0xff;
+    out[2] = (value >>> 8) & 0xff;
+    out[3] = value & 0xff;
+    return out;
+  }
+  
+  function decodeU32(bytes, offset) {
+    return ((bytes[offset] << 24) | (bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3]) >>> 0;
+  }
+  
+  function toUint8(data) {
+    if (data instanceof Uint8Array) return data;
+    if (data instanceof ArrayBuffer) return new Uint8Array(data);
+    if (ArrayBuffer.isView(data)) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+    return null;
+  }
+  
+  function createWsTransport({ url, token, world, onClose }) {
+    const ws = new WebSocket(url);
+    ws.binaryType = "arraybuffer";
+  
+    let datagramController;
+    const datagramReadable = new ReadableStream({
+      start(controller) {
+        datagramController = controller;
+      },
+      cancel() {
+        datagramController = null;
+      },
+    });
+    const datagramWritable = new WritableStream({
+      write(chunk) {
+        const bytes = toUint8(chunk);
+        if (!bytes) return;
+        const out = new Uint8Array(1 + bytes.length);
+        out[0] = WS_FRAME_DATAGRAM;
+        out.set(bytes, 1);
+        ws.send(out);
+      },
+    });
+  
+    let incomingBidiController;
+    const incomingBidi = new ReadableStream({
+      start(controller) {
+        incomingBidiController = controller;
+      },
+      cancel() {
+        incomingBidiController = null;
+      },
+    });
+    let incomingUniController;
+    const incomingUni = new ReadableStream({
+      start(controller) {
+        incomingUniController = controller;
+      },
+      cancel() {
+        incomingUniController = null;
+      },
+    });
+  
+    const streams = new Map();
+    let nextStreamId = 1;
+  
+    function createWritable(streamId) {
+      return new WritableStream({
+        write(chunk) {
+          const bytes = toUint8(chunk);
+          if (!bytes) return;
+          const header = new Uint8Array(1 + 4);
+          header[0] = WS_FRAME_STREAM_DATA;
+          header.set(encodeU32(streamId), 1);
+          const out = new Uint8Array(header.length + bytes.length);
+          out.set(header, 0);
+          out.set(bytes, header.length);
+          ws.send(out);
+        },
+        close() {
+          const out = new Uint8Array(1 + 4);
+          out[0] = WS_FRAME_STREAM_FIN;
+          out.set(encodeU32(streamId), 1);
+          ws.send(out);
+        },
+        abort() {
+          const out = new Uint8Array(1 + 4);
+          out[0] = WS_FRAME_STREAM_FIN;
+          out.set(encodeU32(streamId), 1);
+          ws.send(out);
+        },
+      });
+    }
+  
+    function createReadable() {
+      let controller;
+      const readable = new ReadableStream({
+        start(ctrl) {
+          controller = ctrl;
+        },
+        cancel() {
+          controller = null;
+        },
+      });
+      return { readable, controller: () => controller };
+    }
+  
+    function createBidirectionalStream(streamId) {
+      const { readable, controller } = createReadable();
+      const writable = createWritable(streamId);
+      const stream = { readable, writable };
+      streams.set(streamId, { controller, stream, bidi: true });
+      return stream;
+    }
+  
+    function createIncomingStream(streamId, bidi) {
+      if (bidi) {
+        const stream = createBidirectionalStream(streamId);
+        if (incomingBidiController) incomingBidiController.enqueue(stream);
+        return;
+      }
+      const { readable, controller } = createReadable();
+      streams.set(streamId, { controller, stream: readable, bidi: false });
+      if (incomingUniController) incomingUniController.enqueue(readable);
+    }
+  
+    function handleStreamData(streamId, data) {
+      const entry = streams.get(streamId);
+      if (!entry) return;
+      const ctrl = entry.controller();
+      if (!ctrl) return;
+      ctrl.enqueue(data);
+    }
+  
+    function handleStreamFin(streamId) {
+      const entry = streams.get(streamId);
+      if (!entry) return;
+      const ctrl = entry.controller();
+      if (ctrl) ctrl.close();
+      streams.delete(streamId);
+    }
+  
+    let closedResolve;
+    const closed = new Promise((resolve) => {
+      closedResolve = resolve;
+    });
+  
+    function resolveClosed(info) {
+      if (closedResolve) {
+        closedResolve(info);
+        closedResolve = null;
+      }
+    }
+  
+    ws.addEventListener("message", (event) => {
+      const data = event.data;
+      if (!(data instanceof ArrayBuffer)) return;
+      const bytes = new Uint8Array(data);
+      if (bytes.length === 0) return;
+      const type = bytes[0];
+      if (type === WS_FRAME_DATAGRAM) {
+        if (datagramController) datagramController.enqueue(bytes.slice(1));
+        return;
+      }
+      if (type === WS_FRAME_STREAM_OPEN_BI || type === WS_FRAME_STREAM_OPEN_UNI) {
+        if (bytes.length < 5) return;
+        const streamId = decodeU32(bytes, 1);
+        createIncomingStream(streamId, type === WS_FRAME_STREAM_OPEN_BI);
+        return;
+      }
+      if (type === WS_FRAME_STREAM_DATA) {
+        if (bytes.length < 5) return;
+        const streamId = decodeU32(bytes, 1);
+        handleStreamData(streamId, bytes.slice(5));
+        return;
+      }
+      if (type === WS_FRAME_STREAM_FIN) {
+        if (bytes.length < 5) return;
+        const streamId = decodeU32(bytes, 1);
+        handleStreamFin(streamId);
+        return;
+      }
+      if (type === WS_FRAME_CONTROL) {
+        // Control handled by manager-level token refresh only.
+        return;
+      }
+      if (type === WS_FRAME_CLOSE) {
+        const closeCode = bytes.length >= 5 ? decodeU32(bytes, 1) : 0;
+        const reason = bytes.length > 5 ? new TextDecoder().decode(bytes.slice(5)) : "";
+        resolveClosed({ closeCode, reason });
+        ws.close();
+      }
+    });
+  
+    ws.addEventListener("close", (event) => {
+      resolveClosed({ closeCode: event.code || 0, reason: event.reason || "" });
+      if (onClose) onClose();
+    });
+  
+    const ready = new Promise((resolve, reject) => {
+      ws.addEventListener("open", () => resolve());
+      ws.addEventListener("error", () => reject(new Error("websocket_error")));
+    });
+  
+    function sendControl(payload) {
+      const bytes = new TextEncoder().encode(JSON.stringify(payload));
+      const out = new Uint8Array(1 + bytes.length);
+      out[0] = WS_FRAME_CONTROL;
+      out.set(bytes, 1);
+      ws.send(out);
+    }
+  
+    return {
+      ready,
+      closed,
+      datagrams: {
+        readable: datagramReadable,
+        writable: datagramWritable,
+        maxDatagramSize: null,
+      },
+      incomingBidirectionalStreams: incomingBidi,
+      incomingUnidirectionalStreams: incomingUni,
+      createBidirectionalStream() {
+        const streamId = nextStreamId++;
+        const stream = createBidirectionalStream(streamId);
+        const out = new Uint8Array(1 + 4);
+        out[0] = WS_FRAME_STREAM_OPEN_BI;
+        out.set(encodeU32(streamId), 1);
+        ws.send(out);
+        return Promise.resolve(stream);
+      },
+      createUnidirectionalStream() {
+        const streamId = nextStreamId++;
+        const writable = createWritable(streamId);
+        streams.set(streamId, { controller: () => null, stream: writable, bidi: false });
+        const out = new Uint8Array(1 + 4);
+        out[0] = WS_FRAME_STREAM_OPEN_UNI;
+        out.set(encodeU32(streamId), 1);
+        ws.send(out);
+        return Promise.resolve(writable);
+      },
+      close({ closeCode = 0, reason = "" } = {}) {
+        const reasonBytes = new TextEncoder().encode(reason || "");
+        const out = new Uint8Array(1 + 4 + reasonBytes.length);
+        out[0] = WS_FRAME_CLOSE;
+        out.set(encodeU32(closeCode >>> 0), 1);
+        out.set(reasonBytes, 5);
+        ws.send(out);
+        ws.close();
+      },
+      __sendTokenRefresh() {
+        if (!token) return;
+        sendControl({ type: "token_refresh", token, expiry: null });
+      },
+      __updateToken(nextToken, expiry) {
+        token = nextToken;
+        sendControl({ type: "token_refresh", token, expiry });
+      },
+    };
+  }
+  
+  function encodeLengthPrefixed(payload) {
+    const bytes = payload instanceof Uint8Array ? payload : new Uint8Array(payload);
+    const out = new Uint8Array(4 + bytes.length);
+    out[0] = (bytes.length >>> 24) & 0xff;
+    out[1] = (bytes.length >>> 16) & 0xff;
+    out[2] = (bytes.length >>> 8) & 0xff;
+    out[3] = bytes.length & 0xff;
+    out.set(bytes, 4);
+    return out;
+  }
+  
+  function createManager({ embedOrigin, universe }) {
+    let loaded = false;
+    let ready = false;
+    let initSent = false;
+    const queue = [];
+    const pending = new Map();
+    const connections = new Map();
+    const debugPrefix = "[server-plugin]";
+  
+    const iframe = document.createElement("iframe");
+    iframe.src = `${embedOrigin}/embed`;
+    iframe.style.position = "fixed";
+    iframe.style.left = "-10px";
+    iframe.style.top = "-10px";
+    iframe.style.width = "1px";
+    iframe.style.height = "1px";
+    iframe.style.opacity = "0";
+    iframe.style.pointerEvents = "none";
+    document.body.appendChild(iframe);
+  
+    function postToEmbed(payload) {
+      if (!iframe.contentWindow) return;
+      iframe.contentWindow.postMessage(payload, embedOrigin);
+    }
+  
+    function sendInit() {
+      if (initSent) return;
+      initSent = true;
+      const webtransportOrigin =
+        typeof window.__SERVER_PLUGIN_WEBTRANSPORT_ORIGIN__ === "string"
+          ? String(window.__SERVER_PLUGIN_WEBTRANSPORT_ORIGIN__)
+          : null;
+      const defaultWebtransportOrigin =
+        !webtransportOrigin &&
+        typeof location !== "undefined" &&
+        typeof location.hostname === "string" &&
+        location.hostname.endsWith("perchance.org")
+          ? "https://wt0.server-plugin.perchance.org"
+          : null;
+      const webtransportCertHashes =
+        Array.isArray(window.__SERVER_PLUGIN_WEBTRANSPORT_CERT_HASHES__)
+          ? window.__SERVER_PLUGIN_WEBTRANSPORT_CERT_HASHES__
+            .map((entry) => {
+              if (!entry || typeof entry.algorithm !== "string") return null;
+              let value = entry.value;
+              if (value instanceof ArrayBuffer) {
+                value = Array.from(new Uint8Array(value));
+              } else if (ArrayBuffer.isView(value)) {
+                value = Array.from(new Uint8Array(value.buffer, value.byteOffset, value.byteLength));
+              } else if (value instanceof Uint8Array) {
+                value = Array.from(value);
+              } else if (!Array.isArray(value)) {
+                value = null;
+              }
+              if (!value) return null;
+              return { algorithm: entry.algorithm, value };
+            })
+            .filter(Boolean)
+          : null;
+      const devWebtransportPort =
+        typeof window.__DEV_WEBTRANSPORT_PORT__ === "number"
+          ? window.__DEV_WEBTRANSPORT_PORT__
+          : undefined;
+      postToEmbed({
+        type: "init",
+        universe: universe || undefined,
+        origin: location.origin,
+        devGatewayPort: typeof window.__DEV_GATEWAY_PORT__ === "number" ? window.__DEV_GATEWAY_PORT__ : undefined,
+        devWebtransportPort,
+        webtransportOrigin: webtransportOrigin || defaultWebtransportOrigin || undefined,
+        webtransportCertHashes: webtransportCertHashes || undefined,
+        generatorLastEditTime: window.generatorLastEditTime || null,
+        generatorName: window.generatorName || null,
+      });
+      console.debug(`${debugPrefix} embed init sent`, {
+        embedOrigin,
+        universe: universe || null,
+        webtransportOrigin: webtransportOrigin || defaultWebtransportOrigin || null,
+      });
+    }
+  
+    function flushQueue() {
+      if (!ready) return;
+      while (queue.length) {
+        postToEmbed(queue.shift());
+      }
+    }
+  
+    let loadAttemptStart = Date.now();
+    function resetEmbedSrc() {
+      loadAttemptStart = Date.now();
+      const cacheBust = Math.random().toString(36).slice(2);
+      iframe.src = `${embedOrigin}/embed?__cacheBust=${cacheBust}`;
+      console.debug(`${debugPrefix} embed src reset`, { embedOrigin });
+    }
+  
+    function canPostToEmbed() {
+      if (!iframe.contentWindow) return false;
+      try {
+        const href = iframe.contentWindow.location.href;
+        if (href === "about:blank") return false;
+      } catch {
+        // Cross-origin access throws once navigation starts; safe to postMessage.
+      }
+      return true;
+    }
+  
+    const poll = setInterval(() => {
+      if (!loaded) {
+        if (Date.now() - loadAttemptStart > 30000) resetEmbedSrc();
+        if (canPostToEmbed()) postToEmbed({ type: "ping" });
+      }
+    }, PING_INTERVAL_MS);
+  
+    function onWindowMessage(e) {
+      if (e.source !== iframe.contentWindow) return;
+      if (e.origin !== embedOrigin) return;
+      const msg = e.data || {};
+      if (msg.type === "loaded") {
+        loaded = true;
+        clearInterval(poll);
+        console.debug(`${debugPrefix} embed loaded`, { embedOrigin });
+        sendInit();
+        return;
+      }
+      if (msg.type === "ready") {
+        ready = true;
+        console.debug(`${debugPrefix} embed ready`, { embedOrigin });
+        flushQueue();
+        return;
+      }
+      if (msg.type === "connect_ready") {
+        const pendingReq = pending.get(msg.requestId);
+        if (!pendingReq) return;
+        pending.delete(msg.requestId);
+        pendingReq.resolve(msg);
+        return;
+      }
+      if (msg.type === "connect_error") {
+        const pendingReq = pending.get(msg.requestId);
+        if (!pendingReq) return;
+        pending.delete(msg.requestId);
+        pendingReq.reject(new Error(msg.message || "connect_error"));
+        return;
+      }
+      if (msg.type === "evict") {
+        const world = typeof msg.world === "string" ? msg.world : "";
+        const connState = connections.get(world);
+        if (connState && connState.transport && typeof connState.transport.close === "function") {
+          try {
+            connState.transport.close({ closeCode: 0, reason: msg.reason || "evicted" });
+          } catch {}
+        } else if (world) {
+          postToEmbed({ type: "disconnect", world });
+        }
+        return;
+      }
+      if (msg.type === "token_refresh") {
+        const connState = connections.get(msg.world);
+        if (connState && connState.transport && connState.sendTokenRefresh) {
+          connState.sendTokenRefresh(msg.token, msg.expiry);
+        }
+        return;
+      }
+      if (msg.type === "meta") {
+        const meta = msg.data;
+        const worldLabel = msg.world ? ` world=${msg.world}` : "";
+        if (meta && typeof meta === "object") {
+          const metaType = typeof meta.type === "string" ? meta.type : null;
+          const prefix = `[server-plugin] meta${worldLabel}`;
+          if (metaType === "error") {
+            if (typeof meta.message === "string") console.error(`${prefix}: ${meta.message}`);
+            else console.error(`${prefix}: error`, meta);
+          } else if (metaType && metaType.endsWith("_error")) {
+            console.warn(`${prefix}: ${metaType}`, meta);
+          } else {
+            console.debug(`${prefix}: ${metaType || "meta"}`, meta);
+          }
+        } else {
+          console.debug(`[server-plugin] meta${worldLabel}`, meta);
+        }
+        return;
+      }
+    }
+  
+    window.addEventListener("message", onWindowMessage);
+  
+    async function connect(worldInput) {
+      const world = normalizeWorld(worldInput);
+      const existing = connections.get(world);
+      if (existing && existing.transport) {
+        return existing.transport;
+      }
+      const requestId = Math.random().toString(36).slice(2);
+      const payload = { type: "connect", world, requestId };
+      if (ready) {
+        postToEmbed(payload);
+      } else {
+        queue.push(payload);
+        if (loaded && !initSent) sendInit();
+      }
+      const response = await new Promise((resolve, reject) => {
+        pending.set(requestId, { resolve, reject });
+      });
+  
+      const webtransportSupported =
+        typeof WebTransport !== "undefined" &&
+        window.__SERVER_PLUGIN_DISABLE_WEBTRANSPORT__ !== true &&
+        !shouldForceWebSocket();
+      let transport = null;
+      let sendTokenRefresh = null;
+  
+      if (webtransportSupported && response.wtUrl) {
+        const options = {};
+        if (response.webtransportCertHashes) {
+          options.serverCertificateHashes = response.webtransportCertHashes;
+        }
+        const wt = new WebTransport(response.wtUrl, options);
+        await wt.ready;
+        const controlStream = await wt.createUnidirectionalStream();
+        const controlWriter = controlStream.getWriter();
+        sendTokenRefresh = async (token, expiry) => {
+          const payload = { type: "token_refresh", token, expiry };
+          const encoded = new TextEncoder().encode(JSON.stringify(payload));
+          const framed = encodeLengthPrefixed(encoded);
+          await controlWriter.write(framed);
+        };
+        transport = wt;
+        transport.__serverPluginTransportKind = "webtransport";
+        transport.__serverPluginSendTokenRefresh = sendTokenRefresh;
+        transport.__serverPluginWorld = world;
+        const cleanup = () => {
+          if (connections.get(world)?.transport === transport) {
+            connections.delete(world);
+            postToEmbed({ type: "disconnect", world });
+          }
+        };
+        transport.closed?.then(cleanup).catch(cleanup);
+      } else if (response.wsUrl) {
+        const wsTransport = createWsTransport({
+          url: response.wsUrl,
+          token: response.token,
+          world,
+          onClose: () => {
+            if (connections.get(world)?.transport === wsTransport) {
+              connections.delete(world);
+              postToEmbed({ type: "disconnect", world });
+            }
+          },
+        });
+        await wsTransport.ready;
+        sendTokenRefresh = (token, expiry) => wsTransport.__updateToken(token, expiry);
+        transport = wsTransport;
+        transport.__serverPluginTransportKind = "ws";
+      } else if (!transport) {
+        throw new Error("no_transport_url");
+      }
+  
+      connections.set(world, { transport, sendTokenRefresh });
+      if (sendTokenRefresh && response.token) {
+        sendTokenRefresh(response.token, response.expiry || response.tokenExpiry || null);
+      }
+      return transport;
+    }
+  
+    return { connect };
+  }
+  
+  function server(world) {
+    // Validate before creating the manager/iframe.
+    normalizeWorld(world);
+    return getManager().connect(world);
+  }
+  return server; 
+
+
+
+
+

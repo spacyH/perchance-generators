@@ -209,28 +209,79 @@ for the full pattern).
 reach for in panel JS or inline `[expr]` blocks. **For variable-assignment semantics, use
 `selectOne`** — see §6 for why this matters.
 
-| Accessor | Type | Use |
-|----------|------|-----|
-| `list.selectOne` | item *reference* | Pick one random item — works with `[v = list.selectOne]` so `v` becomes a reference (not just a string). Most common operation. |
-| `list.selectMany(n)` | array of items | Pick `n` random items (may repeat). Often chained: `list.selectMany(3).joinItems(", ")`. Two-arg `selectMany(min, max)` picks a random count. |
-| `list.selectUnique(n)` | array of items | Pick `n` *unique* items (no duplicates). Two-arg `selectUnique(min, max)` for variable count. |
-| `list.selectAll` | string array | Every item, each evaluated once. Iterate this. |
-| `list.evaluateItem` | string | One random item, fully evaluated. Implicitly does `selectOne`. Use to *freeze* a random item when its content has unresolved `{…}` / `[…]`, or to *force execution* when the list isn't the last operand in a `[…]` (see §6.4). |
-| `list.joinItems(sep)` | string | Every item joined with separator, in declaration order (not random). Common pattern: `$output = [this.joinItems("\n")]` to flatten a list into one block of text. |
-| `list.consumableList` | List | A new consumable copy — items disappear from the list as they're picked. Like a deck of cards. Built-in DSL, not a plugin. |
-| `list.createClone` | List | A fresh non-destructive copy. |
-| `list.getRawListText` | string | Verbatim source — preserves indentation and Perchance markup. Use to pass content through to `markdown-plugin` or `<pre>` unchanged. |
-| `list.getName` / `list.getName()` | string | List's own name. Both forms work; bare form is more idiomatic in DSL templates. |
-| `list.getLength()` | number | Number of top-level items. |
-| `list.getOdds()` | numbers | Per-item weight. |
-| `list.getParent` / `list.getParent()` | List or root | Parent list — useful inside `$output(thisList) =>` or for `this.getParent.foo` references. |
-| `list.getPropertyKeys` | strings | Names of `key = value` properties on this list. **No `()` — it's a getter.** |
-| `list.getPropertyNames` | strings | Synonym of `getPropertyKeys`. |
-| `list.getChildNames` | strings | Names of indented sub-lists. |
-| `list.getFunctionNames` | strings | Names of `name(args) =>` children. |
-| `list.getAllKeys` | strings | Everything: properties + sub-lists + functions. |
+**Selection & Evaluation:**
+
+| Accessor | Returns | Notes |
+|----------|---------|-------|
+| `list.selectOne` | list item **object** | Pick one random item — returns a list item object, NOT a plain string. Use `String(list.selectOne)` or `list.evaluateItem` to get a string. Works with `[v = list.selectOne]` so `v` becomes a reference. |
+| `list.selectMany(n)` | array of item objects | Pick `n` random items (may repeat). Chain: `list.selectMany(3).joinItems(", ")`. Two-arg `selectMany(min, max)` for variable count. |
+| `list.selectUnique(n)` | array of item objects | Pick `n` *unique* items (no duplicates). Two-arg `selectUnique(min, max)` for variable count. |
+| `list.selectAll` | array of item objects | Every item as a list item object. Iterate this. |
+| `list.evaluateItem` | string | One random item, fully evaluated to a string. Use to freeze a random pick or force execution (see §6.4). |
+| `list.joinItems(sep)` | string | Every item joined with separator, in declaration order (not random). Common: `$output = [this.joinItems("\n")]`. |
+| `list.sumItems` | number or string | Adds all items. For string items, concatenates with leading `"0"`: `"0alphabravocharlie"`. |
+| `list.replaceText(find, replace)` | string | Evaluates a random item with text replacement applied. |
+
+**Metadata (all are properties, not methods — no `()` needed):**
+
+| Accessor | Returns | Notes |
+|----------|---------|-------|
+| `list.getName` | string | List's own name: `"monitorTestList"`. |
+| `list.getLength` | number | Number of top-level items. **This is a PROPERTY, not a method** — `list.getLength` not `list.getLength()`. |
+| `list.getOdds` | number | Weight value (default `1`). |
+| `list.getParent` | list object or null | Parent in the DSL tree. The generator root returns `null`. |
+| `list.getSelf` | list object | The list itself with named children: `{alpha, bravo, charlie}`. |
+
+**Structure (all are properties):**
+
+| Accessor | Returns | Notes |
+|----------|---------|-------|
+| `list.getPropertyKeys` | string array | Names of `key = value` properties. Same as `getPropertyNames`. |
+| `list.getPropertyNames` | string array | Synonym of `getPropertyKeys`. |
+| `list.getChildNames` | string array | Names of child items: `["alpha","bravo","charlie"]`. |
+| `list.getFunctionNames` | string array | Names of `name(args) =>` children. |
+| `list.getAllKeys` | string array | Everything: properties + sub-lists + functions. |
+| `list.getRawListText` | string | Raw DSL source with newlines: `"myList\n  alpha\n  bravo\n"`. |
+
+**Cloning:**
+
+| Accessor | Returns | Notes |
+|----------|---------|-------|
+| `list.consumableList` | list object | A copy whose items disappear as picked (like a deck of cards). |
+| `list.createClone` | — | **Does NOT exist** on list objects despite appearing in some docs. Throws `"not a function"`. |
+
+**Case Transforms (each picks a random item first, then transforms):**
+
+| Accessor | Example output | Notes |
+|----------|---------------|-------|
+| `list.upperCase` | `"ALPHA"` | Random item uppercased. |
+| `list.lowerCase` | `"alpha"` | Random item lowercased. |
+| `list.titleCase` | `"Bravo"` | Random item title-cased. |
+| `list.sentenceCase` | `"Bravo"` | Random item sentence-cased. |
+
+**Grammar Transforms (each picks a random item first, then transforms):**
+
+| Accessor | Example output | Notes |
+|----------|---------------|-------|
+| `list.pluralForm` | `"alphas"` | Appends `s` (basic English pluralization). |
+| `list.singularForm` | `"alpha"` | Attempts singularization. |
+| `list.presentTense` | `"alphas"` | Present tense (adds `s`). |
+| `list.futureTense` | `"will alpha"` | Prepends `"will "`. |
+| `list.pastTense` | — | **THROWS** `"PERCH is not defined"` in panel JS. Only works in the top editor context. |
+| `list.negativeForm` | `"alpha"` | Currently a no-op for simple words. |
+
+**String Conversion:**
+
+| Accessor | Returns | Notes |
+|----------|---------|-------|
+| `list.toString()` | string | Evaluates to a random item string. |
+| `list.valueOf()` | string | Same as `toString()`. |
 | `list[i]` | string | Item at integer index. |
 | `list["propName"]` | any | Property/sub-list by name (same as `list.propName`). |
+
+> **Key insight:** Case and grammar transforms pick a **random item** each time they're
+> accessed. Accessing `list.upperCase` twice may return different items. To freeze a
+> specific item's transform, first `selectOne` then transform: `String(list.selectOne).toUpperCase()`.
 
 ### 3.1 Random Sub-List Pick
 

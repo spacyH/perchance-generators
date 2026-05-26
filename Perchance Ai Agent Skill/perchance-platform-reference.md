@@ -132,10 +132,10 @@ The brokers are independent services, so calls to different services run in para
 | `db-plugin.perchance.org` | Database plugin backend | Live (CORS-blocked) |
 | `editor-collab.perchance.org` | Collaborative editing service | CT cert (untested) |
 | `editor-copilot.perchance.org` | AI copilot for the editor | Down (404) |
-| `posts-plugin.perchance.org` | Posts CRUD API (`{import:posts-plugin}` broker) | Active |
+| `posts-plugin.perchance.org` | Posts CRUD API broker (WIP, source has bugs) | Down (HTTP 522 — origin timeout) |
 | `rss-feeds.perchance.org` | RSS feed per generator (path = name; strict CSP) | Live |
-| `server-plugin.perchance.org` | Server-side plugin host (wildcard: `*.server-plugin`) | Live (CORS-blocked) |
-| `wt0.server-plugin.perchance.org` | Server-plugin worker/instance node | Live (CORS-blocked) |
+| `server-plugin.perchance.org` | WebTransport/WebSocket gateway (wildcard: `*.server-plugin`) | Down (HTTP 526 — invalid SSL cert) |
+| `wt0.server-plugin.perchance.org` | WebTransport endpoint for server-plugin | Down (depends on server-plugin) |
 | `null.perchance.org` | Test/sentinel subdomain | Live (CORS-blocked) |
 | `ads.perchance.org` | Ad service for image generation (loads `?provider=vli`) | Live |
 | `api.perchance.org` | DNS exists (CF 520/522 — origin error) | Inactive |
@@ -1703,18 +1703,44 @@ importable — they are backend-only infrastructure with no Perchance generator.
 
 ### Function Plugins
 
-**`serverPlugin(worldName)`** — Server-side persistent environments.
+**`serverPlugin(worldName)`** — WebTransport/WebSocket multiplayer gateway.
+
+Returns a transport object with datagrams and bidirectional/unidirectional streams for
+real-time multiplayer communication. Each generator is its own "universe"
+(`window.generatorPublicId`); worlds are isolated within the universe.
 
 ```js
-const world = root.serverPlugin("my-world");
-// World name regex: /^[a-z][a-z0-9-]*$/
+const transport = await root.serverPlugin("my-world");
+// World name regex (from source): /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
 //   Valid:   "my-app", "test-world", "a", "a-b-c", "abc123"
 //   Invalid: "123abc" (digit start), "my_world" (underscores),
 //            "MY-APP" (uppercase), "my world" (space), "my.app" (dot)
-// Throws: "World name must be a string" for non-string args.
-// Throws: "Invalid world name: X" for names that fail the regex.
-// Valid names timeout at ~2s — the server-plugin broker is unreachable from the sandbox.
+// Returns a transport object (WebTransport or WebSocket-backed):
+//   transport.datagrams.readable  — ReadableStream (fire-and-forget messages)
+//   transport.datagrams.writable  — WritableStream
+//   transport.incomingBidirectionalStreams  — ReadableStream of {readable, writable}
+//   transport.incomingUnidirectionalStreams — ReadableStream of ReadableStream
+//   transport.createBidirectionalStream()  — Promise<{readable, writable}>
+//   transport.createUnidirectionalStream() — Promise<WritableStream>
+//   transport.close({closeCode, reason})
 ```
+
+Handshake (from source — the `$output` creates an iframe to
+`server-plugin.perchance.org/embed`):
+
+```
+1. iframe loads  →  embed sends {type:"loaded"}
+2. parent sends  →  {type:"init", universe, origin, webtransportOrigin, ...}
+3. embed sends   →  {type:"ready"}
+4. parent sends  →  {type:"connect", world, requestId}
+5. embed sends   →  {type:"connect_ready", wtUrl, wsUrl, token}
+6. client opens WebTransport to wtUrl (or WebSocket to wsUrl as fallback)
+```
+
+WebTransport endpoint: `wt0.server-plugin.perchance.org`. WebSocket fallback is
+triggered by `#forceUseWS=1` in the URL hash. Binary framing over WebSocket uses
+frame types: DATAGRAM(1), STREAM_OPEN_BI(2), STREAM_OPEN_UNI(3), STREAM_DATA(4),
+STREAM_FIN(5), CONTROL(6), CLOSE(7).
 
 **`commentsPlugin(opts)`** — Channel-based comment system with moderation.
 
@@ -1740,6 +1766,11 @@ The source code (1,094 lines) reveals it creates an iframe with `postMessage` RP
 supports channel rules (`channelName+u:username,ids:channel`), and has nickname/avatar
 management for anonymous posting.
 
+**Architecture:** The `$output` function returns a `<span>` marker tag (not an iframe)
+with `data-folder-name="generatorName+channelName"`. The Perchance runtime detects this
+marker and replaces it with the full comment widget iframe. Methods like
+`setNicknameForNextComment` work after the marker is rendered into the DOM.
+
 **Important:** The comments iframe is NOT automatically injected. It is only created when
 the plugin's `$output()` function is called (which renders the comment widget HTML).
 Without the rendered widget, `setNicknameForNextComment`, `setAvatarUrlForNextComment`,
@@ -1752,24 +1783,29 @@ Without the rendered widget, `setNicknameForNextComment`, `setAvatarUrlForNextCo
 
 ### Object Plugins
 
-**`postsPlugin`** — CRUD database for posts/content. Backed by
-`posts-plugin.perchance.org/embed` broker iframe.
+**`postsPlugin`** — Post/content database with voting and feeds. Backed by
+`posts-plugin.perchance.org/embed`. **Currently WIP — the plugin source has two bugs**
+(listener on `iframe.contentWindow` instead of `window`; `delete...()` syntax error) that
+prevent broker responses from arriving. The intended API from source:
 
 ```js
 const posts = root.postsPlugin;
-// {
-//   add(postObj)         // create a post — arg is a post object
-//   addMany(postObjs)    // batch create — arg is an array of post objects
-//   get(id)              // retrieve by ID — arg is a string ID
-//   getMany(ids)         // batch retrieve — arg is an array of IDs
-//   query(queryObj)      // search/filter — arg is a query object
-//   stream(queryObj)     // real-time stream — arg is a query object
-// }
-// All methods use iframe.contentWindow.postMessage() to the broker.
-// All methods are async but currently resolve to undefined immediately —
-// the posts-plugin broker loads its iframe but never sends postMessage responses.
-// The broker likely requires editor-context authentication to function.
+// Basic CRUD:
+//   posts.add({content, id?, tags?})                 // auto-generated ID, default channel
+//   posts.<channel>.add({id, tags, title, content})  // add to named channel (e.g. posts.blog)
+//   posts.<channel>.get(id)                          // retrieve by ID
+//   posts.<channel>.vote(id, value)                  // vote: value between -1 and 1
+//   posts.<channel>.seen(id)                         // increment view count
+//   posts.<channel>.update(id, partialObj)            // partial update
+//   posts.<channel>.replace(id, fullObj)              // full replacement
+// Querying:
+//   posts.query({sort, tags, after, limit})           // sort: "new"/"best"/"trending"/"value"
+//   posts.stream({channel})                          // real-time feed
+//   posts.<channel>.feed({sort, period})              // rendered feed widget (for DSL)
 ```
+
+The config system supports voting weights, score decay, per-key max votes,
+public/private values, and Ed25519 encrypted direct messages.
 
 **`kvPlugin`** — Key-value storage. Empty object on `root.*`; the full API is on
 `kvPlugin.folder`:
