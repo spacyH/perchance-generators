@@ -413,6 +413,80 @@ the tree as an object. The return value depends on the generator type:
 - Sub-imports are automatically compiled (e.g. `dice-roller` imports `rpg-icon-plugin`
   and `dice-plugin`).
 
+### Plugin Source Code Patterns (from 76-generator archive)
+
+**Function plugins** (`$output(args) =>`) — the dominant pattern. Every plugin
+that "does something" is a function. Key implementation patterns observed:
+
+**Singleton initialization guard:**
+```js
+$output(args) =>
+  if(!window.__alreadyInitialized12345) {
+    window.__alreadyInitialized12345 = true;
+    // one-time setup: add event listeners, create iframes, load scripts
+  }
+  // per-call logic
+```
+Used by: upload-plugin, background-audio-plugin, tap-anywhere-plugin,
+layout-maker-plugin, locker-plugin, remember-plugin.
+
+**Seeded PRNG** (seeder-plugin): Replaces `Math.random` globally with a
+deterministic function. Uses xfnv1a hash (FNV-1a variant) + mulberry32 PRNG.
+Supports `cache` and `forceUpdate` commands. `Math.random.toString` overridden
+to return `""` so it stringifies cleanly in DSL.
+
+**Tree traversal** (select-leaf-plugin, consumable-leaf-list-plugin,
+select-all-leaves-plugin): Walk DSL trees using `selectAll` + `Object.keys(node).length === 0`
+as the leaf test. consumable-leaf-list creates a stateful wrapper with cascading
+exhaustion — consumed leaves propagate up to mark parent branches as exhausted.
+
+**Instance freezing** (create-instance-plugin): Walks a DSL node, evaluates all
+`= value` properties once, and freezes them. Sublists (no `=`) remain random.
+`create-instances-plugin` is just `new Array(num).fill(0).map(_ => createInstance(list))`.
+
+**Persistent state** (remember-plugin): Saves DSL variables AND input form values
+to localStorage. Uses CSS selector paths (`getCssPath(el)`) as keys for form inputs.
+Runs a `setInterval` to periodically persist. `@forget` command clears all and reloads.
+`@inputs` command auto-saves/restores all `<input>`, `<select>`, `<textarea>` elements.
+
+**kv-plugin internals:** Bundles idb-keyval v6.2.1 inline (minified). Proxy-based
+store access: `kv.myStore.get(key)`. IndexedDB naming: `${storeName}-db-${moduleName}`.
+12 methods: `get`, `has`, `getMany`, `entries`, `keys`, `values`, `set`, `setMany`,
+`update`, `delete`, `deleteMany`, `clear`.
+
+**Upload plugin internals:** Creates a hidden iframe to `upload.perchance.org/embed`,
+pings it until `uploadEmbedIsReady`, then communicates via postMessage
+(`anonUploadRequest` → `anonUploadResponse`). Result URL is a boxed String.
+File host: `user.uploads.dev`. Deletion URLs expire after 3 days.
+
+**Layout-maker-plugin:** Wraps `window.update()` to intercept layout area updates.
+Saves original DSL content in a Map, re-evaluates on update. Uses CSS Grid with
+named template areas.
+
+**Live-activity-plugin:** Uses PubNub for real-time visitor counting. Source is
+heavily obfuscated (8 different obfuscated switch cases for different PubNub keys).
+Each case has unique pub/sub keys, suggesting multiple PubNub accounts for scaling.
+
+**Literal-plugin:** Escapes `[]{}` with backslashes to prevent DSL interpretation.
+`+html` mode additionally escapes `&<>"'` for safe HTML output.
+
+**Tap-plugin:** Creates click-to-randomize spans. Stores list reference on `window`
+with random ID. Returns object with `.html`, `.noTap`, `.noTapNoUpdate` variants.
+
+**Text-to-speech-plugin:** Supports both one-shot and streaming text via
+`ReadableStream`. Auto-splits text into sentences at 4+ sentences for granular
+`stop()` tracking. Accepts `{text, voice, pitch, speed, delay, onSpoken}` options.
+
+**Background-audio-plugin:** Embeds YouTube or SoundCloud. YouTube uses the
+IFrame API (`window.onYouTubeIframeAPIReady`). Auto-plays on first click event.
+
+**Tooltip-plugin:** Wraps Tippy.js with Perchance list interop — converts DSL
+list options to Tippy options object via `getPropertyNames` iteration.
+
+**Prompt2-plugin:** Async function that builds a modal form UI from a spec object.
+Supports `select`, `text`, `textarea`, `checkbox` types. Returns user input as
+structured data. Dark/light mode aware.
+
 ## 5 · The `update()` Global and HTML-ID Globals
 
 ### 5.1 Element IDs Are Globals

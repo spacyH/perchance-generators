@@ -2419,7 +2419,7 @@ tldraw = {import:tldraw-plugin}
 [tldraw({ channel: "my-board", width: 800, height: 600 })]
 ```
 
-**`prompt2-plugin`** — async form-modal builder. Renders a dialog with typed fields
+**`prompt2-plugin` — async modal form builder from spec object, supports select/text/textarea/checkbox, dark/light mode** — async form-modal builder. Renders a dialog with typed fields
 (`textLine`, `text`, `select`, `buttons`, `none`+inline `html`); resolves to an object or
 `null` if cancelled. Conditional field visibility via `show: (v) => …`.
 
@@ -2432,7 +2432,7 @@ const result = await prompt2({
 if (result) console.log(result.name, result.model);
 ```
 
-**`tap-plugin`** — wrap a list so its rendered item re-rolls when clicked. Can render as
+**`tap-plugin` — click-to-randomize inline spans, returns `{html, noTap, noTapNoUpdate}` object** — wrap a list so its rendered item re-rolls when clicked. Can render as
 `<span>` (default), `<button>` (style="button"), or with custom inline CSS.
 
 ```
@@ -2448,12 +2448,12 @@ Click to reroll: [tap(animal)]
 [tap(animal, "button")]
 ```
 
-**`tap-anywhere-plugin`** — like `tap-plugin` but the entire page is the click target.
+**`tap-anywhere-plugin` — one-liner: adds global click → `update()` listener** — like `tap-plugin` — click-to-randomize inline spans, returns `{html, noTap, noTapNoUpdate}` object but the entire page is the click target.
 Click anywhere → page re-rolls.
 
-**`tooltip-plugin`** — hover tooltips with rich content.
+**`tooltip-plugin` — Tippy.js wrapper with Perchance list → options interop (46KB source)** — hover tooltips with rich content.
 
-**`pattern-maker-plugin`** / **`layout-maker-plugin`** — visual editors for repeating
+**`pattern-maker-plugin`** / **`layout-maker-plugin` — CSS Grid layout from DSL spec, wraps `update()` for area-specific re-evaluation** — visual editors for repeating
 patterns and page layouts.
 
 **`flat-avatar-plugin`** — generate simple flat-color avatar images from a seed string
@@ -2476,7 +2476,7 @@ generator.
 
 **`image-plugin`** — non-AI image utility (loading, sizing, basic effects).
 
-**`background-image-plugin`** — fixed-position background image with `opacity`, `blur`,
+**`background-image-plugin` — fixed fullscreen background with opacity/blur/filter, accepts URL or config list** — fixed-position background image with `opacity`, `blur`,
 and CSS-filter options. Accepts a URL string or a list of URLs (picks randomly).
 
 ```
@@ -2486,7 +2486,7 @@ bg = {import:background-image-plugin}
 [bg(bgUrlList)]                                   // picks one randomly from the list
 ```
 
-**`background-audio-plugin`** — embed a background audio player (SoundCloud or YouTube)
+**`background-audio-plugin` — embeds YouTube (IFrame API) or SoundCloud audio, auto-plays on first click** — embed a background audio player (SoundCloud or YouTube)
 that auto-plays on first user interaction (browser autoplay policy compliant).
 
 ```
@@ -2494,10 +2494,10 @@ bgAudio = {import:background-audio-plugin}
 [bgAudio("https://www.youtube.com/watch?v=…", { volume: 30 })]
 ```
 
-**`image-layer-combiner-plugin`** — composite multiple images into one (alpha blending,
+**`image-layer-combiner-plugin` — composites multiple images via canvas, supports CSS filters per layer** — composite multiple images into one (alpha blending,
 per-layer CSS filters). Includes a download-as-PNG button.
 
-**`font-plugin`** — load and use custom Google Fonts (or any web font URL).
+**`font-plugin` — Google Fonts loader, applies to element/body/span with size and color options** — load and use custom Google Fonts (or any web font URL).
 
 **`t2i-styles`** — a curated catalog of `text-to-image-plugin` prompt-engineering
 styles (`Painted Anime`, `Casual Photo`, `Cinematic`, etc.), each with a tagged scoring
@@ -2599,7 +2599,7 @@ output
 
 ### Speech and Accessibility
 
-**`text-to-speech-plugin`** — speak text using the Web Speech API. Accepts a string, a
+**`text-to-speech-plugin` — Web Speech API with streaming support via ReadableStream, auto-sentence splitting** — speak text using the Web Speech API. Accepts a string, a
 stream from `ai-text-plugin.textStream`, or an options object. Returns a handle with
 `.stop()`. Auto-splits long text into sentence chunks for finer-grained `.stop()`.
 
