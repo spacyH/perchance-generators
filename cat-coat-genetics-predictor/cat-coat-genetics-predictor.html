@@ -1,0 +1,610 @@
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg:        light-dark(#fafaf7, #161613);
+    --panel:     light-dark(#ffffff, #1f1f1c);
+    --ink:       light-dark(#1a1a1a, #ececec);
+    --muted:     light-dark(#6e6e6a, #9a9a95);
+    --line:      light-dark(#e5e5e0, #2c2c28);
+    --accent:    light-dark(#a3522b, #d68f5e);
+    --accent-bg: light-dark(#fcf0e6, #3a261a);
+    --good:      light-dark(#557a3b, #8ec06c);
+    --warn:      light-dark(#a55a00, #e0a060);
+    --shadow:    light-dark(0 1px 3px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.4));
+  }
+  * { box-sizing: border-box; }
+  body {
+    font: 15px/1.5 system-ui, -apple-system, sans-serif;
+    color: var(--ink); background: var(--bg);
+    margin: 0; padding: 16px;
+    max-width: 1040px; margin-inline: auto;
+  }
+  h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -.01em; }
+  .lede { color: var(--muted); margin: 0 0 18px; font-size: 14px; }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
+  .tab {
+    padding: 8px 16px; cursor: pointer; border: none; background: transparent;
+    color: var(--muted); font: inherit; font-weight: 500;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+  @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 14px 16px; box-shadow: var(--shadow);
+  }
+  .card h2 {
+    font-size: 13px; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--muted); margin: 0 0 10px;
+  }
+  .row {
+    display: grid; grid-template-columns: 110px 1fr;
+    gap: 8px; align-items: center; margin-bottom: 6px;
+  }
+  .row label { color: var(--muted); font-size: 12.5px; }
+  select, input, button {
+    font: inherit; color: var(--ink); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 6px;
+    padding: 4px 7px; width: 100%; font-size: 13px;
+  }
+  button.primary {
+    background: var(--accent); color: #fff; border-color: var(--accent);
+    cursor: pointer; padding: 8px 14px; font-weight: 600; width: auto; font-size: 14px;
+  }
+  button.primary:hover { filter: brightness(1.05); }
+  button.ghost {
+    background: transparent; color: var(--accent); border-color: var(--line);
+    cursor: pointer; width: auto; padding: 6px 10px; font-size: 13px;
+  }
+  .actions { display: flex; gap: 8px; align-items: center; margin: 4px 0 14px; flex-wrap: wrap; }
+  .actions .muted { color: var(--muted); font-size: 13px; margin-left: auto; }
+  details.advanced { margin-top: 10px; }
+  details.advanced summary {
+    cursor: pointer; color: var(--accent); font-size: 12px; font-weight: 500;
+    padding: 4px 0; user-select: none;
+  }
+  details.advanced > div { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); }
+  .pheno-row {
+    display: grid; grid-template-columns: 64px 1fr 70px;
+    align-items: center; gap: 10px; padding: 8px;
+    border-bottom: 1px solid var(--line);
+  }
+  .pheno-row:last-child { border-bottom: none; }
+  .pheno-row .prob { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 500; }
+  .pheno-row .prob.big { color: var(--good); font-weight: 700; }
+  .kitten-list { display: flex; flex-direction: column; gap: 6px; }
+  .kitten-row {
+    display: grid; grid-template-columns: 24px 1fr auto;
+    gap: 8px; align-items: center; padding: 8px;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+    font-size: 12px;
+  }
+  .kitten-row select { padding: 3px 5px; font-size: 11.5px; }
+  .kitten-row .kfields {
+    display: grid; gap: 4px;
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .kitten-row .kfields-row2 {
+    display: grid; gap: 6px 12px; margin-top: 5px;
+    grid-template-columns: repeat(4, auto);
+    font-size: 11.5px; color: var(--muted);
+  }
+  .kitten-row .kfields-row2 label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+  .kitten-row .kfields-row2 input[type="checkbox"] { width: auto; margin: 0; }
+  @media (max-width: 720px) {
+    .kitten-row .kfields { grid-template-columns: 1fr 1fr; }
+    .kitten-row .kfields-row2 { grid-template-columns: 1fr 1fr; }
+  }
+  .kitten-row .del {
+    background: transparent; border: none; color: var(--muted);
+    cursor: pointer; font-size: 18px; padding: 0 4px; width: auto;
+  }
+  .infer-card {
+    background: var(--accent-bg); border: 1px solid var(--accent);
+    border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;
+  }
+  .infer-card h3 {
+    font-size: 12px; margin: 0 0 6px;
+    text-transform: uppercase; letter-spacing: .04em; color: var(--accent);
+  }
+  .infer-bar {
+    display: grid; grid-template-columns: 90px 1fr 55px;
+    gap: 8px; align-items: center; margin: 4px 0;
+    font-size: 12.5px; font-variant-numeric: tabular-nums;
+  }
+  .infer-bar .bar-track { background: var(--line); height: 8px; border-radius: 4px; overflow: hidden; }
+  .infer-bar .bar-fill  { height: 100%; background: var(--accent); }
+  .impossible { color: var(--warn); font-style: italic; font-size: 13px; margin-top: 8px; }
+  .random-grid {
+    display: grid; gap: 12px; margin-top: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+  .random-card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px; text-align: center;
+  }
+  .random-card .lbl { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  details.legend { margin-top: 14px; }
+  details.legend summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  details.legend > div { margin-top: 10px; font-size: 13px; color: var(--muted); }
+  details.legend code { font-size: 12px; background: var(--bg); padding: 1px 4px; border-radius: 3px; }
+  .mode { display: none; }
+  .mode.active { display: block; }
+  .api-note {
+    background: var(--accent-bg); border-left: 3px solid var(--accent);
+    padding: 8px 12px; margin-bottom: 16px; font-size: 12.5px; color: var(--ink);
+    border-radius: 4px;
+  }
+  .api-note code { background: var(--bg); padding: 1px 4px; border-radius: 3px; font-size: 11.5px; }
+  .footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 32px;
+    padding: 18px 0 8px;
+    border-top: 1px solid var(--line);
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .footer a {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 500;
+    transition: opacity 0.15s;
+  }
+  .footer a:hover { opacity: 0.75; text-decoration: underline; }
+</style>
+
+<h1>&#x1f408; Cat Coat Genetics</h1>
+<p class="lede">Twelve-locus Perchance plugin. Use the demo below, or <span id="importHint">see the README for import syntax</span>.</p>
+
+<div class="api-note">
+  <b>API status:</b> <span id="apiStatus">checking&hellip;</span>
+</div>
+
+<div class="tabs">
+  <button class="tab active" id="tabPredict">Predict offspring</button>
+  <button class="tab" id="tabInfer">Infer father</button>
+  <button class="tab" id="tabRandom">Random cats</button>
+</div>
+
+<!-- ====== PREDICT ====== -->
+<div class="mode active" id="modePredict">
+  <div class="grid">
+    <div class="card"><h2>Mother &#9792;</h2><div id="motherControls"></div></div>
+    <div class="card"><h2>Father &#9794;</h2><div id="fatherControls"></div></div>
+  </div>
+  <div class="actions">
+    <button class="primary" id="runPredict">Predict kitten distribution</button>
+    <button class="ghost" id="randomizeParents">Randomize parents</button>
+    <span class="muted">Exact Punnett probabilities across all 12 loci.</span>
+  </div>
+  <div class="card" id="predictResults" style="display:none">
+    <h2>Phenotype distribution</h2>
+    <div id="predictBody"></div>
+  </div>
+</div>
+
+<!-- ====== INFER ====== -->
+<div class="mode" id="modeInfer">
+  <div class="grid">
+    <div class="card"><h2>Known mother &#9792;</h2><div id="inferMotherControls"></div></div>
+    <div class="card">
+      <h2>Observed kittens</h2>
+      <div class="kitten-list" id="kittenList"></div>
+      <div style="margin-top: 10px;">
+        <button class="ghost" id="addKitten">+ Add kitten</button>
+      </div>
+    </div>
+  </div>
+  <div class="actions">
+    <button class="primary" id="runInfer">Infer father's genotype</button>
+    <span class="muted">More kittens narrow the posterior.</span>
+  </div>
+  <div id="inferResults" style="display:none"></div>
+</div>
+
+<!-- ====== RANDOM ====== -->
+<div class="mode" id="modeRandom">
+  <div class="card">
+    <h2>Random cats from population frequencies</h2>
+    <div class="actions">
+      <button class="primary" id="rollRandom">Roll 12 random cats</button>
+      <span class="muted">Allele frequencies tuned to typical mixed-breed populations.</span>
+    </div>
+    <div class="random-grid" id="randomGrid"></div>
+  </div>
+</div>
+
+<details class="legend">
+  <summary>Genetics legend &amp; assumptions</summary>
+  <div>
+    <p>Twelve independent loci, assorting independently:</p>
+    <ul>
+      <li><b>Orange</b> (X-linked): O orange, o non-orange. Females OO/Oo/oo &#x2192; orange/tortie/eumelanin. Males O/o &#x2192; orange/eumelanin. XXY tortie males excluded.</li>
+      <li><b>B locus</b>: B black &gt; b chocolate &gt; c cinnamon. Only affects eumelanin.</li>
+      <li><b>Dilute</b>: dd dilutes pigment (black&#x2192;blue, chocolate&#x2192;lilac, cinnamon&#x2192;fawn, red&#x2192;cream).</li>
+      <li><b>Agouti</b>: A_ shows tabby pattern on eumelanin; aa solid. Orange always shows pattern (agouti cannot suppress phaeomelanin).</li>
+      <li><b>Tabby T</b>: M mackerel &gt; m classic.</li>
+      <li><b>Ticked</b>: T_ overrides body striping with ticking; epistatic to T-locus and Sp.</li>
+      <li><b>Spotted modifier</b>: P_ turns mackerel into spotted (only visible if T_, ti/ti, Sp).</li>
+      <li><b>Silver</b>: I_ inhibits pigment in hair shaft. Tabby + silver = silver tabby; solid + silver = smoke.</li>
+      <li><b>Colorpoint</b>: ff (recessive) = Siamese-like colorpoint, blue eyes.</li>
+      <li><b>White spotting</b>: dosage matters &#x2014; 0/1/2 copies of S &#x2192; none / some / high white. Tortie + white = calico.</li>
+      <li><b>Dominant white</b>: W_ masks everything &#x2192; all-white cat (often blue eyes &amp; deafness, not modeled).</li>
+      <li><b>Long hair</b>: ll recessive longhair.</li>
+    </ul>
+  </div>
+</details>
+
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>
+
+<script>
+// =========================================================
+// PLUGIN ACCESS
+// Per Perchance gotcha 0.4, only imported plugins return values
+// across the DSL to JS bridge. For the plugin\'s OWN panel, we trigger
+// $output (ignore the dropped return) and read the window cache.
+// =========================================================
+
+// Inject the import-syntax hint into the lede AFTER the Perchance parser has
+// scanned the source. The panel parser decodes HTML entities and intercepts
+// template expressions even inside <script> tags and comments (gotcha 0.5),
+// so any literal curly-brace identifier sequence in this file would trigger
+// an import attempt and hang the page. Build the text from char codes instead.
+(function() {
+  var L = String.fromCharCode(123), R = String.fromCharCode(125);
+  importHint.innerHTML = 'import it in your own generator with <code>catGen = ' +
+    L + 'import:cat-coat-genetics' + R + '</code>';
+})();
+
+function getApi() {
+  if (window.__catCoatGenetics) return window.__catCoatGenetics;
+  try { root.$output(); } catch (e) { /* trigger build */ }
+  return window.__catCoatGenetics;
+}
+
+var api = getApi();
+if (!api) {
+  apiStatus.textContent = "plugin engine failed to load \u2014 reload page";
+  apiStatus.style.color = "var(--warn)";
+} else {
+  apiStatus.innerHTML = "v" + api.VERSION + " \u2014 ready (" +
+    Object.keys(api.LOCI).length + " loci modeled)";
+  apiStatus.style.color = "var(--good)";
+}
+
+// =========================================================
+// LOCUS UI METADATA
+// =========================================================
+var LOCUS_OPTIONS_F = {
+  orange:   [['OO','OO \u2014 orange'], ['Oo','Oo \u2014 tortoiseshell'], ['oo','oo \u2014 non-orange']],
+  bLocus:   [['BB','BB \u2014 black'], ['Bb','Bb \u2014 carries chocolate'], ['Bc','Bc \u2014 carries cinnamon'],
+             ['bb','bb \u2014 chocolate'], ['bc','bc \u2014 chocolate, carries cinnamon'], ['cc','cc \u2014 cinnamon']],
+  dilute:   [['DD','DD \u2014 dense'], ['Dd','Dd \u2014 carrier'], ['dd','dd \u2014 dilute']],
+  agouti:   [['AA','AA \u2014 tabby'], ['Aa','Aa \u2014 tabby (carrier)'], ['aa','aa \u2014 solid']],
+  tabbyT:   [['MM','MM \u2014 mackerel'], ['Mm','Mm \u2014 mackerel/classic'], ['mm','mm \u2014 classic']],
+  tabbyTi:  [['TT','TT \u2014 ticked'], ['Tt','Tt \u2014 ticked carrier'], ['tt','tt \u2014 non-ticked']],
+  tabbySp:  [['PP','PP \u2014 spotted'], ['Pp','Pp \u2014 spotted/mackerel'], ['pp','pp \u2014 no spotting']],
+  silver:   [['II','II \u2014 silver'], ['Ii','Ii \u2014 silver'], ['ii','ii \u2014 non-silver']],
+  point:    [['FF','FF \u2014 full color'], ['Ff','Ff \u2014 carries point'], ['ff','ff \u2014 colorpoint']],
+  white:    [['SS','SS \u2014 high white'], ['Ss','Ss \u2014 some white'], ['ss','ss \u2014 no white']],
+  domWhite: [['WW','WW \u2014 dominant white'], ['Ww','Ww \u2014 dominant white'], ['ww','ww \u2014 normal']],
+  longhair: [['LL','LL \u2014 shorthair'], ['Ll','Ll \u2014 carries longhair'], ['ll','ll \u2014 longhair']],
+};
+var LOCUS_OPTIONS_M = Object.assign({}, LOCUS_OPTIONS_F, {
+  orange: [['O','O \u2014 orange'], ['o','o \u2014 non-orange']],
+});
+
+var COMMON_LOCI   = ['orange','bLocus','dilute','white','longhair'];
+var ADVANCED_LOCI = ['agouti','tabbyT','tabbyTi','tabbySp','silver','point','domWhite'];
+var LOCUS_LABEL = {
+  orange: 'Orange', bLocus: 'B (eum.)', dilute: 'Dilute',
+  agouti: 'Agouti', tabbyT: 'Tabby T', tabbyTi: 'Ticked', tabbySp: 'Spotted',
+  silver: 'Silver', point: 'Colorpoint', white: 'White',
+  domWhite: 'Dom. white', longhair: 'Long hair',
+};
+
+function renderParentControls(target, sex, genotype, idPrefix) {
+  var opts = sex === 'F' ? LOCUS_OPTIONS_F : LOCUS_OPTIONS_M;
+  function rowFor(locus) {
+    var html = '<div class="row"><label>' + LOCUS_LABEL[locus] + '</label>';
+    html += '<select id="' + idPrefix + '_' + locus + '">';
+    var choices = opts[locus];
+    for (var i = 0; i < choices.length; i++) {
+      var sel = choices[i][0] === genotype[locus] ? ' selected' : '';
+      html += '<option value="' + choices[i][0] + '"' + sel + '>' + choices[i][1] + '</option>';
+    }
+    html += '</select></div>';
+    return html;
+  }
+  var s = '';
+  for (var i = 0; i < COMMON_LOCI.length; i++) s += rowFor(COMMON_LOCI[i]);
+  s += '<details class="advanced"><summary>+ Advanced loci (' + ADVANCED_LOCI.length + ')</summary><div>';
+  for (var j = 0; j < ADVANCED_LOCI.length; j++) s += rowFor(ADVANCED_LOCI[j]);
+  s += '</div></details>';
+  target.innerHTML = s;
+}
+
+function readParentControls(idPrefix, sex) {
+  var genotype = { sex: sex };
+  var all = COMMON_LOCI.concat(ADVANCED_LOCI);
+  for (var i = 0; i < all.length; i++) {
+    var el = document.getElementById(idPrefix + '_' + all[i]);
+    genotype[all[i]] = el.value;
+  }
+  return genotype;
+}
+
+// =========================================================
+// INITIAL STATE
+// =========================================================
+var motherGeno = api ? api.defaultGenotype('F') : null;
+var fatherGeno = api ? api.defaultGenotype('M') : null;
+if (motherGeno) { motherGeno.orange = 'Oo'; motherGeno.dilute = 'Dd'; }
+if (fatherGeno) { fatherGeno.bLocus = 'bb'; }
+
+var inferMotherGeno = api ? api.defaultGenotype('F') : null;
+if (inferMotherGeno) { inferMotherGeno.orange = 'Oo'; inferMotherGeno.dilute = 'Dd'; }
+
+if (api) {
+  renderParentControls(motherControls, 'F', motherGeno, 'm');
+  renderParentControls(fatherControls, 'M', fatherGeno, 'f');
+  renderParentControls(inferMotherControls, 'F', inferMotherGeno, 'im');
+}
+
+// =========================================================
+// TAB SWITCHING
+// =========================================================
+function switchTab(which) {
+  tabPredict.classList.toggle('active', which === 'predict');
+  tabInfer.classList.toggle('active', which === 'infer');
+  tabRandom.classList.toggle('active', which === 'random');
+  modePredict.classList.toggle('active', which === 'predict');
+  modeInfer.classList.toggle('active', which === 'infer');
+  modeRandom.classList.toggle('active', which === 'random');
+}
+tabPredict.onclick = function() { switchTab('predict'); };
+tabInfer.onclick   = function() { switchTab('infer'); };
+tabRandom.onclick  = function() { switchTab('random'); };
+
+// =========================================================
+// PREDICT
+// =========================================================
+runPredict.onclick = function() {
+  if (!api) return;
+  var m = readParentControls('m', 'F');
+  var f = readParentControls('f', 'M');
+  var dist = api.predict(m, f);
+  var body = predictBody;
+  body.innerHTML = '';
+  predictResults.style.display = 'block';
+  var max = dist[0] ? dist[0].prob : 1;
+  for (var i = 0; i < dist.length; i++) {
+    var d = dist[i];
+    var pct = (d.prob * 100).toFixed(2) + '%';
+    var big = d.prob >= max * 0.99 ? 'big' : '';
+    var row = document.createElement('div');
+    row.className = 'pheno-row';
+    row.innerHTML = api.avatar(d, { size: 60 })
+      + '<div><b>' + d.sex + '</b> &middot; ' + escapeHtml(d.label) + '</div>'
+      + '<div class="prob ' + big + '">' + pct + '</div>';
+    body.appendChild(row);
+  }
+};
+
+randomizeParents.onclick = function() {
+  if (!api) return;
+  var m = api.randomCat({ sex: 'F' }).genotype;
+  var f = api.randomCat({ sex: 'M' }).genotype;
+  motherGeno = m; fatherGeno = f;
+  renderParentControls(motherControls, 'F', m, 'm');
+  renderParentControls(fatherControls, 'M', f, 'f');
+};
+
+// =========================================================
+// INFER
+// =========================================================
+var kittens = [
+  { sex: 'F', base: 'tortie',    eumFamily: 'black', isDilute: false, whiteClass: 0,
+    isLonghair: false, isSilver: false, isColorpoint: false, isDomWhite: false },
+  { sex: 'M', base: 'orange',                          isDilute: false, whiteClass: 0,
+    isLonghair: false, isSilver: false, isColorpoint: false, isDomWhite: false },
+  { sex: 'M', base: 'eumelanin', eumFamily: 'black', isDilute: false, whiteClass: 0,
+    isLonghair: false, isSilver: false, isColorpoint: false, isDomWhite: false },
+];
+
+var BASE_OPTIONS = [
+  ['orange',    'orange (red/cream)',   null],
+  ['eumelanin', 'black-family',         'black'],
+  ['eumelanin', 'chocolate-family',     'chocolate'],
+  ['eumelanin', 'cinnamon-family',      'cinnamon'],
+  ['tortie',    'tortoiseshell (black eum)', 'black'],
+  ['tortie',    'chocolate tortie',     'chocolate'],
+  ['tortie',    'cinnamon tortie',      'cinnamon'],
+];
+function baseKey(k) { return k.base + '|' + (k.eumFamily || ''); }
+function findBaseIdx(k) {
+  var key = baseKey(k);
+  for (var i = 0; i < BASE_OPTIONS.length; i++) {
+    var opt = BASE_OPTIONS[i];
+    if ((opt[0] + '|' + (opt[2] || '')) === key) return i;
+  }
+  return 0;
+}
+
+function renderKittens() {
+  var list = kittenList;
+  list.innerHTML = '';
+  for (var i = 0; i < kittens.length; i++) {
+    var k = kittens[i];
+    var bi = findBaseIdx(k);
+    var div = document.createElement('div');
+    div.className = 'kitten-row';
+    var html = '<div style="color:var(--muted);font-weight:600;">' + (i+1) + '</div>';
+    html += '<div><div class="kfields">';
+    html += '<select data-i="' + i + '" data-f="sex">' +
+              '<option value="F"' + (k.sex==='F'?' selected':'') + '>&#9792; female</option>' +
+              '<option value="M"' + (k.sex==='M'?' selected':'') + '>&#9794; male</option>' +
+            '</select>';
+    html += '<select data-i="' + i + '" data-f="base">';
+    for (var b = 0; b < BASE_OPTIONS.length; b++) {
+      html += '<option value="' + b + '"' + (b === bi ? ' selected' : '') + '>' + BASE_OPTIONS[b][1] + '</option>';
+    }
+    html += '</select>';
+    html += '<select data-i="' + i + '" data-f="isDilute">' +
+              '<option value="0"' + (!k.isDilute?' selected':'') + '>dense</option>' +
+              '<option value="1"' + (k.isDilute?' selected':'') + '>dilute</option>' +
+            '</select>';
+    html += '<select data-i="' + i + '" data-f="whiteClass">' +
+              '<option value="0"' + (k.whiteClass===0?' selected':'') + '>no white</option>' +
+              '<option value="1"' + (k.whiteClass===1?' selected':'') + '>some white</option>' +
+              '<option value="2"' + (k.whiteClass===2?' selected':'') + '>high white</option>' +
+            '</select>';
+    html += '</div><div class="kfields-row2">';
+    html += '<label><input type="checkbox" data-i="' + i + '" data-f="isLonghair"' +
+              (k.isLonghair?' checked':'') + '> longhair</label>';
+    html += '<label><input type="checkbox" data-i="' + i + '" data-f="isSilver"' +
+              (k.isSilver?' checked':'') + '> silver</label>';
+    html += '<label><input type="checkbox" data-i="' + i + '" data-f="isColorpoint"' +
+              (k.isColorpoint?' checked':'') + '> point</label>';
+    html += '<label><input type="checkbox" data-i="' + i + '" data-f="isDomWhite"' +
+              (k.isDomWhite?' checked':'') + '> all-white</label>';
+    html += '</div></div>';
+    html += '<button class="del" data-i="' + i + '" title="remove">&times;</button>';
+    div.innerHTML = html;
+    list.appendChild(div);
+  }
+  var selects = list.querySelectorAll('select');
+  for (var s = 0; s < selects.length; s++) {
+    selects[s].onchange = function(e) {
+      var idx = +e.target.dataset.i, field = e.target.dataset.f;
+      var v = e.target.value;
+      var k = kittens[idx];
+      if (field === 'sex') k.sex = v;
+      else if (field === 'base') {
+        var opt = BASE_OPTIONS[+v];
+        k.base = opt[0];
+        k.eumFamily = opt[2];
+      } else if (field === 'isDilute') k.isDilute = v === '1';
+      else if (field === 'whiteClass') k.whiteClass = +v;
+    };
+  }
+  var checks = list.querySelectorAll('input[type="checkbox"]');
+  for (var c = 0; c < checks.length; c++) {
+    checks[c].onchange = function(e) {
+      var idx = +e.target.dataset.i, field = e.target.dataset.f;
+      var k = kittens[idx];
+      k[field] = e.target.checked;
+    };
+  }
+  var dels = list.querySelectorAll('.del');
+  for (var d2 = 0; d2 < dels.length; d2++) {
+    dels[d2].onclick = function(e) {
+      kittens.splice(+e.target.dataset.i, 1);
+      renderKittens();
+    };
+  }
+}
+if (api) renderKittens();
+
+addKitten.onclick = function() {
+  kittens.push({ sex: 'F', base: 'eumelanin', eumFamily: 'black', isDilute: false,
+    whiteClass: 0, isLonghair: false, isSilver: false, isColorpoint: false, isDomWhite: false });
+  renderKittens();
+};
+
+runInfer.onclick = function() {
+  if (!api) return;
+  var mom = readParentControls('im', 'F');
+  if (kittens.length === 0) {
+    inferResults.style.display = 'block';
+    inferResults.innerHTML = '<div class="card"><div class="impossible">Add at least one kitten.</div></div>';
+    return;
+  }
+  var post = api.inferFather(mom, kittens);
+  inferResults.style.display = 'block';
+  inferResults.innerHTML = '';
+
+  function renderLocus(title, posterior, labels) {
+    if (!posterior) return null;
+    var card = document.createElement('div');
+    card.className = 'infer-card';
+    if (posterior.__impossible) {
+      card.innerHTML = '<h3>' + title + '</h3>' +
+        '<div class="impossible">No father genotype consistent with these kittens.</div>';
+      return card;
+    }
+    var html = '<h3>' + title + '</h3>';
+    var entries = [];
+    var k = Object.keys(posterior);
+    for (var i = 0; i < k.length; i++) {
+      if (k[i] !== '__impossible') entries.push([k[i], posterior[k[i]]]);
+    }
+    entries.sort(function(a, b) { return b[1] - a[1]; });
+    for (var e = 0; e < entries.length; e++) {
+      var geno = entries[e][0], prob = entries[e][1];
+      var pct = (prob * 100).toFixed(1) + '%';
+      var w = (prob * 100).toFixed(1);
+      html += '<div class="infer-bar">' +
+        '<span><b>' + geno + '</b> <span style="color:var(--muted)">' + (labels[geno] || '') + '</span></span>' +
+        '<div class="bar-track"><div class="bar-fill" style="width:' + w + '%"></div></div>' +
+        '<span>' + pct + '</span></div>';
+    }
+    card.innerHTML = html;
+    return card;
+  }
+
+  var cards = [
+    renderLocus('Orange (X-linked)', post.orange, { 'O': 'orange', 'o': 'non-orange' }),
+    renderLocus('B locus (eumelanin family)', post.bLocus,
+      { 'BB': 'black', 'Bb': 'black/choc carrier', 'Bc': 'black/cinn carrier',
+        'bb': 'chocolate', 'bc': 'choc/cinn', 'cc': 'cinnamon' }),
+    renderLocus('Dilute', post.dilute, { 'DD': 'dense', 'Dd': 'carrier', 'dd': 'dilute' }),
+    renderLocus('Silver', post.silver, { 'II': 'silver', 'Ii': 'silver', 'ii': 'non-silver' }),
+    renderLocus('Colorpoint', post.point, { 'FF': 'full color', 'Ff': 'carrier', 'ff': 'colorpoint' }),
+    renderLocus('White spotting', post.white, { 'SS': 'high', 'Ss': 'some', 'ss': 'none' }),
+    renderLocus('Dominant white', post.domWhite, { 'WW': 'all-white', 'Ww': 'all-white', 'ww': 'normal' }),
+    renderLocus('Long hair', post.longhair, { 'LL': 'short', 'Ll': 'carrier', 'll': 'long' }),
+  ];
+  for (var ci = 0; ci < cards.length; ci++) {
+    if (cards[ci]) inferResults.appendChild(cards[ci]);
+  }
+  if (post.anyImpossible) {
+    var warn = document.createElement('div');
+    warn.className = 'card';
+    warn.innerHTML = '<div class="impossible">At least one locus has no viable father genotype. Check inputs &mdash; the kittens may be inconsistent with the mother\'s genes.</div>';
+    inferResults.appendChild(warn);
+  }
+};
+
+// =========================================================
+// RANDOM CATS
+// =========================================================
+rollRandom.onclick = function() {
+  if (!api) return;
+  randomGrid.innerHTML = '';
+  for (var i = 0; i < 12; i++) {
+    var cat = api.randomCat();
+    var card = document.createElement('div');
+    card.className = 'random-card';
+    card.innerHTML = api.avatar(cat.phenotype, { size: 100 }) +
+      '<div class="lbl">' + escapeHtml(cat.phenotype.sex) + '<br>' +
+      escapeHtml(cat.phenotype.label) + '</div>';
+    randomGrid.appendChild(card);
+  }
+};
+if (api) rollRandom.onclick();
+
+function escapeHtml(s) {
+  var map = { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' };
+  return String(s).replace(/[&<>"']/g, function(c) { return map[c]; });
+}
+</script>
