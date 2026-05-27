@@ -2390,20 +2390,95 @@
     send.hidden = streaming;
   }
 
-  // Drain an inflight {stream, fallback, error} into a normalized result.
-  // Returns one of:
+  // Drain an inflight {stream, expectedStartWith, fallback, error} into a
+  // normalized result. Returns one of:
   //   { kind: "startFailed", message }   — couldn't begin streaming
   //   { kind: "aborted" }                 — user clicked STOP
   //   { kind: "emptyOrError", message }   — stream finished but produced nothing useful
   //   { kind: "ok", text }                — full generated text (untrimmed)
   // Handles currentStream tracking + setStreamingUI for the duration of the await.
-  async function awaitInflight(inflight) {
+  //
+  // STREAMING MODEL (handle.textStream-based):
+  //   If `onChunk` is provided, we drain inflight.stream.textStream via
+  //   `for await` and call onChunk(chunkText) for each fragment. The
+  //   live bubble updates happen here (the DSL side just returns the
+  //   raw aiTextPlugin handle).
+  //
+  // STARTWITH FILTERING (defensive):
+  //   When the DSL call used `startWith` + `hideStartWith: true` (e.g.
+  //   chatReply uses "[[Name]]:"), the platform docs don't explicitly
+  //   say whether `textStream` echoes the startWith or filters it out.
+  //   We handle BOTH cases identically by skipping the first
+  //   `expectedStartWith.length` characters of accumulated stream
+  //   output if and only if they actually match the expected prefix.
+  //   If textStream is already filtered, the accumulated text won't
+  //   match the prefix at the first chunk and we forward everything
+  //   verbatim. If it's not filtered, we silently swallow the echo.
+  async function awaitInflight(inflight, onChunk) {
     if (!inflight || inflight.error || !inflight.stream) {
       return { kind: "startFailed", message: (inflight && inflight.error) || "stream did not start" };
     }
     currentStream = inflight.stream;
     setStreamingUI(true);
     try {
+      // Live UI updates via textStream (when caller wants them).
+      if (typeof onChunk === "function" && inflight.stream.textStream) {
+        const prefix = String(inflight.expectedStartWith || "");
+        // Accumulated emitted chars and whether we've decided the
+        // prefix-skip question. Tri-state: "undecided" until either
+        // we've seen >= prefix.length chars to compare, or we see
+        // a chunk that proves textStream isn't echoing the prefix.
+        let acc = "";
+        let prefixDecision = prefix.length === 0 ? "no-skip" : "undecided";
+        try {
+          for await (const rawChunk of inflight.stream.textStream) {
+            const chunk = String(rawChunk || "");
+            if (!chunk) continue;
+            acc += chunk;
+            if (prefixDecision === "undecided") {
+              // Decide as soon as we have enough characters to compare,
+              // OR as soon as the accumulated prefix can't possibly
+              // match (mismatch in the leading bytes we've seen so far).
+              if (acc.length >= prefix.length) {
+                if (acc.startsWith(prefix)) {
+                  prefixDecision = "skip";
+                  // Emit only what's past the prefix in the current chunk.
+                  const overshoot = acc.length - prefix.length;
+                  if (overshoot > 0) onChunk(acc.slice(prefix.length));
+                } else {
+                  prefixDecision = "no-skip";
+                  onChunk(acc);          // emit everything we've buffered
+                }
+              } else if (!prefix.startsWith(acc)) {
+                // Mismatch in the leading bytes — textStream is not
+                // echoing the prefix. Flush the buffer and stop guarding.
+                prefixDecision = "no-skip";
+                onChunk(acc);
+              }
+              // else: still undecided, keep accumulating silently.
+              continue;
+            }
+            // Past the decision point — forward this chunk verbatim
+            // in both "skip" and "no-skip" states (any prefix portion
+            // was handled at the decision boundary above).
+            onChunk(chunk);
+          }
+          // Edge: stream ended while still undecided (very short reply
+          // that didn't reach the prefix length). If the accumulated
+          // text matches the prefix exactly, swallow it; otherwise emit.
+          if (prefixDecision === "undecided") {
+            if (acc && acc !== prefix && !prefix.startsWith(acc)) {
+              onChunk(acc);
+            }
+          }
+        } catch (streamErr) {
+          // textStream iteration failures shouldn't fail the whole
+          // call — the `await inflight.stream` below will surface the
+          // real reason (network error, etc.).
+          console.warn("textStream iteration threw:", streamErr);
+        }
+      }
+
       const data = await inflight.stream;
       if (!data || !data.generatedText || !data.generatedText.trim() || data.stopReason === "error") {
         const stopped = data && data.stopReason && /stop/i.test(data.stopReason);
@@ -3554,13 +3629,13 @@
         // member of their library. Falls back to global `character` only
         // if the roster is empty.
         const openingChar = (newPrimaryId && chatRoster.get(newPrimaryId)) || character;
-        const inflight = await root.openScene(openingChar, personality, chatScenario(), chatTrackedInfo(), (chunk) => {
+        const inflight = await root.openScene(openingChar, personality, chatScenario(), chatTrackedInfo());
+        if (myDraw !== drawId) return;
+
+        const result = await awaitInflight(inflight, (chunk) => {
           if (myDraw !== drawId) return;
           appendBubbleText(bubble, chunk, "char");
         });
-        if (myDraw !== drawId) return;
-
-        const result = await awaitInflight(inflight);
         if (myDraw !== drawId) return;
         if (result.kind === "ok") {
           const parsed = parseAndStripIllustrateTag(result.text);
@@ -3680,15 +3755,14 @@
       const inflight = await root.chatReply(
         currentMessages,
         replyingChar, personality, chatScenario(), chatTrackedInfo(),
-        (chunk) => {
-          if (myTurn !== drawId) return;
-          appendBubbleText(bubble, chunk, "char");
-        },
         others,
       );
       if (myTurn !== drawId) return;
 
-      const result = await awaitInflight(inflight);
+      const result = await awaitInflight(inflight, (chunk) => {
+        if (myTurn !== drawId) return;
+        appendBubbleText(bubble, chunk, "char");
+      });
       if (myTurn !== drawId) return;
 
       let finalText = "";
@@ -3781,13 +3855,12 @@
       const inflight = await root.narrate(
         currentMessages, primary, personality, chatScenario(), chatTrackedInfo(),
         others,
-        (chunk) => {
-          if (myTurn !== drawId) return;
-          appendBubbleText(bubble, chunk, "char");  // reuse "char" rendering — prose, not user text
-        },
       );
       if (myTurn !== drawId) return;
-      const result = await awaitInflight(inflight);
+      const result = await awaitInflight(inflight, (chunk) => {
+        if (myTurn !== drawId) return;
+        appendBubbleText(bubble, chunk, "char");  // reuse "char" rendering — prose, not user text
+      });
       if (myTurn !== drawId) return;
 
       let finalText = "";

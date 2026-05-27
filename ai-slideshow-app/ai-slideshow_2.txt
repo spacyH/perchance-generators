@@ -1,148 +1,286 @@
 <style>
   :root {
-    --bg: #0a0a0a;
-    --bg-soft: #141414;
-    --bg-softer: #1c1c1c;
-    --text: #e8e6e2;
-    --text-dim: #b9ab91;
-    --text-faint: #96876f;
-    --accent: #00e5ff;
-    --amber: #ffb300;
-    --amber-hot: #ffc940;
-    --magenta: #ff2d95;
-    --border: rgba(255,180,80,0.18);
-    --danger: #e05050;
+    /* ── Surfaces ────────────────────────────────────────────────
+       Slightly warmer base than pure neutral black — pairs better
+       with the amber accent and reads less harsh on OLED screens.
+       Soft / softer steps give us tonal layering without color. */
+    --bg:        #0b0a08;
+    --bg-soft:   #16140f;
+    --bg-softer: #1f1c15;
+    --bg-hi:     #2a261d;   /* hover/active surface */
+
+    /* ── Text scale ──────────────────────────────────────────────
+       4 steps from confident to muted. Warm cream rather than pure
+       white so primary text doesn't fight the amber accent. */
+    --text:       #ebe6dc;
+    --text-dim:   #c3b698;
+    --text-faint: #9a8d72;
+    --text-mute:  #6f6755;
+
+    /* ── Accents ─────────────────────────────────────────────────
+       Amber stays the primary action color. Cool/warm/good are
+       tuned down from the previous saturated palette so the eye
+       knows which color = action (amber) vs. which = state. */
+    --accent-primary: #ffb627;        /* amber — primary CTA */
+    --accent-hot:     #ffcb55;        /* amber hover */
+    --accent-glow:    rgba(255,182,39,0.32);
+    --accent-glow-hi: rgba(255,182,39,0.55);
+    --accent-cool:    #6cd0f5;        /* info / focus rings */
+    --accent-warm:    #ff6fa8;        /* negative / warn highlights */
+    --accent-good:    #5fcf90;        /* success state */
+    --accent-bad:     #e85f5f;        /* destructive */
+
+    /* Back-compat aliases — older code references --accent, --amber,
+       --amber-hot, --magenta, --danger. Mapped to the new tokens
+       so nothing in the existing 5500-line panel breaks. */
+    --accent:   var(--accent-cool);
+    --amber:    var(--accent-primary);
+    --amber-hot:var(--accent-hot);
+    --magenta:  var(--accent-warm);
+    --danger:   var(--accent-bad);
+
+    --border:        rgba(255,182,39,0.18);
+    --border-hi:     rgba(255,182,39,0.38);
+    --border-cool:   rgba(108,208,245,0.30);
+    --border-faint:  rgba(255,255,255,0.06);
+
     --font: 'Nunito', system-ui, -apple-system, sans-serif;
+    --mono: 'SF Mono', ui-monospace, 'Roboto Mono', Menlo, Consolas, monospace;
   }
   * { box-sizing: border-box; }
+  /* Global sharp-corner rule preserved — every container, button,
+     panel, chip stays angular. Toggles and radios are excluded via
+     their input[type] selectors below (we don't touch them). */
   *, *::before, *::after { border-radius: 0 !important; }
   html, body {
     margin: 0; padding: 0;
     background: var(--bg); color: var(--text);
     font-family: var(--font);
     min-height: 100vh;
+    -webkit-text-size-adjust: 100%;
   }
-  body { padding: 20px 14px 60px; line-height: 1.5; }
+  body { padding: 24px 14px 64px; line-height: 1.5; }
 
-  .container { max-width: 900px; margin: 0 auto; }
+  /* Subtle background texture — a near-invisible warm vignette so
+     the page doesn't feel like a flat black void on big monitors.
+     No moving parts, no animation, no perf cost. */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,182,39,0.06), transparent 60%),
+      radial-gradient(ellipse 60% 40% at 50% 100%, rgba(108,208,245,0.03), transparent 70%);
+  }
 
+  /* Container width: 900 → 980 so the prompt textareas have a bit
+     more breathing room on modern desktops without going so wide
+     that lines become hard to scan. */
+  .container { max-width: 980px; margin: 0 auto; }
+
+  /* ── Header ─────────────────────────────────────────────────
+     Wordmark feel — uppercase, big letter-spacing, a thin amber
+     underline rule for decoration without adding any non-sharp
+     shapes. */
   h1 {
-    font-size: 1.4rem;
+    font-size: 1.5rem;
     font-weight: 700;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.18em;
     text-transform: uppercase;
-    color: var(--amber);
-    margin: 0 0 24px;
+    color: var(--accent-primary);
+    margin: 0 0 28px;
     text-align: center;
+    padding-bottom: 14px;
+    position: relative;
+  }
+  h1::after {
+    content: '';
+    position: absolute;
+    left: 50%; transform: translateX(-50%);
+    bottom: 0;
+    width: 64px; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent-primary), transparent);
   }
 
+  /* ── Panels ─────────────────────────────────────────────────
+     The fundamental container. Slight inner-shadow gives depth
+     without rounding anything. */
   .panel {
     background: var(--bg-soft);
     border: 1px solid var(--border);
     padding: 20px;
-    margin-bottom: 16px;
+    margin-bottom: 18px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
   }
   .panel-title {
     font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 0.12em;
+    font-weight: 700;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: var(--amber);
-    margin: 0 0 12px;
+    color: var(--accent-primary);
+    margin: 0 0 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-faint);
   }
 
   .field-label {
     display: block;
     font-size: 0.64rem;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--text-faint);
-    margin-bottom: 4px;
+    margin-bottom: 5px;
+    font-weight: 600;
   }
 
+  /* ── Form fields ───────────────────────────────────────────
+     textarea / text input / select share one visual baseline.
+     Focus ring uses the cool accent so it visibly contrasts with
+     the amber primary action color (you can tell at a glance:
+     amber = "this is a button" vs cool = "this is focused"). */
   textarea, input[type="text"], select {
     width: 100%;
     background: var(--bg);
     border: 1px solid var(--border);
     color: var(--text);
     font-family: var(--font);
-    font-size: 0.9rem;
-    padding: 8px 10px;
-    line-height: 1.4;
+    font-size: 0.92rem;
+    padding: 9px 11px;
+    line-height: 1.45;
+    transition: border-color 0.15s, box-shadow 0.15s;
   }
-  textarea {
-    min-height: 70px;
-    resize: vertical;
-  }
+  textarea { min-height: 70px; resize: vertical; }
   textarea:focus, input:focus, select:focus {
     outline: none;
-    border-color: var(--accent);
+    border-color: var(--accent-cool);
+    box-shadow: 0 0 0 1px var(--accent-cool);
+  }
+  /* Sliders: amber thumb, native rendering for browser checkbox/radio
+     consistency (per user requirement, we don't touch those). */
+  input[type="range"] { width: 100%; accent-color: var(--accent-primary); }
+
+  /* Inline code in tips — used for examples like (word:1.4) */
+  code {
+    font-family: var(--mono);
+    font-size: 0.85em;
+    background: var(--bg);
+    border: 1px solid var(--border-faint);
+    padding: 1px 5px;
+    color: var(--accent-cool);
   }
 
-  input[type="range"] {
-    width: 100%;
-    accent-color: var(--amber);
-  }
-
+  /* ── Prompt grid + tips under each textarea ─────────────────
+     The +/− visual indicators on the labels are preserved; the
+     new prompt-tip is a small lighter-weight helper line. */
   .prompt-grid {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 14px;
+    gap: 16px;
   }
   /* Big prompt textareas — start wide enough to show 500+ chars on screen.
-     At full container width (~860px) with 0.95rem font, ~100 chars/line.
-     min-height 200px → ~9 visible rows → ~900 chars visible. User can
+     At full container width (~940px) with 0.95rem font, ~105 chars/line.
+     min-height 200px → ~9 visible rows → ~950 chars visible. User can
      still drag to resize further. */
   #promptPos, #promptNeg {
     min-height: 200px;
-    font-size: 0.95rem;
-    line-height: 1.45;
+    font-size: 0.96rem;
+    line-height: 1.5;
   }
+  .prompt-tip {
+    font-size: 0.72rem;
+    color: var(--text-faint);
+    margin-top: 6px;
+    line-height: 1.45;
+    font-style: italic;
+  }
+  .prompt-tip code { font-style: normal; }
+  .prompt-tip-warn { color: var(--accent-warm); }
+  .prompt-tip-warn code { color: var(--accent-warm); }
+
+  /* ── Controls grid (4 cols → 2 cols → 1 col) ─────────────── */
   .controls-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 12px;
-    margin-top: 14px;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 14px;
+    margin-top: 16px;
+  }
+  @media (max-width: 900px) {
+    .controls-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
   }
   @media (max-width: 600px) {
-    .controls-grid { grid-template-columns: 1fr; }
-    #promptPos, #promptNeg { min-height: 170px; }
+    .controls-grid { grid-template-columns: 1fr; gap: 10px; }
+    #promptPos, #promptNeg { min-height: 170px; font-size: 1rem; }
+    body { padding: 16px 10px 60px; }
+    .panel { padding: 16px; }
   }
   .control-val {
-    color: var(--accent);
-    font-weight: 600;
+    color: var(--accent-cool);
+    font-weight: 700;
     font-size: 0.78rem;
     margin-left: 4px;
   }
 
+  /* ── Aux toggles row — between controls grid and advanced note.
+        Native checkbox preserved (per user requirement); only the
+        wrapper label is styled. */
+  .aux-toggles {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-faint);
+    display: flex; flex-wrap: wrap; gap: 14px;
+  }
+  .aux-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    cursor: pointer;
+    user-select: none;
+    min-height: 32px;
+  }
+  .aux-toggle:hover { color: var(--text); }
+  .aux-toggle-note {
+    font-size: 0.7rem;
+    color: var(--text-mute);
+    font-style: italic;
+    margin-left: 2px;
+  }
+
+  /* ── Buttons ───────────────────────────────────────────────
+     Primary (.btn) is amber, prominent. .btn.ghost is the
+     understated outline variant. .btn.big is the hero CTA size
+     (used for the player Play button). Touch targets are min
+     44px tall on mobile per Apple HIG. */
   .btn-row {
     display: flex;
-    gap: 8px;
-    margin-top: 14px;
+    gap: 10px;
+    margin-top: 16px;
     flex-wrap: wrap;
   }
   .btn {
-    background: var(--amber);
-    color: #000;
-    border: 1px solid var(--amber);
-    box-shadow: 0 0 10px rgba(255,140,0,0.28);
-    padding: 10px 18px;
+    background: var(--accent-primary);
+    color: #1a1408;
+    border: 1px solid var(--accent-primary);
+    box-shadow: 0 0 12px var(--accent-glow);
+    padding: 11px 20px;
+    min-height: 42px;
     font-family: var(--font);
-    font-size: 0.82rem;
+    font-size: 0.84rem;
     font-weight: 700;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     cursor: pointer;
     transition: background 0.12s, border-color 0.12s, box-shadow 0.12s, transform 0.08s;
   }
   .btn:hover:not(:disabled) {
-    background: var(--amber-hot);
-    border-color: var(--amber-hot);
-    box-shadow: 0 0 16px rgba(255,140,0,0.5);
+    background: var(--accent-hot);
+    border-color: var(--accent-hot);
+    box-shadow: 0 0 18px var(--accent-glow-hi);
   }
   .btn:active:not(:disabled) {
     transform: translateY(1px);
-    box-shadow: 0 0 6px rgba(255,140,0,0.3);
+    box-shadow: 0 0 6px var(--accent-glow);
   }
   .btn:disabled {
     opacity: 0.4;
@@ -157,34 +295,47 @@
     font-weight: 600;
   }
   .btn.ghost:hover:not(:disabled) {
-    color: var(--amber);
-    border-color: var(--amber);
-    background: transparent;
+    color: var(--accent-primary);
+    border-color: var(--accent-primary);
+    background: rgba(255,182,39,0.04);
     box-shadow: none;
   }
+  /* Tiny variant — for queue management secondary buttons. */
+  .btn.tiny {
+    padding: 6px 11px;
+    font-size: 0.72rem;
+    min-height: 30px;
+    letter-spacing: 0.04em;
+  }
   .btn.big {
-    padding: 16px 28px;
-    font-size: 1rem;
-    color: #000;
-    letter-spacing: 0.12em;
-    box-shadow: 0 0 18px rgba(255,140,0,0.5);
+    padding: 17px 30px;
+    font-size: 1.02rem;
+    color: #1a1408;
+    letter-spacing: 0.14em;
+    box-shadow: 0 0 22px var(--accent-glow-hi);
     width: 100%;
+    min-height: 56px;
   }
   .btn.big:hover:not(:disabled) {
-    box-shadow: 0 0 28px rgba(255,140,0,0.7);
+    box-shadow: 0 0 32px var(--accent-glow-hi);
+  }
+  @media (max-width: 600px) {
+    /* Beefier primary buttons on mobile so they're easy to tap. */
+    .btn { min-height: 46px; padding: 12px 18px; font-size: 0.88rem; }
+    .btn.tiny { min-height: 36px; padding: 8px 12px; font-size: 0.74rem; }
   }
 
   .hint {
-    font-size: 0.72rem;
+    font-size: 0.74rem;
     color: var(--text-faint);
-    margin-top: 8px;
-    line-height: 1.4;
+    margin-top: 10px;
+    line-height: 1.5;
   }
 
   .status {
-    font-size: 0.8rem;
+    font-size: 0.82rem;
     color: var(--text-dim);
-    margin-top: 10px;
+    margin-top: 12px;
     min-height: 1.2em;
   }
 
@@ -589,9 +740,6 @@
     margin-left: auto; padding: 3px 0;
   }
   .queue-status.hidden { display: none; }
-  .btn.tiny {
-    padding: 6px 12px; font-size: 0.7rem;
-  }
 
   /* ═══ LIGHTBOX PREVIEW POPUP ═══
      Sized to fit a 512×512 image plus chrome — no longer fullscreen.
@@ -1234,10 +1382,16 @@
           </div>
         </div>
         <textarea id="promptPos" placeholder="dark ethereal misty landscape, dreamlike, soft focus..."></textarea>
+        <div class="prompt-tip">
+          Tip: use <code>(word:1.4)</code> to emphasize, <code>(word:0.5)</code> to de-emphasize. Square brackets are intercepted by Perchance — use parentheses only.
+        </div>
       </div>
       <div>
         <label class="field-label">Negative <span style="color:var(--magenta);">−</span></label>
         <textarea id="promptNeg" placeholder="text, watermark, bright, harsh, deformed..."></textarea>
+        <div class="prompt-tip prompt-tip-warn">
+          ⚠ Recorded with each image but silently dropped by the SD backend — keep entries here for documentation, but expect them not to filter output.
+        </div>
       </div>
     </div>
 
@@ -1256,8 +1410,10 @@
       <div>
         <label class="field-label">Orientation</label>
         <select id="orientation">
-          <option value="default">Default</option>
-          <option value="square">Square 1:1</option>
+          <option value="auto">Auto (from prompt)</option>
+          <option value="default">Default 1:1</option>
+          <option value="square">Square 1:1 (512)</option>
+          <option value="square-hd">Square HD 1:1 (768)</option>
           <option value="portrait">Portrait 2:3</option>
           <option value="landscape" selected>Landscape 3:2</option>
         </select>
@@ -1270,13 +1426,38 @@
         <label class="field-label">Quality steps <span class="control-val" id="stepsVal">30</span></label>
         <input type="range" id="steps" min="15" max="50" step="1" value="30">
       </div>
+      <div>
+        <label class="field-label" title="How many image generations may run in parallel. Each call spawns its own Perchance broker iframe, so true parallelism — but higher values consume more Perchance daily quota at once and can slow each individual gen.">Concurrent gens</label>
+        <select id="maxParallel">
+          <option value="1" selected>1 (serial)</option>
+          <option value="2">2 parallel</option>
+          <option value="3">3 parallel</option>
+          <option value="4">4 parallel</option>
+        </select>
+      </div>
     </div>
-    <!-- Per the platform reference, the text-to-image plugin honors:
-         prompt, negativePrompt, resolution, guidanceScale. seed is echoed
-         in inputs but not reliably honored. Quality steps is not a
-         documented plugin parameter and is shown for reference only. -->
+
+    <!-- Auxiliary toggles row: transparent background toggle (removeBackground:true)
+         runs client-side via briaai/RMBG-1.4 model (transformers.js, WASM). First
+         call downloads ~50MB of model weights then strips backgrounds locally.
+         Per platform ref §4.4, the option is NOT echoed in `inputs` because it's
+         a post-process, not a server parameter. Output is PNG with alpha. -->
+    <div class="aux-toggles">
+      <label class="aux-toggle" title="Strip the background from each generated image (client-side, ~50MB model downloads on first use). Output becomes a transparent PNG instead of JPEG. Slows the first generation; subsequent calls reuse the cached model.">
+        <input type="checkbox" id="removeBg">
+        <span>Transparent background <span class="aux-toggle-note">(client-side, ~50MB on first use)</span></span>
+      </label>
+    </div>
+    <!-- Per platform reference §4.4 [VERIFIED R24]: the SD backend silently
+         drops negativePrompt even though it reaches the broker payload —
+         likely deliberate content-moderation hardening. We still send it
+         (for documentation, sharing, and the day the backend honors it)
+         but tell users the truth about its current effect. Orientation +
+         guidanceScale + 768x768 ARE honored. Seed is echoed in inputs
+         but not reliably honored. Quality steps is not a documented
+         parameter at all. -->
     <div class="advanced-note">
-      ⓘ Orientation, prompt strength, and the negative prompt are honored by the Perchance image plugin and will affect the output. Seed is recorded for sorting but the backend may not always respect it. Quality steps is not a documented plugin parameter — left here as a recorded preference for future use.
+      <strong>What's actually honored:</strong> orientation, prompt strength, prompt content, weight syntax like <code>(word:1.4)</code>. <strong>Sent but silently dropped by the backend:</strong> negative prompt — recorded with each image for documentation and reroll, but does not filter output. <strong>Recorded only:</strong> seed (echoed, not reliably honored), quality steps (not a plugin parameter). Higher concurrent-gen values speed up batches but consume your Perchance daily quota faster.
     </div>
 
     <div class="btn-row">
@@ -1632,12 +1813,12 @@
   // Cache — image Blobs stored individually; manifest tracks order +
   // metadata. Each entry shape:
   //   { id, prompt, negative?, seed?, resolution?, guidanceScale?,
-  //     createdAt, favorited? }
+  //     removeBackground?, createdAt, favorited? }
   //
-  // `negative`, `seed`, `resolution`, `guidanceScale`, and `favorited`
-  // are optional — entries persisted before these fields shipped won't
-  // have them, so all readers use defensive `?? null` / `=== true`
-  // patterns rather than expecting them to be present.
+  // `negative`, `seed`, `resolution`, `guidanceScale`, `removeBackground`,
+  // and `favorited` are optional — entries persisted before these
+  // fields shipped won't have them, so all readers use defensive
+  // `?? null` / `=== true` patterns rather than expecting them.
   //
   // Eviction: when the cache is full, prefer non-favorited oldest entries
   // for eviction. Only evict a favorited entry as a last resort (every
@@ -1647,7 +1828,9 @@
   // `cacheStore` accepts a Blob directly (not a dataUrl). The previous
   // dataUrl path forced a base64 round-trip through `fetch(dataUrl)` —
   // taking the Blob straight from `canvas.toBlob()` is meaningfully
-  // faster, especially when generating in batches of 10.
+  // faster, especially when generating in batches of 10. Blob type
+  // is JPEG by default, PNG when removeBackground was applied (alpha
+  // channel preservation).
   // ══════════════════════════════════════════════════════════════════════
   async function cacheStore(blob, meta) {
     if (!(blob instanceof Blob)) {
@@ -1684,13 +1867,14 @@
     // strings default to '' so renderers don't have to null-check.
     manifest.push({
       id,
-      prompt:        meta.prompt || '',
-      negative:      meta.negative || '',
-      createdAt:     Date.now(),
-      seed:          (typeof meta.seed === 'number' && Number.isFinite(meta.seed)) ? meta.seed : null,
-      resolution:    meta.resolution || null,
-      guidanceScale: (typeof meta.guidanceScale === 'number' && Number.isFinite(meta.guidanceScale)) ? meta.guidanceScale : null,
-      favorited:     false,
+      prompt:           meta.prompt || '',
+      negative:         meta.negative || '',
+      createdAt:        Date.now(),
+      seed:             (typeof meta.seed === 'number' && Number.isFinite(meta.seed)) ? meta.seed : null,
+      resolution:       meta.resolution || null,
+      guidanceScale:    (typeof meta.guidanceScale === 'number' && Number.isFinite(meta.guidanceScale)) ? meta.guidanceScale : null,
+      removeBackground: meta.removeBackground === true,
+      favorited:        false,
     });
     await idbSet(MANIFEST_KEY, manifest);
 
@@ -1784,7 +1968,7 @@
   async function cacheDownload(id) {
     if (_downloadInflight.has(id)) return; // debounce
     _downloadInflight.add(id);
-    setTimeout(() => _downloadInflight.delete(id), 1500);
+    setTimeout(() => _downloadInflight.delete(id), 9900);
     const blob = await idbGet(id);
     if (!blob) return;
     const ext = _extFromMime(blob.type);
@@ -1792,7 +1976,7 @@
     a.href = URL.createObjectURL(blob);
     a.download = id + '.' + ext;
     a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    setTimeout(() => URL.revokeObjectURL(a.href), 9900);
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -1822,6 +2006,8 @@
       orientation:        'landscape',
       guidance:           7,
       steps:              30,
+      maxParallel:        1,           // 1-4 concurrent image generations
+      removeBg:           false,       // client-side transparent-PNG post-process
       interval:           8,
       duration:           2,
       order:              'sequential',
@@ -1861,6 +2047,23 @@
     $('guidanceVal').textContent = s.guidance;
     $('steps').value = s.steps;
     $('stepsVal').textContent = s.steps;
+
+    // Transparent-background toggle — boolean checkbox; default false.
+    if ($('removeBg')) $('removeBg').checked = !!s.removeBg;
+
+    // Concurrent-gens select — also applies to the live MAX_PARALLEL.
+    // Clamp on load so a corrupted settings payload (or a downgrade
+    // from a future version that allowed higher values) can't push the
+    // runtime out of range.
+    {
+      const clamped = Math.max(MAX_PARALLEL_MIN, Math.min(MAX_PARALLEL_MAX, Number(s.maxParallel) || 1));
+      const sel = $('maxParallel');
+      if (sel) sel.value = String(clamped);
+      // Use setMaxParallel so the value goes through the same clamp +
+      // queue-kick logic as a manual UI change, keeping the two paths
+      // honest with each other.
+      setMaxParallel(clamped);
+    }
     $('interval').value = s.interval;
     $('intervalVal').textContent = s.interval;
     $('duration').value = s.duration;
@@ -1938,7 +2141,7 @@
   }
 
   let _saveTimer = null;
-  function saveSettings(delay = 300) {
+  function saveSettings(delay = 1000) {
     clearTimeout(_saveTimer);
     _saveTimer = setTimeout(() => {
       const payload = {
@@ -1947,6 +2150,8 @@
         orientation:        $('orientation').value,
         guidance:           Number($('guidance').value),
         steps:              Number($('steps').value),
+        maxParallel:        MAX_PARALLEL,  // already clamped at change-time via setMaxParallel
+        removeBg:           !!$('removeBg')?.checked,
         interval:           Number($('interval').value),
         duration:           Number($('duration').value),
         order:              currentOrder,
@@ -2222,7 +2427,7 @@
     ta.scrollIntoView({ behavior: 'smooth', block: 'center' });
     ta.focus({ preventScroll: true });
     ta.style.boxShadow = '0 0 14px rgba(255,45,149,0.6)';
-    setTimeout(() => { ta.style.boxShadow = ''; }, 700);
+    setTimeout(() => { ta.style.boxShadow = ''; }, 1000);
     toast('🎲 New prompt idea — try ✨ enhance to expand it.');
   }
 
@@ -2596,22 +2801,82 @@
   const STYLE_PRESET_MAP = Object.fromEntries(STYLE_PRESETS.map(p => [p.id, p]));
 
   // ══════════════════════════════════════════════════════════════════════
-  // Generator — strictly serial per the platform reference §3.6 + §4
+  // Generator — concurrency is user-configurable (1-4)
   // ══════════════════════════════════════════════════════════════════════
-  // The image broker handles one request at a time; concurrent calls
-  // queue inside the broker rather than running truly in parallel.
-  // Setting MAX_PARALLEL above 1 only adds local scheduler noise
-  // without buying throughput. Kept as a named constant so future
-  // multi-broker support (when text+image+upload run in parallel) is
-  // easy to opt into.
-  const MAX_PARALLEL = 1;
+  // Despite the platform reference's "1 call at a time per broker"
+  // language (§3.6, §4), each call to textToImagePlugin() spawns its
+  // OWN broker iframe with its own freshly-allocated userKey. Real-world
+  // console logs confirm this: two simultaneous calls hit the backend
+  // with `userKey=330a689...` and `userKey=1bd3f68...` respectively.
+  // The "1 call per broker" rule is per-iframe, but parallelism scales
+  // with the number of iframes. So MAX_PARALLEL > 1 actually delivers
+  // throughput.
+  //
+  // Cost: each parallel slot consumes Perchance's per-day generation
+  // quota at the same rate, so a value of 4 drains the daily limit 4x
+  // faster than a value of 1. We let the user choose. Capped at 4
+  // because beyond that Perchance often starts rate-limiting and
+  // throughput stops scaling.
+  //
+  // Implementation: `MAX_PARALLEL` is a `let` so the settings UI can
+  // change it at runtime. The cooperative `while (activeGens >=
+  // MAX_PARALLEL)` gate in generateOne() handles raises (more slots
+  // free up immediately) and lowers (already-running gens finish
+  // naturally; new ones wait for headroom).
+  const MAX_PARALLEL_MIN = 1;
+  const MAX_PARALLEL_MAX = 4;
+  let MAX_PARALLEL = 1;
+
+  /** Apply a new concurrency setting. Clamps to [1, 4]. If the new
+   *  value is HIGHER than the old one and there's pending work, kicks
+   *  the queue runner so it can launch additional gens to fill the
+   *  newly-available slots. Lowering is purely passive — in-flight
+   *  gens finish, the next gate-check throttles new launches. */
+  function setMaxParallel(n) {
+    const clamped = Math.max(MAX_PARALLEL_MIN, Math.min(MAX_PARALLEL_MAX, Number(n) || 1));
+    const raised = clamped > MAX_PARALLEL;
+    MAX_PARALLEL = clamped;
+    // If we just opened up slots and there's backlog, nudge the queue
+    // runner. _qRun() is idempotent (early-return if _qRunning) so this
+    // is safe to call even if it's already draining — the existing run
+    // will naturally pick up the higher cap on its next iteration of
+    // the `while (_qPending > 0)` loop.
+    if (raised && _qPending > 0 && !_qRunning) _qRun();
+    _bumpQueueUI();
+  }
+
+  // Per platform reference §4.2: only four resolution strings are
+  // accepted ("512x512", "512x768", "768x512", "768x768"); any other
+  // value is silently dropped client-side. RESOLUTIONS maps our UI
+  // option values onto the documented strings; `default` and `auto`
+  // are special-cased — see resolveAutoResolution() below.
   const RESOLUTIONS = {
-    default:   null,        // plugin picks 512x512 if nothing supplied
-    square:    '512x512',
-    portrait:  '512x768',
-    landscape: '768x512',
+    default:     null,        // omit option entirely → plugin picks 512x512
+    square:      '512x512',
+    'square-hd': '768x768',
+    portrait:    '512x768',
+    landscape:   '768x512',
+    auto:        null,        // resolveAutoResolution() decides per-prompt
   };
   let activeGens = 0;
+
+  /** Auto-orientation — pick a resolution from prompt keywords, mirroring
+   *  the AI character chat heuristic per platform ref §4.2:
+   *
+   *    "portrait" / "selfie"      → 512x768 (vertical)
+   *    "landscape" / "wide angle" → 768x512 (horizontal)
+   *    no orientation keyword     → 768x768 (HD square — best general default)
+   *
+   *  We default to 768x768 (not 512x512) because the bigger square gives
+   *  notably better detail for an unspecified subject. Returns null if
+   *  the input is empty so callers can fall back to plugin default. */
+  function resolveAutoResolution(promptText) {
+    const p = String(promptText || '');
+    if (!p.trim()) return null;
+    if (/\b(portrait|selfie)\b/i.test(p))             return '512x768';
+    if (/\b(landscape|wide.?angle|panorama)\b/i.test(p)) return '768x512';
+    return '768x768';
+  }
 
   // Strip the plugin's (key:::value) inline params from a prompt and
   // return what real description text remains. Per the platform
@@ -2639,7 +2904,16 @@
    *  positive) and stored on the manifest entry so the gallery can sort
    *  by it. The plugin echoes it in `inputs` but doesn't reliably
    *  honor it (platform ref §4.4) — recording it locally is still
-   *  useful for the gallery sort and the info overlay. */
+   *  useful for the gallery sort and the info overlay.
+   *
+   *  Auto-orientation: when the orientation select is "auto", we run
+   *  resolveAutoResolution() on the FINAL composed prompt (so style
+   *  preset keywords like "wide-angle landscape" can influence the
+   *  pick). Result is one of 512x768 / 768x512 / 768x768.
+   *
+   *  removeBackground: a client-side post-process flag (platform ref
+   *  §4.4). Adds time to the first generation only (model download)
+   *  but is free thereafter. Output becomes a PNG with alpha. */
   function currentParams() {
     const userPrompt = ($('promptPos').value || '').trim();
     const userNeg = ($('promptNeg').value || '').trim();
@@ -2658,28 +2932,55 @@
     const seed = Math.floor(Math.random() * 2147483647);
     const guidanceScale = Number($('guidance').value);
 
+    const orientationVal = $('orientation').value;
+    let resolution = RESOLUTIONS[orientationVal] || null;
+    if (orientationVal === 'auto') {
+      resolution = resolveAutoResolution(finalPrompt);
+    }
+
     return {
-      prompt:        finalPrompt,
-      negativePrompt: finalNeg,
-      resolution:    RESOLUTIONS[$('orientation').value] || null,
-      guidanceScale: Number.isFinite(guidanceScale) ? guidanceScale : 7,
+      prompt:           finalPrompt,
+      negativePrompt:   finalNeg,
+      resolution,
+      guidanceScale:    Number.isFinite(guidanceScale) ? guidanceScale : 7,
       seed,
+      // Client-side post-process — see platform ref §4.4. The flag is
+      // NOT echoed in `inputs` because it isn't a server parameter.
+      removeBackground: !!$('removeBg')?.checked,
     };
   }
 
-  /** Convert the canvas the plugin returns into a JPEG Blob. Skips the
-   *  base64 round-trip that the old `fetch(dataUrl).then(r => r.blob())`
-   *  path performed — meaningfully faster when generating in batches.
-   *  Falls back to the dataUrl path if canvas is absent (older plugin
-   *  versions only populated dataUrl). */
-  async function imagePluginResultToBlob(result) {
+  /** Convert the canvas the plugin returns into a Blob. JPEG by default
+   *  (smaller); PNG when removeBackground was used so the alpha channel
+   *  is preserved (PNG supports alpha; JPEG doesn't). Skips the base64
+   *  round-trip that `fetch(dataUrl).then(r => r.blob())` performed —
+   *  meaningfully faster in batches. Falls back to the dataUrl path if
+   *  canvas is absent (older plugin versions only populated dataUrl). */
+  async function imagePluginResultToBlob(result, opts) {
+    const wantPng = !!opts?.transparent;
+    const mime = wantPng ? 'image/png' : 'image/jpeg';
     if (result?.canvas && typeof result.canvas.toBlob === 'function') {
-      return await new Promise(res => result.canvas.toBlob(res, 'image/jpeg', 0.92));
+      // PNG ignores the quality arg; passing it doesn't hurt.
+      return await new Promise(res => result.canvas.toBlob(res, mime, 0.92));
     }
     if (result?.dataUrl && String(result.dataUrl).startsWith('data:')) {
       return await fetch(String(result.dataUrl)).then(r => r.blob());
     }
     return null;
+  }
+
+  /** Build the saveTitle/saveDescription that Perchance attaches to
+   *  the generated image in its public gallery (platform ref §4.3
+   *  inline parameters and §4 options). 100-char title cap so the
+   *  gallery doesn't get truncated mid-word; the full prompt is in
+   *  the description. No-op when the prompt is empty. */
+  function buildGalleryMetadata(prompt) {
+    const trimmed = String(prompt || '').trim();
+    if (!trimmed) return {};
+    return {
+      saveTitle: trimmed.length > 100 ? trimmed.slice(0, 97) + '...' : trimmed,
+      saveDescription: 'Generated via the AI Slideshow generator on perchance.org.',
+    };
   }
 
   async function generateOne() {
@@ -2703,31 +3004,34 @@
         toast('Prompt needs at least some description text.', 'warn');
         return null;
       }
-      // Build the call with ONLY documented plugin parameters (platform
-      // ref §4.4). The previous code used `negative` and `guidance` —
-      // both undocumented and silently dropped. Sending `seed` even
-      // though it isn't reliably honored: still echoed in `inputs`
-      // and useful if the backend ever starts honoring it.
+      // Build the call with documented plugin parameters per platform
+      // ref §4.4. negativePrompt reaches the broker but is silently
+      // dropped by the SD backend — sent anyway in case the backend
+      // ever starts honoring it. removeBackground is a client-side
+      // post-process flag.
       const call = {
         prompt:         p.prompt,
         negativePrompt: p.negativePrompt,
+        ...buildGalleryMetadata(p.prompt),
       };
-      if (p.resolution)    call.resolution    = p.resolution;
-      if (p.guidanceScale) call.guidanceScale = p.guidanceScale;
-      if (p.seed)          call.seed          = p.seed;
+      if (p.resolution)       call.resolution       = p.resolution;
+      if (p.guidanceScale)    call.guidanceScale    = p.guidanceScale;
+      if (p.seed)             call.seed             = p.seed;
+      if (p.removeBackground) call.removeBackground = true;
 
       const result = await t2i(call);
-      const blob = await imagePluginResultToBlob(result);
+      const blob = await imagePluginResultToBlob(result, { transparent: p.removeBackground });
       if (!blob) {
         console.warn('[generateOne] plugin returned no canvas/dataUrl', result);
         return null;
       }
       const id = await cacheStore(blob, {
-        prompt:        p.prompt,
-        negative:      p.negativePrompt,
-        seed:          p.seed,
-        resolution:    p.resolution,
-        guidanceScale: p.guidanceScale,
+        prompt:           p.prompt,
+        negative:         p.negativePrompt,
+        seed:             p.seed,
+        resolution:       p.resolution,
+        guidanceScale:    p.guidanceScale,
+        removeBackground: p.removeBackground,
       });
       _bumpQueueUI();
       return id;
@@ -2770,27 +3074,38 @@
       const call = {
         prompt:         promptStr,
         negativePrompt: negStr,
+        ...buildGalleryMetadata(promptStr),
       };
-      // Inherit the current orientation + strength from the controls so
-      // a reroll matches what the user is currently set up to generate.
-      const orientation = RESOLUTIONS[$('orientation')?.value] || null;
+      // Inherit the current advanced controls so a reroll matches what
+      // the user is currently set up to generate. Auto orientation
+      // re-resolves against the reroll's prompt text (not the
+      // textarea), so style-keywords in the saved prompt influence it.
+      const orientationVal = $('orientation')?.value;
+      let orientation = RESOLUTIONS[orientationVal] || null;
+      if (orientationVal === 'auto') {
+        orientation = resolveAutoResolution(promptStr);
+      }
       const guidance = Number($('guidance')?.value);
-      if (orientation)               call.resolution    = orientation;
-      if (Number.isFinite(guidance)) call.guidanceScale = guidance;
+      const transparent = !!$('removeBg')?.checked;
+
+      if (orientation)               call.resolution       = orientation;
+      if (Number.isFinite(guidance)) call.guidanceScale    = guidance;
+      if (transparent)               call.removeBackground = true;
       call.seed = seed;
 
       const result = await t2i(call);
-      const blob = await imagePluginResultToBlob(result);
+      const blob = await imagePluginResultToBlob(result, { transparent });
       if (!blob) {
         toast('Reroll failed — no image returned.', 'err');
         return null;
       }
       const id = await cacheStore(blob, {
-        prompt:        promptStr,
-        negative:      negStr,
+        prompt:           promptStr,
+        negative:         negStr,
         seed,
-        resolution:    orientation,
-        guidanceScale: Number.isFinite(guidance) ? guidance : null,
+        resolution:       orientation,
+        guidanceScale:    Number.isFinite(guidance) ? guidance : null,
+        removeBackground: transparent,
       });
       renderGallery();
       return id;
@@ -3394,7 +3709,7 @@ OUTPUT: ONLY the final raw prompt string. No preamble. No quotes.`,
         ta.scrollIntoView({ behavior: 'smooth', block: 'center' });
         ta.focus({ preventScroll: true });
         ta.style.boxShadow = '0 0 14px rgba(0,229,255,0.6)';
-        setTimeout(() => { ta.style.boxShadow = ''; }, 700);
+        setTimeout(() => { ta.style.boxShadow = ''; }, 1000);
         toast('Prompt loaded — press +1 image to regenerate.');
       });
 
@@ -3573,14 +3888,7 @@ OUTPUT: ONLY the final raw prompt string. No preamble. No quotes.`,
   // Generation queue — split pending vs active, hard-capped at MAX_IMAGES
   // ══════════════════════════════════════════════════════════════════════
   // The +1 / +10 buttons add to a pending counter; a runner drains the
-  // pending queue by launching up to MAX_PARALLEL generations at a time.
-  // With MAX_PARALLEL=1 (broker is strictly serial — platform ref §3.6)
-  // this is effectively a FIFO with concurrency=1, but the structure is
-  // preserved so future text+image broker parallelism is trivial to opt
-  // into. The status bar shows pending and active counters separately
-  // so the user can tell "queued but not started" from "currently
-  // generating".
-  //
+  // pending queue (broker is strictly serial)
   // Hard cap: gallery + pending + active is never allowed to exceed
   // MAX_IMAGES. Every queue-add intent is clamped against the
   // currently-cached size. _qAdd() returns the number actually accepted
@@ -5065,6 +5373,18 @@ OUTPUT: ONLY the final raw prompt string. No preamble. No quotes.`,
   $('autoGen').addEventListener('change', () => saveSettings(0));
   $('enhanceLength')?.addEventListener('change', () => saveSettings(0));
 
+  // Transparent-background toggle — saved immediately so the user's
+  // choice is in effect by the time they click +1 image.
+  $('removeBg')?.addEventListener('change', () => saveSettings(0));
+
+  // Concurrent-gens — go through setMaxParallel so raises immediately
+  // open up slots for backlog and the value is clamped consistently
+  // with the load-time path.
+  $('maxParallel')?.addEventListener('change', e => {
+    setMaxParallel(Number(e.target.value));
+    saveSettings(0);
+  });
+
   // ✨ Prompt enhancer — toggle-cancel handled inside runEnhance()
   $('enhanceBtn')?.addEventListener('click', runEnhance);
 
@@ -5445,7 +5765,7 @@ OUTPUT: ONLY the final raw prompt string. No preamble. No quotes.`,
     if (window.innerWidth < 500) {
       setTimeout(preloadPlugins, 5000);
     } else {
-      setTimeout(preloadPlugins, 800);
+      setTimeout(preloadPlugins, 1000);
     }
   })();
 })();

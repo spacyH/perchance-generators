@@ -28,9 +28,73 @@ output
 // =====================================================================
 // CHAT AI — the storyteller voice that writes the narrative
 // =====================================================================
-// Each call returns { stream, charName, error? } so the caller can
-// .stop() the stream and decide post-processing. Streams emit chunks
-// via onChunk(textChunk). Final text comes from `await stream`.
+// Each call returns { stream, charName, expectedStartWith, error? }.
+//
+// Streaming model (NEW — uses handle.textStream, not onChunk):
+//   - `stream` is the raw aiTextPlugin handle: a thenable with
+//     `.textStream` (ReadableStream of plain string chunks), `.stop()`,
+//     and resolving to a boxed-String result via `await`.
+//   - The caller (HTML side) drains `stream.textStream` via `for await`
+//     for live UI updates, and `await stream` for the final value +
+//     stopReason. See `awaitInflight` in html-panel.html for the wiring.
+//   - `expectedStartWith`: when the call uses `startWith` + `hideStartWith`
+//     (i.e. chatReply), `textStream` MAY or MAY NOT echo the startWith —
+//     the platform docs don't specify. The HTML side defensively skips
+//     this many chars of leading prefix from the accumulated stream, so
+//     either behavior renders identically. For calls with `startWith: ""`
+//     this field is the empty string and the skip is a no-op.
+
+// =====================================================================
+// TOKEN BUDGET — clamp message history to fit the model's context
+// =====================================================================
+// Given a fixed-overhead text (the instruction body without messages
+// inlined) and the full message array, return the largest contiguous
+// tail of messages that still fits within the token budget.
+//
+// `countTokens` is a fast bigram approximation (no network call) so the
+// per-message lookup is cheap. We also cap at 50 messages regardless of
+// budget — for sanity and to keep the prompt focused on recent context.
+//
+// Returns the kept messages (oldest-first, same shape as input). Empty
+// array if the overhead alone already exceeds budget.
+clampMessagesToBudget(messages, fixedOverheadText) =>
+  let arr = Array.isArray(messages) ? messages : [];
+  if(arr.length === 0) return [];
+  let tools;
+  try { tools = root.aiTextPlugin({ getMetaObject: true }); } catch(e) { tools = null; }
+  // If the meta object isn't available (very early in load), fall back
+  // to the legacy slice-of-14 to preserve behavior.
+  if(!tools || typeof tools.countTokens !== "function") {
+    return arr.slice(-14);
+  }
+  let countTokens = tools.countTokens;
+  let idealMax = tools.idealMaxContextTokens || 6000;
+  // Reserve ~800 tokens for the model's reply + some slack for prefix-
+  // cache stability (re-tokenizing changing prefixes is expensive on the
+  // backend, so we keep our overhead-text edge stable).
+  let budget = idealMax - 800;
+  let overhead = countTokens(String(fixedOverheadText || ""));
+  let available = budget - overhead;
+  if(available <= 0) return [];
+  // Walk from the most recent backwards, including each message as long
+  // as it fits. Stop at the first message that would overflow — older
+  // messages are dropped silently (and ideally are covered by the
+  // tracked-info state the user maintains).
+  let kept = [];
+  let used = 0;
+  let cap = Math.min(arr.length, 50);
+  for(let i = arr.length - 1; i >= arr.length - cap; i--) {
+    let text = String((arr[i] && arr[i].content) || "");
+    let n = countTokens(text);
+    // Per-message overhead for the "[[Speaker]]: " label, joining
+    // newline, etc. — small but real. Add a small constant fudge so
+    // we don't quietly creep over budget.
+    n = n + 6;
+    if(used + n > available) break;
+    kept.unshift(arr[i]);
+    used += n;
+  }
+  return kept;
 
 // --- Opening message ---------------------------------------------------
 // When the user starts a new chat, this writes the character's opening
@@ -40,7 +104,7 @@ output
 // `trackedInfo` is a freeform string of story state the user maintains
 // (locations, items, knowledge, relationships, time of day, etc.). It's
 // injected into the prompt so the character "knows" the state.
-async openScene(character, personality, scenario, trackedInfo, onChunk) =>
+async openScene(character, personality, scenario, trackedInfo) =>
   let charDesc = (character && character.description) ? String(character.description).trim() : "";
   let charName = (character && character.name) ? String(character.name).trim() : "Character";
   let scenarioText = scenario ? String(scenario).trim() : "";
@@ -101,14 +165,11 @@ async openScene(character, personality, scenario, trackedInfo, onChunk) =>
       instruction,
       startWith: "",
       stopSequences: ["\n\n[[", "\n[[", "\n>>>"],
-      onChunk: (d) => {
-        if(onChunk && d && d.textChunk) onChunk(d.textChunk);
-      },
     });
-    return { stream, charName };
+    return { stream, charName, expectedStartWith: "" };
   } catch(e) {
     console.error("openScene setup failed:", e);
-    return { stream: null, charName, error: (e && e.message) || String(e) };
+    return { stream: null, charName, expectedStartWith: "", error: (e && e.message) || String(e) };
   }
 
 // --- Chat reply (continues a conversation) ----------------------------
@@ -130,7 +191,7 @@ async openScene(character, personality, scenario, trackedInfo, onChunk) =>
 // characters present in the scene besides the replying one. Used to
 // build a brief "also in the scene" context block so the AI knows who
 // these other speakers are. Pass an empty array (or omit) to skip.
-async chatReply(messages, character, personality, scenario, trackedInfo, onChunk, otherCharacters) =>
+async chatReply(messages, character, personality, scenario, trackedInfo, otherCharacters) =>
   let charDesc = (character && character.description) ? String(character.description).trim() : "";
   let charName = (character && character.name) ? String(character.name).trim() : "Character";
   let scenarioText = scenario ? String(scenario).trim() : "";
@@ -175,8 +236,10 @@ async chatReply(messages, character, personality, scenario, trackedInfo, onChunk
     if(lines.length > 2) othersBlock = lines.join("\n");
   }
 
-  let trimmed = (messages || []).slice(-14);
-  let convo = trimmed.map(m => {
+  // Format a single past-message into its on-the-wire line. Extracted
+  // so we can measure individual message lengths cleanly when clamping
+  // to the token budget below.
+  let formatMessage = (m) => {
     // System messages are scene notes (e.g. "[Lyle has joined the
     // scene.]"). Render them as their own line with no speaker prefix
     // so the AI reads them as narrator-style context, not as something
@@ -195,11 +258,17 @@ async chatReply(messages, character, personality, scenario, trackedInfo, onChunk
     // single-character data.
     let who = m.role === "user" ? seekerLabel : (m.speakerName || charName);
     return `[[${who}]]: ${String(m.content).replace(/\s+/g, " ").trim()}`;
-  }).join("\n");
+  };
 
   let token = Math.random().toString(36).slice(2, 8);
 
-  let instruction = [
+  // Build the instruction shell as a function of the inlined-message
+  // block. We measure the shell with the convo slot empty as our
+  // "fixed overhead" for the token budget, then format only as many
+  // recent messages as fit. This replaces the older hard-coded
+  // .slice(-14) with a content-aware cap that holds on long, dense
+  // chats and gives more headroom on short, terse ones.
+  let buildInstruction = (convoText) => [
     `You are ${charName}.`,
     charDesc || "A character in a story.",
     personaBlock,
@@ -231,26 +300,29 @@ async chatReply(messages, character, personality, scenario, trackedInfo, onChunk
     `(Internal variety token — ignore: ${token}.)`,
     "",
     "<MESSAGES>",
-    convo,
+    convoText,
     "</MESSAGES>",
     "",
     `>>> TASK: Write ${charName}'s next single reply only, in character. Stop at the end of your reply.`,
   ].filter(Boolean).join("\n");
 
+  // Clamp the history to whatever fits in the budget, then render it.
+  let trimmed = clampMessagesToBudget(messages || [], buildInstruction(""));
+  let convo = trimmed.map(formatMessage).join("\n");
+  let instruction = buildInstruction(convo);
+
+  let startWithText = `[[${charName}]]:`;
   try {
     let stream = root.aiTextPlugin({
       instruction,
-      startWith: `[[${charName}]]:`,
+      startWith: startWithText,
       hideStartWith: true,
       stopSequences: ["\n\n[[", "\n[[", "\n>>>"],
-      onChunk: (d) => {
-        if(onChunk && d && d.textChunk && !d.isFromStartWith) onChunk(d.textChunk);
-      },
     });
-    return { stream, charName };
+    return { stream, charName, expectedStartWith: startWithText };
   } catch(e) {
     console.error("chatReply setup failed:", e);
-    return { stream: null, charName, error: (e && e.message) || String(e) };
+    return { stream: null, charName, expectedStartWith: startWithText, error: (e && e.message) || String(e) };
   }
 
 // =====================================================================
@@ -270,7 +342,7 @@ async chatReply(messages, character, personality, scenario, trackedInfo, onChunk
 // no [[Speaker]]: prefix, no first-person voice. The prompt is shaped
 // for prose description rather than character roleplay. Trying to bend
 // chatReply into this role would distort its prompts for everyone else.
-async narrate(messages, character, personality, scenario, trackedInfo, otherCharacters, onChunk) =>
+async narrate(messages, character, personality, scenario, trackedInfo, otherCharacters) =>
   let scenarioText = scenario ? String(scenario).trim() : "";
   let tracked = trackedInfo ? String(trackedInfo).trim() : "";
 
@@ -294,13 +366,12 @@ async narrate(messages, character, personality, scenario, trackedInfo, otherChar
   let pAppr = (personality && personality.appearance) ? String(personality.appearance).trim() : "";
   if(pName || pAppr) castLines.push(`${pName || "the user"} (the seeker): ${pAppr || "no appearance set"}`);
 
-  // Conversation context. Same trimming/labeling as chatReply, with the
-  // important difference that NARRATOR lines (role=narrator) get a bare
-  // italic-bracketed label so the model sees prior narration as
-  // continuity, not as something a character said.
+  // Same labeling rules as chatReply, with the important difference
+  // that NARRATOR lines (role=narrator) get a bare italic-bracketed
+  // label so the model sees prior narration as continuity, not as
+  // something a character said.
   let seekerLabel = pName || "User";
-  let trimmed = (messages || []).slice(-14);
-  let convo = trimmed.map(m => {
+  let formatMessage = (m) => {
     if(m.role === "narrator") {
       return `*[scene]: ${String(m.content).replace(/\s+/g, " ").trim()}*`;
     }
@@ -309,14 +380,17 @@ async narrate(messages, character, personality, scenario, trackedInfo, otherChar
     }
     let who = m.role === "user" ? seekerLabel : (m.speakerName || primaryName || "Character");
     return `[[${who}]]: ${String(m.content).replace(/\s+/g, " ").trim()}`;
-  }).join("\n");
+  };
 
   let scenarioBlock = scenarioText ? ["", "THE SCENE:", scenarioText].join("\n") : "";
   let trackedBlock = tracked ? ["", "TRACKED STATE (canonical facts you must respect):", tracked].join("\n") : "";
   let castBlock = castLines.length ? ["", "WHO IS IN THE SCENE:", ...castLines].join("\n") : "";
   let token = Math.random().toString(36).slice(2, 8);
 
-  let instruction = [
+  // Instruction-shell builder — convoText slot is empty when measuring
+  // the budget overhead, then populated after we know which messages
+  // fit. See chatReply / clampMessagesToBudget for the same pattern.
+  let buildInstruction = (convoText) => [
     "You are the NARRATOR of an unfolding scene. You are not a character.",
     "You do not speak. You do not have a name. Your role is to describe —",
     "to set the stage, mark passage of time, fill in sensory detail, note",
@@ -346,25 +420,26 @@ async narrate(messages, character, personality, scenario, trackedInfo, otherChar
     `(Internal variety token — ignore: ${token}.)`,
     "",
     "<MESSAGES>",
-    convo,
+    convoText,
     "</MESSAGES>",
     "",
     ">>> TASK: Write a single short narrative beat continuing the scene. Just the prose, no preamble, no asterisks, no quotes.",
   ].filter(Boolean).join("\n");
+
+  let trimmed = clampMessagesToBudget(messages || [], buildInstruction(""));
+  let convo = trimmed.map(formatMessage).join("\n");
+  let instruction = buildInstruction(convo);
 
   try {
     let stream = root.aiTextPlugin({
       instruction,
       startWith: "",
       stopSequences: ["\n\n[[", "\n[[", "\n>>>"],
-      onChunk: (d) => {
-        if(onChunk && d && d.textChunk) onChunk(d.textChunk);
-      },
     });
-    return { stream };
+    return { stream, expectedStartWith: "" };
   } catch(e) {
     console.error("narrate setup failed:", e);
-    return { stream: null, error: (e && e.message) || String(e) };
+    return { stream: null, expectedStartWith: "", error: (e && e.message) || String(e) };
   }
 
 // =====================================================================
