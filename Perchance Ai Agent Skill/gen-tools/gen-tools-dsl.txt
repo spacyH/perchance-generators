@@ -1,0 +1,214 @@
+$meta
+  title       = Gen Tools Plugin
+  description = Inspect, load, search, and mutate any Perchance generator at runtime. Read the full source of any public generator, enumerate its lists, load its parsed tree via dynamicImport, and write new properties to the DSL tree — all from your HTML panel JS.
+  tags        = plugin, tools, generator, inspect, remix, developer
+
+dynamicImport = {import:dynamic-import-plugin}
+superFetch    = {import:super-fetch-plugin}
+
+$output() =>
+  // ── gen-tools: Generator Introspection & Remix Toolkit ──
+  // Returns an API object for inspecting, loading, and mutating generators.
+  
+  const api = {};
+  
+  // ── SELF-INSPECTION ──
+  
+  api.source = function() {
+    try { return root.$perchanceCode || ""; } catch(e) { return ""; }
+  };
+  
+  api.meta = function() {
+    try { return root.$meta || null; } catch(e) { return null; }
+  };
+  
+  api.moduleName = function() {
+    try { return root.$moduleName || window.generatorName || ""; } catch(e) { return ""; }
+  };
+  
+  api.children = function() {
+    try { return root.$children || {}; } catch(e) { return {}; }
+  };
+  
+  api.lists = function() {
+    let result = {};
+    try {
+      let ch = root.$children;
+      if (!ch) return result;
+      let keys;
+      try { keys = Object.keys(ch); } catch(e) { keys = []; }
+      for (let i = 0; i < keys.length; i++) {
+        let k = keys[i];
+        if (k.startsWith("$")) continue;
+        let node = ch[k];
+        let info = { name: k, type: typeof node };
+        try {
+          if (node && typeof node === "object") {
+            if (node.getLength !== undefined) info.length = node.getLength;
+            if (node.getChildNames) info.childNames = node.getChildNames;
+            if (node.getPropertyNames) info.propertyNames = node.getPropertyNames;
+            if (node.getFunctionNames) info.functionNames = node.getFunctionNames;
+            if (node.getRawListText) info.rawText = String(node.getRawListText);
+          }
+        } catch(e) {}
+        result[k] = info;
+      }
+    } catch(e) {}
+    return result;
+  };
+  
+  // ── REMOTE LOADING ──
+  
+  api.load = async function(generatorName) {
+    if (typeof dynamicImport !== "function") throw new Error("dynamic-import-plugin not available");
+    return await dynamicImport(generatorName);
+  };
+  
+  api.exists = async function(generatorName) {
+    try {
+      let url = "https://perchance.org/api/getGeneratorsAndDependencies?generatorNames=" + encodeURIComponent(generatorName);
+      let r = await superFetch(url);
+      let json = await r.json();
+      return !!(json.generators && json.generators[generatorName]);
+    } catch(e) { return false; }
+  };
+  
+  api.sourceOf = async function(generatorName) {
+    try {
+      let url = "https://perchance.org/api/downloadGenerator?generatorName=" + encodeURIComponent(generatorName) + "&listsOnly=true";
+      let r = await superFetch(url);
+      return await r.text();
+    } catch(e) { throw new Error("Failed to fetch source: " + e.message); }
+  };
+  
+  api.inspect = async function(generatorName) {
+    let result = { name: generatorName, lists: {}, functions: [], imports: [], source: "" };
+    
+    // Get raw source
+    try { result.source = await api.sourceOf(generatorName); } catch(e) {}
+    
+    // Parse imports from source
+    let importRe = new RegExp(String.fromCharCode(123) + "import:([^" + String.fromCharCode(125) + "]+)" + String.fromCharCode(125), "g");
+    let m;
+    while ((m = importRe.exec(result.source)) !== null) {
+      result.imports.push(m[1]);
+    }
+    
+    // Load and inspect tree
+    try {
+      let tree = await api.load(generatorName);
+      if (typeof tree === "function") {
+        result.type = "function";
+        result.arity = tree.length;
+      } else if (tree && typeof tree === "object") {
+        result.type = "object";
+        let keys = [];
+        try {
+          if (tree.getChildNames) keys = tree.getChildNames;
+          else if (tree.getAllKeys) keys = tree.getAllKeys;
+          else { for (let k in tree) keys.push(k); }
+        } catch(e) { try { for (let k in tree) keys.push(k); } catch(e2) {} }
+        
+        for (let i = 0; i < keys.length; i++) {
+          let k = keys[i];
+          try {
+            let node = tree[k];
+            let info = { name: k, type: typeof node };
+            if (node && node.getLength !== undefined) info.length = node.getLength;
+            if (typeof node === "function") {
+              result.functions.push(k);
+              info.type = "function";
+              info.arity = node.length;
+            }
+            result.lists[k] = info;
+          } catch(e) {}
+        }
+      }
+    } catch(e) { result.loadError = e.message; }
+    
+    return result;
+  };
+  
+  // ── RUNTIME MUTATION ──
+  
+  api.set = function(name, value) {
+    root[name] = value;
+    return root[name];
+  };
+  
+  api.get = function(name) {
+    try { return root[name]; } catch(e) { return undefined; }
+  };
+  
+  api.del = function(name) {
+    try { return delete root[name]; } catch(e) { return false; }
+  };
+  
+  api.has = function(name) {
+    try { return name in root; } catch(e) { return false; }
+  };
+  
+  // ── ANALYSIS ──
+  
+  api.listNames = function(tree) {
+    if (!tree) tree = api.children();
+    let keys = [];
+    try {
+      if (tree.getChildNames) keys = Array.from(tree.getChildNames);
+      else keys = Object.keys(tree);
+    } catch(e) { try { for (let k in tree) keys.push(k); } catch(e2) {} }
+    return keys.filter(function(k) { return !k.startsWith("$"); });
+  };
+  
+  api.flatten = function(tree) {
+    if (!tree) tree = api.children();
+    let result = {};
+    let names = api.listNames(tree);
+    for (let i = 0; i < names.length; i++) {
+      let name = names[i];
+      try {
+        let node = tree[name];
+        if (node && node.selectAll) {
+          result[name] = Array.from(node.selectAll).map(function(item) {
+            return String(item);
+          });
+        } else {
+          result[name] = [String(node)];
+        }
+      } catch(e) { result[name] = []; }
+    }
+    return result;
+  };
+  
+  api.search = function(tree, query) {
+    if (!tree) tree = api.children();
+    let flat = api.flatten(tree);
+    let results = [];
+    let q = query.toLowerCase();
+    for (let listName in flat) {
+      let items = flat[listName];
+      for (let j = 0; j < items.length; j++) {
+        if (items[j].toLowerCase().indexOf(q) !== -1) {
+          results.push({ list: listName, index: j, item: items[j] });
+        }
+      }
+    }
+    return results;
+  };
+  
+  api.diff = function(treeA, treeB) {
+    let namesA = new Set(api.listNames(treeA));
+    let namesB = new Set(api.listNames(treeB));
+    let onlyA = [], onlyB = [], both = [];
+    namesA.forEach(function(n) { if (namesB.has(n)) both.push(n); else onlyA.push(n); });
+    namesB.forEach(function(n) { if (!namesA.has(n)) onlyB.push(n); });
+    return { onlyA: onlyA, onlyB: onlyB, both: both };
+  };
+  
+  // ── VERSION ──
+  api.version = "1.0.1";
+  
+  // Stash on window so panel JS can access without bridge issues
+  window.__genToolsApi = api;
+  
+  return api;
