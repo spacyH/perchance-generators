@@ -2210,6 +2210,26 @@
     }
     return (h >>> 0).toString(36);
   }
+  // Core avatar fetch + cache: call `generate(subject)`, persist on
+  // success, surface errors via showError, return the URL ("" on
+  // failure). The three call sites below each layer their own
+  // stale-detection / refresh strategy on top of this shared core.
+  async function generateAndCacheAvatar({ subject, hash, cache, miscKey, generate, label }) {
+    try {
+      const res = await generate(subject);
+      if (res && res.url) {
+        cache[hash] = res.url;
+        await setMisc(miscKey, cache);
+        return res.url;
+      }
+      if (res && res.error) showError(label, res.error);
+      return "";
+    } catch (e) {
+      showError(label, e);
+      return "";
+    }
+  }
+
   async function resolveCharAvatar() {
     const hash = personaHash(character);
     currentCharAvatarHash = hash;
@@ -2222,22 +2242,16 @@
       refreshCharAvatars(); return;
     }
     currentCharAvatarUrl = ""; currentCharAvatarPending = true; refreshCharAvatars();
-    try {
-      const res = await root.generateCharacterAvatar(character);
-      if (personaHash(character) !== hash) return;
-      if (res && res.url) {
-        charAvatars[hash] = res.url;
-        await setMisc("charAvatars", charAvatars);
-        currentCharAvatarUrl = res.url;
-      } else if (res && res.error) showError("char avatar", res.error);
-    } catch (e) {
-      if (personaHash(character) !== hash) return;
-      showError("char avatar", e);
-    } finally {
-      if (personaHash(character) === hash) {
-        currentCharAvatarPending = false; refreshCharAvatars();
-      }
-    }
+    const url = await generateAndCacheAvatar({
+      subject: character, hash, cache: charAvatars, miscKey: "charAvatars",
+      generate: (s) => root.generateCharacterAvatar(s), label: "char avatar",
+    });
+    // Drop the result if `character` changed during the await — a newer
+    // resolveCharAvatar() invocation is already running or has finished.
+    if (personaHash(character) !== hash) return;
+    if (url) currentCharAvatarUrl = url;
+    currentCharAvatarPending = false;
+    refreshCharAvatars();
   }
   async function resolveUserAvatar() {
     const hash = personaHash(personality);
@@ -2251,22 +2265,14 @@
       refreshUserAvatars(); return;
     }
     currentUserAvatarUrl = ""; currentUserAvatarPending = true; refreshUserAvatars();
-    try {
-      const res = await root.generateUserAvatar(personality);
-      if (personaHash(personality) !== hash) return;
-      if (res && res.url) {
-        userAvatars[hash] = res.url;
-        await setMisc("userAvatars", userAvatars);
-        currentUserAvatarUrl = res.url;
-      } else if (res && res.error) showError("user avatar", res.error);
-    } catch (e) {
-      if (personaHash(personality) !== hash) return;
-      showError("user avatar", e);
-    } finally {
-      if (personaHash(personality) === hash) {
-        currentUserAvatarPending = false; refreshUserAvatars();
-      }
-    }
+    const url = await generateAndCacheAvatar({
+      subject: personality, hash, cache: userAvatars, miscKey: "userAvatars",
+      generate: (s) => root.generateUserAvatar(s), label: "user avatar",
+    });
+    if (personaHash(personality) !== hash) return;
+    if (url) currentUserAvatarUrl = url;
+    currentUserAvatarPending = false;
+    refreshUserAvatars();
   }
 
   // Synchronous lookup: returns the cached URL for the given character
@@ -2292,16 +2298,11 @@
     if (inFlightAvatars.has(hash)) return;     // already generating
     inFlightAvatars.add(hash);
     try {
-      const res = await root.generateCharacterAvatar(charRecord);
-      if (res && res.url) {
-        charAvatars[hash] = res.url;
-        await setMisc("charAvatars", charAvatars);
-        refreshCharAvatars();
-      } else if (res && res.error) {
-        showError("char avatar", res.error);
-      }
-    } catch (e) {
-      showError("char avatar", e);
+      const url = await generateAndCacheAvatar({
+        subject: charRecord, hash, cache: charAvatars, miscKey: "charAvatars",
+        generate: (s) => root.generateCharacterAvatar(s), label: "char avatar",
+      });
+      if (url) refreshCharAvatars();
     } finally {
       inFlightAvatars.delete(hash);
     }
@@ -2390,30 +2391,24 @@
     send.hidden = streaming;
   }
 
-  // Drain an inflight {stream, expectedStartWith, fallback, error} into a
+  // Drain an inflight {stream, expectedStartWith, error} into a
   // normalized result. Returns one of:
-  //   { kind: "startFailed", message }   — couldn't begin streaming
-  //   { kind: "aborted" }                 — user clicked STOP
-  //   { kind: "emptyOrError", message }   — stream finished but produced nothing useful
-  //   { kind: "ok", text }                — full generated text (untrimmed)
-  // Handles currentStream tracking + setStreamingUI for the duration of the await.
+  //   { kind: "startFailed", message }    — couldn't begin streaming
+  //   { kind: "aborted" }                  — user clicked STOP
+  //   { kind: "emptyOrError", message }    — stream produced nothing useful
+  //   { kind: "ok", text }                 — full generated text (untrimmed)
+  // Handles currentStream tracking + setStreamingUI for the await window.
   //
-  // STREAMING MODEL (handle.textStream-based):
-  //   If `onChunk` is provided, we drain inflight.stream.textStream via
-  //   `for await` and call onChunk(chunkText) for each fragment. The
-  //   live bubble updates happen here (the DSL side just returns the
-  //   raw aiTextPlugin handle).
+  // If `onChunk` is supplied, we drain inflight.stream.textStream and
+  // call onChunk(chunkText) for each fragment (live UI updates).
   //
-  // STARTWITH FILTERING (defensive):
-  //   When the DSL call used `startWith` + `hideStartWith: true` (e.g.
-  //   chatReply uses "[[Name]]:"), the platform docs don't explicitly
-  //   say whether `textStream` echoes the startWith or filters it out.
-  //   We handle BOTH cases identically by skipping the first
-  //   `expectedStartWith.length` characters of accumulated stream
-  //   output if and only if they actually match the expected prefix.
-  //   If textStream is already filtered, the accumulated text won't
-  //   match the prefix at the first chunk and we forward everything
-  //   verbatim. If it's not filtered, we silently swallow the echo.
+  // STARTWITH FILTERING: when the DSL call used startWith + hideStartWith
+  // (e.g. chatReply with "[[Name]]:"), the platform docs don't specify
+  // whether `textStream` echoes the startWith or filters it. We handle
+  // both: we hold back chunks until we can decide whether the accumulated
+  // bytes match `expectedStartWith`. If they match → skip the prefix
+  // characters once and forward the rest. If they don't → flush
+  // immediately and never guard again. No-op when expectedStartWith is "".
   async function awaitInflight(inflight, onChunk) {
     if (!inflight || inflight.error || !inflight.stream) {
       return { kind: "startFailed", message: (inflight && inflight.error) || "stream did not start" };
@@ -2481,8 +2476,9 @@
 
       const data = await inflight.stream;
       if (!data || !data.generatedText || !data.generatedText.trim() || data.stopReason === "error") {
-        const stopped = data && data.stopReason && /stop/i.test(data.stopReason);
-        if (stopped) return { kind: "aborted" };
+        // stopReason vocabulary: "natural" | "artificial" | "error" | "user".
+        // A clean user-initiated abort lands here with stopReason === "user".
+        if (data && data.stopReason === "user") return { kind: "aborted" };
         return { kind: "emptyOrError", message: "stopReason=" + ((data && data.stopReason) || "(none)") + " with empty text" };
       }
       return { kind: "ok", text: data.generatedText };
@@ -2599,26 +2595,23 @@
     delete wrap._streamingRaw;
     setBubbleText(wrap, text, role);
   }
-  function renderCutsceneImage(wrap, url) {
+  // Shared lookup + visibility toggle for the three render modes below.
+  // Each mode supplies its own inner HTML; only `failed` flips the class.
+  function renderCutsceneInto(wrap, mode, html) {
     const ctn = wrap.querySelector(".cutscene");
     if (!ctn) return;
     ctn.hidden = false;
-    ctn.classList.remove("failed");
-    ctn.innerHTML = `<img src="${escapeHTML(url)}" alt="">`;
+    ctn.classList.toggle("failed", mode === "failed");
+    ctn.innerHTML = html;
+  }
+  function renderCutsceneImage(wrap, url) {
+    renderCutsceneInto(wrap, "ok", `<img src="${escapeHTML(url)}" alt="">`);
   }
   function renderCutscenePending(wrap, statusText) {
-    const ctn = wrap.querySelector(".cutscene");
-    if (!ctn) return;
-    ctn.hidden = false;
-    ctn.classList.remove("failed");
-    ctn.innerHTML = `<div class="cutsceneStatus"><div class="spinner"></div><span>${escapeHTML(statusText || "Illustrating…")}</span></div>`;
+    renderCutsceneInto(wrap, "pending", `<div class="cutsceneStatus"><div class="spinner"></div><span>${escapeHTML(statusText || "Illustrating…")}</span></div>`);
   }
   function renderCutsceneFailed(wrap, errText) {
-    const ctn = wrap.querySelector(".cutscene");
-    if (!ctn) return;
-    ctn.hidden = false;
-    ctn.classList.add("failed");
-    ctn.innerHTML = `<div class="cutsceneStatus"><span>Could not illustrate: ${escapeHTML(errText || "unknown error")}</span></div>`;
+    renderCutsceneInto(wrap, "failed", `<div class="cutsceneStatus"><span>Could not illustrate: ${escapeHTML(errText || "unknown error")}</span></div>`);
   }
   function renderErrorBubble(where, errorText) {
     const wrap = document.createElement("div");
@@ -3769,9 +3762,7 @@
       let aborted = false;
       let illustrateFlag = false;
       if (result.kind === "ok") {
-        // Strip a stray leading [[Speaker]]: that the model sometimes emits.
-        const cleaned = result.text.trim().replace(/^\[\[[^\]]+\]\]:\s*/i, "").trim();
-        const parsed = parseAndStripIllustrateTag(cleaned);
+        const parsed = parseAndStripIllustrateTag(result.text);
         finalText = parsed.text;
         illustrateFlag = parsed.illustrate;
       } else if (result.kind === "aborted") {
@@ -3867,10 +3858,7 @@
       let aborted = false;
       let illustrateFlag = false;
       if (result.kind === "ok") {
-        // Strip any stray quoted dialogue or [[Speaker]]: prefix that the
-        // model sometimes adds despite the instructions.
-        const cleaned = result.text.trim().replace(/^\[\[[^\]]+\]\]:\s*/i, "").trim();
-        const parsed = parseAndStripIllustrateTag(cleaned);
+        const parsed = parseAndStripIllustrateTag(result.text);
         finalText = parsed.text;
         illustrateFlag = parsed.illustrate;
       } else if (result.kind === "aborted") {
@@ -3914,8 +3902,15 @@
   // =====================================================================
   // ILLUSTRATE TAG + AUTO-ILLUSTRATE
   // =====================================================================
+  // Trim, strip a stray leading "[[Speaker]]:" (the model sometimes
+  // emits one despite startWith priming or the explicit instructions),
+  // then peel off a trailing <<illustrate>> marker. Returns
+  // { text, illustrate } where text is the cleaned content.
   function parseAndStripIllustrateTag(text) {
-    const t = (text || "").trim();
+    let t = String(text || "").trim();
+    // Speaker-prefix strip — safe for openScene too (where the model
+    // shouldn't emit one but occasionally does).
+    t = t.replace(/^\[\[[^\]]+\]\]:\s*/i, "").trim();
     const re = /\s*<<\s*illustrate\s*>>\s*\.?\s*$/i;
     if (re.test(t)) return { text: t.replace(re, "").trim(), illustrate: true };
     return { text: t, illustrate: false };

@@ -13324,7 +13324,7 @@ Use this template for your response:
           throw new Error(error);
         } else {
           if(!character.loreBookUrls) character.loreBookUrls = [];
-          character.loreBookUrls.push(url);
+          character.loreBookUrls.push(String(url)); // String() — uploadPlugin .url is a boxed-String
         }
       } catch(e) {
         console.error(e);
@@ -42417,12 +42417,13 @@ Use this template for your response:
       try {
         const r = (typeof window !== 'undefined') ? window.root : null;
         if (!r || typeof r.textToImagePlugin !== 'function') return null;
-        // Strict contract: ONLY {prompt, negative}. Extra fields route
-        // values through Perchance's DSL evaluator, which throws on
-        // brace-containing user input. AI Slideshow's exact warning.
+        // The plugin's documented option is `negativePrompt` — `negative`
+        // was a typo and is silently dropped. (negativePrompt is itself
+        // dropped by the SD backend per verified R24, but using the
+        // correct field name avoids confusion.)
         const result = await r.textToImagePlugin({
           prompt:   composedPrompt(),
-          negative: DEFAULT_NEGATIVE,
+          negativePrompt: DEFAULT_NEGATIVE,
         });
         const dataUrl = (result && result.dataUrl) || (typeof result === 'string' ? result : null);
         if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) return null;
@@ -43062,7 +43063,7 @@ Use this template for your response:
       try {
         const result = await r.textToImagePlugin({
           prompt:   buildPortraitPrompt(character),
-          negative: NEGATIVE,
+          negativePrompt: NEGATIVE,
         });
         const dataUrl = (result && result.dataUrl) || (typeof result === 'string' ? result : null);
         if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) return null;

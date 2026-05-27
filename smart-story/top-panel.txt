@@ -28,21 +28,19 @@ output
 // =====================================================================
 // CHAT AI — the storyteller voice that writes the narrative
 // =====================================================================
-// Each call returns { stream, charName, expectedStartWith, error? }.
-//
-// Streaming model (NEW — uses handle.textStream, not onChunk):
-//   - `stream` is the raw aiTextPlugin handle: a thenable with
+// Each call returns { stream, charName, expectedStartWith, error? }:
+//   - `stream` is the raw aiTextPlugin handle: a thenable carrying
 //     `.textStream` (ReadableStream of plain string chunks), `.stop()`,
 //     and resolving to a boxed-String result via `await`.
-//   - The caller (HTML side) drains `stream.textStream` via `for await`
-//     for live UI updates, and `await stream` for the final value +
-//     stopReason. See `awaitInflight` in html-panel.html for the wiring.
+//   - The HTML side drains `stream.textStream` via `for await` for live
+//     UI updates, and `await stream` for the final value + stopReason.
+//     See `awaitInflight` in html-panel.html.
 //   - `expectedStartWith`: when the call uses `startWith` + `hideStartWith`
 //     (i.e. chatReply), `textStream` MAY or MAY NOT echo the startWith —
 //     the platform docs don't specify. The HTML side defensively skips
-//     this many chars of leading prefix from the accumulated stream, so
-//     either behavior renders identically. For calls with `startWith: ""`
-//     this field is the empty string and the skip is a no-op.
+//     a matching leading prefix from the accumulated stream so either
+//     behavior renders identically. For calls with `startWith: ""` this
+//     field is the empty string and the skip is a no-op.
 
 // =====================================================================
 // TOKEN BUDGET — clamp message history to fit the model's context
@@ -95,6 +93,93 @@ clampMessagesToBudget(messages, fixedOverheadText) =>
     used += n;
   }
   return kept;
+
+// =====================================================================
+// tti — text-to-image wrapper that extracts the JPEG dataURL
+// =====================================================================
+// Call `root.textToImagePlugin(opts)` and return a normalized
+// { url, error? } shape with `url` set to the rendered image dataURL.
+//
+// The awaited result of textToImagePlugin is a boxed-String object whose
+// primitive value is the iframe HTML — NOT a usable image URL. The
+// actual image lives on `.dataUrl` (canvas.toDataURL JPEG). Use this
+// helper everywhere that needs a renderable URL; never await the plugin
+// directly into an <img src=>.
+//
+// `where` is a short label included in error messages so the caller's
+// log surfaces which feature failed ("cutscene", "character avatar"…).
+async tti(opts, where) =>
+  let label = where || "image";
+  try {
+    let result = await root.textToImagePlugin(opts || {});
+    if(!result) return { url: "", error: label + ": textToImagePlugin returned nothing" };
+    let url = result.dataUrl ? String(result.dataUrl) : "";
+    if(!url) return { url: "", error: label + ": textToImagePlugin produced no dataUrl" };
+    return { url };
+  } catch(e) {
+    return { url: "", error: label + ": " + ((e && e.message) || String(e)) };
+  }
+
+// =====================================================================
+// oneShotAi — non-streaming aiTextPlugin wrapper with normalized errors
+// =====================================================================
+// For one-and-done text generations (synthesize*, suggestActions,
+// updateTrackedInfo, Cutscene Director's prompt-gen step) — anywhere
+// the caller awaits a single result rather than streaming chunks.
+//
+//   { text: "..." }                    on success — trimmed generatedText
+//   { error: "<label>: <reason>" }     on any failure path
+//
+// `label` prefixes error messages so callers don't have to thread their
+// own name in. The stopReason "error" check and the empty-text guard
+// live here so future stopReason-vocabulary changes touch one place.
+async oneShotAi(opts, label) =>
+  let lab = label || "ai";
+  try {
+    let result = await root.aiTextPlugin(opts || {});
+    if(!result) return { error: lab + ": no result" };
+    if(result.stopReason === "error") return { error: lab + ": stopReason=error" };
+    let text = result.generatedText ? String(result.generatedText).trim() : "";
+    if(!text) return { error: lab + ": empty response (stopReason=" + (result.stopReason || "?") + ")" };
+    return { text };
+  } catch(e) {
+    return { error: lab + ": " + ((e && e.message) || String(e)) };
+  }
+
+// =====================================================================
+// parseNameDescAppearance — shared parser for synthesize{Character,Persona}
+// =====================================================================
+// Parses the strict three-line response format both synthesizers ask
+// the AI to produce:
+//   NAME: <...>
+//   DESCRIPTION: <one or more lines>
+//   APPEARANCE: <one or more lines>
+//
+// Returns { name, description, appearance } on success, plus an `error`
+// key on failure. On the error path, any successfully parsed fields are
+// still returned (callers may use whatever the model got right).
+parseNameDescAppearance(generatedText) =>
+  let raw = String(generatedText || "").trim();
+  if(!raw) return { name: "", description: "", appearance: "", error: "empty response" };
+  let nameMatch = raw.match(/^\s*NAME:\s*(.*?)\s*$/im);
+  let descMatch = raw.match(/^\s*DESCRIPTION:\s*([\s\S]*?)(?=\n\s*APPEARANCE:|$)/im);
+  let apprMatch = raw.match(/^\s*APPEARANCE:\s*([\s\S]*?)$/im);
+  // The model sometimes wraps individual fields in straight quotes —
+  // strip a single pair (don't recurse, the field is plain text).
+  let stripQuotes = (s) => s ? s.trim().replace(/^["']|["']$/g, "") : "";
+  let name = nameMatch ? stripQuotes(nameMatch[1]) : "";
+  let description = descMatch ? stripQuotes(descMatch[1]) : "";
+  let appearance = apprMatch ? stripQuotes(apprMatch[1]) : "";
+  // Fallback: if none of the labels matched, the model dropped the
+  // labels entirely. Treat the whole body as a description rather than
+  // failing — the user can still recover something useful from it.
+  if(!description && !name && !appearance) {
+    description = raw.replace(/^NAME:.*\n?/im, "").replace(/^DESCRIPTION:\s*/im, "").trim();
+  }
+  if(!description && !appearance) {
+    return { name, description: "", appearance: "", error: "could not parse fields from model output" };
+  }
+  return { name, description, appearance };
 
 // --- Opening message ---------------------------------------------------
 // When the user starts a new chat, this writes the character's opening
@@ -262,12 +347,10 @@ async chatReply(messages, character, personality, scenario, trackedInfo, otherCh
 
   let token = Math.random().toString(36).slice(2, 8);
 
-  // Build the instruction shell as a function of the inlined-message
-  // block. We measure the shell with the convo slot empty as our
-  // "fixed overhead" for the token budget, then format only as many
-  // recent messages as fit. This replaces the older hard-coded
-  // .slice(-14) with a content-aware cap that holds on long, dense
-  // chats and gives more headroom on short, terse ones.
+  // Build the instruction shell parameterised on the inlined-message
+  // block. We measure the shell with the convo slot empty as our fixed
+  // overhead, then format only as many recent messages as fit the token
+  // budget — see clampMessagesToBudget below.
   let buildInstruction = (convoText) => [
     `You are ${charName}.`,
     charDesc || "A character in a story.",
@@ -388,8 +471,7 @@ async narrate(messages, character, personality, scenario, trackedInfo, otherChar
   let token = Math.random().toString(36).slice(2, 8);
 
   // Instruction-shell builder — convoText slot is empty when measuring
-  // the budget overhead, then populated after we know which messages
-  // fit. See chatReply / clampMessagesToBudget for the same pattern.
+  // the budget overhead, then populated with whichever messages fit.
   let buildInstruction = (convoText) => [
     "You are the NARRATOR of an unfolding scene. You are not a character.",
     "You do not speak. You do not have a name. Your role is to describe —",
@@ -494,35 +576,27 @@ async suggestActions(messages, character, personality, scenario, trackedInfo) =>
     `(Internal variety token — ignore: ${token}.)`,
   ].filter(Boolean).join("\n");
 
-  try {
-    let result = await root.aiTextPlugin({
-      instruction,
-      stopSequences: ["\n\n", "\n>>>", "<MESSAGES>"],
-    });
-    if(!result || !result.generatedText || !result.generatedText.trim()) {
-      return { actions: [], error: "empty response" };
+  let r = await oneShotAi({
+    instruction,
+    stopSequences: ["\n\n", "\n>>>", "<MESSAGES>"],
+  }, "suggestActions");
+  if(r.error) return { actions: [], error: r.error };
+  // Parse lines starting with "- " (or fallback "1. "). Tolerate stray
+  // numbering or quotes the model sometimes adds despite instructions.
+  let actions = [];
+  for(let line of r.text.split("\n")) {
+    let m = line.match(/^\s*[-*•]\s+(.+?)\s*$/);
+    if(!m) m = line.match(/^\s*\d+[.)]\s+(.+?)\s*$/);
+    if(!m) continue;
+    let s = m[1].trim();
+    // Strip surrounding straight-quotes if the whole suggestion was wrapped.
+    if((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+      s = s.slice(1, -1).trim();
     }
-    // Parse lines starting with "- ". Tolerate stray numbering or quotes.
-    let lines = result.generatedText.split("\n");
-    let actions = [];
-    for(let line of lines) {
-      let m = line.match(/^\s*[-*•]\s+(.+?)\s*$/);
-      if(!m) { m = line.match(/^\s*\d+[.)]\s+(.+?)\s*$/); } // tolerate "1. foo"
-      if(m) {
-        let s = m[1].trim();
-        // Strip surrounding quotes if the model wrapped the whole suggestion.
-        if((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
-          s = s.slice(1, -1).trim();
-        }
-        if(s) actions.push(s);
-      }
-    }
-    if(actions.length === 0) return { actions: [], error: "no parseable suggestions" };
-    return { actions: actions.slice(0, 3) };
-  } catch(e) {
-    console.error("suggestActions failed:", e);
-    return { actions: [], error: (e && e.message) || String(e) };
+    if(s) actions.push(s);
   }
+  if(actions.length === 0) return { actions: [], error: "no parseable suggestions" };
+  return { actions: actions.slice(0, 3) };
 
 // =====================================================================
 // ART STYLE PRESETS — curated styles for cutscene rendering
@@ -752,26 +826,18 @@ async generateCutscene(focusMessage, recentMessages, character, personality, sce
   ].filter(Boolean).join("\n");
 
   // Step 1: ask the AI to write the prompt content
-  let directorPrompt = "";
-  try {
-    let streamObj = root.aiTextPlugin({
-      instruction,
-      startWith: "",
-      stopSequences: ["\n\n[", "\n>>>"],
-    });
-    let data = await streamObj;
-    if(data.stopReason === "error" || !data.generatedText || !data.generatedText.trim()) {
-      return { url: "", prompt: "", error: "Director AI returned empty prompt" };
-    }
-    directorPrompt = data.generatedText.trim();
-    directorPrompt = directorPrompt.replace(/^```[a-z]*\s*/i, "").replace(/```\s*$/i, "").trim();
-    directorPrompt = directorPrompt.replace(/^["']|["']$/g, "").trim();
-  } catch(e) {
-    console.error("Cutscene Director prompt-gen failed:", e);
-    return { url: "", prompt: "", error: "Director: " + ((e && e.message) || String(e)) };
-  }
-
-  if(!directorPrompt) return { url: "", prompt: "", error: "empty prompt after parsing" };
+  let dr = await oneShotAi({
+    instruction,
+    startWith: "",
+    stopSequences: ["\n\n[", "\n>>>"],
+  }, "cutscene director");
+  if(dr.error) return { url: "", prompt: "", error: dr.error };
+  // Strip markdown code fences and outer straight-quotes the model
+  // sometimes wraps the prompt in, despite the instructions.
+  let directorPrompt = dr.text
+    .replace(/^```[a-z]*\s*/i, "").replace(/```\s*$/i, "").trim()
+    .replace(/^["']|["']$/g, "").trim();
+  if(!directorPrompt) return { url: "", prompt: "", error: "empty prompt after stripping wrappers" };
 
   // Step 2: wrap with the chosen art style. The Director output may
   // already include a (resolution:::WxH) suffix — keep that at the end.
@@ -780,17 +846,16 @@ async generateCutscene(focusMessage, recentMessages, character, personality, sce
   let finalPrompt = stylePrefix + " " + directorPrompt;
   finalPrompt = finalPrompt.replace(/\s+/g, " ").trim();
 
-  // Step 3: render the image
-  try {
-    let imageOpts = { prompt: finalPrompt };
-    if(styleNegative) imageOpts.negativePrompt = styleNegative;
-    let url = await root.textToImagePlugin(imageOpts);
-    if(!url) return { url: "", prompt: finalPrompt, error: "textToImagePlugin returned empty url" };
-    return { url, prompt: finalPrompt };
-  } catch(e) {
-    console.error("Cutscene image render failed:", e);
-    return { url: "", prompt: finalPrompt, error: "Render: " + ((e && e.message) || String(e)) };
+  // Step 3: render the image via the tti helper so the dataUrl
+  // extraction (and the boxed-String quirk) is handled in one place.
+  let imageOpts = { prompt: finalPrompt };
+  if(styleNegative) imageOpts.negativePrompt = styleNegative;
+  let img = await tti(imageOpts, "cutscene");
+  if(img.error) {
+    console.error("Cutscene image render failed:", img.error);
+    return { url: "", prompt: finalPrompt, error: img.error };
   }
+  return { url: img.url, prompt: finalPrompt };
 
 // =====================================================================
 // CHARACTER / PERSONALITY SYNTHESIS — AI-assisted profile filling
@@ -843,35 +908,14 @@ async synthesizeCharacter(existingName, existingDesc, existingAppearance) =>
     "APPEARANCE: <2-4 sentence visual portrait brief, third person>",
   ].filter(Boolean).join("\n");
 
-  try {
-    let streamObj = root.aiTextPlugin({
-      instruction,
-      startWith: "NAME: ",
-      hideStartWith: false,
-      stopSequences: ["\n\n", "\nNAME:"],
-    });
-    let data = await streamObj;
-    if(data.stopReason === "error" || !data.generatedText || !data.generatedText.trim()) {
-      return { name: "", description: "", appearance: "", error: "AI returned stopReason=" + (data.stopReason || "(none)") };
-    }
-    let raw = data.generatedText.trim();
-    let nameMatch = raw.match(/^\s*NAME:\s*(.*?)\s*$/im);
-    let descMatch = raw.match(/^\s*DESCRIPTION:\s*([\s\S]*?)(?=\n\s*APPEARANCE:|$)/im);
-    let apprMatch = raw.match(/^\s*APPEARANCE:\s*([\s\S]*?)$/im);
-    let name = nameMatch ? nameMatch[1].trim().replace(/^["']|["']$/g, "") : "";
-    let description = descMatch ? descMatch[1].trim().replace(/^["']|["']$/g, "") : "";
-    let appearance = apprMatch ? apprMatch[1].trim().replace(/^["']|["']$/g, "") : "";
-    if(!description && !name && !appearance) {
-      description = raw.replace(/^NAME:.*\n?/im, "").replace(/^DESCRIPTION:\s*/im, "").trim();
-    }
-    if(!description && !appearance) {
-      return { name, description: "", appearance: "", error: "could not parse fields from model output" };
-    }
-    return { name, description, appearance };
-  } catch(e) {
-    console.error("synthesizeCharacter failed:", e);
-    return { name: "", description: "", appearance: "", error: (e && e.message) || String(e) };
-  }
+  let r = await oneShotAi({
+    instruction,
+    startWith: "NAME: ",
+    hideStartWith: false,
+    stopSequences: ["\n\n", "\nNAME:"],
+  }, "synthesizeCharacter");
+  if(r.error) return { name: "", description: "", appearance: "", error: r.error };
+  return parseNameDescAppearance(r.text);
 
 // Build out the user's persona from saved memories + any seed input.
 // Returns { name, description, appearance, error? }
@@ -925,35 +969,14 @@ async synthesizePersona(memoryEntries, existingName, existingDesc, existingAppea
     "APPEARANCE: <1-2 sentence visual sketch>",
   ].filter(Boolean).join("\n");
 
-  try {
-    let streamObj = root.aiTextPlugin({
-      instruction,
-      startWith: "NAME: ",
-      hideStartWith: false,
-      stopSequences: ["\n\n", "\nNAME:"],
-    });
-    let data = await streamObj;
-    if(data.stopReason === "error" || !data.generatedText || !data.generatedText.trim()) {
-      return { name: "", description: "", appearance: "", error: "AI returned stopReason=" + (data.stopReason || "(none)") };
-    }
-    let raw = data.generatedText.trim();
-    let nameMatch = raw.match(/^\s*NAME:\s*(.*?)\s*$/im);
-    let descMatch = raw.match(/^\s*DESCRIPTION:\s*([\s\S]*?)(?=\n\s*APPEARANCE:|$)/im);
-    let apprMatch = raw.match(/^\s*APPEARANCE:\s*([\s\S]*?)$/im);
-    let name = nameMatch ? nameMatch[1].trim().replace(/^["']|["']$/g, "") : "";
-    let description = descMatch ? descMatch[1].trim().replace(/^["']|["']$/g, "") : "";
-    let appearance = apprMatch ? apprMatch[1].trim().replace(/^["']|["']$/g, "") : "";
-    if(!description && !name && !appearance) {
-      description = raw.replace(/^NAME:.*\n?/im, "").replace(/^DESCRIPTION:\s*/im, "").trim();
-    }
-    if(!description && !appearance) {
-      return { name, description: "", appearance: "", error: "could not parse fields from model output" };
-    }
-    return { name, description, appearance };
-  } catch(e) {
-    console.error("synthesizePersona failed:", e);
-    return { name: "", description: "", appearance: "", error: (e && e.message) || String(e) };
-  }
+  let r = await oneShotAi({
+    instruction,
+    startWith: "NAME: ",
+    hideStartWith: false,
+    stopSequences: ["\n\n", "\nNAME:"],
+  }, "synthesizePersona");
+  if(r.error) return { name: "", description: "", appearance: "", error: r.error };
+  return parseNameDescAppearance(r.text);
 
 // Generate a scenario / opening setting from a seed.
 // Returns { scenario, error? }
@@ -982,22 +1005,15 @@ async synthesizeScenario(existingScenario, characterHint) =>
     "Output ONLY the scenario text, nothing else.",
   ].filter(Boolean).join("\n");
 
-  try {
-    let streamObj = root.aiTextPlugin({
-      instruction,
-      startWith: "",
-      stopSequences: ["\n\n\n", "\n>>>"],
-    });
-    let data = await streamObj;
-    if(data.stopReason === "error" || !data.generatedText || !data.generatedText.trim()) {
-      return { scenario: "", error: "AI returned empty scenario" };
-    }
-    let text = data.generatedText.trim().replace(/^["']|["']$/g, "").trim();
-    return { scenario: text };
-  } catch(e) {
-    console.error("synthesizeScenario failed:", e);
-    return { scenario: "", error: (e && e.message) || String(e) };
-  }
+  let r = await oneShotAi({
+    instruction,
+    startWith: "",
+    stopSequences: ["\n\n\n", "\n>>>"],
+  }, "synthesizeScenario");
+  if(r.error) return { scenario: "", error: r.error };
+  // Trim outer straight-quotes if the model wrapped the whole scenario.
+  let text = r.text.replace(/^["']|["']$/g, "").trim();
+  return { scenario: text };
 
 // =====================================================================
 // TRACKED INFO — AI-assisted state update
@@ -1066,78 +1082,53 @@ async updateTrackedInfo(currentTrackedInfo, recentMessages, character, personali
     "code fences. Just the plaintext content.",
   ].filter(Boolean).join("\n");
 
-  try {
-    let streamObj = root.aiTextPlugin({
-      instruction,
-      startWith: "",
-      stopSequences: ["\n\n\n---", "\n>>>"],
-    });
-    let data = await streamObj;
-    if(data.stopReason === "error" || !data.generatedText || !data.generatedText.trim()) {
-      return { trackedInfo: current, error: "AI returned empty update" };
-    }
-    let text = data.generatedText.trim();
-    text = text.replace(/^```[a-z]*\s*/i, "").replace(/```\s*$/i, "").trim();
-    text = text.replace(/^["']|["']$/g, "").trim();
-    if(!text) {
-      return { trackedInfo: current, error: "empty output after parsing" };
-    }
-    return { trackedInfo: text };
-  } catch(e) {
-    console.error("updateTrackedInfo failed:", e);
-    return { trackedInfo: current, error: (e && e.message) || String(e) };
-  }
+  let r = await oneShotAi({
+    instruction,
+    startWith: "",
+    stopSequences: ["\n\n\n---", "\n>>>"],
+  }, "updateTrackedInfo");
+  if(r.error) return { trackedInfo: current, error: r.error };
+  // Strip markdown code fences (the model sometimes wraps in ``` despite
+  // being told not to) and any outer straight-quotes.
+  let text = r.text
+    .replace(/^```[a-z]*\s*/i, "").replace(/```\s*$/i, "").trim()
+    .replace(/^["']|["']$/g, "").trim();
+  if(!text) return { trackedInfo: current, error: "empty output after stripping wrappers" };
+  return { trackedInfo: text };
 
 // =====================================================================
 // AVATARS — quick portrait images for the speaker icons
 // =====================================================================
 // One-shot calls (not streams). Returns { url, error? }.
 
+// Build a portrait image-prompt from any subject that has at least one
+// of {appearance, description, name}. Returns "" if the subject has no
+// drawable fields (the caller treats this as "nothing to render").
+buildPortraitPrompt(subject) =>
+  if(!subject) return "";
+  let appearance = subject.appearance ? String(subject.appearance).trim() : "";
+  let desc = subject.description ? String(subject.description).trim() : "";
+  let name = subject.name ? String(subject.name).trim() : "";
+  if(!appearance && !desc && !name) return "";
+  let subjectText = appearance || desc || `a person named ${name}`;
+  return [
+    "portrait of",
+    subjectText,
+    ", head-and-shoulders, centered, vertical composition,",
+    "painted illustration, soft natural lighting,",
+    "single subject, neutral expression, painterly brushwork,",
+    "(resolution:::512x768)",
+  ].join(" ");
+
 async generateCharacterAvatar(character) =>
-  try {
-    let appearance = (character && character.appearance) ? String(character.appearance).trim() : "";
-    let desc = (character && character.description) ? String(character.description).trim() : "";
-    let name = (character && character.name) ? String(character.name).trim() : "";
-    if(!appearance && !desc && !name) return { url: "", error: "no character data to draw from" };
-    let subject = appearance || desc || `a person named ${name}`;
-    let prompt = [
-      "portrait of",
-      subject,
-      ", head-and-shoulders, centered, vertical composition,",
-      "painted illustration, soft natural lighting,",
-      "single subject, neutral expression, painterly brushwork,",
-      "(resolution:::512x768)",
-    ].join(" ");
-    let url = await root.textToImagePlugin({ prompt });
-    if(!url) return { url: "", error: "textToImagePlugin returned empty url" };
-    return { url };
-  } catch(e) {
-    console.error("generateCharacterAvatar failed:", e);
-    return { url: "", error: (e && e.message) || String(e) };
-  }
+  let prompt = buildPortraitPrompt(character);
+  if(!prompt) return { url: "", error: "no character data to draw from" };
+  return await tti({ prompt }, "character avatar");
 
 async generateUserAvatar(personality) =>
-  try {
-    let appearance = (personality && personality.appearance) ? String(personality.appearance).trim() : "";
-    let desc = (personality && personality.description) ? String(personality.description).trim() : "";
-    let name = (personality && personality.name) ? String(personality.name).trim() : "";
-    if(!appearance && !desc && !name) return { url: "", error: "no persona to draw from" };
-    let subject = appearance || desc || `a person named ${name}`;
-    let prompt = [
-      "portrait of",
-      subject,
-      ", head-and-shoulders, centered, vertical composition,",
-      "painted illustration, soft natural lighting,",
-      "single subject, neutral expression, painterly brushwork,",
-      "(resolution:::512x768)",
-    ].join(" ");
-    let url = await root.textToImagePlugin({ prompt });
-    if(!url) return { url: "", error: "textToImagePlugin returned empty url" };
-    return { url };
-  } catch(e) {
-    console.error("generateUserAvatar failed:", e);
-    return { url: "", error: (e && e.message) || String(e) };
-  }
+  let prompt = buildPortraitPrompt(personality);
+  if(!prompt) return { url: "", error: "no persona to draw from" };
+  return await tti({ prompt }, "user avatar");
 
 // =====================================================================
 // confirmAsync — Promise-based confirm dialog
@@ -1558,10 +1549,6 @@ parseTavernCard(obj) =>
     },
   };
 
-// --- Parser: Smart Story native backup -----------------------------
-// Our own export format. Round-trips perfectly. The on-disk format string
-// is "tableau" (preserved from the app's original name) so backups from
-// older builds still detect — do not change the literal string.
 // --- Parser: TavernAI / SillyTavern group chat ---------------------
 // Input: an array of parsed JSONL records from a SillyTavern group chat
 // export (.jsonl file). The first record is the chat header; subsequent
@@ -1741,7 +1728,12 @@ parseJsonlLines(text) =>
   }
   return out;
 
-
+// --- Parser: Smart Story native backup ------------------------------
+// Our own export format ("app" : "tableau"). Round-trips perfectly.
+// The on-disk format string is "tableau" (preserved from the app's
+// original name) so backups from older builds still detect — do not
+// change the literal string.
+parseTableauBackup(obj) =>
   if(!obj || obj.app !== "tableau") return { ok: false, error: "Smart Story: missing app marker" };
   // Smart Story backups carry the full state and are restored by the importer
   // differently — through a dedicated restore path. We still produce the
