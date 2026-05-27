@@ -1,0 +1,417 @@
+<style>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');
+
+:root{
+  --bg:#0d1117; --ink:#e6edf3; --muted:#7d8590; --faint:#21262d;
+  --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --font:'DM Sans',system-ui,sans-serif; --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:14px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);}
+code{font-family:var(--mono);font-size:12px;color:var(--accent);}
+#page{max-width:1200px;margin:0 auto;padding:32px 20px 80px;}
+header{margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid var(--faint);}
+header h1{font-size:24px;font-weight:700;letter-spacing:-.3px;margin-bottom:6px;}
+.lead{color:var(--muted);font-size:14px;max-width:680px;}
+.controls{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;padding:16px;
+  background:var(--faint);border-radius:8px;margin-bottom:14px;}
+.controls .row{display:flex;flex-direction:column;gap:5px;}
+.controls .row.spacer{flex:1;}
+.controls label{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+  color:var(--muted);}
+select,input[type=text],input[type=number]{font:13px var(--mono);background:var(--bg);color:var(--ink);
+  border:1px solid rgba(255,255,255,.12);border-radius:5px;padding:7px 10px;outline:none;}
+select:focus,input:focus{border-color:rgba(68,147,248,.5);}
+input[type=number]{width:110px;}
+select{min-width:140px;}
+button{font:13px var(--font);font-weight:500;background:var(--bg);color:var(--ink);
+  border:1px solid rgba(255,255,255,.12);border-radius:5px;padding:7px 14px;cursor:pointer;}
+button:hover:not(:disabled){border-color:rgba(255,255,255,.3);}
+button:disabled{opacity:.4;cursor:not-allowed;}
+button.primary{background:var(--accent);color:#0d1117;border-color:var(--accent);font-weight:600;
+  padding:8px 18px;}
+button.primary:hover:not(:disabled){background:#58a6ff;}
+button.ghost{background:transparent;}
+.test-info{font-size:13px;color:var(--muted);background:rgba(68,147,248,.08);
+  border-left:3px solid var(--accent);border-radius:0 4px 4px 0;padding:10px 14px;margin-bottom:20px;}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+@media(max-width:980px){.grid{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:520px){.grid{grid-template-columns:1fr;}}
+.cell{display:flex;flex-direction:column;gap:8px;}
+.cell-hdr{display:flex;align-items:baseline;gap:8px;}
+.cell-letter{font:700 13px var(--mono);color:var(--accent);width:18px;}
+.cell-label{font:600 13px var(--mono);color:var(--ink);overflow-wrap:break-word;}
+.img-slot{aspect-ratio:1;background:var(--faint);border:1px solid rgba(255,255,255,.06);
+  border-radius:6px;display:flex;align-items:center;justify-content:center;overflow:hidden;
+  position:relative;}
+.img-slot iframe{width:100%;height:100%;border:0;display:block;background:transparent;}
+.img-slot .empty{color:var(--muted);font-size:12px;text-align:center;padding:20px;font-style:italic;}
+.img-slot .empty.err{color:var(--red);font-style:normal;font-family:var(--mono);font-size:11px;}
+.img-slot .loading{color:var(--accent);font-size:13px;text-align:center;animation:pulse 1.4s ease infinite;}
+.loading-detail{color:var(--muted);font-size:11px;font-family:var(--mono);}
+@keyframes pulse{0%,100%{opacity:.5;}50%{opacity:1;}}
+.prompt-edit{font:11px/1.45 var(--mono);background:var(--faint);color:var(--ink);
+  border:1px solid rgba(255,255,255,.08);border-radius:5px;padding:8px 10px;
+  resize:vertical;min-height:60px;outline:none;width:100%;}
+.prompt-edit:focus{border-color:rgba(68,147,248,.5);}
+.cell-actions{display:flex;gap:6px;}
+.cell-actions button{flex:1;font-size:11px;padding:5px 8px;}
+.copy-prompt-btn.ok{color:var(--green);border-color:rgba(63,185,80,.4);}
+.footer{margin-top:32px;padding-top:20px;border-top:1px solid var(--faint);}
+.hint{color:var(--muted);font-size:12px;}
+</style>
+<div id="page"><p style="color:#7d8590;padding:40px 0;font:13px monospace">Loading...</p></div>
+<script>
+(function(){
+'use strict';
+
+// \u2500\u2500 TEST DEFINITIONS \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// Each test isolates ONE variable across 4 cells.
+// Same seed used for all 4 so any difference = the variable's effect.
+var TESTS = [
+  {
+    id: 'weights-up',
+    name: 'Weight syntax (increase)',
+    info: 'A1111-style attention emphasis. If working: dragon should become more red-prominent across cells. If not: all 4 look similar.',
+    variations: [
+      { label: 'baseline',     prompt: 'a portrait of a red dragon, fantasy art' },
+      { label: '(red)',        prompt: 'a portrait of a (red) dragon, fantasy art' },
+      { label: '((red))',      prompt: 'a portrait of a ((red)) dragon, fantasy art' },
+      { label: '(red:1.5)',    prompt: 'a portrait of a (red:1.5) dragon, fantasy art' },
+    ]
+  },
+  {
+    id: 'weights-down',
+    name: 'Weight syntax (decrease)',
+    info: 'A1111-style de-emphasis. If working: vibrant colors should fade across cells.',
+    variations: [
+      { label: 'baseline',       prompt: 'a vibrant colorful tropical flower' },
+      { label: '\[vibrant\]',      prompt: 'a \[vibrant\] colorful tropical flower' },
+      { label: '(vibrant:0.5)',  prompt: 'a (vibrant:0.5) colorful tropical flower' },
+      { label: '(vibrant:0.2)',  prompt: 'a (vibrant:0.2) colorful tropical flower' },
+    ]
+  },
+  {
+    id: 'inline-seed',
+    name: 'Inline (seed:::N)',
+    info: 'Tests whether inline seed override works. A and B should be identical (both seed=100). C uses 200. D uses param seed.',
+    variations: [
+      { label: 'param seed=100',     prompt: 'a unique flower arrangement',          seedOverride: 100 },
+      { label: '(seed:::100)',       prompt: 'a unique flower arrangement (seed:::100)' },
+      { label: '(seed:::200)',       prompt: 'a unique flower arrangement (seed:::200)' },
+      { label: 'no seed override',   prompt: 'a unique flower arrangement' },
+    ]
+  },
+  {
+    id: 'inline-guidance',
+    name: 'Inline (guidanceScale:::N)',
+    info: 'Low guidance = looser; high = more prompt-faithful. If inline works: A should be loosest, D most rigid.',
+    variations: [
+      { label: '(guidanceScale:::3)',   prompt: 'an abstract painting of cosmic ocean (guidanceScale:::3)' },
+      { label: '(guidanceScale:::7)',   prompt: 'an abstract painting of cosmic ocean (guidanceScale:::7)' },
+      { label: '(guidanceScale:::15)',  prompt: 'an abstract painting of cosmic ocean (guidanceScale:::15)' },
+      { label: '(guidanceScale:::25)',  prompt: 'an abstract painting of cosmic ocean (guidanceScale:::25)' },
+    ]
+  },
+  {
+    id: 'inline-negative',
+    name: 'Inline (negativePrompt:::...)',
+    info: 'A has no negative. B uses param. C and D use inline syntax. If working: B/C should match; D should suppress more.',
+    variations: [
+      { label: 'no negative',           prompt: 'a beautiful landscape painting' },
+      { label: 'param negative',        prompt: 'a beautiful landscape painting',                              neg: 'blurry, ugly' },
+      { label: '(negativePrompt:::)',   prompt: 'a beautiful landscape painting (negativePrompt:::blurry, ugly)' },
+      { label: 'longer inline neg',     prompt: 'a beautiful landscape painting (negativePrompt:::blurry, ugly, low quality, distorted, oversaturated)' },
+    ]
+  },
+  {
+    id: 'inline-resolution',
+    name: 'Inline (resolution:::...)',
+    info: 'Tests whether inline resolution override works. If working: D should be a vertical portrait.',
+    variations: [
+      { label: 'param 512x512',                prompt: 'a tall waterfall scene',                          resOverride: '512x512' },
+      { label: '(resolution:::512x512)',       prompt: 'a tall waterfall scene (resolution:::512x512)' },
+      { label: '(resolution:::768x512)',       prompt: 'a tall waterfall scene (resolution:::768x512)' },
+      { label: '(resolution:::512x768)',       prompt: 'a tall waterfall scene (resolution:::512x768)' },
+    ]
+  },
+  {
+    id: 'prompt-editing',
+    name: 'Prompt editing [A:B:N]',
+    info: 'Switches A to B at step N. If working: C should be a lion-to-wolf blend; D should be more wolf.',
+    variations: [
+      { label: 'baseline: lion',         prompt: 'a majestic lion in a forest' },
+      { label: 'baseline: wolf',         prompt: 'a majestic wolf in a forest' },
+      { label: '\[lion:wolf:0.5\]',        prompt: 'a majestic \[lion:wolf:0.5\] in a forest' },
+      { label: '\[lion:wolf:0.8\]',        prompt: 'a majestic \[lion:wolf:0.8\] in a forest' },
+    ]
+  },
+  {
+    id: 'alternating',
+    name: 'Alternating [A|B]',
+    info: 'Alternates between tokens each step. If working: C and D should show features of both inputs.',
+    variations: [
+      { label: 'baseline: cat',          prompt: 'a small fluffy cat sitting on grass' },
+      { label: 'baseline: dog',          prompt: 'a small fluffy dog sitting on grass' },
+      { label: '\[cat|dog\]',              prompt: 'a small fluffy \[cat|dog\] sitting on grass' },
+      { label: '\[cat|dog|rabbit\]',       prompt: 'a small fluffy \[cat|dog|rabbit\] sitting on grass' },
+    ]
+  },
+  {
+    id: 'compositional',
+    name: 'Compositional AND / BREAK',
+    info: 'Compositional diffusion separators. If working: C/D should show two distinct scenes side-by-side or composed.',
+    variations: [
+      { label: 'commas',                 prompt: 'a forest, a beach, single image' },
+      { label: 'AND uppercase',          prompt: 'a forest AND a beach' },
+      { label: 'and lowercase',          prompt: 'a forest and a beach' },
+      { label: 'BREAK',                  prompt: 'a forest BREAK a beach' },
+    ]
+  },
+  {
+    id: 'custom',
+    name: 'Custom \u2014 edit all 4 freely',
+    info: 'Edit all four prompts directly. Same seed across all 4. Use this to test arbitrary syntax.',
+    variations: [
+      { label: 'A', prompt: 'a serene mountain landscape at sunset' },
+      { label: 'B', prompt: 'a serene mountain landscape at sunset' },
+      { label: 'C', prompt: 'a serene mountain landscape at sunset' },
+      { label: 'D', prompt: 'a serene mountain landscape at sunset' },
+    ]
+  },
+];
+
+var state = {
+  testId: TESTS[0].id,
+  seed: Math.floor(Math.random() * 1000000),
+  resolution: '512x512',
+  guidanceScale: 7,
+  prompts: ['', '', '', ''],
+};
+
+function el(id) { return document.getElementById(id); }
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function currentTest() { return TESTS.find(function(t){ return t.id === state.testId; }); }
+
+function copy(text, btn) {
+  var t = btn.textContent;
+  (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).catch(function() {
+    var a = document.createElement('textarea'); a.value = text;
+    document.body.appendChild(a); a.select();
+    try { document.execCommand('copy'); } catch(e) {}
+    document.body.removeChild(a);
+  });
+  btn.textContent = 'copied'; btn.classList.add('ok');
+  setTimeout(function() { btn.textContent = t; btn.classList.remove('ok'); }, 1500);
+}
+
+// \u2500\u2500 RENDER PAGE \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function renderPage() {
+  document.title = 'Image Gen Test Rig';
+
+  var testOptions = TESTS.map(function(t) {
+    return '<option value="' + t.id + '"' + (t.id === state.testId ? ' selected' : '') + '>' + esc(t.name) + '</option>';
+  }).join('');
+
+  document.getElementById('page').innerHTML =
+
+    '<header>' +
+      '<h1>Image Gen Test Rig</h1>' +
+      '<p class="lead">Generate 4 variations side-by-side with the same seed. Verify which Perchance image-generation syntax actually does anything.</p>' +
+    '</header>' +
+
+    // CONTROLS
+    '<div class="controls">' +
+      '<div class="row">' +
+        '<label>Test</label>' +
+        '<select id="ctl-test">' + testOptions + '</select>' +
+      '</div>' +
+      '<div class="row">' +
+        '<label>Seed</label>' +
+        '<input type="number" id="ctl-seed" value="' + state.seed + '">' +
+        '<button id="ctl-rand" class="ghost" title="Randomize seed">\uD83C\uDFB2</button>' +
+      '</div>' +
+      '<div class="row">' +
+        '<label>Resolution</label>' +
+        '<select id="ctl-res">' +
+          ['512x512', '512x768', '768x512', '768x768'].map(function(r) {
+            return '<option' + (r === state.resolution ? ' selected' : '') + '>' + r + '</option>';
+          }).join('') +
+        '</select>' +
+      '</div>' +
+      '<div class="row">' +
+        '<label>Guidance</label>' +
+        '<input type="number" id="ctl-cfg" value="' + state.guidanceScale + '" min="1" max="30">' +
+      '</div>' +
+      '<div class="row spacer"></div>' +
+      '<button id="ctl-go" class="primary">Generate 4 images</button>' +
+    '</div>' +
+
+    // TEST INFO
+    '<div id="test-info" class="test-info"></div>' +
+
+    // 4-COLUMN GRID
+    '<div class="grid" id="cell-grid">' +
+      [0,1,2,3].map(function(i) {
+        return (
+          '<div class="cell" data-i="' + i + '">' +
+            '<div class="cell-hdr">' +
+              '<span class="cell-letter">' + 'ABCD'[i] + '</span>' +
+              '<span class="cell-label" id="lbl-' + i + '">\u2014</span>' +
+            '</div>' +
+            '<div class="img-slot" id="img-' + i + '">' +
+              '<div class="empty">Click Generate to begin</div>' +
+            '</div>' +
+            '<textarea class="prompt-edit" id="prompt-' + i + '" rows="3" placeholder="Prompt for this cell"></textarea>' +
+            '<div class="cell-actions">' +
+              '<button class="copy-prompt-btn" data-i="' + i + '">Copy prompt</button>' +
+              '<button class="regen-btn" data-i="' + i + '">\u21BB Regenerate</button>' +
+            '</div>' +
+          '</div>'
+        );
+      }).join('') +
+    '</div>' +
+
+    // FOOTER
+    '<div class="footer">' +
+      '<p class="hint">\uD83D\uDCA1 Same seed across all 4 means any visual difference is caused by the syntax variation \u2014 not random noise. Switch tests with the dropdown above. Regenerate individual cells to test edits.</p>' +
+    '</div>';
+
+  // Wire events
+  el('ctl-test').onchange = function() {
+    state.testId = this.value;
+    loadTest();
+  };
+  el('ctl-seed').oninput = function() { state.seed = parseInt(this.value) || 0; };
+  el('ctl-rand').onclick = function() {
+    state.seed = Math.floor(Math.random() * 1000000);
+    el('ctl-seed').value = state.seed;
+  };
+  el('ctl-res').onchange = function() { state.resolution = this.value; };
+  el('ctl-cfg').oninput = function() { state.guidanceScale = parseInt(this.value) || 7; };
+  el('ctl-go').onclick = generateAll;
+
+  document.querySelectorAll('.copy-prompt-btn').forEach(function(btn) {
+    btn.onclick = function() {
+      var i = parseInt(btn.dataset.i);
+      copy(el('prompt-' + i).value, btn);
+    };
+  });
+  document.querySelectorAll('.regen-btn').forEach(function(btn) {
+    btn.onclick = function() {
+      var i = parseInt(btn.dataset.i);
+      regenerateOne(i);
+    };
+  });
+
+  loadTest();
+}
+
+// \u2500\u2500 LOAD TEST CONFIG \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function loadTest() {
+  var t = currentTest();
+  el('test-info').textContent = t.info;
+  t.variations.forEach(function(v, i) {
+    el('lbl-' + i).textContent = v.label;
+    el('prompt-' + i).value = v.prompt;
+    state.prompts[i] = v.prompt;
+    el('img-' + i).innerHTML = '<div class="empty">Click Generate</div>';
+  });
+}
+
+// \u2500\u2500 GENERATE (SEQUENTIAL) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// We fire one at a time so the queue doesn't stack up. Each call awaits
+// the plugin's onFinish callback before starting the next cell.
+var generationRunId = 0; // bumped to cancel in-flight runs
+
+async function generateAll() {
+  var myRunId = ++generationRunId;
+  // Capture latest prompt edits
+  for (var i = 0; i < 4; i++) state.prompts[i] = el('prompt-' + i).value;
+  // Mark all cells as queued
+  for (var j = 0; j < 4; j++) {
+    el('img-' + j).innerHTML = '<div class="empty">Queued\u2026</div>';
+  }
+  el('ctl-go').disabled = true;
+  var origText = el('ctl-go').textContent;
+  try {
+    for (var k = 0; k < 4; k++) {
+      if (myRunId !== generationRunId) return; // newer run started, abandon
+      el('ctl-go').textContent = 'Generating ' + (k + 1) + ' / 4\u2026';
+      await generateCell(k);
+    }
+  } finally {
+    if (myRunId === generationRunId) {
+      el('ctl-go').disabled = false;
+      el('ctl-go').textContent = origText;
+    }
+  }
+}
+
+function generateCell(i) {
+  return new Promise(function(resolve) {
+    var t = currentTest();
+    var variation = t.variations[i];
+    var prompt = el('prompt-' + i).value;
+
+    if (!prompt.trim()) {
+      el('img-' + i).innerHTML = '<div class="empty err">Empty prompt</div>';
+      resolve(); return;
+    }
+
+    var opts = {
+      prompt: prompt,
+      seed: variation.seedOverride !== undefined ? variation.seedOverride : state.seed,
+      resolution: variation.resOverride !== undefined ? variation.resOverride : state.resolution,
+      guidanceScale: state.guidanceScale,
+      onFinish: function(data) {
+        if (!settled) { settled = true; resolve(data); }
+      }
+    };
+    if (variation.neg) opts.negativePrompt = variation.neg;
+
+    var settled = false;
+    // Safety timeout \u2014 if onFinish never fires, don't block the queue forever
+    var timeoutMs = 90000;
+    setTimeout(function() {
+      if (!settled) { settled = true; resolve(); }
+    }, timeoutMs);
+
+    el('img-' + i).innerHTML = '<div class="loading">Generating\u2026<br><span class="loading-detail">seed ' + opts.seed + '</span></div>';
+
+    try {
+      var iframeHtml = String(root.image(opts));
+      el('img-' + i).innerHTML = iframeHtml;
+    } catch (e) {
+      el('img-' + i).innerHTML = '<div class="empty err">' + esc(e.message) + '</div>';
+      if (!settled) { settled = true; resolve(); }
+    }
+  });
+}
+
+// Single-cell regenerate (skips the queue logic \u2014 only one request anyway)
+function regenerateOne(i) {
+  state.prompts[i] = el('prompt-' + i).value;
+  generateCell(i);
+}
+
+// \u2500\u2500 INIT \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function init() {
+  if (typeof root === 'undefined' || !root.image) {
+    document.getElementById('page').innerHTML =
+      '<p style="color:#f85149;padding:20px;font:13px monospace">' +
+      'text-to-image-plugin not loaded. Make sure it\'s imported in the lists editor as: image = '+String.fromCharCode(123)+'import:text-to-image-plugin'+String.fromCharCode(125) +
+      '</p>';
+    return;
+  }
+  renderPage();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() { setTimeout(init, 2000); });
+} else {
+  setTimeout(init, 2000);
+}
+})();
+
+</script>
