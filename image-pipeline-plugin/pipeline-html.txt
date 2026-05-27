@@ -1,0 +1,182 @@
+<style>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');
+:root{
+  --bg:#0d1117;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;
+  --accent:#4493f8;--green:#3fb950;--red:#f85149;--yellow:#d29922;
+  --font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.7 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);}
+code{font-family:var(--mono);font-size:12px;color:var(--accent);}
+pre{font:12px/1.6 var(--mono);background:var(--faint);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:16px;overflow-x:auto;white-space:pre;color:var(--ink);}
+#page{max-width:760px;margin:0 auto;padding:48px 24px 100px;}
+header,.hero{margin-bottom:56px;}
+h1{font-size:28px;font-weight:700;letter-spacing:-.5px;line-height:1.2;margin-bottom:10px;}
+h2{font-size:17px;font-weight:600;margin:0;}
+p{color:var(--muted);margin-bottom:10px;}
+p:last-child{margin-bottom:0;}
+p strong,p em{color:var(--ink);}
+.lead{font-size:16px;color:var(--muted);max-width:560px;margin-bottom:20px;}
+.breadcrumb{font-size:13px;margin-bottom:16px;}
+.breadcrumb a{color:var(--muted);text-decoration:none;}
+.breadcrumb a:hover{color:var(--ink);}
+.pill-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
+.pill{font:11px/1 var(--mono);border:1px solid var(--faint);border-radius:20px;padding:4px 10px;color:var(--muted);}
+.pill.version{color:var(--accent);border-color:rgba(68,147,248,.3);}
+.block{margin-bottom:48px;}
+.block .label{font:700 11px var(--mono);letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
+.code-line{display:flex;align-items:center;gap:10px;background:var(--faint);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:12px 14px;font-family:var(--mono);font-size:13px;margin-bottom:14px;}
+.code-line code{flex:1;color:var(--ink);font-size:13px;}
+.usecases{display:grid;gap:18px;}
+.usecases dt{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:2px;}
+.usecases dd{color:var(--muted);font-size:14px;}
+.api{width:100%;border-collapse:collapse;font-size:13px;}
+.api th{text-align:left;padding:8px 12px 8px 0;font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--faint);}
+.api td{padding:9px 12px 9px 0;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:top;}
+.api tr:last-child td{border-bottom:0;}
+.api td:first-child{font-family:var(--mono);font-size:12px;color:var(--accent);white-space:nowrap;padding-right:16px;}
+.api td:nth-child(2){color:var(--muted);white-space:nowrap;padding-right:16px;}
+.api td:last-child{color:var(--muted);}
+.cta-link{display:inline-block;margin-top:14px;font-size:14px;font-weight:500;}
+button{font:13px var(--font);font-weight:500;background:var(--faint);color:var(--ink);border:1px solid rgba(255,255,255,.12);border-radius:5px;padding:8px 14px;cursor:pointer;}
+button:hover:not(:disabled){border-color:rgba(255,255,255,.3);}
+button:disabled{opacity:.4;cursor:not-allowed;}
+button.primary{background:var(--accent);color:#0d1117;border-color:var(--accent);font-weight:600;}
+button.primary:hover:not(:disabled){background:#58a6ff;}
+.btn-copy{font:11px var(--mono);padding:5px 10px;background:transparent;color:var(--muted);border:1px solid var(--faint);border-radius:4px;cursor:pointer;}
+.btn-copy:hover{color:var(--ink);border-color:var(--muted);}
+.btn-copy.ok{color:var(--green);border-color:rgba(63,185,80,.4);}
+input[type=text],input[type=number],textarea,select{font:13px var(--mono);background:var(--faint);color:var(--ink);border:1px solid rgba(255,255,255,.1);border-radius:5px;padding:8px 11px;outline:none;width:100%;}
+input:focus,textarea:focus,select:focus{border-color:rgba(68,147,248,.5);}
+textarea{resize:vertical;min-height:80px;line-height:1.5;}
+.row{display:flex;gap:8px;margin-bottom:10px;}
+.row input{flex:1;}
+.notes ul{padding-left:18px;color:var(--muted);font-size:13px;}
+.notes li{margin-bottom:8px;line-height:1.6;}
+.note{font-size:12px;color:var(--muted);}
+.muted{color:var(--muted);}
+.err{color:var(--red);font-size:13px;}
+.ok{color:var(--green);}
+.warn{color:var(--yellow);}
+.demo{padding:32px 0;border-top:1px solid var(--faint);}
+.demo:first-child{border-top:0;padding-top:0;}
+.demo-meta{display:flex;align-items:baseline;gap:14px;margin-bottom:12px;}
+.demo-meta .n{font:700 11px var(--mono);color:var(--faint);letter-spacing:1px;}
+.demo-meta h2{margin-bottom:4px;}
+.stat{font:13px var(--mono);color:var(--muted);padding:4px 0;}
+.stat .val{color:var(--ink);font-weight:600;}
+.stat .accent{color:var(--accent);}
+.metric-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:14px;}
+.metric{background:var(--faint);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:10px 12px;}
+.metric .label{font:10px var(--mono);text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px;}
+.metric .value{font:600 18px var(--mono);color:var(--ink);}
+.metric .value.dim{color:var(--muted);}
+.metric .value.ok{color:var(--green);}
+.metric .value.warn{color:var(--yellow);}
+.metric .value.err{color:var(--red);}
+</style>
+<div id="page"><p style="color:#7d8590;padding:40px 0;font:13px monospace">Loading...</p></div>
+<script>
+(function(){
+'use strict';
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function copy(text,btn){
+  var t=btn.textContent;
+  (navigator.clipboard?navigator.clipboard.writeText(text):Promise.reject()).catch(function(){});
+  btn.textContent='Copied';btn.classList.add('ok');
+  setTimeout(function(){btn.textContent=t;btn.classList.remove('ok');},2000);
+}
+
+function renderPage(slug){
+  var LB=String.fromCharCode(123),RB=String.fromCharCode(125);
+  var importLine='pipeline = '+LB+'import:'+slug+RB;
+  document.title='Custom Image Pipeline Plugin';
+  document.getElementById('page').innerHTML=
+
+  '<div class="hero">'+
+    '<h1>custom-image-pipeline-plugin</h1>'+
+    '<p class="lead">A higher\u2011level wrapper around <code>text\u2011to\u2011image\u2011plugin</code> with Promise\u2011based generation, batching, style presets, and retry logic.</p>'+
+    '<div class="pill-row">'+
+      '<span class="pill version">v1.0.0</span>'+
+      '<span class="pill">text-to-image-plugin</span>'+
+    '</div>'+
+  '</div>'+
+
+  '<div class="block">'+
+    '<div class="label">Installation</div>'+
+    '<p>Add to your <strong>lists editor</strong>:</p>'+
+    '<div class="code-line">'+
+      '<code id="install-code">'+esc(importLine)+'</code>'+
+      '<button id="install-copy" class="btn-copy">Copy</button>'+
+    '</div>'+
+    '<p>Then in your HTML panel script:</p>'+
+    '<pre>setTimeout(async function() {\n  var pipe = window.__imagePipeline;\n  // generate one image, wait for it to finish\n  var result = await pipe.generate({\n    prompt: pipe.withStyle("a forest temple", "cinematic"),\n    resolution: pipe.resolutions.landscape,\n    into: "#my-image"\n  });\n  console.log(result.imageId);\n}, 2000);</pre>'+
+  '</div>'+
+
+  '<div class="block">'+
+    '<div class="label">What it does</div>'+
+    '<p>The raw <code>text\u2011to\u2011image\u2011plugin</code> returns iframe HTML synchronously and you have to deal with timing yourself. This wrapper gives you a clean Promise\u2011based API and adds:</p>'+
+    '<ul class="notes" style="padding-left:18px">'+
+      '<li><strong>Style presets</strong> \u2014 positive\u2011prompt\u2011only style modifiers (since negative prompts are silently ignored by Perchance\u2019s backend).</li>'+
+      '<li><strong>Batch generation</strong> \u2014 generate N variations of a prompt sequentially with progress callbacks.</li>'+
+      '<li><strong>Async/await</strong> \u2014 each generation resolves when complete, with the actual result data.</li>'+
+      '<li><strong>Auto\u2011retry</strong> \u2014 exponential backoff on failure.</li>'+
+      '<li><strong>Resolution helpers</strong> \u2014 named presets instead of remembering "512x768" vs "768x512".</li>'+
+    '</ul>'+
+  '</div>'+
+
+  '<div class="block">'+
+    '<div class="label">What can I build with it?</div>'+
+    '<dl class="usecases">'+
+      '<dt>Variation grids</dt>'+
+      '<dd>Generate 4\u20139 images with the same prompt and a different seed each. Show them in a grid for the user to pick favorites.</dd>'+
+      '<dt>Multi-step pipelines</dt>'+
+      '<dd>Run a sequence of related images (different styles, different angles, different subjects) and let the user compare side-by-side.</dd>'+
+      '<dt>Style explorers</dt>'+
+      '<dd>Apply 10 style presets to the same prompt and let the user pick which aesthetic they prefer before committing to a high-resolution render.</dd>'+
+      '<dt>Reliable batch generation</dt>'+
+      '<dd>Auto-retry on transient failures so a long batch run doesn\u2019t give up on the first hiccup.</dd>'+
+    '</dl>'+
+    '<p><a class="cta-link" href="https://perchance.org/image-pipeline-plugin-example" target="_blank">See it running live at the example page \u2192</a></p>'+
+  '</div>'+
+
+  '<div class="block">'+
+    '<div class="label">API reference</div>'+
+    '<table class="api">'+
+      '<thead><tr><th>Method</th><th>Returns</th><th>Description</th></tr></thead>'+
+      '<tbody>'+
+        '<tr><td>pipe.embed(opts)</td><td>string</td><td>Synchronous: returns iframe HTML to insert directly.</td></tr>'+
+        '<tr><td>pipe.generate(opts)</td><td>Promise</td><td>Async: generates, waits, resolves with result data. Pass <code>into: "#selector"</code> to auto-insert.</td></tr>'+
+        '<tr><td>pipe.batch(opts, n, onProgress)</td><td>Promise&lt;array&gt;</td><td>Sequential batch of N images. Auto-varies seed.</td></tr>'+
+        '<tr><td>pipe.variations(prompts, sharedOpts, onProgress)</td><td>Promise&lt;array&gt;</td><td>Each prompt in the array generates with shared options.</td></tr>'+
+        '<tr><td>pipe.generateWithRetry(opts, n)</td><td>Promise</td><td>Auto-retry up to N times with exponential backoff.</td></tr>'+
+        '<tr><td>pipe.withStyle(prompt, name)</td><td>string</td><td>Returns prompt with style preset appended.</td></tr>'+
+        '<tr><td>pipe.styles</td><td>object</td><td>Map of style preset names to suffix strings.</td></tr>'+
+        '<tr><td>pipe.styleNames()</td><td>string[]</td><td>List of available style names.</td></tr>'+
+        '<tr><td>pipe.resolutions</td><td>object</td><td>Named presets: square, portrait, landscape, largeSquare.</td></tr>'+
+      '</tbody>'+
+    '</table>'+
+  '</div>'+
+
+  '<div class="block notes">'+
+    '<div class="label">Notes</div>'+
+    '<ul>'+
+      '<li><strong>Negative prompts don\u2019t work on Perchance.</strong> Empirically verified: <code>negativePrompt</code> reaches the broker but the backend silently ignores it. This plugin focuses on positive\u2011only style control.</li>'+
+      '<li>For Promise\u2011based <code>pipe.generate(opts)</code> to fire, the resulting iframe must be inserted into a visible part of the page (the underlying plugin uses an IntersectionObserver to lazy\u2011load). Pass <code>into: "#mySelector"</code> or use <code>pipe.embed(opts)</code> directly and insert it yourself.</li>'+
+      '<li>Available style presets: photo, cinematic, anime, painting, digital, watercolor, sketch, lowpoly, pixelart, cyberpunk. See <code>pipe.styles</code> for the full text appended to your prompt.</li>'+
+    '</ul>'+
+  '</div>';
+
+  document.getElementById('install-copy').onclick=function(){copy(importLine,this);};
+}
+
+async function init(){
+  var slug='custom-image-pipeline-plugin';
+  try { slug = root.$moduleName || window.generatorName || slug; } catch(e) {}
+  renderPage(slug);
+}
+if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',function(){setTimeout(init,1500);});}
+else{setTimeout(init,1500);}
+})();
+
+</script>

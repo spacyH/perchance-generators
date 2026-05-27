@@ -1,0 +1,142 @@
+$meta
+  title       = Custom Image Pipeline Plugin
+  description = A higher-level wrapper around Perchance's text-to-image-plugin with batching, async Promise-based generation, style presets, automatic retry on failure, and resolution helpers. Since negative prompts are silently ignored by Perchance's backend, this plugin focuses on positive-prompt-only style control.
+  tags        = plugin, image, pipeline, batch, style, t2i
+
+image = {import:text-to-image-plugin}
+
+$output() =>
+  // Idempotency: if already built, return cached
+  if (window.__imagePipeline) return window.__imagePipeline;
+  
+  // ── Custom Image Pipeline Plugin ──
+  // Wraps text-to-image-plugin with Promise-based async generation,
+  // batching, style presets, and retry logic.
+  
+  const api = {};
+  
+  // Resolution presets
+  api.resolutions = {
+    square: "512x512",
+    portrait: "512x768",
+    landscape: "768x512",
+    largeSquare: "768x768"
+  };
+  
+  // Positive-only style presets (negatives don't work on Perchance)
+  api.styles = {
+    photo:      ", photorealistic, sharp focus, detailed, 8k, professional photography",
+    cinematic:  ", cinematic shot, dramatic lighting, depth of field, film grain, atmospheric",
+    anime:      ", anime style, cel shaded, vibrant, detailed line art",
+    painting:   ", oil painting, classical art, brush strokes, painterly, masterpiece",
+    digital:    ", digital art, concept art, trending on artstation, highly detailed",
+    watercolor: ", watercolor painting, soft edges, paper texture, flowing colors",
+    sketch:     ", pencil sketch, hand drawn, graphite, shading, detailed lines",
+    lowpoly:    ", low poly 3d render, geometric, isometric, minimalist",
+    pixelart:   ", pixel art, 16-bit style, retro game graphics, pixelated",
+    cyberpunk:  ", cyberpunk, neon lights, futuristic, blade runner aesthetic, rain"
+  };
+  
+  api.styleNames = () => Object.keys(api.styles);
+  
+  // Apply a style preset to a prompt (positive-only since negatives don't reach backend)
+  api.withStyle = (prompt, styleName) => {
+    const suffix = api.styles[styleName] || "";
+    return String(prompt) + suffix;
+  };
+  
+  // Synchronous: returns the iframe HTML to insert into the DOM
+  api.embed = (opts) => String(image(opts));
+  
+  // Async: generates one image, resolves with the result data
+  // (includes imageId, prompt, seed, etc.)
+  api.generate = (opts) => {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const enriched = Object.assign({}, opts, {
+        onFinish: (data) => {
+          if (settled) return;
+          settled = true;
+          resolve(data);
+        }
+      });
+      const html = api.embed(enriched);
+      // Caller must insert the html somewhere visible for generation to start.
+      enriched.__iframeHtml = html;
+      // Resolve via embed return value
+      try {
+        if (opts.into) {
+          const target = typeof opts.into === "string" ? document.querySelector(opts.into) : opts.into;
+          if (target) target.innerHTML = html;
+        }
+      } catch (e) { /* ignore */ }
+      
+      // Timeout safety
+      const ms = opts.timeoutMs || 120000;
+      setTimeout(() => {
+        if (!settled) { settled = true; reject(new Error("Generation timeout after " + ms + "ms")); }
+      }, ms);
+    });
+  };
+  
+  // Generate N images sequentially with the same prompt (for variation)
+  // Optionally pass onProgress(index, total, data) for live updates
+  api.batch = async (opts, count, onProgress) => {
+    const results = [];
+    for (let i = 0; i < count; i++) {
+      try {
+        const cellOpts = Object.assign({}, opts);
+        // Per-cell unique seed if not specified
+        if (cellOpts.seed === undefined || cellOpts.seed === -1) {
+          cellOpts.seed = Math.floor(Math.random() * 1000000);
+        } else if (i > 0) {
+          // Each subsequent cell increments the seed for variation
+          cellOpts.seed = opts.seed + i;
+        }
+        const data = await api.generate(cellOpts);
+        results.push(data);
+        if (onProgress) onProgress(i + 1, count, data);
+      } catch (e) {
+        results.push({ error: e.message });
+        if (onProgress) onProgress(i + 1, count, { error: e.message });
+      }
+    }
+    return results;
+  };
+  
+  // Variations: same opts but different prompts, sequential
+  api.variations = async (prompts, sharedOpts, onProgress) => {
+    const results = [];
+    for (let i = 0; i < prompts.length; i++) {
+      try {
+        const cellOpts = Object.assign({}, sharedOpts, { prompt: prompts[i] });
+        const data = await api.generate(cellOpts);
+        results.push(data);
+        if (onProgress) onProgress(i + 1, prompts.length, data);
+      } catch (e) {
+        results.push({ error: e.message, prompt: prompts[i] });
+      }
+    }
+    return results;
+  };
+  
+  // Auto-retry on failure
+  api.generateWithRetry = async (opts, maxRetries) => {
+    maxRetries = maxRetries || 3;
+    let lastError;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await api.generate(opts);
+      } catch (e) {
+        lastError = e;
+        // Wait with exponential backoff
+        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
+      }
+    }
+    throw lastError;
+  };
+  
+  // Stash for cross-script access
+  window.__imagePipeline = api;
+  
+  return api;

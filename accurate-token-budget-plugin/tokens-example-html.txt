@@ -1,0 +1,348 @@
+<style>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');
+:root{
+  --bg:#0d1117;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;
+  --accent:#4493f8;--green:#3fb950;--red:#f85149;--yellow:#d29922;
+  --font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.7 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);}
+code{font-family:var(--mono);font-size:12px;color:var(--accent);}
+pre{font:12px/1.6 var(--mono);background:var(--faint);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:16px;overflow-x:auto;white-space:pre;color:var(--ink);}
+#page{max-width:760px;margin:0 auto;padding:48px 24px 100px;}
+header,.hero{margin-bottom:56px;}
+h1{font-size:28px;font-weight:700;letter-spacing:-.5px;line-height:1.2;margin-bottom:10px;}
+h2{font-size:17px;font-weight:600;margin:0;}
+p{color:var(--muted);margin-bottom:10px;}
+p:last-child{margin-bottom:0;}
+p strong,p em{color:var(--ink);}
+.lead{font-size:16px;color:var(--muted);max-width:560px;margin-bottom:20px;}
+.breadcrumb{font-size:13px;margin-bottom:16px;}
+.breadcrumb a{color:var(--muted);text-decoration:none;}
+.breadcrumb a:hover{color:var(--ink);}
+.pill-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
+.pill{font:11px/1 var(--mono);border:1px solid var(--faint);border-radius:20px;padding:4px 10px;color:var(--muted);}
+.pill.version{color:var(--accent);border-color:rgba(68,147,248,.3);}
+.block{margin-bottom:48px;}
+.block .label{font:700 11px var(--mono);letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
+.code-line{display:flex;align-items:center;gap:10px;background:var(--faint);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:12px 14px;font-family:var(--mono);font-size:13px;margin-bottom:14px;}
+.code-line code{flex:1;color:var(--ink);font-size:13px;}
+.usecases{display:grid;gap:18px;}
+.usecases dt{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:2px;}
+.usecases dd{color:var(--muted);font-size:14px;}
+.api{width:100%;border-collapse:collapse;font-size:13px;}
+.api th{text-align:left;padding:8px 12px 8px 0;font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--faint);}
+.api td{padding:9px 12px 9px 0;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:top;}
+.api tr:last-child td{border-bottom:0;}
+.api td:first-child{font-family:var(--mono);font-size:12px;color:var(--accent);white-space:nowrap;padding-right:16px;}
+.api td:nth-child(2){color:var(--muted);white-space:nowrap;padding-right:16px;}
+.api td:last-child{color:var(--muted);}
+.cta-link{display:inline-block;margin-top:14px;font-size:14px;font-weight:500;}
+button{font:13px var(--font);font-weight:500;background:var(--faint);color:var(--ink);border:1px solid rgba(255,255,255,.12);border-radius:5px;padding:8px 14px;cursor:pointer;}
+button:hover:not(:disabled){border-color:rgba(255,255,255,.3);}
+button:disabled{opacity:.4;cursor:not-allowed;}
+button.primary{background:var(--accent);color:#0d1117;border-color:var(--accent);font-weight:600;}
+button.primary:hover:not(:disabled){background:#58a6ff;}
+.btn-copy{font:11px var(--mono);padding:5px 10px;background:transparent;color:var(--muted);border:1px solid var(--faint);border-radius:4px;cursor:pointer;}
+.btn-copy:hover{color:var(--ink);border-color:var(--muted);}
+.btn-copy.ok{color:var(--green);border-color:rgba(63,185,80,.4);}
+input[type=text],input[type=number],textarea,select{font:13px var(--mono);background:var(--faint);color:var(--ink);border:1px solid rgba(255,255,255,.1);border-radius:5px;padding:8px 11px;outline:none;width:100%;}
+input:focus,textarea:focus,select:focus{border-color:rgba(68,147,248,.5);}
+textarea{resize:vertical;min-height:80px;line-height:1.5;}
+.row{display:flex;gap:8px;margin-bottom:10px;}
+.row input{flex:1;}
+.notes ul{padding-left:18px;color:var(--muted);font-size:13px;}
+.notes li{margin-bottom:8px;line-height:1.6;}
+.note{font-size:12px;color:var(--muted);}
+.muted{color:var(--muted);}
+.err{color:var(--red);font-size:13px;}
+.ok{color:var(--green);}
+.warn{color:var(--yellow);}
+.demo{padding:32px 0;border-top:1px solid var(--faint);}
+.demo:first-child{border-top:0;padding-top:0;}
+.demo-meta{display:flex;align-items:baseline;gap:14px;margin-bottom:12px;}
+.demo-meta .n{font:700 11px var(--mono);color:var(--faint);letter-spacing:1px;}
+.demo-meta h2{margin-bottom:4px;}
+.stat{font:13px var(--mono);color:var(--muted);padding:4px 0;}
+.stat .val{color:var(--ink);font-weight:600;}
+.stat .accent{color:var(--accent);}
+.metric-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:14px;}
+.metric{background:var(--faint);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:10px 12px;}
+.metric .label{font:10px var(--mono);text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px;}
+.metric .value{font:600 18px var(--mono);color:var(--ink);}
+.metric .value.dim{color:var(--muted);}
+.metric .value.ok{color:var(--green);}
+.metric .value.warn{color:var(--yellow);}
+.metric .value.err{color:var(--red);}
+</style>
+<div id="page"><p style="color:#7d8590;padding:40px 0;font:13px monospace">Loading...</p></div>
+<script>
+(function(){
+'use strict';
+var tok = null;
+
+function el(id){return document.getElementById(id);}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function renderPage(){
+  document.title = 'Token Budget \u2014 Examples';
+  document.getElementById('page').innerHTML =
+    '<header>' +
+      '<div class="breadcrumb"><a href="https://perchance.org/accurate-token-budget-plugin" target="_blank">\u2190 accurate-token-budget-plugin</a></div>' +
+      '<h1>Examples</h1>' +
+      '<p class="lead">Live token counting using the DeepSeek\u2011R1 tokenizer.</p>' +
+      '<div id="status" class="stat">Tokenizer status: <span class="val" id="status-val">not loaded</span></div>' +
+    '</header>' +
+
+    // 01 Live counter
+    '<section class="demo">' +
+      '<div class="demo-meta"><span class="n">01</span><h2>Live token counter</h2></div>' +
+      '<p>Type into the box. The exact token count updates after each keystroke (with the DeepSeek\u2011R1 tokenizer).</p>' +
+      '<textarea id="live-input" rows="6" placeholder="Paste any text here\u2026">The quick brown fox jumps over the lazy dog. This sentence has exactly enough common English words to demonstrate how tokenization works.</textarea>' +
+      '<div class="metric-row" style="margin-top:10px">' +
+        '<div class="metric"><div class="label">Characters</div><div class="value" id="m-chars">0</div></div>' +
+        '<div class="metric"><div class="label">Estimate (chars/4)</div><div class="value dim" id="m-est">0</div></div>' +
+        '<div class="metric"><div class="label">Exact tokens</div><div class="value" id="m-exact">\u2014</div></div>' +
+        '<div class="metric"><div class="label">Words</div><div class="value dim" id="m-words">0</div></div>' +
+      '</div>' +
+    '</section>' +
+
+    // 02 Budget check
+    '<section class="demo">' +
+      '<div class="demo-meta"><span class="n">02</span><h2>Budget check</h2></div>' +
+      '<p>Set a token budget and see whether the text above fits.</p>' +
+      '<div class="row">' +
+        '<input type="number" id="budget-max" value="100" min="1" max="100000" style="flex:0 0 140px">' +
+        '<span class="stat" style="line-height:32px">max tokens</span>' +
+      '</div>' +
+      '<div id="budget-result" class="stat" style="margin-top:8px">Enter text above and a budget here.</div>' +
+    '</section>' +
+
+    // 03 Truncate
+    '<section class="demo">' +
+      '<div class="demo-meta"><span class="n">03</span><h2>Truncate to fit</h2></div>' +
+      '<p>Trim the text above to fit within a budget. Choose start- or end-preserving.</p>' +
+      '<div class="row">' +
+        '<input type="number" id="trunc-max" value="20" min="1" max="10000" style="flex:0 0 140px">' +
+        '<button id="trunc-start">Keep start</button>' +
+        '<button id="trunc-end">Keep end</button>' +
+      '</div>' +
+      '<pre id="trunc-result" style="white-space:pre-wrap;word-break:break-word">(click a button)</pre>' +
+    '</section>' +
+
+    // 04 Chunk
+    '<section class="demo">' +
+      '<div class="demo-meta"><span class="n">04</span><h2>Chunk a long document</h2></div>' +
+      '<p>Split the text above into N-token chunks for RAG-style processing.</p>' +
+      '<div class="row">' +
+        '<input type="number" id="chunk-size" value="15" min="1" max="2000" style="flex:0 0 140px">' +
+        '<button id="chunk-btn">Chunk</button>' +
+      '</div>' +
+      '<div id="chunk-result"></div>' +
+    '</section>' +
+
+    // 05 Chat budget
+    '<section class="demo">' +
+      '<div class="demo-meta"><span class="n">05</span><h2>Chat history budget</h2></div>' +
+      '<p>Tracks token usage across a multi-message conversation. Simulates an AI chat context window.</p>' +
+      '<textarea id="msg-input" rows="2" placeholder="Type a new message and press Enter\u2026"></textarea>' +
+      '<div class="row" style="margin-top:8px">' +
+        '<button id="msg-add">Add message</button>' +
+        '<button id="msg-clear">Clear all</button>' +
+      '</div>' +
+      '<div class="metric-row" style="margin-top:10px">' +
+        '<div class="metric"><div class="label">Messages</div><div class="value" id="msg-count">0</div></div>' +
+        '<div class="metric"><div class="label">Total tokens</div><div class="value" id="msg-tokens">0</div></div>' +
+        '<div class="metric"><div class="label">Context (max 4096)</div><div class="value" id="msg-status">empty</div></div>' +
+      '</div>' +
+      '<div id="msg-list" style="margin-top:12px"></div>' +
+    '</section>';
+
+  // Wire events
+  el('live-input').oninput = updateLive;
+  el('budget-max').oninput = updateBudget;
+  el('trunc-start').onclick = function(){ doTruncate('start'); };
+  el('trunc-end').onclick = function(){ doTruncate('end'); };
+  el('chunk-btn').onclick = doChunk;
+  el('msg-input').onkeydown = function(e){ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();addMessage();} };
+  el('msg-add').onclick = addMessage;
+  el('msg-clear').onclick = clearMessages;
+
+  updateLive();
+}
+
+async function updateLive(){
+  var text = el('live-input').value;
+  el('m-chars').textContent = text.length.toLocaleString();
+  el('m-est').textContent = tok.estimate(text).toLocaleString();
+  el('m-words').textContent = (text.match(/\S+/g) || []).length.toLocaleString();
+  if (tok.isLoaded()) {
+    el('m-exact').textContent = tok.countSync(text).toLocaleString();
+  } else {
+    el('m-exact').textContent = 'loading\u2026';
+    try {
+      var n = await tok.count(text);
+      el('m-exact').textContent = n.toLocaleString();
+      updateStatus();
+    } catch (e) {
+      el('m-exact').textContent = 'error';
+    }
+  }
+  updateBudget();
+}
+
+async function updateBudget(){
+  var text = el('live-input').value;
+  var max = parseInt(el('budget-max').value) || 100;
+  try {
+    var b = await tok.budget(text, max);
+    var cls = b.percent < 80 ? 'ok' : b.percent < 100 ? 'warn' : 'err';
+    el('budget-result').innerHTML =
+      '<span class="val">' + b.used + '</span> / ' + b.max + ' tokens used (' +
+      '<span class="' + cls + '">' + b.percent + '%</span>). ' +
+      'Remaining: <span class="val">' + b.remaining + '</span>. ' +
+      'Fits: <span class="' + (b.fits ? 'ok' : 'err') + '">' + (b.fits ? 'yes' : 'no') + '</span>.';
+  } catch (e) {
+    el('budget-result').textContent = 'Error: ' + e.message;
+  }
+}
+
+async function doTruncate(which){
+  var text = el('live-input').value;
+  var max = parseInt(el('trunc-max').value) || 20;
+  el('trunc-result').textContent = 'Working\u2026';
+  try {
+    var result = which === 'start' ? await tok.truncate(text, max) : await tok.truncateStart(text, max);
+    var n = await tok.count(result);
+    el('trunc-result').textContent = '[' + n + ' tokens] ' + result;
+  } catch (e) {
+    el('trunc-result').textContent = 'Error: ' + e.message;
+  }
+}
+
+async function doChunk(){
+  var text = el('live-input').value;
+  var size = parseInt(el('chunk-size').value) || 15;
+  el('chunk-result').innerHTML = '<p class="muted">Working\u2026</p>';
+  try {
+    var chunks = await tok.chunk(text, size);
+    var html = '<p class="muted">' + chunks.length + ' chunks of up to ' + size + ' tokens each:</p>';
+    for (var i = 0; i < chunks.length; i++) {
+      var n = await tok.count(chunks[i]);
+      html += '<div class="metric" style="margin-bottom:6px">' +
+        '<div class="label">Chunk ' + (i+1) + ' (' + n + ' tokens)</div>' +
+        '<div style="font-family:var(--mono);font-size:12px;color:var(--ink);margin-top:4px;word-break:break-word">' + esc(chunks[i]) + '</div>' +
+      '</div>';
+    }
+    el('chunk-result').innerHTML = html;
+  } catch (e) {
+    el('chunk-result').innerHTML = '<p class="err">' + e.message + '</p>';
+  }
+}
+
+var messages = [];
+async function addMessage(){
+  var text = el('msg-input').value.trim();
+  if (!text) return;
+  messages.push({ role: messages.length % 2 ? 'assistant' : 'user', content: text });
+  el('msg-input').value = '';
+  await renderMessages();
+}
+function clearMessages(){
+  messages = [];
+  renderMessages();
+}
+async function renderMessages(){
+  var html = '';
+  for (var i = 0; i < messages.length; i++) {
+    var n = await tok.count(messages[i].content);
+    html += '<div class="metric" style="margin-bottom:6px">' +
+      '<div class="label">' + esc(messages[i].role) + ' \u2014 ' + n + ' tokens</div>' +
+      '<div style="font-size:13px;color:var(--ink);margin-top:4px">' + esc(messages[i].content) + '</div>' +
+    '</div>';
+  }
+  el('msg-list').innerHTML = html;
+  el('msg-count').textContent = messages.length;
+  if (messages.length === 0) {
+    el('msg-tokens').textContent = '0';
+    el('msg-status').textContent = 'empty';
+    el('msg-status').className = 'value dim';
+    return;
+  }
+  var total = await tok.countMessages(messages);
+  el('msg-tokens').textContent = total.toLocaleString();
+  var pct = Math.round((total / 4096) * 100);
+  el('msg-status').textContent = pct + '%';
+  el('msg-status').className = 'value ' + (pct < 80 ? 'ok' : pct < 100 ? 'warn' : 'err');
+}
+
+function updateStatus(){
+  var info = tok.info();
+  if (info.loaded) {
+    el('status-val').innerHTML = '<span class="ok">loaded</span> (vocab ' + (info.vocabSize || '?') + ')';
+  } else if (info.error) {
+    el('status-val').innerHTML = '<span class="err">error: ' + esc(info.error) + '</span>';
+  } else {
+    el('status-val').innerHTML = '<span class="warn">loading\u2026 (~7MB on first visit)</span>';
+  }
+}
+
+function init(){
+  // Show a "loading" placeholder while we wait for the plugin
+  document.getElementById('page').innerHTML = '<p style="color:#7d8590;padding:40px 0;font:13px monospace">Loading plugin\u2026</p>';
+  
+  // Poll for the plugin to become available. The plugin is imported via
+  // tokens = '+String.fromCharCode(123)+'import:<slug>'+String.fromCharCode(125)+' in the lists editor.
+  // Loading can take 2-5 seconds. We try every 300ms for up to 15s.
+  var attempts = 0;
+  var maxAttempts = 50;
+  
+  function attempt() {
+    attempts++;
+    
+    // Has root.tokens appeared yet?
+    if (typeof root === 'undefined' || typeof root.tokens !== 'function') {
+      if (attempts < maxAttempts) {
+        setTimeout(attempt, 300);
+        return;
+      }
+      // Gave up
+      showError('Plugin not imported. Add to your lists editor: <br><br><code style="background:var(--faint);padding:6px 10px;border-radius:4px;display:inline-block">tokens = '+String.fromCharCode(123)+'import:accurate-token-budget-plugin'+String.fromCharCode(125)+'</code><br><br>Replace <code>accurate-token-budget-plugin</code> with the actual URL slug of your deployed plugin if different.');
+      return;
+    }
+    
+    // Invoke the plugin's $output to build & stash the API.
+    // This is the missing piece \u2014 $output doesn't auto-run on import.
+    try {
+      var api = root.tokens();
+      // Prefer the window-stashed reference (set inside $output);
+      // fall back to the direct return value if the stash didn't happen.
+      tok = window.__tokenBudget || api;
+    } catch (e) {
+      showError('Plugin imported but failed to initialize: ' + (e && e.message ? e.message : String(e)));
+      return;
+    }
+    
+    if (!tok) {
+      showError('Plugin returned no API.');
+      return;
+    }
+    
+    renderPage();
+    updateStatus(); tok.preload().catch(function(){}).finally(updateStatus);
+  }
+  
+  function showError(msg) {
+    document.getElementById('page').innerHTML =
+      '<header><h1 style="font-size:22px;font-weight:700;margin-bottom:12px">Plugin not ready</h1>' +
+      '<p style="color:var(--muted);font-size:14px">' + msg + '</p>' +
+      '<p style="color:var(--muted);font-size:13px;margin-top:18px">Or visit the <a href="https://perchance.org/accurate-token-budget-plugin" target="_blank">plugin docs page</a> for installation help.</p></header>';
+  }
+  
+  attempt();
+}
+if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',function(){setTimeout(init,1500);});}
+else{setTimeout(init,1500);}
+})();
+
+</script>

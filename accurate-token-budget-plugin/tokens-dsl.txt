@@ -1,0 +1,135 @@
+$meta
+  title       = Accurate Token Budget Plugin
+  description = Count tokens accurately using the same DeepSeek-R1 tokenizer that Perchance's AI uses. Plan context budgets, truncate prompts to fit, chunk long documents, and stop guessing how big your text really is.
+  tags        = plugin, tokens, ai, tokenizer, budget, context
+
+superFetch = {import:super-fetch-plugin}
+
+$output() =>
+  // Idempotency: if already built, return cached
+  if (window.__tokenBudget) return window.__tokenBudget;
+  
+  // ── Accurate Token Budget Plugin ──
+  // Loads the DeepSeek-R1-0528 tokenizer (same one used by Perchance's AI broker)
+  // via transformers.js, then exposes precise counting and budget operations.
+  
+  const api = {};
+  let tokenizerPromise = null;
+  let tokenizer = null;
+  let loadError = null;
+  
+  // Lazy-load the tokenizer on first use
+  function load() {
+    if (tokenizerPromise) return tokenizerPromise;
+    tokenizerPromise = (async () => {
+      try {
+        const mod = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@latest/+esm');
+        tokenizer = await mod.AutoTokenizer.from_pretrained('deepseek-ai/DeepSeek-R1-0528');
+        return tokenizer;
+      } catch (e) {
+        loadError = e;
+        throw e;
+      }
+    })();
+    return tokenizerPromise;
+  }
+  
+  // Eager load — call this to kick off the download
+  api.preload = () => load();
+  
+  // Wait until tokenizer is ready
+  api.ready = () => load();
+  
+  api.isLoaded = () => tokenizer !== null;
+  api.loadError = () => loadError;
+  
+  // Cheap heuristic estimate (no tokenizer needed) — ~4 chars per token
+  api.estimate = (text) => Math.ceil(String(text).length / 4);
+  
+  // Exact token count
+  api.count = async (text) => {
+    const t = await load();
+    return t.encode(String(text)).length;
+  };
+  
+  // Synchronous count (returns null if not loaded yet)
+  api.countSync = (text) => {
+    if (!tokenizer) return null;
+    return tokenizer.encode(String(text)).length;
+  };
+  
+  // Encode text to token IDs
+  api.encode = async (text) => {
+    const t = await load();
+    return t.encode(String(text));
+  };
+  
+  // Decode token IDs to text
+  api.decode = async (ids) => {
+    const t = await load();
+    return t.decode(ids, { skip_special_tokens: true });
+  };
+  
+  // Budget check
+  api.budget = async (text, maxTokens) => {
+    const used = await api.count(text);
+    return {
+      used: used,
+      max: maxTokens,
+      remaining: maxTokens - used,
+      fits: used <= maxTokens,
+      percent: Math.round((used / maxTokens) * 100)
+    };
+  };
+  
+  // Truncate text to fit within a token budget (preserves prefix)
+  api.truncate = async (text, maxTokens) => {
+    const t = await load();
+    const ids = t.encode(String(text));
+    if (ids.length <= maxTokens) return String(text);
+    return t.decode(ids.slice(0, maxTokens), { skip_special_tokens: true });
+  };
+  
+  // Truncate keeping the END (preserves suffix — useful for chat histories)
+  api.truncateStart = async (text, maxTokens) => {
+    const t = await load();
+    const ids = t.encode(String(text));
+    if (ids.length <= maxTokens) return String(text);
+    return t.decode(ids.slice(-maxTokens), { skip_special_tokens: true });
+  };
+  
+  // Split text into chunks of approximately N tokens each
+  api.chunk = async (text, maxTokensPerChunk) => {
+    const t = await load();
+    const ids = t.encode(String(text));
+    const chunks = [];
+    for (let i = 0; i < ids.length; i += maxTokensPerChunk) {
+      chunks.push(t.decode(ids.slice(i, i + maxTokensPerChunk), { skip_special_tokens: true }));
+    }
+    return chunks;
+  };
+  
+  // Count tokens across an array of messages (chat history)
+  api.countMessages = async (messages) => {
+    let total = 0;
+    for (const msg of messages) {
+      const txt = typeof msg === "string" ? msg : (msg.content || msg.text || "");
+      total += await api.count(txt);
+      // Approximate per-message overhead (role tags, separators)
+      total += 4;
+    }
+    return total;
+  };
+  
+  // Diagnostic info
+  api.info = () => ({
+    model: "deepseek-ai/DeepSeek-R1-0528",
+    loaded: tokenizer !== null,
+    error: loadError ? String(loadError.message || loadError) : null,
+    vocabSize: tokenizer ? tokenizer.vocab_size : null
+  });
+  
+  // Stash for cross-script access
+  window.__tokenBudget = api;
+  
+  return api;

@@ -1,0 +1,185 @@
+<style>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');
+:root{
+  --bg:#0d1117;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;
+  --accent:#4493f8;--green:#3fb950;--red:#f85149;--yellow:#d29922;
+  --font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.7 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);}
+code{font-family:var(--mono);font-size:12px;color:var(--accent);}
+pre{font:12px/1.6 var(--mono);background:var(--faint);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:16px;overflow-x:auto;white-space:pre;color:var(--ink);}
+#page{max-width:760px;margin:0 auto;padding:48px 24px 100px;}
+header,.hero{margin-bottom:56px;}
+h1{font-size:28px;font-weight:700;letter-spacing:-.5px;line-height:1.2;margin-bottom:10px;}
+h2{font-size:17px;font-weight:600;margin:0;}
+p{color:var(--muted);margin-bottom:10px;}
+p:last-child{margin-bottom:0;}
+p strong,p em{color:var(--ink);}
+.lead{font-size:16px;color:var(--muted);max-width:560px;margin-bottom:20px;}
+.breadcrumb{font-size:13px;margin-bottom:16px;}
+.breadcrumb a{color:var(--muted);text-decoration:none;}
+.breadcrumb a:hover{color:var(--ink);}
+.pill-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
+.pill{font:11px/1 var(--mono);border:1px solid var(--faint);border-radius:20px;padding:4px 10px;color:var(--muted);}
+.pill.version{color:var(--accent);border-color:rgba(68,147,248,.3);}
+.block{margin-bottom:48px;}
+.block .label{font:700 11px var(--mono);letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
+.code-line{display:flex;align-items:center;gap:10px;background:var(--faint);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:12px 14px;font-family:var(--mono);font-size:13px;margin-bottom:14px;}
+.code-line code{flex:1;color:var(--ink);font-size:13px;}
+.usecases{display:grid;gap:18px;}
+.usecases dt{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:2px;}
+.usecases dd{color:var(--muted);font-size:14px;}
+.api{width:100%;border-collapse:collapse;font-size:13px;}
+.api th{text-align:left;padding:8px 12px 8px 0;font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--faint);}
+.api td{padding:9px 12px 9px 0;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:top;}
+.api tr:last-child td{border-bottom:0;}
+.api td:first-child{font-family:var(--mono);font-size:12px;color:var(--accent);white-space:nowrap;padding-right:16px;}
+.api td:nth-child(2){color:var(--muted);white-space:nowrap;padding-right:16px;}
+.api td:last-child{color:var(--muted);}
+.cta-link{display:inline-block;margin-top:14px;font-size:14px;font-weight:500;}
+button{font:13px var(--font);font-weight:500;background:var(--faint);color:var(--ink);border:1px solid rgba(255,255,255,.12);border-radius:5px;padding:8px 14px;cursor:pointer;}
+button:hover:not(:disabled){border-color:rgba(255,255,255,.3);}
+button:disabled{opacity:.4;cursor:not-allowed;}
+button.primary{background:var(--accent);color:#0d1117;border-color:var(--accent);font-weight:600;}
+button.primary:hover:not(:disabled){background:#58a6ff;}
+.btn-copy{font:11px var(--mono);padding:5px 10px;background:transparent;color:var(--muted);border:1px solid var(--faint);border-radius:4px;cursor:pointer;}
+.btn-copy:hover{color:var(--ink);border-color:var(--muted);}
+.btn-copy.ok{color:var(--green);border-color:rgba(63,185,80,.4);}
+input[type=text],input[type=number],textarea,select{font:13px var(--mono);background:var(--faint);color:var(--ink);border:1px solid rgba(255,255,255,.1);border-radius:5px;padding:8px 11px;outline:none;width:100%;}
+input:focus,textarea:focus,select:focus{border-color:rgba(68,147,248,.5);}
+textarea{resize:vertical;min-height:80px;line-height:1.5;}
+.row{display:flex;gap:8px;margin-bottom:10px;}
+.row input{flex:1;}
+.notes ul{padding-left:18px;color:var(--muted);font-size:13px;}
+.notes li{margin-bottom:8px;line-height:1.6;}
+.note{font-size:12px;color:var(--muted);}
+.muted{color:var(--muted);}
+.err{color:var(--red);font-size:13px;}
+.ok{color:var(--green);}
+.warn{color:var(--yellow);}
+.demo{padding:32px 0;border-top:1px solid var(--faint);}
+.demo:first-child{border-top:0;padding-top:0;}
+.demo-meta{display:flex;align-items:baseline;gap:14px;margin-bottom:12px;}
+.demo-meta .n{font:700 11px var(--mono);color:var(--faint);letter-spacing:1px;}
+.demo-meta h2{margin-bottom:4px;}
+.stat{font:13px var(--mono);color:var(--muted);padding:4px 0;}
+.stat .val{color:var(--ink);font-weight:600;}
+.stat .accent{color:var(--accent);}
+.metric-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:14px;}
+.metric{background:var(--faint);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:10px 12px;}
+.metric .label{font:10px var(--mono);text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px;}
+.metric .value{font:600 18px var(--mono);color:var(--ink);}
+.metric .value.dim{color:var(--muted);}
+.metric .value.ok{color:var(--green);}
+.metric .value.warn{color:var(--yellow);}
+.metric .value.err{color:var(--red);}
+</style>
+<div id="page"><p style="color:#7d8590;padding:40px 0;font:13px monospace">Loading...</p></div>
+<script>
+(function(){
+'use strict';
+
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function copy(text,btn){
+  var t=btn.textContent;
+  (navigator.clipboard?navigator.clipboard.writeText(text):Promise.reject()).catch(function(){});
+  btn.textContent='Copied';btn.classList.add('ok');
+  setTimeout(function(){btn.textContent=t;btn.classList.remove('ok');},2000);
+}
+
+function renderPage(slug){
+  var LB=String.fromCharCode(123),RB=String.fromCharCode(125);
+  var importLine='tokens = '+LB+'import:'+slug+RB;
+  document.title='Accurate Token Budget Plugin';
+  document.getElementById('page').innerHTML=
+
+  '<div class="hero">'+
+    '<h1>accurate-token-budget-plugin</h1>'+
+    '<p class="lead">Count tokens exactly using the same DeepSeek\u2011R1 tokenizer that Perchance\u2019s AI uses. No more guessing whether your prompt fits.</p>'+
+    '<div class="pill-row">'+
+      '<span class="pill version">v1.0.0</span>'+
+      '<span class="pill">super-fetch-plugin</span>'+
+      '<span class="pill">@huggingface/transformers</span>'+
+    '</div>'+
+  '</div>'+
+
+  '<div class="block">'+
+    '<div class="label">Installation</div>'+
+    '<p>Add to your <strong>lists editor</strong>:</p>'+
+    '<div class="code-line">'+
+      '<code id="install-code">'+esc(importLine)+'</code>'+
+      '<button id="install-copy" class="btn-copy">Copy</button>'+
+    '</div>'+
+    '<p>Then in your HTML panel script (wait 2\u20133 seconds for the plugin to load):</p>'+
+    '<pre>setTimeout(async function() {\n  var tok = window.__tokenBudget;\n  await tok.ready();      // load the DeepSeek-R1 tokenizer once\n  var count = await tok.count("hello world"); // exact token count\n}, 3000);</pre>'+
+    '<p class="note">First call downloads ~7MB of tokenizer files from HuggingFace. Subsequent calls use the browser cache.</p>'+
+  '</div>'+
+
+  '<div class="block">'+
+    '<div class="label">What it does</div>'+
+    '<p>Perchance\u2019s AI broker uses the <strong>DeepSeek\u2011R1\u20110528</strong> tokenizer to chunk your input before sending it to the model. This plugin loads the same tokenizer in your browser via transformers.js, so you can know <em>exactly</em> how many tokens your text will become.</p>'+
+    '<p>For quick estimates without loading the tokenizer, use <code>tok.estimate(text)</code> which returns chars/4 (close enough for budgeting).</p>'+
+  '</div>'+
+
+  '<div class="block">'+
+    '<div class="label">What can I build with it?</div>'+
+    '<dl class="usecases">'+
+      '<dt>Smart chat context windows</dt>'+
+      '<dd>Sum tokens across an AI chat history. Drop old messages or summarize when you approach the model\u2019s context limit, instead of failing mid-conversation.</dd>'+
+      '<dt>RAG document chunking</dt>'+
+      '<dd>Split a long document into N\u2011token chunks for retrieval. Each chunk is sized to fit the embedding model exactly, no fuzzy estimates.</dd>'+
+      '<dt>Pre-flight prompt validation</dt>'+
+      '<dd>Before calling the AI, check whether your prompt fits and show the user a real "X / Y tokens used" indicator instead of failing later.</dd>'+
+      '<dt>Truncate to fit</dt>'+
+      '<dd>Auto-truncate long inputs to fit within a budget. Choose to preserve the start (instructions) or the end (recent context).</dd>'+
+    '</dl>'+
+    '<p><a class="cta-link" href="https://perchance.org/token-budget-plugin-example" target="_blank">See it running live at the example page \u2192</a></p>'+
+  '</div>'+
+
+  '<div class="block">'+
+    '<div class="label">API reference</div>'+
+    '<table class="api">'+
+      '<thead><tr><th>Method</th><th>Returns</th><th>Description</th></tr></thead>'+
+      '<tbody>'+
+        '<tr><td>tok.estimate(text)</td><td>number</td><td>Fast approximation (chars / 4). No tokenizer needed.</td></tr>'+
+        '<tr><td>tok.count(text)</td><td>Promise&lt;number&gt;</td><td>Exact token count.</td></tr>'+
+        '<tr><td>tok.countSync(text)</td><td>number\u00A0|\u00A0null</td><td>Exact count if tokenizer is loaded, otherwise null.</td></tr>'+
+        '<tr><td>tok.encode(text)</td><td>Promise&lt;number[]&gt;</td><td>Token IDs.</td></tr>'+
+        '<tr><td>tok.decode(ids)</td><td>Promise&lt;string&gt;</td><td>Inverse of encode.</td></tr>'+
+        '<tr><td>tok.budget(text, max)</td><td>Promise&lt;object&gt;</td><td>{used, max, remaining, fits, percent}</td></tr>'+
+        '<tr><td>tok.truncate(text, max)</td><td>Promise&lt;string&gt;</td><td>Cuts to fit, preserves start.</td></tr>'+
+        '<tr><td>tok.truncateStart(text, max)</td><td>Promise&lt;string&gt;</td><td>Cuts to fit, preserves end.</td></tr>'+
+        '<tr><td>tok.chunk(text, n)</td><td>Promise&lt;string[]&gt;</td><td>Split into N-token chunks.</td></tr>'+
+        '<tr><td>tok.countMessages(arr)</td><td>Promise&lt;number&gt;</td><td>Sum tokens across a chat history array.</td></tr>'+
+        '<tr><td>tok.ready()</td><td>Promise</td><td>Resolves when tokenizer is loaded.</td></tr>'+
+        '<tr><td>tok.preload()</td><td>Promise</td><td>Eager-load tokenizer (call on page init).</td></tr>'+
+        '<tr><td>tok.isLoaded()</td><td>boolean</td><td>Whether the tokenizer is ready.</td></tr>'+
+        '<tr><td>tok.info()</td><td>object</td><td>Model name, vocab size, load status.</td></tr>'+
+      '</tbody>'+
+    '</table>'+
+  '</div>'+
+
+  '<div class="block notes">'+
+    '<div class="label">Notes</div>'+
+    '<ul>'+
+      '<li>The plugin lazy-loads the tokenizer on first use. Call <code>tok.preload()</code> on page init to start the download early.</li>'+
+      '<li>Tokenizer files (~7MB) are cached by the browser after first load. Repeat visits are instant.</li>'+
+      '<li>This is the <strong>same</strong> tokenizer Perchance\u2019s AI broker uses internally, confirmed by reverse-engineering the broker source. Counts match exactly.</li>'+
+      '<li>For environments where you can\u2019t afford to wait for the tokenizer to load, use <code>tok.estimate(text)</code> for an immediate chars/4 approximation.</li>'+
+    '</ul>'+
+  '</div>';
+
+  document.getElementById('install-copy').onclick=function(){copy(importLine,this);};
+}
+
+async function init(){
+  var slug = 'accurate-token-budget-plugin';
+  try { slug = root.$moduleName || window.generatorName || slug; } catch(e) {}
+  renderPage(slug);
+}
+if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',function(){setTimeout(init,1500);});}
+else{setTimeout(init,1500);}
+})();
+
+</script>
