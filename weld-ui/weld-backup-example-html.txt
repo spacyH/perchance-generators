@@ -1,0 +1,1484 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+#page{max-width:760px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:48px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr h1{font-size:30px;font-weight:700;font-family:var(--mono);letter-spacing:-0.5px;margin-bottom:8px;}
+.hdr p{color:var(--muted);font-size:15px;}
+.sec{margin-bottom:48px;}
+.sec-num{font:600 11px var(--mono);color:var(--muted);letter-spacing:2px;margin-bottom:8px;}
+.sec-title{font-size:20px;font-weight:600;margin-bottom:8px;letter-spacing:-0.2px;}
+.sec-desc{color:var(--muted);margin-bottom:20px;font-size:14px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:12px 14px;overflow:auto;font:12px var(--mono);color:#c9d1d9;
+  max-height:280px;line-height:1.5;}
+.row{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap;}
+.summary{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px;font:13px var(--mono);color:#c9d1d9;line-height:1.7;}
+.summary strong{color:var(--accent);}
+.summary .ok{color:var(--green);}
+.summary .warn{color:var(--yellow);}
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer code{font-family:var(--mono);color:var(--accent);background:var(--faint);padding:1px 6px;border-radius:3px;font-size:12px;}
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+<div id="page">
+  <div class="breadcrumb">
+    <span class="crumb">
+      <a href="https://perchance.org/weld-ui-index">weld</a>
+      <span class="crumb-sep">/</span>
+      weld.backup
+      <span class="crumb-sep">/</span>
+      <span class="crumb-cur">examples</span>
+    </span>
+    <span class="crumb-action">
+      <a href="https://perchance.org/weld-backup-plugin">docs &rarr;</a>
+    </span>
+  </div>
+  <div class="hdr">
+    <h1>weld.backup example</h1>
+    <p>Export the sample character database to a JSON file, then re-import it. Try the format-migration demo at the bottom to see how older backups can be transformed on the way in.</p>
+  </div>
+
+  <div class="sec">
+    <div class="sec-num">01</div>
+    <h2 class="sec-title">Current data</h2>
+    <p class="sec-desc">The contents of the <code>characters</code> store in the example database. This refreshes after each import.</p>
+    <pre id="inspect-pre"></pre>
+  </div>
+
+  <div class="sec">
+    <div class="sec-num">02</div>
+    <h2 class="sec-title">Export</h2>
+    <p class="sec-desc"><code>weld.backup.downloadFromDb()</code> reads the full database and triggers a JSON download. <code>fromDb()</code> just returns the envelope without downloading.</p>
+    <div id="sec-export"></div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-num">03</div>
+    <h2 class="sec-title">Validate</h2>
+    <p class="sec-desc"><code>weld.backup.validate()</code> checks the envelope signature, format version, and structure without actually importing anything. Useful for showing the user "this file is from X, made on Y" before they commit to overwriting their data.</p>
+    <div id="sec-validate"></div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-num">04</div>
+    <h2 class="sec-title">Import</h2>
+    <p class="sec-desc">Three import modes. <strong>Merge</strong> overwrites same-key records, <strong>replace</strong> clears the store first, <strong>append</strong> only adds new records. Try downloading the current data, resetting to seed, then re-importing.</p>
+    <div id="sec-import"></div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-num">05</div>
+    <h2 class="sec-title">Format migration</h2>
+    <p class="sec-desc">A hand-crafted v1 backup with different field names. Without migrations you get the old shape. With a v2 migration the data is reshaped on the way in -- so you can keep adding new versions over time without breaking old backups.</p>
+    <div id="sec-migrate-demo"></div>
+  </div></div>
+<script>(function(){
+'use strict';
+
+// Namespace
+if (!window.weld) window.weld = {};
+if (window.weld.ui) return; // already loaded
+
+// THEME
+var defaultTheme = {
+  bg:        '#0d1117',
+  surface:   '#161b22',
+  faint:     '#21262d',
+  ink:       '#e6edf3',
+  muted:     '#7d8590',
+  accent:    '#4493f8',
+  accentInk: '#0d1117',
+  green:     '#3fb950',
+  red:       '#f85149',
+  yellow:    '#d29922',
+  blue:      '#58a6ff',
+  border:    'rgba(255,255,255,0.10)',
+  borderHi:  'rgba(255,255,255,0.20)',
+  radius:    '6px',
+  radiusSm:  '4px',
+  radiusLg:  '10px',
+  font:      "'DM Sans', system-ui, sans-serif",
+  fontMono:  "'JetBrains Mono', monospace",
+  shadow:    '0 8px 32px rgba(0,0,0,0.5)',
+  transit:   '120ms cubic-bezier(0.4, 0, 0.2, 1)',
+};
+
+var theme = Object.assign({}, defaultTheme);
+
+function setTheme(updates) {
+  Object.assign(theme, updates);
+  applyThemeVars();
+}
+
+function getTheme() { return Object.assign({}, theme); }
+
+function applyThemeVars() {
+  var root = document.documentElement;
+  Object.keys(theme).forEach(function(k){
+    root.style.setProperty('--w-' + k, theme[k]);
+  });
+}
+
+// CSS - injected once. All values use CSS vars.
+var CSS = [
+"@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');",
+".w-btn{font:500 13px var(--w-font);background:var(--w-bg);color:var(--w-ink);",
+"  border:1px solid var(--w-border);border-radius:var(--w-radius);padding:7px 14px;",
+"  cursor:pointer;display:inline-flex;align-items:center;gap:6px;line-height:1;",
+"  transition:border-color var(--w-transit), background var(--w-transit);outline:none;}",
+".w-btn:hover:not(:disabled){border-color:var(--w-borderHi);}",
+".w-btn:focus-visible{border-color:var(--w-accent);box-shadow:0 0 0 2px rgba(68,147,248,0.3);}",
+".w-btn:disabled{opacity:.4;cursor:not-allowed;}",
+".w-btn-primary{background:var(--w-accent);color:var(--w-accentInk);border-color:var(--w-accent);font-weight:600;}",
+".w-btn-primary:hover:not(:disabled){background:#58a6ff;border-color:#58a6ff;}",
+".w-btn-danger{color:var(--w-red);border-color:rgba(248,81,73,0.4);}",
+".w-btn-danger:hover:not(:disabled){background:rgba(248,81,73,0.1);border-color:var(--w-red);}",
+".w-btn-ghost{background:transparent;border-color:transparent;}",
+".w-btn-ghost:hover:not(:disabled){background:var(--w-faint);}",
+".w-btn-sm{padding:4px 10px;font-size:12px;}",
+".w-btn-lg{padding:10px 20px;font-size:14px;}",
+".w-input,.w-select,.w-textarea{font:13px var(--w-fontMono);background:var(--w-bg);color:var(--w-ink);",
+"  border:1px solid var(--w-border);border-radius:var(--w-radiusSm);padding:7px 10px;outline:none;",
+"  width:100%;box-sizing:border-box;transition:border-color var(--w-transit);}",
+".w-input:focus,.w-select:focus,.w-textarea:focus{border-color:var(--w-accent);box-shadow:0 0 0 2px rgba(68,147,248,0.2);}",
+".w-textarea{resize:vertical;min-height:60px;line-height:1.45;font-size:12px;}",
+".w-select{cursor:pointer;}",
+".w-checkbox{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font:13px var(--w-font);color:var(--w-ink);}",
+".w-checkbox input{margin:0;cursor:pointer;}",
+".w-range{width:100%;height:4px;-webkit-appearance:none;appearance:none;background:var(--w-faint);border-radius:2px;outline:none;}",
+".w-range::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--w-accent);cursor:pointer;border:0;}",
+".w-range::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--w-accent);cursor:pointer;border:0;}",
+".w-label{display:block;font:600 10px var(--w-fontMono);letter-spacing:1px;text-transform:uppercase;",
+"  color:var(--w-muted);margin-bottom:5px;}",
+".w-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;",
+"  display:flex;align-items:center;justify-content:center;padding:20px;",
+"  animation:w-fade-in 150ms ease-out;}",
+"@keyframes w-fade-in{from{opacity:0;}to{opacity:1;}}",
+"@keyframes w-pop-in{from{opacity:0;transform:scale(0.96);}to{opacity:1;transform:scale(1);}}",
+".w-modal{background:var(--w-surface);border:1px solid var(--w-border);border-radius:var(--w-radiusLg);",
+"  box-shadow:var(--w-shadow);max-height:90vh;display:flex;flex-direction:column;",
+"  animation:w-pop-in 160ms ease-out;color:var(--w-ink);font:14px var(--w-font);}",
+".w-modal-sm{width:380px;max-width:100%;}",
+".w-modal-md{width:560px;max-width:100%;}",
+".w-modal-lg{width:800px;max-width:100%;}",
+".w-modal-full{width:96vw;height:90vh;}",
+".w-modal-hdr{padding:16px 20px;border-bottom:1px solid var(--w-border);display:flex;",
+"  align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;}",
+".w-modal-title{font-size:15px;font-weight:600;margin:0;}",
+".w-modal-close{background:transparent;border:0;color:var(--w-muted);cursor:pointer;",
+"  padding:4px;border-radius:var(--w-radiusSm);line-height:0;transition:color var(--w-transit);}",
+".w-modal-close:hover{color:var(--w-ink);background:var(--w-faint);}",
+".w-modal-body{padding:20px;overflow-y:auto;flex:1;font-size:14px;line-height:1.55;}",
+".w-modal-actions{padding:14px 20px;border-top:1px solid var(--w-border);display:flex;",
+"  gap:8px;justify-content:flex-end;flex-shrink:0;}",
+".w-spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--w-faint);",
+"  border-top-color:var(--w-accent);border-radius:50%;animation:w-spin 700ms linear infinite;}",
+".w-spinner-lg{width:24px;height:24px;border-width:3px;}",
+"@keyframes w-spin{to{transform:rotate(360deg);}}",
+".w-disclosure{border:1px solid var(--w-border);border-radius:var(--w-radius);overflow:hidden;}",
+".w-disclosure summary{padding:10px 14px;cursor:pointer;font:600 13px var(--w-font);",
+"  color:var(--w-ink);background:var(--w-faint);outline:none;list-style:none;",
+"  display:flex;align-items:center;justify-content:space-between;}",
+".w-disclosure summary::-webkit-details-marker{display:none;}",
+".w-disclosure summary::after{content:'+';color:var(--w-muted);font-family:var(--w-fontMono);font-size:14px;}",
+".w-disclosure\[open\] summary::after{content:'-';}",
+".w-disclosure-body{padding:14px;}",
+".w-tabs{display:flex;gap:0;border-bottom:1px solid var(--w-border);}",
+".w-tab{padding:9px 16px;background:transparent;border:0;border-bottom:2px solid transparent;",
+"  color:var(--w-muted);font:500 13px var(--w-font);cursor:pointer;transition:color var(--w-transit);",
+"  margin-bottom:-1px;}",
+".w-tab:hover{color:var(--w-ink);}",
+".w-tab-active{color:var(--w-accent);border-bottom-color:var(--w-accent);}",
+".w-row{display:flex;gap:8px;align-items:center;}",
+".w-col{display:flex;flex-direction:column;gap:8px;}",
+".w-stack{display:flex;flex-direction:column;gap:14px;}",
+".w-card{background:var(--w-faint);border:1px solid var(--w-border);border-radius:var(--w-radius);padding:14px;}",
+".w-divider{height:1px;background:var(--w-border);margin:14px 0;border:0;}",
+].join('\n');
+
+var STYLE_ID = 'weld-ui-styles';
+function injectCSS() {
+  if (document.getElementById(STYLE_ID)) return;
+  var style = document.createElement('style');
+  style.id = STYLE_ID;
+  style.textContent = CSS;
+  document.head.appendChild(style);
+}
+
+// DOM HELPER
+// el(tag, attrs, children) - children is string or element or array
+function el(tag, attrs, children) {
+  var node = document.createElement(tag);
+  if (attrs) {
+    Object.keys(attrs).forEach(function(k){
+      var v = attrs[k];
+      if (v == null) return;
+      if (k === 'class' || k === 'className') node.className = v;
+      else if (k === 'style' && typeof v === 'object') Object.assign(node.style, v);
+      else if (k === 'dataset' && typeof v === 'object') Object.assign(node.dataset, v);
+      else if (k.indexOf('on') === 0 && typeof v === 'function') node.addEventListener(k.slice(2).toLowerCase(), v);
+      else if (k === 'html') node.innerHTML = v;
+      else if (k === 'text') node.textContent = v;
+      else node.setAttribute(k, v);
+    });
+  }
+  if (children != null) {
+    if (!Array.isArray(children)) children = [children];
+    children.forEach(function(c){
+      if (c == null) return;
+      if (typeof c === 'string' || typeof c === 'number') node.appendChild(document.createTextNode(c));
+      else if (c.nodeType) node.appendChild(c);
+    });
+  }
+  return node;
+}
+
+// ICONS (small embedded SVG set, lucide-style stroke icons)
+var ICONS = {
+  'x':       'M18 6L6 18M6 6l12 12',
+  'check':   'M20 6L9 17l-5-5',
+  'plus':    'M12 5v14M5 12h14',
+  'minus':   'M5 12h14',
+  'trash':   'M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2',
+  'edit':    'M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z',
+  'save':    'M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2zM17 21v-8H7v8M7 3v5h8',
+  'copy':    'M20 9h-9a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-9a2 2 0 00-2-2zM5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1',
+  'download':'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3',
+  'upload':  'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12',
+  'refresh': 'M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15',
+  'settings':'M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2zM15 12a3 3 0 11-6 0 3 3 0 016 0z',
+  'info':    'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM12 16v-4M12 8h.01',
+  'warn':    'M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01',
+  'error':   'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM15 9l-6 6M9 9l6 6',
+  'search':  'M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z',
+  'chevDown':'M6 9l6 6 6-6',
+  'chevUp':  'M18 15l-6-6-6 6',
+  'chevRight':'M9 18l6-6-6-6',
+  'chevLeft':'M15 18l-9-6 6-6',
+  'external':'M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3',
+};
+
+function icon(name, opts) {
+  opts = opts || {};
+  var size = opts.size || 16;
+  var path = ICONS[name];
+  if (!path) return el('span', { text: '?' });
+  var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('width', size);
+  svg.setAttribute('height', size);
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', opts.color || 'currentColor');
+  svg.setAttribute('stroke-width', opts.weight || '2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  p.setAttribute('d', path);
+  svg.appendChild(p);
+  return svg;
+}
+
+function registerIcon(name, pathD) { ICONS[name] = pathD; }
+
+// COMPONENTS
+function button(opts) {
+  opts = opts || {};
+  var classes = ['w-btn'];
+  if (opts.variant === 'primary') classes.push('w-btn-primary');
+  else if (opts.variant === 'danger') classes.push('w-btn-danger');
+  else if (opts.variant === 'ghost') classes.push('w-btn-ghost');
+  if (opts.size === 'sm') classes.push('w-btn-sm');
+  else if (opts.size === 'lg') classes.push('w-btn-lg');
+  var children = [];
+  if (opts.icon) children.push(icon(opts.icon, { size: opts.size === 'sm' ? 14 : 16 }));
+  if (opts.label != null) children.push(opts.label);
+  return el('button', {
+    class: classes.join(' '),
+    type: opts.type || 'button',
+    disabled: opts.disabled ? 'disabled' : null,
+    onclick: opts.onClick,
+  }, children);
+}
+
+function input(opts) {
+  opts = opts || {};
+  return el('input', {
+    class: 'w-input',
+    type: opts.type || 'text',
+    placeholder: opts.placeholder,
+    value: opts.value != null ? opts.value : '',
+    oninput: opts.onInput ? function(e){ opts.onInput(e.target.value, e); } : null,
+    onchange: opts.onChange ? function(e){ opts.onChange(e.target.value, e); } : null,
+    disabled: opts.disabled ? 'disabled' : null,
+    readonly: opts.readonly ? 'readonly' : null,
+  });
+}
+
+function select(opts) {
+  opts = opts || {};
+  var options = (opts.options || []).map(function(o){
+    if (typeof o === 'string') o = { value: o, label: o };
+    return el('option', {
+      value: o.value,
+      selected: o.value === opts.value ? 'selected' : null,
+    }, o.label);
+  });
+  return el('select', {
+    class: 'w-select',
+    onchange: opts.onChange ? function(e){ opts.onChange(e.target.value, e); } : null,
+    disabled: opts.disabled ? 'disabled' : null,
+  }, options);
+}
+
+function textarea(opts) {
+  opts = opts || {};
+  return el('textarea', {
+    class: 'w-textarea',
+    rows: opts.rows || 4,
+    placeholder: opts.placeholder,
+    oninput: opts.onInput ? function(e){ opts.onInput(e.target.value, e); } : null,
+    onchange: opts.onChange ? function(e){ opts.onChange(e.target.value, e); } : null,
+  }, opts.value || '');
+}
+
+function checkbox(opts) {
+  opts = opts || {};
+  var box = el('input', {
+    type: 'checkbox',
+    checked: opts.checked ? 'checked' : null,
+    onchange: opts.onChange ? function(e){ opts.onChange(e.target.checked, e); } : null,
+  });
+  return el('label', { class: 'w-checkbox' }, [box, opts.label || '']);
+}
+
+function range(opts) {
+  opts = opts || {};
+  return el('input', {
+    class: 'w-range',
+    type: 'range',
+    min: opts.min != null ? opts.min : 0,
+    max: opts.max != null ? opts.max : 100,
+    step: opts.step != null ? opts.step : 1,
+    value: opts.value != null ? opts.value : 0,
+    oninput: opts.onInput ? function(e){ opts.onInput(parseFloat(e.target.value), e); } : null,
+    onchange: opts.onChange ? function(e){ opts.onChange(parseFloat(e.target.value), e); } : null,
+  });
+}
+
+function spinner(opts) {
+  opts = opts || {};
+  var classes = ['w-spinner'];
+  if (opts.size === 'lg') classes.push('w-spinner-lg');
+  return el('span', { class: classes.join(' '), role: 'status' });
+}
+
+function label(text) {
+  return el('label', { class: 'w-label', text: text });
+}
+
+function disclosure(opts) {
+  opts = opts || {};
+  var summary = el('summary', { text: opts.title || '' });
+  var body = el('div', { class: 'w-disclosure-body' }, opts.content);
+  return el('details', {
+    class: 'w-disclosure',
+    open: opts.open ? 'open' : null,
+  }, [summary, body]);
+}
+
+function tabs(opts) {
+  opts = opts || {};
+  var items = opts.items || [];
+  var active = opts.active || (items[0] && items[0].id);
+  var tabBar = el('div', { class: 'w-tabs' });
+  var panel = el('div', { class: 'w-tab-panel' });
+
+  function render(activeId) {
+    tabBar.innerHTML = '';
+    items.forEach(function(it){
+      var btn = el('button', {
+        class: 'w-tab' + (it.id === activeId ? ' w-tab-active' : ''),
+        onclick: function(){ render(it.id); if (opts.onChange) opts.onChange(it.id); },
+      }, it.label);
+      tabBar.appendChild(btn);
+    });
+    panel.innerHTML = '';
+    var found = items.find(function(it){ return it.id === activeId; });
+    if (found && found.content) {
+      panel.appendChild(typeof found.content === 'function' ? found.content() : found.content);
+    }
+  }
+  render(active);
+
+  var wrap = el('div', { class: 'w-tabs-wrap' }, [tabBar, panel]);
+  wrap.setActive = function(id){ render(id); };
+  return wrap;
+}
+
+function row(children, gap) {
+  var r = el('div', { class: 'w-row' }, children);
+  if (gap != null) r.style.gap = gap + 'px';
+  return r;
+}
+function col(children, gap) {
+  var c = el('div', { class: 'w-col' }, children);
+  if (gap != null) c.style.gap = gap + 'px';
+  return c;
+}
+function stack(children, gap) {
+  var s = el('div', { class: 'w-stack' }, children);
+  if (gap != null) s.style.gap = gap + 'px';
+  return s;
+}
+function card(children) { return el('div', { class: 'w-card' }, children); }
+function divider() { return el('hr', { class: 'w-divider' }); }
+
+// MODAL
+// Returns { el, close } and is auto-attached to body
+function modal(opts) {
+  opts = opts || {};
+  var sizeClass = 'w-modal-' + (opts.size || 'md');
+  var closeBtn = el('button', {
+    class: 'w-modal-close',
+    onclick: function(){ close(); },
+    'aria-label': 'Close',
+  }, [icon('x', { size: 18 })]);
+
+  var header = opts.title || opts.dismissable !== false
+    ? el('div', { class: 'w-modal-hdr' }, [
+        opts.title ? el('h3', { class: 'w-modal-title', text: opts.title }) : el('div'),
+        opts.dismissable !== false ? closeBtn : null,
+      ])
+    : null;
+
+  var bodyContent = opts.content;
+  if (typeof bodyContent === 'string') bodyContent = el('div', { html: bodyContent });
+  var body = el('div', { class: 'w-modal-body' }, bodyContent);
+
+  var actions = opts.actions ? el('div', { class: 'w-modal-actions' },
+    opts.actions.map(function(a){
+      return button({
+        label: a.label,
+        variant: a.variant || (a.primary ? 'primary' : null),
+        onClick: function(){
+          if (a.onClick) {
+            var res = a.onClick();
+            if (res !== false) close();
+          } else { close(); }
+        },
+      });
+    })
+  ) : null;
+
+  var modalEl = el('div', { class: 'w-modal ' + sizeClass }, [header, body, actions]);
+
+  var overlay = el('div', {
+    class: 'w-modal-overlay',
+    onclick: function(e){ if (e.target === overlay && opts.dismissable !== false) close(); },
+  }, [modalEl]);
+
+  var closed = false;
+  function close() {
+    if (closed) return;
+    closed = true;
+    overlay.remove();
+    document.removeEventListener('keydown', escHandler);
+    if (opts.onClose) opts.onClose();
+  }
+  function escHandler(e) {
+    if (e.key === 'Escape' && opts.dismissable !== false) close();
+  }
+  document.addEventListener('keydown', escHandler);
+
+  document.body.appendChild(overlay);
+  return { el: overlay, close: close, body: body };
+}
+
+// PUBLIC API
+window.weld.ui = {
+  theme: theme,
+  setTheme: setTheme,
+  getTheme: getTheme,
+  el: el,
+  button: button,
+  input: input,
+  select: select,
+  textarea: textarea,
+  checkbox: checkbox,
+  range: range,
+  label: label,
+  spinner: spinner,
+  icon: icon,
+  registerIcon: registerIcon,
+  disclosure: disclosure,
+  tabs: tabs,
+  row: row,
+  col: col,
+  stack: stack,
+  card: card,
+  divider: divider,
+  modal: modal,
+  injectCSS: injectCSS,
+  version: '1.0.0',
+};
+
+// INIT
+function init() {
+  injectCSS();
+  applyThemeVars();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+})();
+</script>
+<script>(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.migrate) return;
+
+// META store name -- tracks which data migrations have been applied
+var META_STORE = '_weldMeta';
+var META_KEY = 'appliedDataMigrations';
+
+// Wrap an IDBRequest in a Promise
+function req(idbRequest) {
+  return new Promise(function(resolve, reject) {
+    idbRequest.onsuccess = function(){ resolve(idbRequest.result); };
+    idbRequest.onerror = function(){ reject(idbRequest.error); };
+  });
+}
+
+// Wait for transaction completion
+function txComplete(tx) {
+  return new Promise(function(resolve, reject) {
+    tx.oncomplete = function(){ resolve(); };
+    tx.onerror = function(){ reject(tx.error); };
+    tx.onabort = function(){ reject(tx.error || new Error('Transaction aborted')); };
+  });
+}
+
+// Normalize an index spec - accepts string keyPath OR full object
+function normalizeIndex(spec) {
+  if (typeof spec === 'string') return { keyPath: spec, unique: false };
+  return Object.assign({ unique: false }, spec);
+}
+
+// Apply schema upgrade INSIDE upgradeneeded handler
+function applySchema(db, tx, schema, fromVer, toVer, log) {
+  // Always ensure meta store exists from v1
+  if (!db.objectStoreNames.contains(META_STORE)) {
+    db.createObjectStore(META_STORE, { keyPath: 'key' });
+    log('created meta store ' + META_STORE);
+  }
+
+  // Apply each version step
+  for (var v = fromVer + 1; v <= toVer; v++) {
+    var step = schema[v];
+    if (!step) continue;
+    log('applying schema v' + v);
+
+    // Create new stores
+    if (step.stores) {
+      Object.keys(step.stores).forEach(function(name){
+        if (db.objectStoreNames.contains(name)) {
+          log('  store ' + name + ' already exists, skipping create');
+          return;
+        }
+        var sp = step.stores[name];
+        var opts = {};
+        if (sp.keyPath) opts.keyPath = sp.keyPath;
+        if (sp.autoIncrement) opts.autoIncrement = true;
+        var store = db.createObjectStore(name, opts);
+        log('  + store ' + name);
+        if (sp.indexes) {
+          Object.keys(sp.indexes).forEach(function(idxName){
+            var idx = normalizeIndex(sp.indexes[idxName]);
+            store.createIndex(idxName, idx.keyPath, { unique: idx.unique, multiEntry: !!idx.multiEntry });
+            log('    + index ' + idxName);
+          });
+        }
+      });
+    }
+
+    // Modify existing stores
+    if (step.modify) {
+      Object.keys(step.modify).forEach(function(name){
+        if (!db.objectStoreNames.contains(name)) {
+          log('  cannot modify ' + name + ' (does not exist)');
+          return;
+        }
+        var store = tx.objectStore(name);
+        var mods = step.modify[name];
+        if (mods.dropIndexes) {
+          mods.dropIndexes.forEach(function(idxName){
+            if (store.indexNames.contains(idxName)) {
+              store.deleteIndex(idxName);
+              log('  - index ' + name + '.' + idxName);
+            }
+          });
+        }
+        if (mods.addIndexes) {
+          Object.keys(mods.addIndexes).forEach(function(idxName){
+            if (store.indexNames.contains(idxName)) return;
+            var idx = normalizeIndex(mods.addIndexes[idxName]);
+            store.createIndex(idxName, idx.keyPath, { unique: idx.unique, multiEntry: !!idx.multiEntry });
+            log('  + index ' + name + '.' + idxName);
+          });
+        }
+      });
+    }
+
+    // Drop stores
+    if (step.drop) {
+      step.drop.forEach(function(name){
+        if (db.objectStoreNames.contains(name)) {
+          db.deleteObjectStore(name);
+          log('  - store ' + name);
+        }
+      });
+    }
+  }
+}
+
+// Open a database with declarative schema + data migrations
+function open(name, config) {
+  config = config || {};
+  var schema = config.schema || {};
+  var dataMigrations = config.dataMigrations || {};
+  var onProgress = config.onProgress || function(){};
+
+  // Highest schema version
+  var versions = Object.keys(schema).map(Number).filter(function(n){ return !isNaN(n); });
+  var targetVersion = versions.length ? Math.max.apply(null, versions) : 1;
+
+  return new Promise(function(resolve, reject) {
+    var req = indexedDB.open(name, targetVersion);
+
+    req.onerror = function(){
+      onProgress('error: ' + (req.error && req.error.message));
+      reject(req.error);
+    };
+
+    req.onupgradeneeded = function(e){
+      var db = req.result;
+      var tx = e.target.transaction;
+      var oldVer = e.oldVersion;
+      var newVer = e.newVersion;
+      onProgress('upgrading ' + name + ' from v' + oldVer + ' to v' + newVer);
+      try {
+        applySchema(db, tx, schema, oldVer, newVer, onProgress);
+      } catch (err) {
+        onProgress('schema error: ' + err.message);
+        tx.abort();
+        reject(err);
+      }
+    };
+
+    req.onblocked = function(){
+      onProgress('blocked: another connection has an older version open');
+    };
+
+    req.onsuccess = function(){
+      var db = req.result;
+      db.onversionchange = function(){
+        db.close();
+        onProgress('closed due to newer version opening');
+      };
+
+      // Run data migrations
+      runDataMigrations(db, dataMigrations, onProgress).then(function(){
+        resolve(wrapDb(db, name));
+      }).catch(reject);
+    };
+  });
+}
+
+// Run any data migrations whose version hasn't been applied yet
+function runDataMigrations(db, migrations, onProgress) {
+  var versions = Object.keys(migrations).map(Number).sort(function(a, b){ return a - b; });
+  if (!versions.length) return Promise.resolve();
+
+  // Read applied set from meta
+  var tx = db.transaction([META_STORE], 'readonly');
+  var store = tx.objectStore(META_STORE);
+  return req(store.get(META_KEY)).then(function(entry){
+    var applied = (entry && entry.value) || [];
+    var todo = versions.filter(function(v){ return applied.indexOf(v) === -1; });
+    if (!todo.length) return;
+
+    onProgress('running ' + todo.length + ' data migration(s): ' + todo.join(', '));
+    var wrapped = wrapDb(db, '_internal');
+    var chain = Promise.resolve();
+    todo.forEach(function(v){
+      chain = chain.then(function(){
+        onProgress('  data migration v' + v + ' starting');
+        return Promise.resolve(migrations[v](wrapped));
+      }).then(function(){
+        onProgress('  data migration v' + v + ' done');
+        // Mark applied
+        var tx2 = db.transaction([META_STORE], 'readwrite');
+        var s2 = tx2.objectStore(META_STORE);
+        return req(s2.get(META_KEY)).then(function(cur){
+          var arr = (cur && cur.value) || [];
+          if (arr.indexOf(v) === -1) arr.push(v);
+          return req(s2.put({ key: META_KEY, value: arr }));
+        }).then(function(){ return txComplete(tx2); });
+      });
+    });
+    return chain;
+  });
+}
+
+// Wrap a raw IDBDatabase in a friendly Promise-based API
+function wrapDb(db, name) {
+  function tx(stores, mode, callback) {
+    if (!Array.isArray(stores)) stores = [stores];
+    var t = db.transaction(stores, mode || 'readonly');
+    var helper = {
+      _tx: t,
+      objectStore: function(s){ return t.objectStore(s); },
+      put: function(s, v){ return req(t.objectStore(s).put(v)); },
+      get: function(s, k){ return req(t.objectStore(s).get(k)); },
+      delete: function(s, k){ return req(t.objectStore(s).delete(k)); },
+      getAll: function(s){ return req(t.objectStore(s).getAll()); },
+      clear: function(s){ return req(t.objectStore(s).clear()); },
+      count: function(s){ return req(t.objectStore(s).count()); },
+    };
+    var result = Promise.resolve(callback(helper));
+    return result.then(function(r){
+      return txComplete(t).then(function(){ return r; });
+    });
+  }
+
+  return {
+    name: name,
+    _db: db,
+    version: db.version,
+    storeNames: Array.from(db.objectStoreNames),
+
+    put: function(store, value) {
+      var t = db.transaction([store], 'readwrite');
+      return req(t.objectStore(store).put(value));
+    },
+    get: function(store, key) {
+      var t = db.transaction([store], 'readonly');
+      return req(t.objectStore(store).get(key));
+    },
+    delete: function(store, key) {
+      var t = db.transaction([store], 'readwrite');
+      return req(t.objectStore(store).delete(key));
+    },
+    getAll: function(store, opts) {
+      opts = opts || {};
+      var t = db.transaction([store], 'readonly');
+      var s = t.objectStore(store);
+      if (opts.limit != null) return req(s.getAll(opts.range || null, opts.limit));
+      return req(s.getAll(opts.range || null));
+    },
+    count: function(store) {
+      var t = db.transaction([store], 'readonly');
+      return req(t.objectStore(store).count());
+    },
+    clear: function(store) {
+      var t = db.transaction([store], 'readwrite');
+      return req(t.objectStore(store).clear());
+    },
+    query: function(store, indexName, value) {
+      var t = db.transaction([store], 'readonly');
+      var s = t.objectStore(store);
+      var idx = s.index(indexName);
+      return req(idx.getAll(value));
+    },
+    queryFirst: function(store, indexName, value) {
+      var t = db.transaction([store], 'readonly');
+      var s = t.objectStore(store);
+      var idx = s.index(indexName);
+      return req(idx.get(value));
+    },
+    queryRange: function(store, indexName, range) {
+      var t = db.transaction([store], 'readonly');
+      var s = t.objectStore(store);
+      var idx = s.index(indexName);
+      return req(idx.getAll(range));
+    },
+    keys: function(store) {
+      var t = db.transaction([store], 'readonly');
+      return req(t.objectStore(store).getAllKeys());
+    },
+    tx: tx,
+    close: function() { db.close(); },
+
+    // Bulk helpers
+    bulkPut: function(store, items) {
+      var t = db.transaction([store], 'readwrite');
+      var s = t.objectStore(store);
+      var promises = items.map(function(item){ return req(s.put(item)); });
+      return Promise.all(promises).then(function(){ return txComplete(t); });
+    },
+    bulkDelete: function(store, keys) {
+      var t = db.transaction([store], 'readwrite');
+      var s = t.objectStore(store);
+      var promises = keys.map(function(k){ return req(s.delete(k)); });
+      return Promise.all(promises).then(function(){ return txComplete(t); });
+    },
+
+    // Iterator for huge datasets - avoids loading all into memory
+    each: function(store, callback) {
+      var t = db.transaction([store], 'readonly');
+      var s = t.objectStore(store);
+      return new Promise(function(resolve, reject) {
+        var cur = s.openCursor();
+        cur.onsuccess = function(){
+          var c = cur.result;
+          if (!c) { resolve(); return; }
+          try {
+            var r = callback(c.value, c.key);
+            if (r === false) { resolve(); return; }
+          } catch (e) { reject(e); return; }
+          c.continue();
+        };
+        cur.onerror = function(){ reject(cur.error); };
+      });
+    },
+  };
+}
+
+// Delete a whole database
+function deleteDatabase(name) {
+  return new Promise(function(resolve, reject) {
+    var req = indexedDB.deleteDatabase(name);
+    req.onsuccess = function(){ resolve(); };
+    req.onerror = function(){ reject(req.error); };
+    req.onblocked = function(){ /* still waiting */ };
+  });
+}
+
+// List all databases (Chrome/Firefox 126+, may not exist in older browsers)
+function listDatabases() {
+  if (indexedDB.databases) {
+    return indexedDB.databases();
+  }
+  return Promise.resolve([]);
+}
+
+// Get current version of a DB without opening it for writes
+function currentVersion(name) {
+  return new Promise(function(resolve) {
+    var req = indexedDB.open(name);
+    req.onsuccess = function(){
+      var v = req.result.version;
+      req.result.close();
+      resolve(v);
+    };
+    req.onerror = function(){ resolve(0); };
+  });
+}
+
+// PUBLIC API
+window.weld.migrate = {
+  open: open,
+  deleteDatabase: deleteDatabase,
+  listDatabases: listDatabases,
+  currentVersion: currentVersion,
+  version: '1.0.0',
+};
+
+})();
+</script>
+<script>(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.backup) return;
+
+var FORMAT_VERSION = 1;     // bumped only if envelope format changes (not the data inside)
+var SIGNATURE = 'weld-backup';
+
+// Build an export envelope from arbitrary data
+function exportData(opts) {
+  opts = opts || {};
+  var envelope = {
+    signature: SIGNATURE,
+    formatVersion: FORMAT_VERSION,
+    dataVersion: opts.version != null ? opts.version : 1,
+    generator: opts.generator || 'unknown',
+    createdAt: new Date().toISOString(),
+    metadata: opts.metadata || {},
+    data: opts.data || {},
+  };
+  return envelope;
+}
+
+// Serialize envelope to a JSON Blob
+function exportBlob(opts) {
+  var env = exportData(opts);
+  var json = JSON.stringify(env, null, 2);
+  return new Blob([json], { type: 'application/json' });
+}
+
+// Trigger a browser download
+function download(opts) {
+  opts = opts || {};
+  var blob = exportBlob(opts);
+  var fname = opts.filename;
+  if (!fname) {
+    var stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    fname = (opts.generator || 'backup') + '-' + stamp + '.weld.json';
+  }
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = fname;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  return fname;
+}
+
+// Read a File/Blob/string into an envelope, validating signature
+function readEnvelope(source) {
+  return new Promise(function(resolve, reject) {
+    if (typeof source === 'string') {
+      try { resolve(JSON.parse(source)); }
+      catch (e) { reject(new Error('Not valid JSON: ' + e.message)); }
+      return;
+    }
+    if (source instanceof Blob || source instanceof File) {
+      var reader = new FileReader();
+      reader.onload = function(){
+        try { resolve(JSON.parse(reader.result)); }
+        catch (e) { reject(new Error('Not valid JSON: ' + e.message)); }
+      };
+      reader.onerror = function(){ reject(reader.error); };
+      reader.readAsText(source);
+      return;
+    }
+    if (source && typeof source === 'object') {
+      resolve(source);
+      return;
+    }
+    reject(new Error('Unsupported source type'));
+  });
+}
+
+function validateEnvelope(env) {
+  if (!env || typeof env !== 'object') {
+    return { ok: false, error: 'Not an object' };
+  }
+  if (env.signature !== SIGNATURE) {
+    return { ok: false, error: 'Missing or wrong signature (expected "' + SIGNATURE + '")' };
+  }
+  if (env.formatVersion == null) {
+    return { ok: false, error: 'Missing formatVersion' };
+  }
+  if (env.formatVersion > FORMAT_VERSION) {
+    return { ok: false, error: 'Envelope is newer (format v' + env.formatVersion + ') than this importer (v' + FORMAT_VERSION + ')' };
+  }
+  return {
+    ok: true,
+    formatVersion: env.formatVersion,
+    dataVersion: env.dataVersion,
+    generator: env.generator,
+    createdAt: env.createdAt,
+    metadata: env.metadata || {},
+  };
+}
+
+function validate(source) {
+  return readEnvelope(source).then(validateEnvelope).catch(function(e){
+    return { ok: false, error: e.message };
+  });
+}
+
+// Apply data migrations (provided by caller) to bring dataVersion up to current
+function migrateData(env, migrations) {
+  migrations = migrations || {};
+  var versions = Object.keys(migrations).map(Number).sort(function(a, b){ return a - b; });
+  var maxVer = versions.length ? Math.max.apply(null, versions) : env.dataVersion;
+  var data = env.data;
+  var fromVer = env.dataVersion;
+  if (fromVer < maxVer) {
+    for (var v = fromVer + 1; v <= maxVer; v++) {
+      if (migrations[v]) {
+        data = migrations[v](data) || data;
+      }
+    }
+  }
+  return { data: data, fromVersion: fromVer, toVersion: maxVer };
+}
+
+// Import an envelope - returns the data (optionally migrated)
+function importData(source, opts) {
+  opts = opts || {};
+  return readEnvelope(source).then(function(env){
+    var v = validateEnvelope(env);
+    if (!v.ok) throw new Error(v.error);
+    var migrated = migrateData(env, opts.migrations);
+    return {
+      data: migrated.data,
+      generator: env.generator,
+      fromVersion: migrated.fromVersion,
+      toVersion: migrated.toVersion,
+      metadata: env.metadata || {},
+      createdAt: env.createdAt,
+      importedAt: new Date().toISOString(),
+    };
+  });
+}
+
+// Show a hidden file picker, resolve with selected File
+function pickFile(accept) {
+  return new Promise(function(resolve, reject) {
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept || '.json,.weld.json,application/json';
+    input.style.display = 'none';
+    input.onchange = function(){
+      var f = input.files && input.files[0];
+      document.body.removeChild(input);
+      if (f) resolve(f);
+      else reject(new Error('No file selected'));
+    };
+    document.body.appendChild(input);
+    input.click();
+  });
+}
+
+// Dump an entire weld.migrate DB to an envelope
+function fromDb(db, opts) {
+  opts = opts || {};
+  var stores = opts.stores || db.storeNames.filter(function(s){ return s.indexOf('_weld') !== 0; });
+  var data = {};
+  var chain = Promise.resolve();
+  stores.forEach(function(s){
+    chain = chain.then(function(){
+      return db.getAll(s).then(function(items){ data[s] = items; });
+    });
+  });
+  return chain.then(function(){
+    return exportData({
+      version: opts.version != null ? opts.version : (db.version || 1),
+      generator: opts.generator || db.name,
+      metadata: Object.assign({ stores: stores, recordCount: countTotal(data) }, opts.metadata || {}),
+      data: data,
+    });
+  });
+}
+
+// Convenience - dump and download in one call
+function downloadFromDb(db, opts) {
+  return fromDb(db, opts).then(function(env){
+    var blob = new Blob([JSON.stringify(env, null, 2)], { type: 'application/json' });
+    var fname = (opts && opts.filename) || (env.generator + '-' + new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19) + '.weld.json');
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = fname;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    return { filename: fname, env: env };
+  });
+}
+
+// Restore an envelope into a weld.migrate DB
+// mode: 'merge' (default) - put each item, overwriting same-key
+//       'replace'          - clear store first, then put all
+//       'append'           - only put items whose key doesn't exist
+function toDb(source, db, opts) {
+  opts = opts || {};
+  var mode = opts.mode || 'merge';
+  var onConflict = opts.onConflict; // (existing, incoming) => resolved | null to skip
+
+  return importData(source, { migrations: opts.migrations }).then(function(result){
+    var data = result.data;
+    var stores = opts.stores || Object.keys(data);
+    var summary = { imported: {}, skipped: {}, conflicts: {} };
+
+    var chain = Promise.resolve();
+    stores.forEach(function(s){
+      if (!data[s]) return;
+      var items = data[s];
+
+      chain = chain.then(function(){
+        if (mode === 'replace') {
+          return db.clear(s).then(function(){
+            return db.bulkPut(s, items);
+          }).then(function(){
+            summary.imported[s] = items.length;
+          });
+        }
+
+        if (mode === 'append') {
+          // Check each item's key
+          var skipped = 0, imported = 0;
+          var toPut = [];
+          var lookups = items.map(function(item){
+            // We need the keyPath of the store to know the key - use raw IDB
+            var t = db._db.transaction([s], 'readonly');
+            var store = t.objectStore(s);
+            var keyPath = store.keyPath;
+            var key = (typeof keyPath === 'string') ? item[keyPath] : null;
+            return new Promise(function(resolve){
+              if (key == null) { toPut.push(item); imported++; resolve(); return; }
+              var r = store.get(key);
+              r.onsuccess = function(){
+                if (r.result == null) { toPut.push(item); imported++; }
+                else { skipped++; }
+                resolve();
+              };
+              r.onerror = function(){ resolve(); };
+            });
+          });
+          return Promise.all(lookups).then(function(){
+            summary.imported[s] = imported;
+            summary.skipped[s] = skipped;
+            if (toPut.length) return db.bulkPut(s, toPut);
+          });
+        }
+
+        // merge mode
+        if (!onConflict) {
+          return db.bulkPut(s, items).then(function(){
+            summary.imported[s] = items.length;
+          });
+        }
+
+        // merge with conflict resolution
+        var imported = 0, conflicts = 0;
+        var resolved = [];
+        var lookups = items.map(function(item){
+          var t = db._db.transaction([s], 'readonly');
+          var store = t.objectStore(s);
+          var keyPath = store.keyPath;
+          var key = (typeof keyPath === 'string') ? item[keyPath] : null;
+          return new Promise(function(resolve){
+            if (key == null) { resolved.push(item); imported++; resolve(); return; }
+            var r = store.get(key);
+            r.onsuccess = function(){
+              var existing = r.result;
+              if (existing == null) { resolved.push(item); imported++; }
+              else {
+                conflicts++;
+                var merged = onConflict(existing, item, s);
+                if (merged != null) resolved.push(merged);
+              }
+              resolve();
+            };
+            r.onerror = function(){ resolve(); };
+          });
+        });
+        return Promise.all(lookups).then(function(){
+          summary.imported[s] = imported;
+          summary.conflicts[s] = conflicts;
+          if (resolved.length) return db.bulkPut(s, resolved);
+        });
+      });
+    });
+
+    return chain.then(function(){
+      summary.fromVersion = result.fromVersion;
+      summary.toVersion = result.toVersion;
+      summary.generator = result.generator;
+      return summary;
+    });
+  });
+}
+
+// Count total records across all stores
+function countTotal(data) {
+  var n = 0;
+  Object.keys(data).forEach(function(k){
+    if (Array.isArray(data[k])) n += data[k].length;
+  });
+  return n;
+}
+
+// PUBLIC API
+window.weld.backup = {
+  exportData: exportData,
+  exportBlob: exportBlob,
+  download: download,
+  importData: importData,
+  validate: validate,
+  pickFile: pickFile,
+  fromDb: fromDb,
+  downloadFromDb: downloadFromDb,
+  toDb: toDb,
+  FORMAT_VERSION: FORMAT_VERSION,
+  version: '1.0.0',
+};
+
+})();
+</script>
+<script>
+var db = null;
+var ui = null;
+var refs = {};
+
+async function init() {
+  ui = window.weld.ui;
+  if (!ui || !window.weld.migrate || !window.weld.backup) { setTimeout(init, 50); return; }
+
+  // Set up a sample database
+  db = await window.weld.migrate.open('weld-example-backup', {
+    schema: {
+      1: {
+        stores: {
+          characters: {
+            keyPath: 'id',
+            indexes: { byName: 'name' }
+          }
+        }
+      }
+    }
+  });
+
+  // Seed if empty
+  var count = await db.count('characters');
+  if (count === 0) {
+    var seed = [
+      { id: '1', name: 'Aria',     species: 'human',  level: 12 },
+      { id: '2', name: 'Bex',      species: 'dwarf',  level:  8 },
+      { id: '3', name: 'Casimir',  species: 'elf',    level: 15 },
+    ];
+    await db.bulkPut('characters', seed);
+  }
+
+  // SECTION 01 - Inspect current data
+  await renderInspect();
+
+  // SECTION 02 - Export
+  buildExportSection();
+
+  // SECTION 03 - Validate
+  buildValidateSection();
+
+  // SECTION 04 - Import (with optional migration)
+  buildImportSection();
+
+  // SECTION 05 - Format migration demo
+  buildMigrationDemo();
+}
+
+async function renderInspect() {
+  var items = await db.getAll('characters');
+  var pre = document.getElementById('inspect-pre');
+  pre.textContent = JSON.stringify(items, null, 2);
+}
+
+function buildExportSection() {
+  var sec = document.getElementById('sec-export');
+  sec.appendChild(ui.row([
+    ui.button({
+      label: 'Download backup',
+      variant: 'primary',
+      icon: 'download',
+      onClick: async function() {
+        var result = await window.weld.backup.downloadFromDb(db, {
+          generator: 'weld-example-backup',
+          version: 1,
+          metadata: { note: 'Sample export from the weld.backup demo page' },
+        });
+        showSummary(sec, 'Downloaded ' + result.filename + ' (' + result.env.metadata.recordCount + ' records, dataVersion ' + result.env.dataVersion + ')');
+      }
+    }),
+    ui.button({
+      label: 'Show envelope (no download)',
+      icon: 'info',
+      variant: 'ghost',
+      onClick: async function() {
+        var env = await window.weld.backup.fromDb(db, {
+          generator: 'weld-example-backup',
+          version: 1,
+        });
+        ui.modal({
+          title: 'Envelope preview',
+          size: 'lg',
+          content: ui.el('pre', { text: JSON.stringify(env, null, 2), style: { background: 'var(--bg)', padding: '14px', borderRadius: '6px', maxHeight: '60vh', overflow: 'auto' } }),
+        });
+      }
+    }),
+  ]));
+}
+
+function buildValidateSection() {
+  var sec = document.getElementById('sec-validate');
+  sec.appendChild(ui.row([
+    ui.button({
+      label: 'Pick file and validate',
+      icon: 'check',
+      onClick: async function() {
+        try {
+          var file = await window.weld.backup.pickFile();
+          var info = await window.weld.backup.validate(file);
+          if (info.ok) {
+            showSummary(sec, '<span class="ok">VALID</span> backup<br>generator: <strong>' + info.generator + '</strong><br>dataVersion: <strong>' + info.dataVersion + '</strong><br>created: <strong>' + info.createdAt + '</strong><br>metadata: ' + JSON.stringify(info.metadata));
+          } else {
+            showSummary(sec, '<span class="warn">INVALID</span>: ' + info.error);
+          }
+        } catch (e) {
+          showSummary(sec, 'cancelled or read failed: ' + e.message);
+        }
+      }
+    }),
+  ]));
+}
+
+function buildImportSection() {
+  var sec = document.getElementById('sec-import');
+  var modeSel = ui.select({
+    options: [
+      { value: 'merge',   label: 'merge (overwrite same keys)' },
+      { value: 'replace', label: 'replace (clear store first)' },
+      { value: 'append',  label: 'append (skip existing keys)' },
+    ],
+    value: 'merge',
+  });
+  sec.appendChild(ui.col([
+    ui.row([ui.label('Mode'), modeSel]),
+    ui.row([
+      ui.button({
+        label: 'Pick file and import',
+        variant: 'primary',
+        icon: 'upload',
+        onClick: async function() {
+          try {
+            var file = await window.weld.backup.pickFile();
+            var summary = await window.weld.backup.toDb(file, db, {
+              mode: modeSel.value,
+              onConflict: function(existing, incoming) { return incoming; },
+            });
+            var lines = ['<span class="ok">IMPORTED</span> in mode <strong>' + modeSel.value + '</strong>'];
+            lines.push('generator: <strong>' + summary.generator + '</strong>');
+            Object.keys(summary.imported).forEach(function(s) {
+              lines.push('  ' + s + ': ' + summary.imported[s] + ' imported');
+            });
+            Object.keys(summary.conflicts || {}).forEach(function(s) {
+              if (summary.conflicts[s]) lines.push('  ' + s + ': ' + summary.conflicts[s] + ' conflicts resolved');
+            });
+            Object.keys(summary.skipped || {}).forEach(function(s) {
+              if (summary.skipped[s]) lines.push('  ' + s + ': ' + summary.skipped[s] + ' skipped');
+            });
+            showSummary(sec, lines.join('<br>'));
+            await renderInspect();
+          } catch (e) {
+            showSummary(sec, 'import failed: ' + e.message);
+          }
+        }
+      }),
+      ui.button({
+        label: 'Reset to seed',
+        icon: 'refresh',
+        variant: 'ghost',
+        onClick: async function() {
+          await db.clear('characters');
+          await db.bulkPut('characters', [
+            { id: '1', name: 'Aria',     species: 'human',  level: 12 },
+            { id: '2', name: 'Bex',      species: 'dwarf',  level:  8 },
+            { id: '3', name: 'Casimir',  species: 'elf',    level: 15 },
+          ]);
+          await renderInspect();
+        }
+      }),
+    ]),
+  ]));
+}
+
+function buildMigrationDemo() {
+  var sec = document.getElementById('sec-migrate-demo');
+
+  // An older v1 backup with different field names
+  var oldBackup = {
+    signature: 'weld-backup',
+    formatVersion: 1,
+    dataVersion: 1,
+    generator: 'old-example',
+    createdAt: '2025-01-15T10:00:00.000Z',
+    metadata: { note: 'Hand-crafted v1 backup from before the schema changed' },
+    data: {
+      characters: [
+        { id: 'old1', first: 'Mira', last: 'Hollow', class: 'rogue' },
+        { id: 'old2', first: 'Nyx',  last: 'Quill',  class: 'mage'  },
+      ]
+    }
+  };
+
+  sec.appendChild(ui.col([
+    ui.el('p', { text: 'A pretend v1 backup with old field names (first/last/class). Importing without migrations gives you that old data shape. Importing with migrations transforms it to the new shape (name/species) on the way in.', style: { color: 'var(--muted)', fontSize: '14px', marginBottom: '10px' } }),
+    ui.el('pre', { text: JSON.stringify(oldBackup, null, 2), style: { background: 'var(--faint)', maxHeight: '180px' } }),
+    ui.row([
+      ui.button({
+        label: 'Import as-is',
+        variant: 'ghost',
+        onClick: async function() {
+          var result = await window.weld.backup.importData(oldBackup);
+          ui.modal({
+            title: 'Imported without migrations',
+            content: ui.el('pre', { text: JSON.stringify(result, null, 2), style: { background: 'var(--bg)', padding: '14px', borderRadius: '6px', maxHeight: '60vh', overflow: 'auto' } }),
+          });
+        }
+      }),
+      ui.button({
+        label: 'Import with migrations',
+        variant: 'primary',
+        icon: 'refresh',
+        onClick: async function() {
+          var result = await window.weld.backup.importData(oldBackup, {
+            migrations: {
+              2: function(data) {
+                data.characters.forEach(function(c) {
+                  c.name = c.first + ' ' + c.last;
+                  c.species = c.class === 'rogue' ? 'human' : (c.class === 'mage' ? 'elf' : 'human');
+                  delete c.first;
+                  delete c.last;
+                  delete c.class;
+                });
+                return data;
+              }
+            }
+          });
+          ui.modal({
+            title: 'Imported with v2 migration applied',
+            content: ui.el('pre', { text: JSON.stringify(result, null, 2), style: { background: 'var(--bg)', padding: '14px', borderRadius: '6px', maxHeight: '60vh', overflow: 'auto' } }),
+          });
+        }
+      }),
+    ]),
+  ]));
+}
+
+function showSummary(section, html) {
+  var existing = section.querySelector('.summary');
+  if (existing) existing.remove();
+  var s = document.createElement('div');
+  s.className = 'summary';
+  s.innerHTML = html;
+  section.appendChild(s);
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+else init();
+</script>
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>

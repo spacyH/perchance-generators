@@ -1,0 +1,526 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.backup<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-backup-example">demo &rarr;</a></span></div>  <div class="hdr">
+    <div class="hdr-row">
+      <h1>weld.backup</h1>
+      <span class="ver">v1.0.0</span>
+    </div>
+    <p class="lead">Versioned export and import for any data or weld.migrate databases. Format-versioned envelopes, conflict resolution, automatic migration of older backups on import.</p>
+  </div>
+  <h2>Overview</h2>
+<p>weld.backup handles the perennial export/import problem: serializing user data to a file, restoring it later, and migrating older backups when your data format has moved on.</p>
+<p>It works with any data (give it a plain object), but pairs especially well with weld.migrate (one call to dump or restore an entire database). Backups are JSON files with a versioned envelope, so you can detect old formats and auto-migrate them on import.</p>
+<h2>Quick start</h2>
+<p>In your lists editor:</p>
+<pre data-codeid="code1"></pre>
+
+<p>The simplest case: serialize a JS object and trigger a download.</p>
+<pre data-codeid="code2"></pre>
+
+<p>Import: let the user pick a file, then read it.</p>
+<pre data-codeid="code3"></pre>
+<h2>The envelope format</h2>
+<p>Backups are JSON files with a fixed envelope structure:</p>
+<pre data-codeid="code4"></pre>
+<p><strong>signature</strong> identifies the file as a weld backup. <strong>formatVersion</strong> describes the envelope itself (bumped only if this plugin's format changes). <strong>dataVersion</strong> is your data's version (you decide what numbers mean). <strong>metadata</strong> is freeform - put anything useful for the import side.</p>
+<h2>API</h2><h3>exportData(opts)</h3>
+<div class="sig" data-codeid="sig5"></div>
+<p>Build an envelope object (does not serialize or download). Useful when you want to send the backup somewhere other than a file - e.g. POST to a server.</p>
+<h3>exportBlob(opts)</h3>
+<div class="sig" data-codeid="sig6"></div>
+<p>Same as <code>exportData</code> but returns a JSON Blob you can pass to URL.createObjectURL, fetch, etc.</p>
+<h3>download(opts)</h3>
+<div class="sig" data-codeid="sig7"></div>
+<p>Build the envelope and trigger a browser download in one call. <code>filename</code> is optional - if not provided, a timestamped name is auto-generated like <code>my-app-2026-05-27T11-00-00.weld.json</code>.</p>
+<h3>importData(source, opts?)</h3>
+<div class="sig" data-codeid="sig8"></div>
+<p>Read and validate an envelope, then return the decoded data. <code>source</code> can be a <code>File</code>, <code>Blob</code>, JSON string, or already-parsed object.</p>
+
+<pre data-codeid="code9"></pre>
+
+<p>The <code>migrations</code> option lets you transform older data formats on import:</p>
+<pre data-codeid="code10"></pre>
+
+<p>The plugin compares the backup's <code>dataVersion</code> to the highest migration key, and applies each migration in order. If the backup is already at the latest version, no migration runs. If it's newer than your migrations, the data is returned as-is (and you should treat that as a warning).</p>
+<h3>validate(source)</h3>
+<div class="sig" data-codeid="sig11"></div>
+<p>Check that a file is a valid weld backup without importing it. Returns <code>{ ok: true, ... }</code> or <code>{ ok: false, error: "..." }</code>.</p>
+
+<pre data-codeid="code12"></pre>
+<h3>pickFile(accept?)</h3>
+<div class="sig" data-codeid="sig13"></div>
+<p>Show a hidden file picker, resolve with the selected File. Reject if the user cancels.</p>
+<h2>weld.migrate integration</h2>
+<p>If your data lives in a weld.migrate database, you can dump or restore the whole thing in one call.</p>
+
+<div class="sig" data-codeid="sig14"></div>
+<p>Read all stores in the database into an envelope. <code>opts.stores</code> restricts which stores to include; otherwise everything except internal <code>_weld*</code> stores.</p>
+
+<pre data-codeid="code15"></pre>
+
+<div class="sig" data-codeid="sig16"></div>
+<p>Combine <code>fromDb</code> and <code>download</code> in one call.</p>
+
+<div class="sig" data-codeid="sig17"></div>
+<p>Restore an envelope into a database. <code>opts.mode</code> controls how existing records are handled:</p>
+<ul>
+  <li><code>merge</code> (default) - put each item, overwriting same-key records</li>
+  <li><code>replace</code> - clear the store first, then put all items</li>
+  <li><code>append</code> - only put items whose key doesn't already exist</li>
+</ul>
+
+<pre data-codeid="code18"></pre>
+
+<p><code>onConflict</code> is only called in <code>merge</code> mode when a record with the same key already exists. Return the resolved value, or <code>null</code> to skip importing that record.</p>
+<h2>Notes</h2>
+<div class="note">All exports are pretty-printed JSON. For very large datasets, expect file sizes proportional to data. If you have binary data (images, audio), encode as data URLs or store separately - JSON doesn't do binary efficiently.</div>
+<div class="warn">The plugin doesn't encrypt, sign, or compress backups. If you need any of that, do it on the resulting Blob before downloading.</div>
+<div class="note">On import, the plugin reads the ENTIRE file into memory. This is fine for backups in the megabyte range but may struggle with gigabytes - consider chunking large datasets across multiple files.</div></div>
+<script>
+(function(){
+  var examples = {
+  'code1': 'output\n  weld-backup = \{import:weld-backup-plugin\}',
+  'code2': 'weld.backup.download(\{\n  generator: \'my-app\',\n  version: 1,\n  data: \{\n    characters: getCharacters(),\n    settings: getSettings(),\n  \}\n\});',
+  'code3': 'var file = await weld.backup.pickFile();\nvar result = await weld.backup.importData(file);\nconsole.log(result.data);          // your data\nconsole.log(result.fromVersion);   // version of the file\nconsole.log(result.toVersion);     // version after migration (if any)',
+  'code4': '\{\n  "signature": "weld-backup",\n  "formatVersion": 1,\n  "dataVersion": 3,\n  "generator": "my-app",\n  "createdAt": "2026-05-27T11:00:00.000Z",\n  "metadata": \{ "stores": \["characters", "messages"\], "recordCount": 142 \},\n  "data": \{ ... your actual data ... \}\n\}',
+  'sig5': 'exportData(\{ version, generator, data, metadata \})',
+  'sig6': 'exportBlob(\{ version, generator, data, metadata \})',
+  'sig7': 'download(\{ version, generator, data, metadata, filename? \})',
+  'sig8': 'importData(file|blob|string|object, \{ migrations? \})',
+  'code9': 'var result = await weld.backup.importData(file);\n// result.data        - the actual data payload\n// result.generator   - which app made this backup\n// result.fromVersion - the dataVersion field\n// result.toVersion   - same, unless migrations bumped it\n// result.metadata    - the metadata field\n// result.createdAt   - when the backup was made\n// result.importedAt  - when this import happened',
+  'code10': 'var result = await weld.backup.importData(file, \{\n  migrations: \{\n    2: (data) => \{\n      // v1 had separate firstName/lastName, v2 has just name\n      data.characters.forEach(c => \{\n        c.name = c.firstName + \' \' + c.lastName;\n        delete c.firstName;\n        delete c.lastName;\n      \});\n      return data;\n    \},\n    3: (data) => \{\n      // v3 adds a defaults field\n      data.characters.forEach(c => c.archived = c.archived || false);\n      return data;\n    \},\n  \}\n\});',
+  'sig11': 'validate(file|blob|string|object)',
+  'code12': 'var info = await weld.backup.validate(file);\nif (!info.ok) \{ alert(\'Not a valid backup: \' + info.error); return; \}\nconsole.log(\'Made by:\', info.generator, \'on\', info.createdAt);',
+  'sig13': 'pickFile(accept = ".json,.weld.json,application/json")',
+  'sig14': 'fromDb(db, opts?)',
+  'code15': 'var db = await weld.migrate.open(\'mychat\', \{ /* ... */ \});\nvar envelope = await weld.backup.fromDb(db, \{\n  generator: \'mychat\',\n  version: 2,\n  metadata: \{ note: \'Pre-migration snapshot\' \},\n\});',
+  'sig16': 'downloadFromDb(db, opts?)',
+  'sig17': 'toDb(source, db, opts?)',
+  'code18': 'var file = await weld.backup.pickFile();\nvar summary = await weld.backup.toDb(file, db, \{\n  mode: \'merge\',\n  onConflict: (existing, incoming) => \{\n    // Return the resolved value, or null to skip\n    return incoming.updatedAt > existing.updatedAt ? incoming : existing;\n  \},\n  migrations: \{ 2: (data) => \{ /* ... */ \} \}\n\});\nconsole.log(summary);\n// \{ imported: \{ characters: 50, messages: 200 \},\n//   conflicts: \{ characters: 3 \},\n//   skipped: \{ ... \},\n//   fromVersion: 1, toVersion: 2, generator: \'mychat\' \}'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    var nodes = document.querySelectorAll('[data-codeid]');
+    nodes.forEach(function(n){
+      var id = n.getAttribute('data-codeid');
+      var src = examples[id];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.backup) return;
+
+var FORMAT_VERSION = 1;     // bumped only if envelope format changes (not the data inside)
+var SIGNATURE = 'weld-backup';
+
+// Build an export envelope from arbitrary data
+function exportData(opts) {
+  opts = opts || {};
+  var envelope = {
+    signature: SIGNATURE,
+    formatVersion: FORMAT_VERSION,
+    dataVersion: opts.version != null ? opts.version : 1,
+    generator: opts.generator || 'unknown',
+    createdAt: new Date().toISOString(),
+    metadata: opts.metadata || {},
+    data: opts.data || {},
+  };
+  return envelope;
+}
+
+// Serialize envelope to a JSON Blob
+function exportBlob(opts) {
+  var env = exportData(opts);
+  var json = JSON.stringify(env, null, 2);
+  return new Blob([json], { type: 'application/json' });
+}
+
+// Trigger a browser download
+function download(opts) {
+  opts = opts || {};
+  var blob = exportBlob(opts);
+  var fname = opts.filename;
+  if (!fname) {
+    var stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    fname = (opts.generator || 'backup') + '-' + stamp + '.weld.json';
+  }
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = fname;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  return fname;
+}
+
+// Read a File/Blob/string into an envelope, validating signature
+function readEnvelope(source) {
+  return new Promise(function(resolve, reject) {
+    if (typeof source === 'string') {
+      try { resolve(JSON.parse(source)); }
+      catch (e) { reject(new Error('Not valid JSON: ' + e.message)); }
+      return;
+    }
+    if (source instanceof Blob || source instanceof File) {
+      var reader = new FileReader();
+      reader.onload = function(){
+        try { resolve(JSON.parse(reader.result)); }
+        catch (e) { reject(new Error('Not valid JSON: ' + e.message)); }
+      };
+      reader.onerror = function(){ reject(reader.error); };
+      reader.readAsText(source);
+      return;
+    }
+    if (source && typeof source === 'object') {
+      resolve(source);
+      return;
+    }
+    reject(new Error('Unsupported source type'));
+  });
+}
+
+function validateEnvelope(env) {
+  if (!env || typeof env !== 'object') {
+    return { ok: false, error: 'Not an object' };
+  }
+  if (env.signature !== SIGNATURE) {
+    return { ok: false, error: 'Missing or wrong signature (expected "' + SIGNATURE + '")' };
+  }
+  if (env.formatVersion == null) {
+    return { ok: false, error: 'Missing formatVersion' };
+  }
+  if (env.formatVersion > FORMAT_VERSION) {
+    return { ok: false, error: 'Envelope is newer (format v' + env.formatVersion + ') than this importer (v' + FORMAT_VERSION + ')' };
+  }
+  return {
+    ok: true,
+    formatVersion: env.formatVersion,
+    dataVersion: env.dataVersion,
+    generator: env.generator,
+    createdAt: env.createdAt,
+    metadata: env.metadata || {},
+  };
+}
+
+function validate(source) {
+  return readEnvelope(source).then(validateEnvelope).catch(function(e){
+    return { ok: false, error: e.message };
+  });
+}
+
+// Apply data migrations (provided by caller) to bring dataVersion up to current
+function migrateData(env, migrations) {
+  migrations = migrations || {};
+  var versions = Object.keys(migrations).map(Number).sort(function(a, b){ return a - b; });
+  var maxVer = versions.length ? Math.max.apply(null, versions) : env.dataVersion;
+  var data = env.data;
+  var fromVer = env.dataVersion;
+  if (fromVer < maxVer) {
+    for (var v = fromVer + 1; v <= maxVer; v++) {
+      if (migrations[v]) {
+        data = migrations[v](data) || data;
+      }
+    }
+  }
+  return { data: data, fromVersion: fromVer, toVersion: maxVer };
+}
+
+// Import an envelope - returns the data (optionally migrated)
+function importData(source, opts) {
+  opts = opts || {};
+  return readEnvelope(source).then(function(env){
+    var v = validateEnvelope(env);
+    if (!v.ok) throw new Error(v.error);
+    var migrated = migrateData(env, opts.migrations);
+    return {
+      data: migrated.data,
+      generator: env.generator,
+      fromVersion: migrated.fromVersion,
+      toVersion: migrated.toVersion,
+      metadata: env.metadata || {},
+      createdAt: env.createdAt,
+      importedAt: new Date().toISOString(),
+    };
+  });
+}
+
+// Show a hidden file picker, resolve with selected File
+function pickFile(accept) {
+  return new Promise(function(resolve, reject) {
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept || '.json,.weld.json,application/json';
+    input.style.display = 'none';
+    input.onchange = function(){
+      var f = input.files && input.files[0];
+      document.body.removeChild(input);
+      if (f) resolve(f);
+      else reject(new Error('No file selected'));
+    };
+    document.body.appendChild(input);
+    input.click();
+  });
+}
+
+// Dump an entire weld.migrate DB to an envelope
+function fromDb(db, opts) {
+  opts = opts || {};
+  var stores = opts.stores || db.storeNames.filter(function(s){ return s.indexOf('_weld') !== 0; });
+  var data = {};
+  var chain = Promise.resolve();
+  stores.forEach(function(s){
+    chain = chain.then(function(){
+      return db.getAll(s).then(function(items){ data[s] = items; });
+    });
+  });
+  return chain.then(function(){
+    return exportData({
+      version: opts.version != null ? opts.version : (db.version || 1),
+      generator: opts.generator || db.name,
+      metadata: Object.assign({ stores: stores, recordCount: countTotal(data) }, opts.metadata || {}),
+      data: data,
+    });
+  });
+}
+
+// Convenience - dump and download in one call
+function downloadFromDb(db, opts) {
+  return fromDb(db, opts).then(function(env){
+    var blob = new Blob([JSON.stringify(env, null, 2)], { type: 'application/json' });
+    var fname = (opts && opts.filename) || (env.generator + '-' + new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19) + '.weld.json');
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = fname;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    return { filename: fname, env: env };
+  });
+}
+
+// Restore an envelope into a weld.migrate DB
+// mode: 'merge' (default) - put each item, overwriting same-key
+//       'replace'          - clear store first, then put all
+//       'append'           - only put items whose key doesn't exist
+function toDb(source, db, opts) {
+  opts = opts || {};
+  var mode = opts.mode || 'merge';
+  var onConflict = opts.onConflict; // (existing, incoming) => resolved | null to skip
+
+  return importData(source, { migrations: opts.migrations }).then(function(result){
+    var data = result.data;
+    var stores = opts.stores || Object.keys(data);
+    var summary = { imported: {}, skipped: {}, conflicts: {} };
+
+    var chain = Promise.resolve();
+    stores.forEach(function(s){
+      if (!data[s]) return;
+      var items = data[s];
+
+      chain = chain.then(function(){
+        if (mode === 'replace') {
+          return db.clear(s).then(function(){
+            return db.bulkPut(s, items);
+          }).then(function(){
+            summary.imported[s] = items.length;
+          });
+        }
+
+        if (mode === 'append') {
+          // Check each item's key
+          var skipped = 0, imported = 0;
+          var toPut = [];
+          var lookups = items.map(function(item){
+            // We need the keyPath of the store to know the key - use raw IDB
+            var t = db._db.transaction([s], 'readonly');
+            var store = t.objectStore(s);
+            var keyPath = store.keyPath;
+            var key = (typeof keyPath === 'string') ? item[keyPath] : null;
+            return new Promise(function(resolve){
+              if (key == null) { toPut.push(item); imported++; resolve(); return; }
+              var r = store.get(key);
+              r.onsuccess = function(){
+                if (r.result == null) { toPut.push(item); imported++; }
+                else { skipped++; }
+                resolve();
+              };
+              r.onerror = function(){ resolve(); };
+            });
+          });
+          return Promise.all(lookups).then(function(){
+            summary.imported[s] = imported;
+            summary.skipped[s] = skipped;
+            if (toPut.length) return db.bulkPut(s, toPut);
+          });
+        }
+
+        // merge mode
+        if (!onConflict) {
+          return db.bulkPut(s, items).then(function(){
+            summary.imported[s] = items.length;
+          });
+        }
+
+        // merge with conflict resolution
+        var imported = 0, conflicts = 0;
+        var resolved = [];
+        var lookups = items.map(function(item){
+          var t = db._db.transaction([s], 'readonly');
+          var store = t.objectStore(s);
+          var keyPath = store.keyPath;
+          var key = (typeof keyPath === 'string') ? item[keyPath] : null;
+          return new Promise(function(resolve){
+            if (key == null) { resolved.push(item); imported++; resolve(); return; }
+            var r = store.get(key);
+            r.onsuccess = function(){
+              var existing = r.result;
+              if (existing == null) { resolved.push(item); imported++; }
+              else {
+                conflicts++;
+                var merged = onConflict(existing, item, s);
+                if (merged != null) resolved.push(merged);
+              }
+              resolve();
+            };
+            r.onerror = function(){ resolve(); };
+          });
+        });
+        return Promise.all(lookups).then(function(){
+          summary.imported[s] = imported;
+          summary.conflicts[s] = conflicts;
+          if (resolved.length) return db.bulkPut(s, resolved);
+        });
+      });
+    });
+
+    return chain.then(function(){
+      summary.fromVersion = result.fromVersion;
+      summary.toVersion = result.toVersion;
+      summary.generator = result.generator;
+      return summary;
+    });
+  });
+}
+
+// Count total records across all stores
+function countTotal(data) {
+  var n = 0;
+  Object.keys(data).forEach(function(k){
+    if (Array.isArray(data[k])) n += data[k].length;
+  });
+  return n;
+}
+
+// PUBLIC API
+window.weld.backup = {
+  exportData: exportData,
+  exportBlob: exportBlob,
+  download: download,
+  importData: importData,
+  validate: validate,
+  pickFile: pickFile,
+  fromDb: fromDb,
+  downloadFromDb: downloadFromDb,
+  toDb: toDb,
+  FORMAT_VERSION: FORMAT_VERSION,
+  version: '1.0.0',
+};
+
+})();
+
+</script>
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>

@@ -1,0 +1,360 @@
+$meta
+  title       = weld.migrate
+  description = Versioned IndexedDB schema migrations for the weld plugin suite. Declarative schema definitions, automatic upgrades, data migrations tracked separately. Promise-based DB wrapper. Stash on window.weld.migrate.
+  tags        = weld, indexeddb, migrations, schema, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.migrate) return window.weld.migrate;
+
+  // META store name -- tracks which data migrations have been applied
+  var META_STORE = '_weldMeta';
+  var META_KEY = 'appliedDataMigrations';
+
+  // Wrap an IDBRequest in a Promise
+  function req(idbRequest) {
+    return new Promise(function(resolve, reject) {
+      idbRequest.onsuccess = function(){ resolve(idbRequest.result); };
+      idbRequest.onerror = function(){ reject(idbRequest.error); };
+    });
+  }
+
+  // Wait for transaction completion
+  function txComplete(tx) {
+    return new Promise(function(resolve, reject) {
+      tx.oncomplete = function(){ resolve(); };
+      tx.onerror = function(){ reject(tx.error); };
+      tx.onabort = function(){ reject(tx.error || new Error('Transaction aborted')); };
+    });
+  }
+
+  // Normalize an index spec - accepts string keyPath OR full object
+  function normalizeIndex(spec) {
+    if (typeof spec === 'string') return { keyPath: spec, unique: false };
+    return Object.assign({ unique: false }, spec);
+  }
+
+  // Apply schema upgrade INSIDE upgradeneeded handler
+  function applySchema(db, tx, schema, fromVer, toVer, log) {
+    // Always ensure meta store exists from v1
+    if (!db.objectStoreNames.contains(META_STORE)) {
+      db.createObjectStore(META_STORE, { keyPath: 'key' });
+      log('created meta store ' + META_STORE);
+    }
+
+    // Apply each version step
+    for (var v = fromVer + 1; v <= toVer; v++) {
+      var step = schema[v];
+      if (!step) continue;
+      log('applying schema v' + v);
+
+      // Create new stores
+      if (step.stores) {
+        Object.keys(step.stores).forEach(function(name){
+          if (db.objectStoreNames.contains(name)) {
+            log('  store ' + name + ' already exists, skipping create');
+            return;
+          }
+          var sp = step.stores[name];
+          var opts = {};
+          if (sp.keyPath) opts.keyPath = sp.keyPath;
+          if (sp.autoIncrement) opts.autoIncrement = true;
+          var store = db.createObjectStore(name, opts);
+          log('  + store ' + name);
+          if (sp.indexes) {
+            Object.keys(sp.indexes).forEach(function(idxName){
+              var idx = normalizeIndex(sp.indexes[idxName]);
+              store.createIndex(idxName, idx.keyPath, { unique: idx.unique, multiEntry: !!idx.multiEntry });
+              log('    + index ' + idxName);
+            });
+          }
+        });
+      }
+
+      // Modify existing stores
+      if (step.modify) {
+        Object.keys(step.modify).forEach(function(name){
+          if (!db.objectStoreNames.contains(name)) {
+            log('  cannot modify ' + name + ' (does not exist)');
+            return;
+          }
+          var store = tx.objectStore(name);
+          var mods = step.modify[name];
+          if (mods.dropIndexes) {
+            mods.dropIndexes.forEach(function(idxName){
+              if (store.indexNames.contains(idxName)) {
+                store.deleteIndex(idxName);
+                log('  - index ' + name + '.' + idxName);
+              }
+            });
+          }
+          if (mods.addIndexes) {
+            Object.keys(mods.addIndexes).forEach(function(idxName){
+              if (store.indexNames.contains(idxName)) return;
+              var idx = normalizeIndex(mods.addIndexes[idxName]);
+              store.createIndex(idxName, idx.keyPath, { unique: idx.unique, multiEntry: !!idx.multiEntry });
+              log('  + index ' + name + '.' + idxName);
+            });
+          }
+        });
+      }
+
+      // Drop stores
+      if (step.drop) {
+        step.drop.forEach(function(name){
+          if (db.objectStoreNames.contains(name)) {
+            db.deleteObjectStore(name);
+            log('  - store ' + name);
+          }
+        });
+      }
+    }
+  }
+
+  // Open a database with declarative schema + data migrations
+  function open(name, config) {
+    config = config || {};
+    var schema = config.schema || {};
+    var dataMigrations = config.dataMigrations || {};
+    var onProgress = config.onProgress || function(){};
+
+    // Highest schema version
+    var versions = Object.keys(schema).map(Number).filter(function(n){ return !isNaN(n); });
+    var targetVersion = versions.length ? Math.max.apply(null, versions) : 1;
+
+    return new Promise(function(resolve, reject) {
+      var req = indexedDB.open(name, targetVersion);
+
+      req.onerror = function(){
+        onProgress('error: ' + (req.error && req.error.message));
+        reject(req.error);
+      };
+
+      req.onupgradeneeded = function(e){
+        var db = req.result;
+        var tx = e.target.transaction;
+        var oldVer = e.oldVersion;
+        var newVer = e.newVersion;
+        onProgress('upgrading ' + name + ' from v' + oldVer + ' to v' + newVer);
+        try {
+          applySchema(db, tx, schema, oldVer, newVer, onProgress);
+        } catch (err) {
+          onProgress('schema error: ' + err.message);
+          tx.abort();
+          reject(err);
+        }
+      };
+
+      req.onblocked = function(){
+        onProgress('blocked: another connection has an older version open');
+      };
+
+      req.onsuccess = function(){
+        var db = req.result;
+        db.onversionchange = function(){
+          db.close();
+          onProgress('closed due to newer version opening');
+        };
+
+        // Run data migrations
+        runDataMigrations(db, dataMigrations, onProgress).then(function(){
+          resolve(wrapDb(db, name));
+        }).catch(reject);
+      };
+    });
+  }
+
+  // Run any data migrations whose version hasn't been applied yet
+  function runDataMigrations(db, migrations, onProgress) {
+    var versions = Object.keys(migrations).map(Number).sort(function(a, b){ return a - b; });
+    if (!versions.length) return Promise.resolve();
+
+    // Read applied set from meta
+    var tx = db.transaction([META_STORE], 'readonly');
+    var store = tx.objectStore(META_STORE);
+    return req(store.get(META_KEY)).then(function(entry){
+      var applied = (entry && entry.value) || [];
+      var todo = versions.filter(function(v){ return applied.indexOf(v) === -1; });
+      if (!todo.length) return;
+
+      onProgress('running ' + todo.length + ' data migration(s): ' + todo.join(', '));
+      var wrapped = wrapDb(db, '_internal');
+      var chain = Promise.resolve();
+      todo.forEach(function(v){
+        chain = chain.then(function(){
+          onProgress('  data migration v' + v + ' starting');
+          return Promise.resolve(migrations[v](wrapped));
+        }).then(function(){
+          onProgress('  data migration v' + v + ' done');
+          // Mark applied
+          var tx2 = db.transaction([META_STORE], 'readwrite');
+          var s2 = tx2.objectStore(META_STORE);
+          return req(s2.get(META_KEY)).then(function(cur){
+            var arr = (cur && cur.value) || [];
+            if (arr.indexOf(v) === -1) arr.push(v);
+            return req(s2.put({ key: META_KEY, value: arr }));
+          }).then(function(){ return txComplete(tx2); });
+        });
+      });
+      return chain;
+    });
+  }
+
+  // Wrap a raw IDBDatabase in a friendly Promise-based API
+  function wrapDb(db, name) {
+    function tx(stores, mode, callback) {
+      if (!Array.isArray(stores)) stores = [stores];
+      var t = db.transaction(stores, mode || 'readonly');
+      var helper = {
+        _tx: t,
+        objectStore: function(s){ return t.objectStore(s); },
+        put: function(s, v){ return req(t.objectStore(s).put(v)); },
+        get: function(s, k){ return req(t.objectStore(s).get(k)); },
+        delete: function(s, k){ return req(t.objectStore(s).delete(k)); },
+        getAll: function(s){ return req(t.objectStore(s).getAll()); },
+        clear: function(s){ return req(t.objectStore(s).clear()); },
+        count: function(s){ return req(t.objectStore(s).count()); },
+      };
+      var result = Promise.resolve(callback(helper));
+      return result.then(function(r){
+        return txComplete(t).then(function(){ return r; });
+      });
+    }
+
+    return {
+      name: name,
+      _db: db,
+      version: db.version,
+      storeNames: Array.from(db.objectStoreNames),
+
+      put: function(store, value) {
+        var t = db.transaction([store], 'readwrite');
+        return req(t.objectStore(store).put(value));
+      },
+      get: function(store, key) {
+        var t = db.transaction([store], 'readonly');
+        return req(t.objectStore(store).get(key));
+      },
+      delete: function(store, key) {
+        var t = db.transaction([store], 'readwrite');
+        return req(t.objectStore(store).delete(key));
+      },
+      getAll: function(store, opts) {
+        opts = opts || {};
+        var t = db.transaction([store], 'readonly');
+        var s = t.objectStore(store);
+        if (opts.limit != null) return req(s.getAll(opts.range || null, opts.limit));
+        return req(s.getAll(opts.range || null));
+      },
+      count: function(store) {
+        var t = db.transaction([store], 'readonly');
+        return req(t.objectStore(store).count());
+      },
+      clear: function(store) {
+        var t = db.transaction([store], 'readwrite');
+        return req(t.objectStore(store).clear());
+      },
+      query: function(store, indexName, value) {
+        var t = db.transaction([store], 'readonly');
+        var s = t.objectStore(store);
+        var idx = s.index(indexName);
+        return req(idx.getAll(value));
+      },
+      queryFirst: function(store, indexName, value) {
+        var t = db.transaction([store], 'readonly');
+        var s = t.objectStore(store);
+        var idx = s.index(indexName);
+        return req(idx.get(value));
+      },
+      queryRange: function(store, indexName, range) {
+        var t = db.transaction([store], 'readonly');
+        var s = t.objectStore(store);
+        var idx = s.index(indexName);
+        return req(idx.getAll(range));
+      },
+      keys: function(store) {
+        var t = db.transaction([store], 'readonly');
+        return req(t.objectStore(store).getAllKeys());
+      },
+      tx: tx,
+      close: function() { db.close(); },
+
+      // Bulk helpers
+      bulkPut: function(store, items) {
+        var t = db.transaction([store], 'readwrite');
+        var s = t.objectStore(store);
+        var promises = items.map(function(item){ return req(s.put(item)); });
+        return Promise.all(promises).then(function(){ return txComplete(t); });
+      },
+      bulkDelete: function(store, keys) {
+        var t = db.transaction([store], 'readwrite');
+        var s = t.objectStore(store);
+        var promises = keys.map(function(k){ return req(s.delete(k)); });
+        return Promise.all(promises).then(function(){ return txComplete(t); });
+      },
+
+      // Iterator for huge datasets - avoids loading all into memory
+      each: function(store, callback) {
+        var t = db.transaction([store], 'readonly');
+        var s = t.objectStore(store);
+        return new Promise(function(resolve, reject) {
+          var cur = s.openCursor();
+          cur.onsuccess = function(){
+            var c = cur.result;
+            if (!c) { resolve(); return; }
+            try {
+              var r = callback(c.value, c.key);
+              if (r === false) { resolve(); return; }
+            } catch (e) { reject(e); return; }
+            c.continue();
+          };
+          cur.onerror = function(){ reject(cur.error); };
+        });
+      },
+    };
+  }
+
+  // Delete a whole database
+  function deleteDatabase(name) {
+    return new Promise(function(resolve, reject) {
+      var req = indexedDB.deleteDatabase(name);
+      req.onsuccess = function(){ resolve(); };
+      req.onerror = function(){ reject(req.error); };
+      req.onblocked = function(){ /* still waiting */ };
+    });
+  }
+
+  // List all databases (Chrome/Firefox 126+, may not exist in older browsers)
+  function listDatabases() {
+    if (indexedDB.databases) {
+      return indexedDB.databases();
+    }
+    return Promise.resolve([]);
+  }
+
+  // Get current version of a DB without opening it for writes
+  function currentVersion(name) {
+    return new Promise(function(resolve) {
+      var req = indexedDB.open(name);
+      req.onsuccess = function(){
+        var v = req.result.version;
+        req.result.close();
+        resolve(v);
+      };
+      req.onerror = function(){ resolve(0); };
+    });
+  }
+
+  // PUBLIC API
+  window.weld.migrate = {
+    open: open,
+    deleteDatabase: deleteDatabase,
+    listDatabases: listDatabases,
+    currentVersion: currentVersion,
+    version: '1.0.0',
+  };
+
+  return window.weld.migrate;
+
