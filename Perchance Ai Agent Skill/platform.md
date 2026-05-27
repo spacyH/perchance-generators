@@ -235,6 +235,38 @@ async myFunc(opts) =>
 - Function bodies must be indented relative to the signature.
 - Single-line functions must be `name(args) => expression` on one physical line.
 
+**HTML Panel String-Literal Interception [VERIFIED R24].** The DSL parser scans the
+ENTIRE HTML panel source (including inside `<script>` tags) for template-expression
+patterns BEFORE JavaScript runs. This means string literals in your panel JS that happen
+to contain DSL-shaped patterns get intercepted and evaluated:
+
+```js
+// ❌ BREAKS — parser sees [vibrant] as a list reference
+let prompts = ['a [vibrant] flower'];
+
+// ❌ BREAKS — parser sees {import:foo}
+let helpText = 'Add {import:my-plugin} to your lists';
+
+// ❌ BREAKS — parser sees {1F3B2} as a range/expression
+let dice = '\u{1F3B2}';   // ES6 escape
+
+// ✓ FIX — backslash escape (JS treats \[ \{ as no-op, parser respects as literal)
+let prompts = ['a \[vibrant\] flower'];
+let helpText = 'Add \{import:my-plugin\} to your lists';
+
+// ✓ FIX — surrogate pair or runtime construction
+let dice = '\uD83C\uDFB2';
+let dice = String.fromCodePoint(0x1F3B2);
+
+// ✓ FIX — set via innerHTML at runtime (parser already done)
+el.innerHTML = '<code>literal {brace} text</code>';
+```
+
+Intercepted patterns: `{word}`, `{import:x}`, `{1-10}`, `{A|B|C}`, `{s}`, `{a}`, `[word]`,
+`[A:B:N]`, `[A|B]`. JS array indexing (`arr[i]`) and object literals (`{x:1}`) are
+generally safe — they don't match the DSL pattern shape. HTML entities (`&#123;`,
+`&#x7b;`) are NOT a workaround — the parser decodes entities before scanning.
+
 ### 2.2 Core Plugin Imports
 
 ```
@@ -639,7 +671,7 @@ A beautiful sunset (resolution:::768x512) (negativePrompt:::cars, buildings) (se
 |------------------|------|-------|
 | `(seed:::N)` | number | `-1` = random |
 | `(resolution:::WxH)` | string | one of the four valid sizes |
-| `(negativePrompt:::text)` | string | bracket-depth parser; a missing `)` makes the rest of the string the negative prompt |
+| `(negativePrompt:::text)` | string | parses correctly (bracket-depth parser; missing `)` → rest of string) and reaches broker payload, but **silently ignored by SD backend** [VERIFIED R24] |
 | `(guidanceScale:::N)` | number | 1–30, default 7 |
 | `(size:::N)` | number | square size |
 | `(width:::N)`, `(height:::N)` | number | echoed as a `"512px"` CSS string in `inputs` |
@@ -650,7 +682,7 @@ A beautiful sunset (resolution:::768x512) (negativePrompt:::cars, buildings) (se
 
 | Option / property | Behavior |
 |-------------------|----------|
-| `negativePrompt` | Honored — measurably changes output |
+| `negativePrompt` | Reaches broker payload as a real string but is **silently dropped by the SD backend** before reaching the model. Confirmed by inspecting iframe `data-src` URL hashes [VERIFIED R24]. Likely deliberate content-moderation hardening. |
 | `seed` | Echoed in `inputs` but not reliably honored — output varies regardless |
 | `guidanceScale` | Default 7, range 1–30; reaches the backend |
 | `style` | CSS string applied to the iframe DOM element — not an image-style preset |
@@ -681,6 +713,63 @@ await t2i({ prompt: 'a red apple', negativePrompt: null });
 
 The AI character chat guards against this by stripping empty `<image></image>` tags before
 rendering — custom code must do the same.
+
+### 4.4a A1111 Prompt Syntax Compatibility [VERIFIED R24]
+
+The backend is Stable Diffusion 1.5, which natively understands A1111 WebUI-style prompt
+syntax — but the **Perchance DSL layer sits between you and the backend** and owns the
+`[...]` syntax space. So square-bracket A1111 features get intercepted before they reach
+the model. Verified empirically via side-by-side same-seed comparison tests:
+
+| Syntax | A1111 meaning | Perchance result | Status |
+|---|---|---|---|
+| `(text)` | emphasize ~1.1× | passes to backend, works | ✅ |
+| `((text))` | emphasize ~1.21× | passes to backend, works | ✅ |
+| `(text:1.5)` | explicit weight | passes to backend, works | ✅ |
+| `(text:0.5)` | de-emphasize | passes to backend, works | ✅ |
+| `[text]` | de-emphasize ~0.9× | **intercepted by Perchance DSL parser**, contents dropped | ❌ |
+| `[A:B:N]` | prompt editing (switch A→B at step N) | **intercepted by DSL parser**, contents dropped, empty space remains in prompt | ❌ |
+| `[A\|B]` | alternating tokens per step | **intercepted as Perchance random-pick syntax** — picks ONE option at evaluation | ❌ |
+| `word AND word` | compositional diffusion | backend doesn't implement | ❌ |
+| `BREAK` | attention break | backend doesn't implement | ❌ |
+| `negativePrompt` (param/inline) | suppress concepts | reaches broker as proper string, **backend silently ignores** | ⚠️ |
+
+**The cause of the `[...]` failures is not the model — it's the Perchance DSL layer.**
+Anywhere `[word]` appears in a string sent through the plugin, Perchance evaluates it as
+a template expression and either errors or substitutes random content from a same-named
+list. The string that reaches the SD backend has the bracket content stripped.
+
+**For weight control on Perchance: parentheses only.** `(detailed:1.4)`, `(blurry:0.5)`.
+For "negative prompt" effects: not possible — fall back to positive prompt construction
+with vivid descriptors.
+
+### 4.4b Inspecting the Actual Broker Payload [VERIFIED R24]
+
+To verify what data is actually being sent to `image-generation.perchance.org`, extract
+the iframe's `data-src` URL hash and decode it:
+
+```js
+const iframeHtml = String(root.textToImagePlugin(opts));
+const hashMatch = iframeHtml.match(/data-src="[^"]*#([^"]+)"/);
+if (hashMatch) {
+  const payload = JSON.parse(decodeURIComponent(hashMatch[1]));
+  console.log(payload);
+  // {
+  //   prompt: "a red apple",
+  //   negativePrompt: "blurry, ugly",    // ← actually present in payload
+  //   seed: 42,
+  //   resolution: "512x512",
+  //   guidanceScale: 7,
+  //   requestId: "...",
+  //   userKey: "...",
+  //   ...
+  // }
+}
+```
+
+This technique proved that `negativePrompt` does reach the broker as a proper string — the
+loss happens somewhere between the broker and the model, not in the plugin or the
+DSL→JS bridge.
 
 ### 4.5 Image Persistence
 

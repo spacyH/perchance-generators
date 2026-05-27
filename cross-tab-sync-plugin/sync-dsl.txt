@@ -1,0 +1,226 @@
+$meta
+  title       = Cross-Tab Sync Plugin
+  description = Real-time cross-tab messaging plus persistent local storage. Use BroadcastChannel for instant updates between tabs of the same generator, plus localStorage for data that persists across page reloads. Includes peer presence detection, namespaced storage, and ephemeral channels.
+  tags        = plugin, sync, multiplayer, persistent, storage, broadcast
+
+$output() =>
+  // Idempotency: if already built, return cached
+  if (window.__sync) return window.__sync;
+  
+  // ── Cross-Tab Sync Plugin ──
+  // Real-time messaging (BroadcastChannel) + persistent storage (localStorage)
+  // scoped to this generator. All same-origin tabs see each other's updates instantly.
+  //
+  // NOTE: Cross-generator sync is not possible from the sandboxed iframe — each
+  // Perchance generator runs on its own subdomain with isolated localStorage.
+  
+  const genName = (window.generatorName || "anon").replace(/[^a-z0-9-]/gi, "_");
+  const STORAGE_PREFIX = "sync_" + genName + ":";
+  const BROADCAST_CHANNEL = "sync_" + genName + "_channel";
+  const PEER_ID = Math.random().toString(36).slice(2, 10) + "_" + Date.now();
+  
+  // Real-time channel
+  let bc = null;
+  try { bc = new BroadcastChannel(BROADCAST_CHANNEL); } catch (e) { /* fallback below */ }
+  
+  // Per-channel subscribers
+  const channels = {};
+  // Global change listeners
+  const changeListeners = [];
+  // Per-key change listeners
+  const keyListeners = {};
+  // Peer tracking
+  const peers = new Set();
+  let lastPeerHeartbeat = {};
+  
+  function emit(target, args) {
+    for (let i = 0; i < target.length; i++) {
+      try { target[i].apply(null, args); } catch (e) { /* swallow */ }
+    }
+  }
+  
+  // Handle incoming broadcast messages
+  function handleMessage(msg) {
+    if (!msg || typeof msg !== "object") return;
+    if (msg.peer === PEER_ID) return; // ignore our own
+    
+    if (msg.type === "set") {
+      emit(changeListeners, [msg.key, msg.value, "remote"]);
+      if (keyListeners[msg.key]) emit(keyListeners[msg.key], [msg.value, "remote"]);
+    } else if (msg.type === "delete") {
+      emit(changeListeners, [msg.key, undefined, "remote"]);
+      if (keyListeners[msg.key]) emit(keyListeners[msg.key], [undefined, "remote"]);
+    } else if (msg.type === "broadcast") {
+      if (channels[msg.channel]) emit(channels[msg.channel], [msg.data, msg.peer]);
+    } else if (msg.type === "heartbeat") {
+      peers.add(msg.peer);
+      lastPeerHeartbeat[msg.peer] = Date.now();
+    } else if (msg.type === "goodbye") {
+      peers.delete(msg.peer);
+      delete lastPeerHeartbeat[msg.peer];
+    }
+  }
+  
+  if (bc) bc.onmessage = (e) => handleMessage(e.data);
+  
+  // Storage event fallback for browsers without BroadcastChannel
+  // (also catches localStorage changes from same-origin tabs)
+  window.addEventListener("storage", (e) => {
+    if (!e.key || !e.key.startsWith(STORAGE_PREFIX)) return;
+    const key = e.key.slice(STORAGE_PREFIX.length);
+    let value;
+    try { value = e.newValue === null ? undefined : JSON.parse(e.newValue); }
+    catch (err) { value = e.newValue; }
+    emit(changeListeners, [key, value, "remote"]);
+    if (keyListeners[key]) emit(keyListeners[key], [value, "remote"]);
+  });
+  
+  function publish(msg) {
+    if (bc) {
+      try { bc.postMessage(Object.assign({ peer: PEER_ID }, msg)); }
+      catch (e) { /* channel might be closed */ }
+    }
+  }
+  
+  // Heartbeat for peer presence (every 3s, prune stale after 8s)
+  function heartbeat() { publish({ type: "heartbeat" }); }
+  function pruneStale() {
+    const now = Date.now();
+    for (const id of Array.from(peers)) {
+      if (now - (lastPeerHeartbeat[id] || 0) > 8000) {
+        peers.delete(id);
+        delete lastPeerHeartbeat[id];
+      }
+    }
+  }
+  setInterval(() => { heartbeat(); pruneStale(); }, 3000);
+  heartbeat();
+  
+  // Say goodbye on unload
+  window.addEventListener("beforeunload", () => publish({ type: "goodbye" }));
+  
+  // ── API ──
+  const api = {};
+  
+  // Persistent storage (localStorage, namespaced to this generator)
+  api.set = (key, value) => {
+    try {
+      localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(value));
+      publish({ type: "set", key: key, value: value });
+      // Also notify local listeners (storage event doesn't fire in same tab)
+      emit(changeListeners, [key, value, "local"]);
+      if (keyListeners[key]) emit(keyListeners[key], [value, "local"]);
+      return true;
+    } catch (e) { return false; }
+  };
+  
+  api.get = (key, defaultValue) => {
+    try {
+      const raw = localStorage.getItem(STORAGE_PREFIX + key);
+      if (raw === null) return defaultValue;
+      return JSON.parse(raw);
+    } catch (e) { return defaultValue; }
+  };
+  
+  api.has = (key) => {
+    return localStorage.getItem(STORAGE_PREFIX + key) !== null;
+  };
+  
+  api.delete = (key) => {
+    try {
+      localStorage.removeItem(STORAGE_PREFIX + key);
+      publish({ type: "delete", key: key });
+      emit(changeListeners, [key, undefined, "local"]);
+      if (keyListeners[key]) emit(keyListeners[key], [undefined, "local"]);
+      return true;
+    } catch (e) { return false; }
+  };
+  
+  api.keys = () => {
+    const out = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(STORAGE_PREFIX)) out.push(k.slice(STORAGE_PREFIX.length));
+    }
+    return out;
+  };
+  
+  api.clear = () => {
+    const ks = api.keys();
+    for (const k of ks) api.delete(k);
+    return ks.length;
+  };
+  
+  // Ephemeral broadcast — no persistence, just realtime messaging
+  api.broadcast = (channel, data) => {
+    publish({ type: "broadcast", channel: channel, data: data });
+    return true;
+  };
+  
+  api.subscribe = (channel, callback) => {
+    if (!channels[channel]) channels[channel] = [];
+    channels[channel].push(callback);
+    return () => {
+      const arr = channels[channel];
+      if (!arr) return;
+      const idx = arr.indexOf(callback);
+      if (idx >= 0) arr.splice(idx, 1);
+    };
+  };
+  
+  // Listen for any storage change (local or remote)
+  api.onChange = (callback) => {
+    changeListeners.push(callback);
+    return () => {
+      const idx = changeListeners.indexOf(callback);
+      if (idx >= 0) changeListeners.splice(idx, 1);
+    };
+  };
+  
+  // Listen for a specific key
+  api.onKeyChange = (key, callback) => {
+    if (!keyListeners[key]) keyListeners[key] = [];
+    keyListeners[key].push(callback);
+    return () => {
+      const arr = keyListeners[key];
+      if (!arr) return;
+      const idx = arr.indexOf(callback);
+      if (idx >= 0) arr.splice(idx, 1);
+    };
+  };
+  
+  // Peer presence
+  api.peers = () => peers.size;
+  api.peerIds = () => Array.from(peers);
+  api.myId = () => PEER_ID;
+  
+  // Reactive state primitive
+  api.state = (key, defaultValue) => {
+    if (!api.has(key) && defaultValue !== undefined) {
+      api.set(key, defaultValue);
+    }
+    const subs = [];
+    const unsub = api.onKeyChange(key, (value, source) => {
+      for (const fn of subs) try { fn(value, source); } catch (e) {}
+    });
+    return {
+      get: () => api.get(key, defaultValue),
+      set: (v) => api.set(key, v),
+      onChange: (fn) => { subs.push(fn); return () => { const i = subs.indexOf(fn); if (i >= 0) subs.splice(i, 1); }; },
+      destroy: unsub
+    };
+  };
+  
+  // Diagnostic
+  api.info = () => ({
+    generator: genName,
+    storagePrefix: STORAGE_PREFIX,
+    broadcastChannel: BROADCAST_CHANNEL,
+    broadcastSupported: bc !== null,
+    peerId: PEER_ID,
+    peerCount: peers.size,
+    storedKeys: api.keys().length
+  });
+  
+  window.__sync = api;
+  return api;

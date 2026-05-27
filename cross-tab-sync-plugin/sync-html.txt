@@ -1,0 +1,206 @@
+<style>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');
+:root{
+  --bg:#0d1117;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;
+  --accent:#4493f8;--green:#3fb950;--red:#f85149;--yellow:#d29922;
+  --font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.7 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);}
+code{font-family:var(--mono);font-size:12px;color:var(--accent);}
+pre{font:12px/1.6 var(--mono);background:var(--faint);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:16px;overflow-x:auto;white-space:pre;color:var(--ink);}
+#page{max-width:760px;margin:0 auto;padding:48px 24px 100px;}
+header,.hero{margin-bottom:56px;}
+h1{font-size:28px;font-weight:700;letter-spacing:-.5px;line-height:1.2;margin-bottom:10px;}
+h2{font-size:17px;font-weight:600;margin:0;}
+p{color:var(--muted);margin-bottom:10px;}
+p:last-child{margin-bottom:0;}
+p strong,p em{color:var(--ink);}
+.lead{font-size:16px;color:var(--muted);max-width:560px;margin-bottom:20px;}
+.breadcrumb{font-size:13px;margin-bottom:16px;}
+.breadcrumb a{color:var(--muted);text-decoration:none;}
+.breadcrumb a:hover{color:var(--ink);}
+.pill-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
+.pill{font:11px/1 var(--mono);border:1px solid var(--faint);border-radius:20px;padding:4px 10px;color:var(--muted);}
+.pill.version{color:var(--accent);border-color:rgba(68,147,248,.3);}
+.block{margin-bottom:48px;}
+.block .label{font:700 11px var(--mono);letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
+.code-line{display:flex;align-items:center;gap:10px;background:var(--faint);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:12px 14px;font-family:var(--mono);font-size:13px;margin-bottom:14px;}
+.code-line code{flex:1;color:var(--ink);font-size:13px;}
+.usecases{display:grid;gap:18px;}
+.usecases dt{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:2px;}
+.usecases dd{color:var(--muted);font-size:14px;}
+.api{width:100%;border-collapse:collapse;font-size:13px;}
+.api th{text-align:left;padding:8px 12px 8px 0;font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--faint);}
+.api td{padding:9px 12px 9px 0;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:top;}
+.api tr:last-child td{border-bottom:0;}
+.api td:first-child{font-family:var(--mono);font-size:12px;color:var(--accent);white-space:nowrap;padding-right:16px;}
+.api td:nth-child(2){color:var(--muted);white-space:nowrap;padding-right:16px;}
+.api td:last-child{color:var(--muted);}
+.cta-link{display:inline-block;margin-top:14px;font-size:14px;font-weight:500;}
+button{font:13px var(--font);font-weight:500;background:var(--faint);color:var(--ink);border:1px solid rgba(255,255,255,.12);border-radius:5px;padding:8px 14px;cursor:pointer;}
+button:hover:not(:disabled){border-color:rgba(255,255,255,.3);}
+button:disabled{opacity:.4;cursor:not-allowed;}
+button.primary{background:var(--accent);color:#0d1117;border-color:var(--accent);font-weight:600;}
+button.primary:hover:not(:disabled){background:#58a6ff;}
+.btn-copy{font:11px var(--mono);padding:5px 10px;background:transparent;color:var(--muted);border:1px solid var(--faint);border-radius:4px;cursor:pointer;}
+.btn-copy:hover{color:var(--ink);border-color:var(--muted);}
+.btn-copy.ok{color:var(--green);border-color:rgba(63,185,80,.4);}
+input[type=text],input[type=number],textarea,select{font:13px var(--mono);background:var(--faint);color:var(--ink);border:1px solid rgba(255,255,255,.1);border-radius:5px;padding:8px 11px;outline:none;width:100%;}
+input:focus,textarea:focus,select:focus{border-color:rgba(68,147,248,.5);}
+textarea{resize:vertical;min-height:80px;line-height:1.5;}
+.row{display:flex;gap:8px;margin-bottom:10px;}
+.row input{flex:1;}
+.notes ul{padding-left:18px;color:var(--muted);font-size:13px;}
+.notes li{margin-bottom:8px;line-height:1.6;}
+.note{font-size:12px;color:var(--muted);}
+.muted{color:var(--muted);}
+.err{color:var(--red);font-size:13px;}
+.ok{color:var(--green);}
+.warn{color:var(--yellow);}
+.demo{padding:32px 0;border-top:1px solid var(--faint);}
+.demo:first-child{border-top:0;padding-top:0;}
+.demo-meta{display:flex;align-items:baseline;gap:14px;margin-bottom:12px;}
+.demo-meta .n{font:700 11px var(--mono);color:var(--faint);letter-spacing:1px;}
+.demo-meta h2{margin-bottom:4px;}
+.stat{font:13px var(--mono);color:var(--muted);padding:4px 0;}
+.stat .val{color:var(--ink);font-weight:600;}
+.stat .accent{color:var(--accent);}
+.metric-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:14px;}
+.metric{background:var(--faint);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:10px 12px;}
+.metric .label{font:10px var(--mono);text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px;}
+.metric .value{font:600 18px var(--mono);color:var(--ink);}
+.metric .value.dim{color:var(--muted);}
+.metric .value.ok{color:var(--green);}
+.metric .value.warn{color:var(--yellow);}
+.metric .value.err{color:var(--red);}
+</style>
+<div id="page"><p style="color:#7d8590;padding:40px 0;font:13px monospace">Loading...</p></div>
+<script>
+(function(){
+'use strict';
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function copy(text,btn){
+  var t=btn.textContent;
+  (navigator.clipboard?navigator.clipboard.writeText(text):Promise.reject()).catch(function(){});
+  btn.textContent='Copied';btn.classList.add('ok');
+  setTimeout(function(){btn.textContent=t;btn.classList.remove('ok');},2000);
+}
+
+function renderPage(slug){
+  var LB=String.fromCharCode(123),RB=String.fromCharCode(125);
+  var importLine='sync = '+LB+'import:'+slug+RB;
+  document.title='Cross-Tab Sync Plugin';
+  document.getElementById('page').innerHTML=
+
+  '<div class="hero">'+
+    '<h1>cross\u2011tab\u2011sync\u2011plugin</h1>'+
+    '<p class="lead">Real\u2011time cross\u2011tab messaging and persistent local storage. All tabs of the same generator stay in sync via BroadcastChannel, and data survives reloads via localStorage.</p>'+
+    '<div class="pill-row">'+
+      '<span class="pill version">v1.0.0</span>'+
+      '<span class="pill">no dependencies</span>'+
+    '</div>'+
+  '</div>'+
+
+  '<div class="block">'+
+    '<div class="label">Installation</div>'+
+    '<p>Add to your <strong>lists editor</strong>:</p>'+
+    '<div class="code-line">'+
+      '<code id="install-code">'+esc(importLine)+'</code>'+
+      '<button id="install-copy" class="btn-copy">Copy</button>'+
+    '</div>'+
+    '<p>Then in your HTML panel script:</p>'+
+    '<pre>setTimeout(function() {\n  var s = window.__sync;\n  \n  // Persistent storage\n  s.set("score", 100);\n  s.get("score");  // 100, persists across reloads\n  \n  // Live cross-tab updates\n  s.onChange(function(key, value) {\n    console.log(key + " changed to " + value);\n  });\n  \n  // Ephemeral broadcast (no storage)\n  s.subscribe("chat", function(msg) { console.log(msg); });\n  s.broadcast("chat", "hello tabs!");\n  \n  // Peer presence\n  console.log("Other tabs open: " + s.peers());\n}, 1500);</pre>'+
+  '</div>'+
+
+  '<div class="block">'+
+    '<div class="label">What it does</div>'+
+    '<p>Combines two related capabilities into one API:</p>'+
+    '<p><strong>Real\u2011time messaging</strong> via BroadcastChannel. When one tab calls <code>sync.set("key", value)</code>, every other tab of the same generator immediately receives a notification through registered <code>onChange</code> listeners. No polling, no delays.</p>'+
+    '<p><strong>Persistent storage</strong> via localStorage. Values written with <code>sync.set</code> survive page reloads and browser restarts. Keys are automatically namespaced to this generator so you don\u2019t conflict with other plugins.</p>'+
+  '</div>'+
+
+  '<div class="block">'+
+    '<div class="label">What can I build with it?</div>'+
+    '<dl class="usecases">'+
+      '<dt>Multi-tab dashboards</dt>'+
+      '<dd>Open your generator in multiple tabs to monitor different aspects. Edit one tab and the others update live.</dd>'+
+      '<dt>Persistent game state</dt>'+
+      '<dd>Save player progress, achievements, settings. Survives browser restarts. Works offline.</dd>'+
+      '<dt>Collaborative editing within a session</dt>'+
+      '<dd>One user with two tabs open can prototype a shared form, character sheet, or document and see live updates.</dd>'+
+      '<dt>Cross-tab pub/sub</dt>'+
+      '<dd>Broadcast events between tabs without storage \u2014 useful for notifications, presence, "user is typing" indicators.</dd>'+
+      '<dt>Reactive state</dt>'+
+      '<dd>Use <code>sync.state(key, default)</code> for an observable value with .get() / .set() / .onChange() that both persists and broadcasts automatically.</dd>'+
+    '</dl>'+
+    '<p><a class="cta-link" href="https://perchance.org/cross-tab-sync-plugin-example" target="_blank">See it running live (open the example in 2+ tabs) \u2192</a></p>'+
+  '</div>'+
+
+  '<div class="block">'+
+    '<div class="label">API reference</div>'+
+    '<p><strong>Persistent storage</strong></p>'+
+    '<table class="api">'+
+      '<thead><tr><th>Method</th><th>Returns</th><th>Description</th></tr></thead>'+
+      '<tbody>'+
+        '<tr><td>sync.set(key, value)</td><td>bool</td><td>Store and broadcast. Values are JSON-serialized.</td></tr>'+
+        '<tr><td>sync.get(key, default)</td><td>any</td><td>Read. Returns default if key not set.</td></tr>'+
+        '<tr><td>sync.has(key)</td><td>bool</td><td>Whether the key exists.</td></tr>'+
+        '<tr><td>sync.delete(key)</td><td>bool</td><td>Remove and broadcast.</td></tr>'+
+        '<tr><td>sync.keys()</td><td>string[]</td><td>All keys in this generator\u2019s namespace.</td></tr>'+
+        '<tr><td>sync.clear()</td><td>number</td><td>Remove all keys. Returns count removed.</td></tr>'+
+      '</tbody>'+
+    '</table>'+
+    '<p style="margin-top:18px"><strong>Ephemeral broadcasting</strong></p>'+
+    '<table class="api">'+
+      '<thead><tr><th>Method</th><th>Returns</th><th>Description</th></tr></thead>'+
+      '<tbody>'+
+        '<tr><td>sync.broadcast(channel, data)</td><td>bool</td><td>Send data to all other tabs. No storage.</td></tr>'+
+        '<tr><td>sync.subscribe(channel, cb)</td><td>function</td><td>Listen for broadcasts. Returns unsubscribe.</td></tr>'+
+      '</tbody>'+
+    '</table>'+
+    '<p style="margin-top:18px"><strong>Reactive listeners</strong></p>'+
+    '<table class="api">'+
+      '<thead><tr><th>Method</th><th>Returns</th><th>Description</th></tr></thead>'+
+      '<tbody>'+
+        '<tr><td>sync.onChange(cb)</td><td>function</td><td>cb(key, value, source). Source is "local" or "remote".</td></tr>'+
+        '<tr><td>sync.onKeyChange(key, cb)</td><td>function</td><td>Listen for one key. cb(value, source).</td></tr>'+
+        '<tr><td>sync.state(key, default)</td><td>object</td><td>Reactive primitive with .get(), .set(), .onChange().</td></tr>'+
+      '</tbody>'+
+    '</table>'+
+    '<p style="margin-top:18px"><strong>Peer presence</strong></p>'+
+    '<table class="api">'+
+      '<thead><tr><th>Method</th><th>Returns</th><th>Description</th></tr></thead>'+
+      '<tbody>'+
+        '<tr><td>sync.peers()</td><td>number</td><td>Count of other live tabs (excluding this one).</td></tr>'+
+        '<tr><td>sync.peerIds()</td><td>string[]</td><td>IDs of other tabs.</td></tr>'+
+        '<tr><td>sync.myId()</td><td>string</td><td>This tab\u2019s unique ID.</td></tr>'+
+        '<tr><td>sync.info()</td><td>object</td><td>Diagnostic info: namespace, peer count, broadcast support.</td></tr>'+
+      '</tbody>'+
+    '</table>'+
+  '</div>'+
+
+  '<div class="block notes">'+
+    '<div class="label">Notes</div>'+
+    '<ul>'+
+      '<li><strong>Same\u2011generator only.</strong> Perchance runs each generator on its own subdomain (<code>\\{id\\}.user\u2011content.perchance.org</code>) for sandboxing, which isolates localStorage and BroadcastChannel. Cross\u2011<em>generator</em> sync would require a backend service.</li>'+
+      '<li>BroadcastChannel is supported in all modern browsers. Falls back to the localStorage <code>storage</code> event for older ones (also cross-tab, but slightly slower).</li>'+
+      '<li>Peer presence uses 3-second heartbeats. Stale peers are pruned after 8 seconds of silence.</li>'+
+      '<li>Keys are auto\u2011namespaced under <code>sync_{generatorName}:</code> to avoid colliding with other plugins\u2019 localStorage usage.</li>'+
+      '<li>Storage values are JSON\u2011serialized, so you can store objects, arrays, numbers, strings, booleans \u2014 anything JSON\u2011safe.</li>'+
+    '</ul>'+
+  '</div>';
+
+  document.getElementById('install-copy').onclick=function(){copy(importLine,this);};
+}
+
+async function init(){
+  var slug='cross-tab-sync-plugin';
+  try { slug = root.$moduleName || window.generatorName || slug; } catch(e) {}
+  renderPage(slug);
+}
+if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',function(){setTimeout(init,1500);});}
+else{setTimeout(init,1500);}
+})();
+
+</script>

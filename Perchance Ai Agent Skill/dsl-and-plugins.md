@@ -387,6 +387,56 @@ gifts
   car^[totalScore >= 100 ? 1 : 0]   // unavailable until score is high enough
 ```
 
+### 4.3 The Reverse Direction — Brace Interception in HTML Panel Strings [VERIFIED R24]
+
+The DSL parser doesn't just evaluate `[expr]` and `{expr}` in **DSL** contexts — it ALSO
+scans the entire HTML panel source (including inside `<script>` tags) for the same
+patterns, BEFORE JavaScript runs. This causes silent breakage when string literals in your
+JS code happen to contain DSL-shaped patterns:
+
+```js
+// ❌ BREAKS — parser sees [vibrant] and tries to evaluate it as a list reference
+let testPrompts = ['a [vibrant] colorful flower'];
+
+// ❌ BREAKS — parser sees {import:my-plugin}
+let docsText = 'Add {import:my-plugin} to your lists editor';
+
+// ❌ BREAKS — parser sees {1F3B2} as a range/expression
+let dice = '\u{1F3B2}';   // ES6 unicode escape
+
+// ✓ FIX — backslash escape (JS treats \[ \{ as no-op, parser respects them as literal)
+let testPrompts = ['a \[vibrant\] colorful flower'];
+let docsText = 'Add \{import:my-plugin\} to your lists editor';
+
+// ✓ FIX — surrogate pair instead of \u{...}
+let dice = '\uD83C\uDFB2';
+
+// ✓ FIX — runtime construction with String.fromCharCode / fromCodePoint
+let dice = String.fromCodePoint(0x1F3B2);
+let bracketChar = String.fromCharCode(91); // '['
+
+// ✓ FIX — inject content via innerHTML at runtime (after parser has run)
+el.innerHTML = '<code>literal {brace} text</code>'; // parser sees the JS source, not the runtime DOM
+```
+
+Patterns the parser intercepts in string literals:
+
+| Pattern | Treated as |
+|---------|------------|
+| `{word}`, `{import:x}`, `{1-10}`, `{A\|B\|C}`, `{s}`, `{a}` | Curly template expression |
+| `[word]`, `[A:B:N]`, `[A\|B]` | Square template expression |
+| `\u{XXXXX}` (ES6 escapes inside strings) | The `{XXXXX}` portion as a curly expression |
+| `&#123;`, `&#x7b;` (HTML entities) | **Decoded before scanning** — still triggers |
+
+JS array indexing (`arr[i]`, `state.prompts[i]`) and object literals (`{x: 1}`) are
+generally safe because they don't match the DSL pattern shape. Single-letter or numeric
+indices, dot-prefixed access, and curly object literals with property-value pairs don't
+look like template expressions to the parser.
+
+The cleanest workflow when authoring HTML panel JS that needs to display DSL-syntax text
+to the user: write the JS source with backslash-escaped braces, JS evaluates them as
+literals, the parser leaves them alone, and the runtime content is what you want.
+
 ---
 
 ### Dollar-Prefixed Root Properties [VERIFIED R23]
@@ -876,6 +926,67 @@ mw = {import:my-plugin-slug}
 // HTML panel:
 [mw({width: 600})]
 ```
+
+### 7.1a Plugin `$output` Does NOT Auto-Run on Import [VERIFIED R24]
+
+This is the trap that breaks every plugin that builds its API via window stashing.
+Importing a plugin only makes its `$output` *available as a callable* — it does not
+execute it. Until something calls it, no side effects run.
+
+```
+// In importer's DSL:
+myPlugin = {import:my-plugin-slug}   // $output NOT executed yet
+
+// In importer's panel JS — assumes $output already ran (it didn't):
+if (!window.__myPlugin) {            // ❌ always falsy
+  showError('plugin not loaded');
+  return;
+}
+```
+
+**The fix** (importer side): explicitly call the plugin's import alias to trigger
+`$output`:
+
+```js
+function init() {
+  // 1. Did the import succeed? Check the alias exists.
+  if (typeof root === 'undefined' || typeof root.myPlugin !== 'function') {
+    // Try again — plugins load asynchronously (2-5s typical)
+    if (attempts < maxAttempts) return setTimeout(init, 300);
+    return showError('plugin not imported');
+  }
+
+  // 2. Invoke $output explicitly — this is what was missing
+  try {
+    var api = root.myPlugin();
+    pipe = window.__myPlugin || api;   // prefer the side-effect stash; fall back to return value
+  } catch (e) {
+    return showError('plugin failed to init: ' + e.message);
+  }
+
+  renderPage();
+}
+```
+
+**The fix** (plugin author side): make `$output` idempotent so repeated calls are cheap,
+and stash the API on `window` AND return it for both consumption patterns:
+
+```
+$output() =>
+  // Return cached on subsequent calls
+  if (window.__myPlugin) return window.__myPlugin;
+
+  const api = {};
+  api.greet = function(name) { return "hello " + name; };
+  // ... build API ...
+
+  window.__myPlugin = api;  // side-effect for panel JS that reads window
+  return api;               // return value for callers that use root.myPlugin()
+```
+
+This works whether the importer's HTML panel checks `window.__myPlugin` OR captures the
+return of `root.myPlugin()` — and repeated calls (e.g. multiple example demos on one
+page) are O(1).
 
 ### 7.2 `$output` as a Block
 

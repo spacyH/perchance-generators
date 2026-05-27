@@ -1,0 +1,323 @@
+<style>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');
+:root{
+  --bg:#0d1117;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;
+  --accent:#4493f8;--green:#3fb950;--red:#f85149;--yellow:#d29922;
+  --font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.7 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);}
+code{font-family:var(--mono);font-size:12px;color:var(--accent);}
+pre{font:12px/1.6 var(--mono);background:var(--faint);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:16px;overflow-x:auto;white-space:pre;color:var(--ink);}
+#page{max-width:760px;margin:0 auto;padding:48px 24px 100px;}
+header,.hero{margin-bottom:56px;}
+h1{font-size:28px;font-weight:700;letter-spacing:-.5px;line-height:1.2;margin-bottom:10px;}
+h2{font-size:17px;font-weight:600;margin:0;}
+p{color:var(--muted);margin-bottom:10px;}
+p:last-child{margin-bottom:0;}
+p strong,p em{color:var(--ink);}
+.lead{font-size:16px;color:var(--muted);max-width:560px;margin-bottom:20px;}
+.breadcrumb{font-size:13px;margin-bottom:16px;}
+.breadcrumb a{color:var(--muted);text-decoration:none;}
+.breadcrumb a:hover{color:var(--ink);}
+.pill-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
+.pill{font:11px/1 var(--mono);border:1px solid var(--faint);border-radius:20px;padding:4px 10px;color:var(--muted);}
+.pill.version{color:var(--accent);border-color:rgba(68,147,248,.3);}
+.block{margin-bottom:48px;}
+.block .label{font:700 11px var(--mono);letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
+.code-line{display:flex;align-items:center;gap:10px;background:var(--faint);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:12px 14px;font-family:var(--mono);font-size:13px;margin-bottom:14px;}
+.code-line code{flex:1;color:var(--ink);font-size:13px;}
+.usecases{display:grid;gap:18px;}
+.usecases dt{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:2px;}
+.usecases dd{color:var(--muted);font-size:14px;}
+.api{width:100%;border-collapse:collapse;font-size:13px;}
+.api th{text-align:left;padding:8px 12px 8px 0;font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--faint);}
+.api td{padding:9px 12px 9px 0;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:top;}
+.api tr:last-child td{border-bottom:0;}
+.api td:first-child{font-family:var(--mono);font-size:12px;color:var(--accent);white-space:nowrap;padding-right:16px;}
+.api td:nth-child(2){color:var(--muted);white-space:nowrap;padding-right:16px;}
+.api td:last-child{color:var(--muted);}
+.cta-link{display:inline-block;margin-top:14px;font-size:14px;font-weight:500;}
+button{font:13px var(--font);font-weight:500;background:var(--faint);color:var(--ink);border:1px solid rgba(255,255,255,.12);border-radius:5px;padding:8px 14px;cursor:pointer;}
+button:hover:not(:disabled){border-color:rgba(255,255,255,.3);}
+button:disabled{opacity:.4;cursor:not-allowed;}
+button.primary{background:var(--accent);color:#0d1117;border-color:var(--accent);font-weight:600;}
+button.primary:hover:not(:disabled){background:#58a6ff;}
+.btn-copy{font:11px var(--mono);padding:5px 10px;background:transparent;color:var(--muted);border:1px solid var(--faint);border-radius:4px;cursor:pointer;}
+.btn-copy:hover{color:var(--ink);border-color:var(--muted);}
+.btn-copy.ok{color:var(--green);border-color:rgba(63,185,80,.4);}
+input[type=text],input[type=number],textarea,select{font:13px var(--mono);background:var(--faint);color:var(--ink);border:1px solid rgba(255,255,255,.1);border-radius:5px;padding:8px 11px;outline:none;width:100%;}
+input:focus,textarea:focus,select:focus{border-color:rgba(68,147,248,.5);}
+textarea{resize:vertical;min-height:80px;line-height:1.5;}
+.row{display:flex;gap:8px;margin-bottom:10px;}
+.row input{flex:1;}
+.notes ul{padding-left:18px;color:var(--muted);font-size:13px;}
+.notes li{margin-bottom:8px;line-height:1.6;}
+.note{font-size:12px;color:var(--muted);}
+.muted{color:var(--muted);}
+.err{color:var(--red);font-size:13px;}
+.ok{color:var(--green);}
+.warn{color:var(--yellow);}
+.demo{padding:32px 0;border-top:1px solid var(--faint);}
+.demo:first-child{border-top:0;padding-top:0;}
+.demo-meta{display:flex;align-items:baseline;gap:14px;margin-bottom:12px;}
+.demo-meta .n{font:700 11px var(--mono);color:var(--faint);letter-spacing:1px;}
+.demo-meta h2{margin-bottom:4px;}
+.stat{font:13px var(--mono);color:var(--muted);padding:4px 0;}
+.stat .val{color:var(--ink);font-weight:600;}
+.stat .accent{color:var(--accent);}
+.metric-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:14px;}
+.metric{background:var(--faint);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:10px 12px;}
+.metric .label{font:10px var(--mono);text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px;}
+.metric .value{font:600 18px var(--mono);color:var(--ink);}
+.metric .value.dim{color:var(--muted);}
+.metric .value.ok{color:var(--green);}
+.metric .value.warn{color:var(--yellow);}
+.metric .value.err{color:var(--red);}
+</style>
+<div id="page"><p style="color:#7d8590;padding:40px 0;font:13px monospace">Loading...</p></div>
+<script>
+(function(){
+'use strict';
+var sync = null;
+
+function el(id){return document.getElementById(id);}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function renderPage(){
+  document.title = 'Cross-Tab Sync \u2014 Examples';
+  document.getElementById('page').innerHTML =
+    '<header>' +
+      '<div class="breadcrumb"><a href="https://perchance.org/cross-tab-sync-plugin" target="_blank">\u2190 cross-tab-sync-plugin</a></div>' +
+      '<h1>Examples</h1>' +
+      '<p class="lead">Open this page in <strong>two or more browser tabs</strong> to see cross-tab sync in action.</p>' +
+      '<div class="metric-row" style="margin-top:14px">' +
+        '<div class="metric"><div class="label">This tab ID</div><div class="value" id="my-id" style="font-size:13px"></div></div>' +
+        '<div class="metric"><div class="label">Other tabs open</div><div class="value ok" id="peer-count">0</div></div>' +
+        '<div class="metric"><div class="label">Storage backend</div><div class="value" id="backend" style="font-size:13px"></div></div>' +
+      '</div>' +
+    '</header>' +
+
+    // 01 Persistent counter
+    '<section class="demo">' +
+      '<div class="demo-meta"><span class="n">01</span><h2>Persistent shared counter</h2></div>' +
+      '<p>Click +1 in this tab and watch other tabs update instantly. Survives page reload.</p>' +
+      '<div class="metric-row" style="grid-template-columns:auto 1fr auto auto">' +
+        '<div class="metric" style="text-align:center"><div class="label">Current value</div><div class="value" id="counter-value">0</div></div>' +
+        '<div></div>' +
+        '<button id="counter-plus" class="primary" style="align-self:center">+1</button>' +
+        '<button id="counter-reset" style="align-self:center">Reset</button>' +
+      '</div>' +
+      '<div id="counter-history" class="stat" style="font-size:11px;margin-top:8px"></div>' +
+    '</section>' +
+
+    // 02 Shared text
+    '<section class="demo">' +
+      '<div class="demo-meta"><span class="n">02</span><h2>Shared text area</h2></div>' +
+      '<p>Type here. Every other tab sees your text live.</p>' +
+      '<textarea id="shared-text" rows="4" placeholder="Type to broadcast\u2026"></textarea>' +
+      '<div class="stat" id="shared-info">Last update: never</div>' +
+    '</section>' +
+
+    // 03 Ephemeral broadcast
+    '<section class="demo">' +
+      '<div class="demo-meta"><span class="n">03</span><h2>Broadcast messages (no storage)</h2></div>' +
+      '<p>Fire-and-forget messages to all other tabs. Useful for notifications, presence, "user is typing" indicators.</p>' +
+      '<div class="row">' +
+        '<input type="text" id="msg-input" placeholder="Type a message\u2026">' +
+        '<button id="msg-send" class="primary">Broadcast</button>' +
+      '</div>' +
+      '<div id="msg-log" style="margin-top:12px;max-height:240px;overflow-y:auto"></div>' +
+    '</section>' +
+
+    // 04 Reactive state
+    '<section class="demo">' +
+      '<div class="demo-meta"><span class="n">04</span><h2>Reactive state primitive</h2></div>' +
+      '<p>The <code>sync.state(key)</code> helper gives you an observable value with .get(), .set(), .onChange(). Pick a theme color and watch it propagate.</p>' +
+      '<div class="row">' +
+        '<button data-color="#4493f8" class="theme-btn">Blue</button>' +
+        '<button data-color="#3fb950" class="theme-btn">Green</button>' +
+        '<button data-color="#f85149" class="theme-btn">Red</button>' +
+        '<button data-color="#d29922" class="theme-btn">Yellow</button>' +
+      '</div>' +
+      '<div id="theme-preview" style="margin-top:12px;height:80px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#0d1117;font-weight:600;background:var(--accent);transition:background 0.3s">Current theme</div>' +
+    '</section>' +
+
+    // 05 Storage inspector
+    '<section class="demo">' +
+      '<div class="demo-meta"><span class="n">05</span><h2>Storage inspector</h2></div>' +
+      '<p>What\u2019s currently stored by this plugin for this generator.</p>' +
+      '<div class="row">' +
+        '<button id="storage-refresh">Refresh</button>' +
+        '<button id="storage-clear">Clear all</button>' +
+      '</div>' +
+      '<div id="storage-list" style="margin-top:8px"></div>' +
+    '</section>';
+
+  // Tab info
+  var info = sync.info();
+  el('my-id').textContent = info.peerId.slice(0, 12) + '...';
+  el('backend').textContent = info.broadcastSupported ? 'BroadcastChannel' : 'localStorage events';
+  
+  // Counter
+  el('counter-value').textContent = sync.get('counter', 0);
+  el('counter-plus').onclick = function(){
+    var current = sync.get('counter', 0);
+    sync.set('counter', current + 1);
+  };
+  el('counter-reset').onclick = function(){ sync.set('counter', 0); };
+  sync.onKeyChange('counter', function(value, source){
+    el('counter-value').textContent = value || 0;
+    var time = new Date().toLocaleTimeString();
+    el('counter-history').textContent = 'Last update at ' + time + ' from ' + source + ' tab';
+  });
+  
+  // Shared text
+  el('shared-text').value = sync.get('shared-text', '');
+  el('shared-text').oninput = function(){ sync.set('shared-text', this.value); };
+  sync.onKeyChange('shared-text', function(value, source){
+    if (source === 'remote') {
+      var elem = el('shared-text');
+      var pos = elem.selectionStart;
+      elem.value = value || '';
+      el('shared-info').textContent = 'Last update at ' + new Date().toLocaleTimeString() + ' from another tab';
+    }
+  });
+  
+  // Broadcast
+  el('msg-send').onclick = sendMessage;
+  el('msg-input').onkeydown = function(e){ if(e.key==='Enter') sendMessage(); };
+  sync.subscribe('chat', function(data, fromPeer){
+    addMessageToLog(data, fromPeer, 'remote');
+  });
+  
+  // Theme
+  var themeState = sync.state('theme', '#4493f8');
+  applyTheme(themeState.get());
+  document.querySelectorAll('.theme-btn').forEach(function(btn){
+    btn.onclick = function(){ themeState.set(btn.dataset.color); };
+  });
+  themeState.onChange(function(value){ applyTheme(value); });
+  
+  // Storage inspector
+  el('storage-refresh').onclick = refreshStorage;
+  el('storage-clear').onclick = function(){
+    if (confirm('Clear all stored data for this generator?')) {
+      var n = sync.clear();
+      refreshStorage();
+      addLog('Cleared ' + n + ' keys', 'warn');
+    }
+  };
+  refreshStorage();
+  
+  // Peer count refresher
+  setInterval(updatePeerCount, 2000);
+  updatePeerCount();
+}
+
+function updatePeerCount(){
+  var count = sync.peers();
+  el('peer-count').textContent = count;
+  el('peer-count').className = 'value ' + (count > 0 ? 'ok' : 'dim');
+}
+
+function sendMessage(){
+  var text = el('msg-input').value.trim();
+  if (!text) return;
+  sync.broadcast('chat', text);
+  addMessageToLog(text, sync.myId(), 'local');
+  el('msg-input').value = '';
+}
+
+function addMessageToLog(text, peerId, type){
+  var div = document.createElement('div');
+  div.style.cssText = 'padding:6px 10px;margin-bottom:4px;background:var(--faint);border-radius:5px;font-size:13px';
+  var badge = type === 'local' ? '<span class="ok">\[this tab\]</span>' : '<span class="accent">[from ' + esc((peerId||'').slice(0,8)) + ']</span>';
+  div.innerHTML = '<span class="muted" style="font-size:11px">' + new Date().toLocaleTimeString() + ' ' + badge + '</span><div style="margin-top:2px">' + esc(text) + '</div>';
+  var log = el('msg-log');
+  log.insertBefore(div, log.firstChild);
+  while (log.children.length > 30) log.removeChild(log.lastChild);
+}
+
+function applyTheme(color){
+  el('theme-preview').style.background = color;
+  el('theme-preview').textContent = 'Theme: ' + color;
+}
+
+function refreshStorage(){
+  var keys = sync.keys();
+  if (keys.length === 0) {
+    el('storage-list').innerHTML = '<p class="muted">No data stored yet.</p>';
+    return;
+  }
+  var html = '';
+  keys.forEach(function(k){
+    var v = sync.get(k);
+    html += '<div class="metric" style="margin-bottom:6px"><div class="label">' + esc(k) + '</div><div style="font-family:var(--mono);font-size:12px;color:var(--ink);margin-top:4px;word-break:break-word">' + esc(JSON.stringify(v)) + '</div></div>';
+  });
+  el('storage-list').innerHTML = html;
+}
+
+function addLog(text, cls){
+  console.log('\[sync\]', text);
+}
+
+function init(){
+  // Show a "loading" placeholder while we wait for the plugin
+  document.getElementById('page').innerHTML = '<p style="color:#7d8590;padding:40px 0;font:13px monospace">Loading plugin\u2026</p>';
+  
+  // Poll for the plugin to become available. The plugin is imported via
+  // sync = '+String.fromCharCode(123)+'import:<slug>'+String.fromCharCode(125)+' in the lists editor.
+  // Loading can take 2-5 seconds. We try every 300ms for up to 15s.
+  var attempts = 0;
+  var maxAttempts = 50;
+  
+  function attempt() {
+    attempts++;
+    
+    // Has root.sync appeared yet?
+    if (typeof root === 'undefined' || typeof root.sync !== 'function') {
+      if (attempts < maxAttempts) {
+        setTimeout(attempt, 300);
+        return;
+      }
+      // Gave up
+      showError('Plugin not imported. Add to your lists editor: <br><br><code style="background:var(--faint);padding:6px 10px;border-radius:4px;display:inline-block">sync = '+String.fromCharCode(123)+'import:cross-tab-sync-plugin'+String.fromCharCode(125)+'</code><br><br>Replace <code>cross-tab-sync-plugin</code> with the actual URL slug of your deployed plugin if different.');
+      return;
+    }
+    
+    // Invoke the plugin's $output to build & stash the API.
+    // This is the missing piece \u2014 $output doesn't auto-run on import.
+    try {
+      var api = root.sync();
+      // Prefer the window-stashed reference (set inside $output);
+      // fall back to the direct return value if the stash didn't happen.
+      sync = window.__sync || api;
+    } catch (e) {
+      showError('Plugin imported but failed to initialize: ' + (e && e.message ? e.message : String(e)));
+      return;
+    }
+    
+    if (!sync) {
+      showError('Plugin returned no API.');
+      return;
+    }
+    
+    renderPage();
+    
+  }
+  
+  function showError(msg) {
+    document.getElementById('page').innerHTML =
+      '<header><h1 style="font-size:22px;font-weight:700;margin-bottom:12px">Plugin not ready</h1>' +
+      '<p style="color:var(--muted);font-size:14px">' + msg + '</p>' +
+      '<p style="color:var(--muted);font-size:13px;margin-top:18px">Or visit the <a href="https://perchance.org/cross-tab-sync-plugin" target="_blank">plugin docs page</a> for installation help.</p></header>';
+  }
+  
+  attempt();
+}
+if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',function(){setTimeout(init,1500);});}
+else{setTimeout(init,1500);}
+})();
+
+</script>
