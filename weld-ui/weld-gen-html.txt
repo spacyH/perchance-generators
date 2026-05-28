@@ -1,0 +1,441 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+.footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--border);
+  color:var(--muted);font-size:12px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+
+.footer-social{text-align:center;font-family:var(--mono);max-width:720px;margin:48px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer-social span,.footer-social a{color:var(--muted);}
+.footer-social a{margin:0 2px;}
+.footer-social a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.gen<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-gen-example">demo &rarr;</a></span></div>  <div class="hdr">
+    <div class="hdr-row">
+      <h1>weld.gen</h1>
+      <span class="ver">v1.0.0</span>
+    </div>
+    <p class="lead">Inspect and mutate any Perchance generator at runtime. Read DSL source, enumerate lists, search items, dynamic-load other generators, rewrite root.* on the fly.</p>
+  </div>
+  <h2>Overview</h2>
+<p>weld.gen is the developer toolkit for the rest of the weld suite: read any Perchance generator's DSL source, enumerate its lists, search items by keyword, load remote generators at runtime, and mutate the live <code>root</code> object. The same toolkit that lets you inspect your own generator's lists also lets you inspect everyone else's.</p>
+<p>Three capability groups, all callable from the HTML panel JS:</p>
+<ul>
+<li><strong>Self-inspection</strong> -- read this generator's source, meta, lists. Always works.</li>
+<li><strong>Remote loading</strong> -- fetch / parse / inspect other public generators. Needs the two helper plugins below.</li>
+<li><strong>Runtime mutation</strong> -- read / write / delete properties on <code>root</code>. Always works.</li>
+</ul>
+<h2>Quick start</h2>
+<p>In your lists editor:</p>
+<pre data-codeid="code1"></pre>
+
+<p>weld.gen's DSL already declares the two helper imports it needs (<code>dynamic-import-plugin</code> for remote loading and <code>super-fetch-plugin</code> for the public APIs) and auto-attaches them after the IIFE runs.</p>
+
+<p>Self-inspection:</p>
+<pre data-codeid="code2"></pre>
+
+<p>Search across your own list items:</p>
+<pre data-codeid="code3"></pre>
+
+<p>Inspect a remote generator:</p>
+<pre data-codeid="code4"></pre>
+<h2>Self-inspection</h2><h3>weld.gen.source() / .meta() / .moduleName()</h3>
+<p>Return the current generator's DSL source text, <code>$meta</code> block, and slug, respectively. All three swallow exceptions and return empty values if the runtime isn't ready yet.</p>
+<h3>weld.gen.children() / .lists()</h3>
+<div class="sig" data-codeid="sig5"></div>
+<p><code>children()</code> returns the raw <code>root.$children</code> tree. <code>lists()</code> is the friendlier version: for each top-level node, it returns a record with <code>name</code>, <code>type</code>, and -- when present on the node -- <code>length</code>, <code>childNames</code>, <code>propertyNames</code>, <code>functionNames</code>, and <code>rawText</code>.</p>
+<p>Both skip keys starting with <code>$</code> (those are internal Perchance metadata).</p>
+<h3>weld.gen.search(listName, query)</h3>
+<div class="sig" data-codeid="sig6"></div>
+<p>Case-insensitive substring search across list items. Pass <code>null</code> for the first argument to search all lists. Returns <code>\{list, index, item\}</code> records for each match.</p>
+<h2>Remote loading</h2><h3>weld.gen.load(name)</h3>
+<div class="sig" data-codeid="sig7"></div>
+<p>Calls <code>dynamicImport(name)</code>. Returns whatever the remote plugin's <code>$output</code> returns -- a function for function-plugins (e.g. <code>markdown-plugin</code>), or an object with list children for list-generators (e.g. <code>animal-generator</code>).</p>
+<p>Note that <code>dynamicImport</code> sometimes returns boxed <code>String</code> objects (not primitives), so use <code>String(x)</code> for comparison.</p>
+<h3>weld.gen.exists(name)</h3>
+<div class="sig" data-codeid="sig8"></div>
+<p>Quick existence check via Perchance's <code>checkIfGeneratorExists</code> API. Useful before calling <code>load</code> to give a friendlier error.</p>
+<h3>weld.gen.sourceOf(name)</h3>
+<div class="sig" data-codeid="sig9"></div>
+<p>Fetch the raw DSL source of any public generator via <code>downloadGenerator?listsOnly=true</code>. The result is the full <code>$meta</code> + lists text, suitable for textarea display or further parsing.</p>
+<h3>weld.gen.inspect(name)</h3>
+<div class="sig" data-codeid="sig10"></div>
+<p>Combined source-fetch + load + parse. Returns an info object with:</p>
+<ul>
+<li><code>name</code> -- echo of the input</li>
+<li><code>type</code> -- <code>'function'</code> or <code>'object'</code> after loading</li>
+<li><code>arity</code> -- function-plugin parameter count (if applicable)</li>
+<li><code>source</code> -- raw DSL text</li>
+<li><code>lists</code> -- map of <code>name -&gt; \{length\}</code></li>
+<li><code>functions</code> -- list of top-level callable names</li>
+<li><code>imports</code> -- list of imported plugin names extracted from the source</li>
+<li><code>loadError</code> -- error string if loading failed, otherwise null</li>
+</ul>
+<p>If sourceOf works but load fails, you still get the source and import list -- only <code>type</code>, <code>arity</code>, <code>lists</code>, and <code>functions</code> are skipped.</p>
+<h2>Runtime mutation</h2><h3>weld.gen.set / .get / .has / .del</h3>
+<p>Read and write properties on the live <code>root</code> object. Useful for stashing computed values where the DSL can read them, or building reactive bridges between panels.</p>
+<pre data-codeid="code11"></pre>
+<p>All four are sync and don't throw -- they return safe defaults (<code>undefined</code> / <code>false</code>) if the runtime isn't ready.</p>
+<h2>Manual attachment</h2>
+<p>If you're loading weld.gen outside the standard DSL flow (e.g. injecting its source via a script tag), the helper plugins aren't auto-wired. Call <code>attach</code> with whatever you have:</p>
+<pre data-codeid="code12"></pre>
+<p>Self-inspection and mutation work without <code>attach</code> -- only the remote-loading methods (<code>load</code>, <code>exists</code>, <code>sourceOf</code>, <code>inspect</code>) need them.</p>
+<h2>Why not Object.keys(root)?</h2><div class="note">
+<code>Object.keys(root)</code> doesn't enumerate properties reliably because of how the root Proxy is implemented. Use <code>weld.gen.children()</code> or <code>weld.gen.lists()</code> instead -- they read <code>root.$children</code> directly, which works.
+</div>
+  <div class="footer">Part of the <a href="https://perchance.org/weld-ui-index">weld plugin suite</a>. Stashed at <code>window.weld.gen</code>. This page loads the plugin so you can inspect it in DevTools.</div>
+</div>
+<script>
+(function(){
+  var examples = {
+  'code1': 'output\n  weld-gen = \{import:weld-gen-plugin\}',
+  'code2': 'root.weldGen();   // trigger $output\n\nconsole.log(weld.gen.moduleName());   // "your-generator-name"\nconsole.log(weld.gen.source());       // full DSL source\nconsole.log(weld.gen.lists());        // \{ animal: \{name, type, length, ...\}, ... \}',
+  'code3': 'const hits = weld.gen.search(null, \'dragon\');\n// \[\{ list: \'creature\', index: 3, item: \'red dragon\' \}, ...\]\n\n// Or scope to one list:\nconst hits = weld.gen.search(\'creature\', \'dragon\');',
+  'code4': 'const info = await weld.gen.inspect(\'animal-generator\');\n// \{\n//   name: \'animal-generator\',\n//   type: \'object\',\n//   source: \'<full DSL text>\',\n//   lists: \{ animal: \{ length: 247 \}, ... \},\n//   imports: \[\'rpg-icon-plugin\', \'dice-plugin\'\],\n//   loadError: null\n// \}',
+  'sig5': 'weld.gen.lists()  ->  \{ name: info \}',
+  'sig6': 'weld.gen.search(listName | null, query)  ->  hit\[\]',
+  'sig7': 'weld.gen.load(name)  ->  Promise<plugin>',
+  'sig8': 'weld.gen.exists(name)  ->  Promise<boolean>',
+  'sig9': 'weld.gen.sourceOf(name)  ->  Promise<string>',
+  'sig10': 'weld.gen.inspect(name)  ->  Promise<info>',
+  'code11': 'weld.gen.set(\'myVar\', 42);\nweld.gen.get(\'myVar\');   // 42\nweld.gen.has(\'myVar\');   // true\nweld.gen.del(\'myVar\');   // true (deleted)\n\n// Now any DSL expression that references \{myVar\} will see undefined',
+  'code12': 'weld.gen.attach(\{\n  dynamicImport: root.dynamicImport,\n  superFetch:    root.superFetch\n\});'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    var nodes = document.querySelectorAll('[data-codeid]');
+    nodes.forEach(function(n){
+      var id = n.getAttribute('data-codeid');
+      var src = examples[id];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.gen) return; // already loaded
+
+// -----------------------------------------------------------------
+// weld.gen: Generator introspection, dynamic import, runtime mutation.
+// Provides three capability groups:
+//   1. Self-inspection: read this generator's DSL source, lists, meta
+//   2. Remote loading: fetch / parse / inspect other public generators
+//   3. Runtime mutation: read/write root.* properties
+// Two dependencies must be imported in the DSL panel for full functionality:
+//   dynamicImport = {import:dynamic-import-plugin}
+//   superFetch    = {import:super-fetch-plugin}
+// The DSL form passes those in via weld.gen.attach -- see docs for keys.
+// Without them, only self-inspection works.
+// -----------------------------------------------------------------
+
+var deps = {
+  dynamicImport: null,
+  superFetch: null
+};
+
+function attach(d) {
+  if (d && d.dynamicImport) deps.dynamicImport = d.dynamicImport;
+  if (d && d.superFetch) deps.superFetch = d.superFetch;
+}
+
+function _safe(fn, fallback) {
+  try { return fn(); } catch (e) { return fallback; }
+}
+
+// -------- SELF-INSPECTION --------
+
+function source() {
+  return _safe(function() {
+    var r = window.root;
+    return (r && r.$perchanceCode) || '';
+  }, '');
+}
+
+function meta() {
+  return _safe(function() {
+    var r = window.root;
+    return (r && r.$meta) || null;
+  }, null);
+}
+
+function moduleName() {
+  return _safe(function() {
+    var r = window.root;
+    return (r && r.$moduleName) || window.generatorName || '';
+  }, '');
+}
+
+function children() {
+  return _safe(function() {
+    var r = window.root;
+    return (r && r.$children) || {};
+  }, {});
+}
+
+function lists() {
+  var result = {};
+  _safe(function() {
+    var ch = children();
+    if (!ch) return;
+    var keys;
+    try { keys = Object.keys(ch); } catch (e) { keys = []; }
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (k.charAt(0) === '$') continue;
+      var node = ch[k];
+      var info = { name: k, type: typeof node };
+      try {
+        if (node && typeof node === 'object') {
+          if (node.getLength !== undefined) info.length = node.getLength;
+          if (node.getChildNames) info.childNames = node.getChildNames;
+          if (node.getPropertyNames) info.propertyNames = node.getPropertyNames;
+          if (node.getFunctionNames) info.functionNames = node.getFunctionNames;
+          if (node.rawText !== undefined) info.rawText = node.rawText;
+        }
+      } catch (e) { /* swallow */ }
+      result[k] = info;
+    }
+  });
+  return result;
+}
+
+// Search items within lists by keyword (case-insensitive substring)
+function search(listName, query) {
+  var hits = [];
+  var ch = children();
+  if (!ch || !query) return hits;
+  var q = String(query).toLowerCase();
+  var keys = listName ? [listName] : Object.keys(ch);
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    if (k.charAt(0) === '$') continue;
+    var node = ch[k];
+    if (!node || typeof node.getLength !== 'number') continue;
+    var len = node.getLength;
+    for (var j = 0; j < len; j++) {
+      try {
+        var item = node[j];
+        var s = String(item == null ? '' : (item.rawText || item.toString()));
+        if (s.toLowerCase().indexOf(q) !== -1) {
+          hits.push({ list: k, index: j, item: s });
+        }
+      } catch (e) { /* swallow */ }
+    }
+  }
+  return hits;
+}
+
+// -------- REMOTE LOADING --------
+
+function load(name) {
+  if (!deps.dynamicImport) {
+    return Promise.reject(new Error('weld.gen: dynamicImport not attached. Pass it via weld.gen.attach({dynamicImport}).'));
+  }
+  return Promise.resolve(deps.dynamicImport(String(name)));
+}
+
+function exists(name) {
+  if (!deps.superFetch) {
+    return Promise.reject(new Error('weld.gen: superFetch not attached.'));
+  }
+  var url = 'https://perchance.org/api/checkIfGeneratorExists?generatorName=' + encodeURIComponent(String(name));
+  return Promise.resolve(deps.superFetch(url)).then(function(r) {
+    try {
+      var data = typeof r === 'string' ? JSON.parse(r) : r;
+      return !!(data && (data.exists || data === true));
+    } catch (e) { return false; }
+  });
+}
+
+function sourceOf(name) {
+  if (!deps.superFetch) {
+    return Promise.reject(new Error('weld.gen: superFetch not attached.'));
+  }
+  var url = 'https://perchance.org/api/downloadGenerator?generatorName=' + encodeURIComponent(String(name)) + '&listsOnly=true';
+  return Promise.resolve(deps.superFetch(url)).then(function(r) { return String(r || ''); });
+}
+
+function inspect(name) {
+  var info = {
+    name: String(name),
+    type: null,
+    arity: null,
+    source: '',
+    lists: {},
+    functions: [],
+    imports: [],
+    loadError: null
+  };
+
+  return sourceOf(name).then(function(src) {
+    info.source = src;
+    // Extract imports from DSL source
+    var importRe = /(\w+)\s*=\s*\{\s*import\s*:\s*([^}]+)\}/g;
+    var m;
+    while ((m = importRe.exec(src)) !== null) {
+      info.imports.push(String(m[2]).trim());
+    }
+    return load(name).catch(function(e) {
+      info.loadError = String(e && e.message || e);
+      return null;
+    });
+  }).then(function(result) {
+    if (result == null) return info;
+    info.type = typeof result;
+    if (typeof result === 'function') {
+      info.arity = result.length;
+    } else if (typeof result === 'object') {
+      var keys;
+      try { keys = Object.keys(result); } catch (e) { keys = []; }
+      for (var i = 0; i < keys.length; i++) {
+        var k = keys[i];
+        if (k.charAt(0) === '$') continue;
+        var node = result[k];
+        if (node && typeof node === 'object' && node.getLength !== undefined) {
+          info.lists[k] = { length: node.getLength };
+        } else if (typeof node === 'function') {
+          info.functions.push(k);
+        }
+      }
+    }
+    return info;
+  });
+}
+
+// -------- RUNTIME MUTATION --------
+
+function setProp(name, value) {
+  _safe(function() {
+    if (window.root) window.root[name] = value;
+  });
+  return value;
+}
+
+function getProp(name) {
+  return _safe(function() {
+    return window.root ? window.root[name] : undefined;
+  });
+}
+
+function delProp(name) {
+  return _safe(function() {
+    if (window.root && (name in window.root)) {
+      delete window.root[name];
+      return true;
+    }
+    return false;
+  }, false);
+}
+
+function hasProp(name) {
+  return _safe(function() {
+    return !!(window.root && (name in window.root));
+  }, false);
+}
+
+window.weld.gen = {
+  attach: attach,
+  source: source,
+  meta: meta,
+  moduleName: moduleName,
+  children: children,
+  lists: lists,
+  search: search,
+  load: load,
+  exists: exists,
+  sourceOf: sourceOf,
+  inspect: inspect,
+  set: setProp,
+  get: getProp,
+  del: delProp,
+  has: hasProp,
+  version: '1.0.0'
+};
+
+})();
+
+</script>
+<footer class="footer-social">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>

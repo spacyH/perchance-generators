@@ -1,0 +1,271 @@
+$meta
+  title       = weld.spamguard
+  description = Multi-channel chat spam detector. Fingerprinting plus Jaccard similarity catches copy-paste spam across channels. Configurable thresholds, optional auto-ban and auto-delete callbacks.
+  tags        = weld, spam, moderation, chat, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.spamguard) return window.weld.spamguard;
+
+  // -----------------------------------------------------------------
+  // Multi-channel chat spam guard.
+  // Detects copy-paste spam across channels using:
+  //   1. Normalised text fingerprint (lowercase, NFKD, emoji + punct stripped,
+  //      char-repeat dampened, whitespace collapsed)
+  //   2. Token-set Jaccard similarity for near-identical messages
+  // Cross-channel threshold + sliding time window controls ban trigger.
+  // -----------------------------------------------------------------
+
+  function fingerprint(text) {
+    if (typeof text !== 'string') return '';
+    return text
+      .toLowerCase()
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '')
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      .replace(/(.)\1{2,}/g, '$1$1')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  // Jaccard similarity on word-token sets, 0 (disjoint) to 1 (identical)
+  function jaccard(a, b) {
+    if (a === b) return 1;
+    if (!a || !b) return 0;
+    var A = new Set(a.split(' '));
+    var B = new Set(b.split(' '));
+    var inter = 0;
+    var itr = A.values();
+    var step;
+    while (!(step = itr.next()).done) {
+      if (B.has(step.value)) inter++;
+    }
+    var union = A.size + B.size - inter;
+    return union === 0 ? 0 : inter / union;
+  }
+
+  function similarEnough(a, b, threshold) {
+    if (a === b) return true;
+    return jaccard(a, b) >= threshold;
+  }
+
+  function createGuard(opts) {
+    opts = opts || {};
+    var DEFAULTS = {
+      channelThreshold: 3,
+      windowMs: 60000,
+      similarityThreshold: 0.92,
+      minMessageLength: 5,
+      maxHistoryPerUser: 50,
+      autoBan: true,
+      autoDelete: true,
+      banDurationMs: 0,
+      whitelistUserIds: [],
+      banFn: null,
+      deleteFn: null,
+      onSpamDetected: null,
+      onBan: null
+    };
+    var merged = Object.assign({}, DEFAULTS, opts);
+
+    var history = new Map();   // userId -> array of message records
+    var banned  = new Map();   // userId -> ban record (reason / bannedAt / expiresAt)
+    var stats   = { tracked: 0, banned: 0, totalReports: 0, totalBans: 0, totalDeletes: 0 };
+
+    function pruneOld(userId, now) {
+      var arr = history.get(userId);
+      if (!arr) return;
+      var cutoff = now - merged.windowMs;
+      var i = 0;
+      while (i < arr.length && arr[i].timestamp < cutoff) i++;
+      if (i > 0) arr.splice(0, i);
+      if (arr.length > merged.maxHistoryPerUser) {
+        arr.splice(0, arr.length - merged.maxHistoryPerUser);
+      }
+    }
+
+    function checkBanExpiry(userId, now) {
+      var b = banned.get(userId);
+      if (b && b.expiresAt && b.expiresAt <= now) {
+        banned.delete(userId);
+        return false;
+      }
+      return !!b;
+    }
+
+    function classify(userId, fp, now) {
+      var arr = history.get(userId) || [];
+      var matchedByChannel = new Map();
+      for (var i = 0; i < arr.length; i++) {
+        var m = arr[i];
+        if (similarEnough(m.fp, fp, merged.similarityThreshold)) {
+          if (!matchedByChannel.has(m.channel)) matchedByChannel.set(m.channel, m);
+        }
+      }
+      if (matchedByChannel.size >= merged.channelThreshold) {
+        var matches = Array.from(matchedByChannel.values());
+        return {
+          fingerprint: fp,
+          channels: Array.from(matchedByChannel.keys()),
+          messages: matches,
+          firstSeen: Math.min.apply(null, matches.map(function(m) { return m.timestamp; })),
+          lastSeen: now
+        };
+      }
+      return null;
+    }
+
+    // -------- PUBLIC: report a new message --------
+    function report(input) {
+      return Promise.resolve().then(function() {
+        stats.totalReports++;
+        if (!input || !input.userId || !input.channel) {
+          return { ok: false, reason: 'missing userId or channel' };
+        }
+        var channel = input.channel;
+        var userId = input.userId;
+        var messageId = input.messageId;
+        var text = input.text;
+
+        if (merged.whitelistUserIds.indexOf(userId) !== -1) {
+          return { ok: true, whitelisted: true };
+        }
+
+        var now = input.timestamp || Date.now();
+        if (checkBanExpiry(userId, now)) {
+          return { ok: false, banned: true };
+        }
+
+        if (typeof text !== 'string' || text.length < merged.minMessageLength) {
+          return { ok: true };
+        }
+        var fp = fingerprint(text);
+        if (!fp) return { ok: true };
+
+        pruneOld(userId, now);
+        if (!history.has(userId)) history.set(userId, []);
+        var arr = history.get(userId);
+        arr.push({ channel: channel, fp: fp, text: text, messageId: messageId, timestamp: now });
+        stats.tracked = history.size;
+
+        var spam = classify(userId, fp, now);
+        if (!spam) return { ok: true };
+
+        // Include the triggering message itself
+        var alreadyHas = false;
+        for (var i = 0; i < spam.messages.length; i++) {
+          if (spam.messages[i].channel === channel) { alreadyHas = true; break; }
+        }
+        if (!alreadyHas) {
+          spam.channels.push(channel);
+          spam.messages.push({ channel: channel, fp: fp, text: text, messageId: messageId, timestamp: now });
+        }
+
+        var verdict = Promise.resolve(true);
+        if (typeof merged.onSpamDetected === 'function') {
+          verdict = Promise.resolve(merged.onSpamDetected(spam));
+        }
+
+        return verdict.then(function(v) {
+          if (v === false) return { ok: true, vetoed: true, spam: spam };
+
+          var actions = Promise.resolve();
+          if (merged.autoBan) {
+            var expiresAt = merged.banDurationMs > 0 ? now + merged.banDurationMs : null;
+            banned.set(userId, { reason: 'cross-channel-spam', bannedAt: now, expiresAt: expiresAt });
+            stats.banned++;
+            stats.totalBans++;
+            if (typeof merged.banFn === 'function') {
+              actions = actions.then(function() {
+                return Promise.resolve(merged.banFn(userId, { reason: 'cross-channel-spam', spam: spam }))
+                  .catch(function(e) { console.error('[weld.spamguard] banFn threw:', e); });
+              });
+            }
+            if (typeof merged.onBan === 'function') {
+              actions = actions.then(function() {
+                return Promise.resolve(merged.onBan(userId, { reason: 'cross-channel-spam', spam: spam }))
+                  .catch(function() {});
+              });
+            }
+          }
+
+          if (merged.autoDelete && typeof merged.deleteFn === 'function') {
+            spam.messages.forEach(function(m) {
+              actions = actions.then(function() {
+                return Promise.resolve(merged.deleteFn(m.messageId, m.channel))
+                  .then(function() { stats.totalDeletes++; })
+                  .catch(function(e) { console.error('[weld.spamguard] deleteFn threw:', e, m); });
+              });
+            });
+          }
+
+          return actions.then(function() {
+            history.delete(userId);
+            return { ok: false, banned: true, spam: spam };
+          });
+        });
+      });
+    }
+
+    function ban(userId, reason) {
+      banned.set(userId, { reason: reason || 'manual', bannedAt: Date.now(), expiresAt: null });
+      stats.banned++;
+      stats.totalBans++;
+    }
+
+    function unban(userId) {
+      if (banned.delete(userId)) stats.banned = Math.max(0, stats.banned - 1);
+    }
+
+    function isBanned(userId) {
+      return checkBanExpiry(userId, Date.now());
+    }
+
+    function bannedUsers() {
+      var now = Date.now();
+      return Array.from(banned.keys()).filter(function(id) { return checkBanExpiry(id, now); });
+    }
+
+    function getHistory(userId) {
+      return (history.get(userId) || []).slice();
+    }
+
+    function flush() {
+      history.clear();
+      stats.tracked = 0;
+    }
+
+    function getStats() {
+      return Object.assign({}, stats, {
+        tracked: history.size,
+        banned: bannedUsers().length
+      });
+    }
+
+    return {
+      report: report,
+      ban: ban,
+      unban: unban,
+      isBanned: isBanned,
+      bannedUsers: bannedUsers,
+      history: getHistory,
+      flush: flush,
+      options: merged,
+      stats: getStats,
+      fingerprint: fingerprint,
+      jaccard: jaccard
+    };
+  }
+
+  window.weld.spamguard = {
+    create: createGuard,
+    fingerprint: fingerprint,
+    jaccard: jaccard,
+    version: '1.0.0'
+  };
+
+  return window.weld.spamguard;
+

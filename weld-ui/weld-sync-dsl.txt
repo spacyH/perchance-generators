@@ -1,0 +1,239 @@
+$meta
+  title       = weld.sync
+  description = Cross-tab BroadcastChannel + namespaced localStorage. Peer presence detection, reactive state, ephemeral pub/sub. Same-origin tabs sync instantly.
+  tags        = weld, sync, broadcast, multiplayer, storage, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.sync) return window.weld.sync;
+
+  // -----------------------------------------------------------------
+  // Cross-tab sync: BroadcastChannel + namespaced localStorage.
+  // Same-origin tabs of the same generator see each other's updates instantly.
+  // -----------------------------------------------------------------
+  function uid() {
+    return Math.random().toString(36).slice(2, 10) + '_' + Date.now();
+  }
+
+  function createSync(opts) {
+    opts = opts || {};
+    var namespace = String(opts.namespace || (window.generatorName || 'anon')).replace(/[^a-z0-9-]/gi, '_');
+    var STORAGE_PREFIX = 'weld-sync_' + namespace + ':';
+    var CHANNEL_NAME = 'weld-sync_' + namespace + '_channel';
+    var PEER_ID = uid();
+
+    var bc = null;
+    try { bc = new BroadcastChannel(CHANNEL_NAME); } catch (e) { /* fallback below */ }
+
+    var channels = {};
+    var changeListeners = [];
+    var keyListeners = {};
+    var peers = new Set();
+    var lastPeerHeartbeat = {};
+
+    function emit(target, args) {
+      for (var i = 0; i < target.length; i++) {
+        try { target[i].apply(null, args); } catch (e) { /* swallow */ }
+      }
+    }
+
+    function handleMessage(msg) {
+      if (!msg || typeof msg !== 'object') return;
+      if (msg.peer === PEER_ID) return;
+
+      if (msg.type === 'set') {
+        emit(changeListeners, [msg.key, msg.value, 'remote']);
+        if (keyListeners[msg.key]) emit(keyListeners[msg.key], [msg.value, 'remote']);
+      } else if (msg.type === 'delete') {
+        emit(changeListeners, [msg.key, undefined, 'remote']);
+        if (keyListeners[msg.key]) emit(keyListeners[msg.key], [undefined, 'remote']);
+      } else if (msg.type === 'broadcast') {
+        if (channels[msg.channel]) emit(channels[msg.channel], [msg.data, msg.peer]);
+      } else if (msg.type === 'heartbeat') {
+        peers.add(msg.peer);
+        lastPeerHeartbeat[msg.peer] = Date.now();
+      } else if (msg.type === 'goodbye') {
+        peers.delete(msg.peer);
+        delete lastPeerHeartbeat[msg.peer];
+      }
+    }
+
+    if (bc) bc.onmessage = function(e) { handleMessage(e.data); };
+
+    // Storage event fallback
+    window.addEventListener('storage', function(e) {
+      if (!e.key || e.key.indexOf(STORAGE_PREFIX) !== 0) return;
+      var key = e.key.slice(STORAGE_PREFIX.length);
+      var value;
+      try { value = e.newValue === null ? undefined : JSON.parse(e.newValue); }
+      catch (err) { value = e.newValue; }
+      emit(changeListeners, [key, value, 'remote']);
+      if (keyListeners[key]) emit(keyListeners[key], [value, 'remote']);
+    });
+
+    function publish(msg) {
+      if (bc) {
+        try { bc.postMessage(Object.assign({ peer: PEER_ID }, msg)); }
+        catch (e) { /* channel might be closed */ }
+      }
+    }
+
+    function heartbeat() { publish({ type: 'heartbeat' }); }
+    function pruneStale() {
+      var now = Date.now();
+      var arr = Array.from(peers);
+      for (var i = 0; i < arr.length; i++) {
+        var id = arr[i];
+        if (now - (lastPeerHeartbeat[id] || 0) > 8000) {
+          peers.delete(id);
+          delete lastPeerHeartbeat[id];
+        }
+      }
+    }
+    var heartbeatTimer = setInterval(function() { heartbeat(); pruneStale(); }, 3000);
+    heartbeat();
+
+    window.addEventListener('beforeunload', function() { publish({ type: 'goodbye' }); });
+
+    // ---------- API ----------
+    var api = {};
+
+    api.set = function(key, value) {
+      try {
+        localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(value));
+        publish({ type: 'set', key: key, value: value });
+        emit(changeListeners, [key, value, 'local']);
+        if (keyListeners[key]) emit(keyListeners[key], [value, 'local']);
+        return true;
+      } catch (e) { return false; }
+    };
+
+    api.get = function(key, defaultValue) {
+      try {
+        var raw = localStorage.getItem(STORAGE_PREFIX + key);
+        if (raw === null) return defaultValue;
+        return JSON.parse(raw);
+      } catch (e) { return defaultValue; }
+    };
+
+    api.has = function(key) {
+      return localStorage.getItem(STORAGE_PREFIX + key) !== null;
+    };
+
+    api.delete = function(key) {
+      try {
+        localStorage.removeItem(STORAGE_PREFIX + key);
+        publish({ type: 'delete', key: key });
+        emit(changeListeners, [key, undefined, 'local']);
+        if (keyListeners[key]) emit(keyListeners[key], [undefined, 'local']);
+        return true;
+      } catch (e) { return false; }
+    };
+
+    api.keys = function() {
+      var out = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && k.indexOf(STORAGE_PREFIX) === 0) out.push(k.slice(STORAGE_PREFIX.length));
+      }
+      return out;
+    };
+
+    api.clear = function() {
+      var ks = api.keys();
+      for (var i = 0; i < ks.length; i++) api.delete(ks[i]);
+      return ks.length;
+    };
+
+    // Ephemeral pub/sub
+    api.broadcast = function(channel, data) {
+      publish({ type: 'broadcast', channel: channel, data: data });
+      return true;
+    };
+
+    api.subscribe = function(channel, callback) {
+      if (!channels[channel]) channels[channel] = [];
+      channels[channel].push(callback);
+      return function() {
+        var arr = channels[channel];
+        if (!arr) return;
+        var idx = arr.indexOf(callback);
+        if (idx >= 0) arr.splice(idx, 1);
+      };
+    };
+
+    api.onChange = function(callback) {
+      changeListeners.push(callback);
+      return function() {
+        var idx = changeListeners.indexOf(callback);
+        if (idx >= 0) changeListeners.splice(idx, 1);
+      };
+    };
+
+    api.onKeyChange = function(key, callback) {
+      if (!keyListeners[key]) keyListeners[key] = [];
+      keyListeners[key].push(callback);
+      return function() {
+        var arr = keyListeners[key];
+        if (!arr) return;
+        var idx = arr.indexOf(callback);
+        if (idx >= 0) arr.splice(idx, 1);
+      };
+    };
+
+    api.peers = function() { return peers.size; };
+    api.peerIds = function() { return Array.from(peers); };
+    api.myId = function() { return PEER_ID; };
+
+    // Reactive state primitive
+    api.state = function(key, defaultValue) {
+      if (!api.has(key) && defaultValue !== undefined) {
+        api.set(key, defaultValue);
+      }
+      var subs = [];
+      var unsub = api.onKeyChange(key, function(value, source) {
+        for (var i = 0; i < subs.length; i++) {
+          try { subs[i](value, source); } catch (e) {}
+        }
+      });
+      return {
+        get: function() { return api.get(key, defaultValue); },
+        set: function(v) { return api.set(key, v); },
+        onChange: function(fn) {
+          subs.push(fn);
+          return function() { var i = subs.indexOf(fn); if (i >= 0) subs.splice(i, 1); };
+        },
+        destroy: unsub
+      };
+    };
+
+    api.info = function() {
+      return {
+        namespace: namespace,
+        storagePrefix: STORAGE_PREFIX,
+        broadcastChannel: CHANNEL_NAME,
+        broadcastSupported: bc !== null,
+        peerId: PEER_ID,
+        peerCount: peers.size,
+        storedKeys: api.keys().length
+      };
+    };
+
+    api.destroy = function() {
+      clearInterval(heartbeatTimer);
+      publish({ type: 'goodbye' });
+      if (bc) try { bc.close(); } catch (e) {}
+    };
+
+    return api;
+  }
+
+  window.weld.sync = {
+    create: createSync,
+    version: '1.0.0'
+  };
+
+  return window.weld.sync;
+

@@ -1,0 +1,342 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+.footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--border);
+  color:var(--muted);font-size:12px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+
+.footer-social{text-align:center;font-family:var(--mono);max-width:720px;margin:48px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer-social span,.footer-social a{color:var(--muted);}
+.footer-social a{margin:0 2px;}
+.footer-social a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.tokens<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-tokens-example">demo &rarr;</a></span></div>  <div class="hdr">
+    <div class="hdr-row">
+      <h1>weld.tokens</h1>
+      <span class="ver">v1.0.0</span>
+    </div>
+    <p class="lead">Accurate token counting via the DeepSeek-R1 tokenizer. The same tokenizer Perchance uses for AI calls, so counts match exactly.</p>
+  </div>
+  <h2>Overview</h2>
+<p>weld.tokens loads the same DeepSeek-R1 tokenizer that Perchance's AI broker uses, then exposes precise counting and budget operations. Use it when you need exact token counts for context-window planning, prompt truncation, document chunking, or anywhere the rough <code>chars/4</code> estimate is too coarse.</p>
+<p>The tokenizer downloads on first use (a few hundred KB via jsdelivr's transformers.js CDN). All counting methods are async; <code>countSync</code> is available once the model is loaded.</p>
+<p>Pairs naturally with weld.lorebook: lorebook's default estimator is char/4 for speed, but you can swap in <code>weld.tokens.countSync</code> for accuracy after preload.</p>
+<h2>Quick start</h2>
+<p>In your lists editor:</p>
+<pre data-codeid="code1"></pre>
+
+<p>Count tokens accurately:</p>
+<pre data-codeid="code2"></pre>
+<h2>Loading the tokenizer</h2>
+<div class="sig" data-codeid="sig3"></div>
+<div class="sig" data-codeid="sig4"></div>
+<div class="sig" data-codeid="sig5"></div>
+<p>The tokenizer lazy-loads on first use of any async method. To avoid latency on the first <code>count</code> call, kick it off explicitly with <code>preload()</code> when the page loads.</p>
+<p><code>isLoaded()</code> returns true once the model is in memory, after which <code>countSync</code> works.</p>
+<h2>Counting</h2><h3>weld.tokens.count(text)</h3>
+<div class="sig" data-codeid="sig6"></div>
+<p>Returns the exact token count. Loads the tokenizer if not already loaded.</p>
+<h3>weld.tokens.countSync(text)</h3>
+<div class="sig" data-codeid="sig7"></div>
+<p>Synchronous version. Returns <code>null</code> if the tokenizer hasn't loaded yet -- check <code>isLoaded()</code> first or use <code>count</code> for safety.</p>
+<h3>weld.tokens.estimate(text)</h3>
+<div class="sig" data-codeid="sig8"></div>
+<p>Fast char/4 heuristic. No tokenizer needed. Use when speed matters and accuracy doesn't.</p>
+<h3>weld.tokens.countMessages(messages)</h3>
+<div class="sig" data-codeid="sig9"></div>
+<p>Counts an array of messages with a per-message overhead (4 tokens) to approximate role tags and separators. Each message can be a string or an object with <code>content</code> or <code>text</code>.</p>
+<h2>Truncation</h2><h3>weld.tokens.truncate(text, max)</h3>
+<div class="sig" data-codeid="sig10"></div>
+<p>Drops tokens from the end until the text fits within <code>max</code>. Use for trimming a system prompt or instruction block where the beginning matters most.</p>
+<h3>weld.tokens.truncateStart(text, max)</h3>
+<div class="sig" data-codeid="sig11"></div>
+<p>Drops tokens from the start until the text fits. Use for chat histories where the most recent messages matter most.</p>
+<pre data-codeid="code12"></pre>
+<h3>weld.tokens.chunk(text, perChunk)</h3>
+<div class="sig" data-codeid="sig13"></div>
+<p>Splits long text into chunks of approximately <code>perChunk</code> tokens each. Useful for document QA pipelines that process content in segments.</p>
+<h2>Budgeting</h2>
+<div class="sig" data-codeid="sig14"></div>
+<p>Returns a structured report:</p>
+<pre data-codeid="code15"></pre>
+<h2>Encoding and decoding</h2>
+<div class="sig" data-codeid="sig16"></div>
+<div class="sig" data-codeid="sig17"></div>
+<p>Round-trip access to the tokenizer's encode/decode primitives. Special tokens are skipped on decode.</p>
+<h2>Common patterns</h2><h3>Chat history within a budget</h3>
+<pre data-codeid="code18"></pre>
+<h3>Document chunking for retrieval</h3>
+<pre data-codeid="code19"></pre>
+<h2>Performance</h2><div class="note">
+The tokenizer file is roughly 2MB. On a cold cache it takes a second or two to download. Always call <code>preload()</code> at page init for the best UX -- the user shouldn't wait when they first hit submit.
+</div>
+  <div class="footer">Part of the <a href="https://perchance.org/weld-ui-index">weld plugin suite</a>. Stashed at <code>window.weld.tokens</code>. This page loads the plugin so you can inspect it in DevTools.</div>
+</div>
+<script>
+(function(){
+  var examples = {
+  'code1': 'output\n  weld-tokens = \{import:weld-tokens-plugin\}',
+  'code2': 'root.weldTokens();   // trigger $output\n\n// Kick off the download in the background\nweld.tokens.preload();\n\n// Later, when ready:\nconst n = await weld.tokens.count(\'A small example sentence.\');\n// 7\n\n// Fits inside a budget?\nconst status = await weld.tokens.budget(longText, 4000);\n// \{ used: 3812, max: 4000, remaining: 188, fits: true, percent: 95 \}',
+  'sig3': 'weld.tokens.preload()  ->  Promise<tokenizer>',
+  'sig4': 'weld.tokens.ready()    ->  Promise<tokenizer>',
+  'sig5': 'weld.tokens.isLoaded() ->  boolean',
+  'sig6': 'weld.tokens.count(text)  ->  Promise<number>',
+  'sig7': 'weld.tokens.countSync(text)  ->  number | null',
+  'sig8': 'weld.tokens.estimate(text)  ->  number',
+  'sig9': 'weld.tokens.countMessages(messages)  ->  Promise<number>',
+  'sig10': 'weld.tokens.truncate(text, max)  ->  Promise<string>',
+  'sig11': 'weld.tokens.truncateStart(text, max)  ->  Promise<string>',
+  'code12': 'const recent = await weld.tokens.truncateStart(fullHistory, 2000);\n// keeps the last 2000 tokens',
+  'sig13': 'weld.tokens.chunk(text, perChunk)  ->  Promise<string\[\]>',
+  'sig14': 'weld.tokens.budget(text, max)  ->  Promise<budget>',
+  'code15': '\{\n  used: 3812,         // tokens in this text\n  max: 4000,          // budget passed in\n  remaining: 188,\n  fits: true,\n  percent: 95         // rounded\n\}',
+  'sig16': 'weld.tokens.encode(text)  ->  Promise<number\[\]>',
+  'sig17': 'weld.tokens.decode(ids)   ->  Promise<string>',
+  'code18': 'async function buildContext(systemPrompt, messages, maxTokens) \{\n  const sysTokens = await weld.tokens.count(systemPrompt);\n  const budget = maxTokens - sysTokens - 100;  // reserve 100 for response\n  const history = messages.map(m => m.role + \': \' + m.content).join(\'\\n\');\n  return systemPrompt + \'\\n\' + await weld.tokens.truncateStart(history, budget);\n\}',
+  'code19': 'async function chunkDocument(text) \{\n  const chunks = await weld.tokens.chunk(text, 500);\n  return chunks.map((c, i) => (\{ id: \'chunk_\' + i, content: c \}));\n\}'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    var nodes = document.querySelectorAll('[data-codeid]');
+    nodes.forEach(function(n){
+      var id = n.getAttribute('data-codeid');
+      var src = examples[id];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.tokens) return; // already loaded
+
+// -----------------------------------------------------------------
+// Accurate tokenizer (DeepSeek-R1-0528) via transformers.js.
+// Same tokenizer Perchance uses for the AI broker, so counts are exact.
+// -----------------------------------------------------------------
+var tokenizerPromise = null;
+var tokenizer = null;
+var loadError = null;
+
+function load() {
+  if (tokenizerPromise) return tokenizerPromise;
+  tokenizerPromise = (function() {
+    return Promise.resolve().then(function() {
+      return import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@latest/+esm');
+    }).then(function(mod) {
+      return mod.AutoTokenizer.from_pretrained('deepseek-ai/DeepSeek-R1-0528');
+    }).then(function(t) {
+      tokenizer = t;
+      return t;
+    }).catch(function(e) {
+      loadError = e;
+      throw e;
+    });
+  })();
+  return tokenizerPromise;
+}
+
+function preload() { return load(); }
+function ready()   { return load(); }
+function isLoaded(){ return tokenizer !== null; }
+function getLoadError() { return loadError; }
+
+// Cheap fallback (~4 chars per token)
+function estimate(text) {
+  return Math.ceil(String(text || '').length / 4);
+}
+
+// Exact count (async)
+function count(text) {
+  return load().then(function(t) {
+    return t.encode(String(text)).length;
+  });
+}
+
+// Sync count -- null if not loaded yet
+function countSync(text) {
+  if (!tokenizer) return null;
+  return tokenizer.encode(String(text)).length;
+}
+
+function encode(text) {
+  return load().then(function(t) { return t.encode(String(text)); });
+}
+
+function decode(ids) {
+  return load().then(function(t) {
+    return t.decode(ids, { skip_special_tokens: true });
+  });
+}
+
+function budget(text, maxTokens) {
+  return count(text).then(function(used) {
+    return {
+      used: used,
+      max: maxTokens,
+      remaining: maxTokens - used,
+      fits: used <= maxTokens,
+      percent: Math.round((used / maxTokens) * 100)
+    };
+  });
+}
+
+// Truncate preserving the START of the text
+function truncate(text, maxTokens) {
+  return load().then(function(t) {
+    var ids = t.encode(String(text));
+    if (ids.length <= maxTokens) return String(text);
+    return t.decode(ids.slice(0, maxTokens), { skip_special_tokens: true });
+  });
+}
+
+// Truncate preserving the END of the text (useful for chat histories)
+function truncateStart(text, maxTokens) {
+  return load().then(function(t) {
+    var ids = t.encode(String(text));
+    if (ids.length <= maxTokens) return String(text);
+    return t.decode(ids.slice(-maxTokens), { skip_special_tokens: true });
+  });
+}
+
+// Split text into chunks of ~N tokens each
+function chunk(text, maxTokensPerChunk) {
+  return load().then(function(t) {
+    var ids = t.encode(String(text));
+    var chunks = [];
+    for (var i = 0; i < ids.length; i += maxTokensPerChunk) {
+      chunks.push(t.decode(ids.slice(i, i + maxTokensPerChunk), { skip_special_tokens: true }));
+    }
+    return chunks;
+  });
+}
+
+// Count tokens across an array of messages
+function countMessages(messages) {
+  var total = 0;
+  function step(i) {
+    if (i >= messages.length) return Promise.resolve(total);
+    var msg = messages[i];
+    var txt = typeof msg === 'string' ? msg : (msg.content || msg.text || '');
+    return count(txt).then(function(n) {
+      total += n + 4;
+      return step(i + 1);
+    });
+  }
+  return step(0);
+}
+
+function info() {
+  return {
+    model: 'deepseek-ai/DeepSeek-R1-0528',
+    loaded: tokenizer !== null,
+    error: loadError ? String(loadError.message || loadError) : null,
+    vocabSize: tokenizer ? tokenizer.vocab_size : null
+  };
+}
+
+window.weld.tokens = {
+  preload: preload,
+  ready: ready,
+  isLoaded: isLoaded,
+  loadError: getLoadError,
+  estimate: estimate,
+  count: count,
+  countSync: countSync,
+  encode: encode,
+  decode: decode,
+  budget: budget,
+  truncate: truncate,
+  truncateStart: truncateStart,
+  chunk: chunk,
+  countMessages: countMessages,
+  info: info,
+  version: '1.0.0'
+};
+
+})();
+
+</script>
+<footer class="footer-social">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>

@@ -1,0 +1,420 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+.footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--border);
+  color:var(--muted);font-size:12px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+
+.footer-social{text-align:center;font-family:var(--mono);max-width:720px;margin:48px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer-social span,.footer-social a{color:var(--muted);}
+.footer-social a{margin:0 2px;}
+.footer-social a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.sync<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-sync-example">demo &rarr;</a></span></div>  <div class="hdr">
+    <div class="hdr-row">
+      <h1>weld.sync</h1>
+      <span class="ver">v1.0.0</span>
+    </div>
+    <p class="lead">Cross-tab messaging and namespaced persistent storage. BroadcastChannel for instant updates, localStorage for what should stick around.</p>
+  </div>
+  <h2>Overview</h2>
+<p>weld.sync handles two related-but-distinct concerns: <strong>cross-tab messaging</strong> (instant updates between tabs of the same generator via BroadcastChannel) and <strong>namespaced persistent storage</strong> (localStorage with a per-generator prefix so multiple plugins don't trample each other).</p>
+<p>Same-origin tabs see each other's storage changes immediately. The plugin also tracks peer presence (heartbeats every 3s, prune stale after 8s) so you can show "3 tabs open" indicators. For ephemeral data that doesn't need persistence, use the <code>broadcast</code>/<code>subscribe</code> pub-sub channel instead of <code>set</code>/<code>get</code>.</p>
+<p>Cross-generator sync is not supported -- each Perchance generator runs on its own subdomain with isolated localStorage. Stick to same-generator multi-tab workflows.</p>
+<h2>Quick start</h2>
+<p>In your lists editor:</p>
+<pre data-codeid="code1"></pre>
+
+<p>Create a sync instance and use it:</p>
+<pre data-codeid="code2"></pre>
+<h2>Configuration</h2>
+<p>All options to <code>create()</code> are optional.</p>
+<ul>
+<li><code>namespace</code>: storage prefix. Defaults to <code>window.generatorName</code> sanitized. Override only if you want multiple independent sync layers per generator.</li>
+</ul>
+<h2>Persistent storage</h2><h3>sync.set / sync.get / sync.has / sync.delete</h3>
+<p>Standard key/value operations against localStorage, scoped to this generator. Values are JSON-stringified on set, parsed on get. Every <code>set</code>/<code>delete</code> emits a change event to all listeners and to other tabs.</p>
+<pre data-codeid="code3"></pre>
+<h3>sync.keys / sync.clear</h3>
+<p><code>keys()</code> returns all keys stored under this namespace. <code>clear()</code> deletes them all and returns the count deleted.</p>
+<h2>Change notifications</h2><h3>sync.onChange(callback)</h3>
+<div class="sig" data-codeid="sig4"></div>
+<p>Fires for every storage change, both local (this tab) and remote (other tabs). The <code>source</code> argument distinguishes them. Returns a function to unsubscribe.</p>
+<pre data-codeid="code5"></pre>
+<h3>sync.onKeyChange(key, callback)</h3>
+<div class="sig" data-codeid="sig6"></div>
+<p>Fires only when the specified key changes. Use for binding a single piece of state to a specific UI element.</p>
+<h2>Reactive state primitive</h2>
+<div class="sig" data-codeid="sig7"></div>
+<p>A convenience wrapper combining storage and notifications. Returns an object with <code>get</code>, <code>set</code>, <code>onChange</code>, and <code>destroy</code>:</p>
+<pre data-codeid="code8"></pre>
+<h2>Ephemeral pub/sub</h2><h3>sync.broadcast(channel, data)</h3>
+<p>Send a message on a named channel. No persistence -- if no listener is currently subscribed, the message is lost. Use for cursor positions, typing indicators, any "now only" signals.</p>
+<h3>sync.subscribe(channel, callback)</h3>
+<div class="sig" data-codeid="sig9"></div>
+<p>Listen on a channel. The <code>peer</code> argument identifies the sender, so each tab knows who sent what.</p>
+<pre data-codeid="code10"></pre>
+<h2>Peer presence</h2>
+<p>The plugin sends a heartbeat every 3 seconds and prunes peers that haven't been heard from in 8 seconds. This gives a live count of active same-origin tabs.</p>
+<ul>
+<li><code>sync.peers()</code>: current peer count (excludes self)</li>
+<li><code>sync.peerIds()</code>: array of peer ids</li>
+<li><code>sync.myId()</code>: this tab's randomly generated id</li>
+</ul>
+<h2>Diagnostics and cleanup</h2>
+<p><code>sync.info()</code> returns config and runtime stats:</p>
+<pre data-codeid="code11"></pre>
+<p><code>sync.destroy()</code> stops the heartbeat, sends a goodbye, and closes the channel. Use when tearing down a sync instance you no longer need.</p>
+<h2>Common patterns</h2><h3>Multi-tab settings</h3>
+<pre data-codeid="code12"></pre>
+<h3>Live collaboration cursor</h3>
+<pre data-codeid="code13"></pre>
+<h2>Browser support</h2><div class="note">
+BroadcastChannel works in all modern browsers but is missing in some older ones. The plugin falls back to the <code>storage</code> event for those, which fires across tabs on every localStorage write. Functional but a touch slower; <code>info().broadcastSupported</code> tells you which path is active.
+</div>
+  <div class="footer">Part of the <a href="https://perchance.org/weld-ui-index">weld plugin suite</a>. Stashed at <code>window.weld.sync</code>. This page loads the plugin so you can inspect it in DevTools.</div>
+</div>
+<script>
+(function(){
+  var examples = {
+  'code1': 'output\n  weld-sync = \{import:weld-sync-plugin\}',
+  'code2': 'root.weldSync();   // trigger $output\n\nconst sync = weld.sync.create();\n\n// Persistent storage with cross-tab notifications\nsync.set(\'username\', \'alice\');\nsync.get(\'username\');         // \'alice\'\nsync.onChange((key, value, source) => \{\n  console.log(key, \'=\', value, \'from\', source);  // source: \'local\' or \'remote\'\n\});\n\n// Ephemeral broadcast (no persistence)\nsync.subscribe(\'cursor-position\', (data, peer) => \{\n  drawCursor(peer, data);\n\});\nsync.broadcast(\'cursor-position\', \{ x: 100, y: 200 \});\n\n// Peer presence\nsync.peers();   // count of other tabs',
+  'code3': 'sync.set(\'settings\', \{ theme: \'dark\', fontSize: 14 \});\nsync.get(\'settings\');                      // \{theme:\'dark\',fontSize:14\}\nsync.get(\'missing\', \{ fallback: true \});   // \{fallback:true\}\nsync.has(\'settings\');                      // true\nsync.delete(\'settings\');',
+  'sig4': 'sync.onChange((key, value, source) => \{ ... \})  ->  unsubscribe',
+  'code5': 'const off = sync.onChange((key, value, source) => \{\n  if (source === \'remote\') refreshUI(key, value);\n\});\n// later:\noff();',
+  'sig6': 'sync.onKeyChange(key, (value, source) => \{ ... \})  ->  unsubscribe',
+  'sig7': 'sync.state(key, defaultValue?)  ->  stateHandle',
+  'code8': 'const count = sync.state(\'counter\', 0);\n\ncount.get();             // 0\ncount.set(count.get() + 1);   // becomes 1; all tabs see it\n\ncount.onChange((v) => updateDisplay(v));\n\ncount.destroy();         // stop listening',
+  'sig9': 'sync.subscribe(channel, (data, peer) => \{ ... \})  ->  unsubscribe',
+  'code10': 'sync.subscribe(\'typing\', (data, peer) => \{\n  showTypingIndicator(peer, data.user);\n\});\n\nsync.broadcast(\'typing\', \{ user: \'alice\', active: true \});',
+  'code11': '\{\n  namespace: \'my-gen\',\n  storagePrefix: \'weld-sync_my-gen:\',\n  broadcastChannel: \'weld-sync_my-gen_channel\',\n  broadcastSupported: true,\n  peerId: \'ab12cd_1234567890\',\n  peerCount: 2,\n  storedKeys: 7\n\}',
+  'code12': 'const settings = sync.state(\'app-settings\', \{ theme: \'light\' \});\nsettings.onChange((v) => applyTheme(v.theme));\n// Change in any tab updates all tabs immediately.',
+  'code13': 'sync.subscribe(\'cursor\', (data, peer) => drawCursor(peer, data));\ndocument.addEventListener(\'mousemove\', (e) => \{\n  sync.broadcast(\'cursor\', \{ x: e.clientX, y: e.clientY \});\n\});'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    var nodes = document.querySelectorAll('[data-codeid]');
+    nodes.forEach(function(n){
+      var id = n.getAttribute('data-codeid');
+      var src = examples[id];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.sync) return; // already loaded
+
+// -----------------------------------------------------------------
+// Cross-tab sync: BroadcastChannel + namespaced localStorage.
+// Same-origin tabs of the same generator see each other's updates instantly.
+// -----------------------------------------------------------------
+function uid() {
+  return Math.random().toString(36).slice(2, 10) + '_' + Date.now();
+}
+
+function createSync(opts) {
+  opts = opts || {};
+  var namespace = String(opts.namespace || (window.generatorName || 'anon')).replace(/[^a-z0-9-]/gi, '_');
+  var STORAGE_PREFIX = 'weld-sync_' + namespace + ':';
+  var CHANNEL_NAME = 'weld-sync_' + namespace + '_channel';
+  var PEER_ID = uid();
+
+  var bc = null;
+  try { bc = new BroadcastChannel(CHANNEL_NAME); } catch (e) { /* fallback below */ }
+
+  var channels = {};
+  var changeListeners = [];
+  var keyListeners = {};
+  var peers = new Set();
+  var lastPeerHeartbeat = {};
+
+  function emit(target, args) {
+    for (var i = 0; i < target.length; i++) {
+      try { target[i].apply(null, args); } catch (e) { /* swallow */ }
+    }
+  }
+
+  function handleMessage(msg) {
+    if (!msg || typeof msg !== 'object') return;
+    if (msg.peer === PEER_ID) return;
+
+    if (msg.type === 'set') {
+      emit(changeListeners, [msg.key, msg.value, 'remote']);
+      if (keyListeners[msg.key]) emit(keyListeners[msg.key], [msg.value, 'remote']);
+    } else if (msg.type === 'delete') {
+      emit(changeListeners, [msg.key, undefined, 'remote']);
+      if (keyListeners[msg.key]) emit(keyListeners[msg.key], [undefined, 'remote']);
+    } else if (msg.type === 'broadcast') {
+      if (channels[msg.channel]) emit(channels[msg.channel], [msg.data, msg.peer]);
+    } else if (msg.type === 'heartbeat') {
+      peers.add(msg.peer);
+      lastPeerHeartbeat[msg.peer] = Date.now();
+    } else if (msg.type === 'goodbye') {
+      peers.delete(msg.peer);
+      delete lastPeerHeartbeat[msg.peer];
+    }
+  }
+
+  if (bc) bc.onmessage = function(e) { handleMessage(e.data); };
+
+  // Storage event fallback
+  window.addEventListener('storage', function(e) {
+    if (!e.key || e.key.indexOf(STORAGE_PREFIX) !== 0) return;
+    var key = e.key.slice(STORAGE_PREFIX.length);
+    var value;
+    try { value = e.newValue === null ? undefined : JSON.parse(e.newValue); }
+    catch (err) { value = e.newValue; }
+    emit(changeListeners, [key, value, 'remote']);
+    if (keyListeners[key]) emit(keyListeners[key], [value, 'remote']);
+  });
+
+  function publish(msg) {
+    if (bc) {
+      try { bc.postMessage(Object.assign({ peer: PEER_ID }, msg)); }
+      catch (e) { /* channel might be closed */ }
+    }
+  }
+
+  function heartbeat() { publish({ type: 'heartbeat' }); }
+  function pruneStale() {
+    var now = Date.now();
+    var arr = Array.from(peers);
+    for (var i = 0; i < arr.length; i++) {
+      var id = arr[i];
+      if (now - (lastPeerHeartbeat[id] || 0) > 8000) {
+        peers.delete(id);
+        delete lastPeerHeartbeat[id];
+      }
+    }
+  }
+  var heartbeatTimer = setInterval(function() { heartbeat(); pruneStale(); }, 3000);
+  heartbeat();
+
+  window.addEventListener('beforeunload', function() { publish({ type: 'goodbye' }); });
+
+  // ---------- API ----------
+  var api = {};
+
+  api.set = function(key, value) {
+    try {
+      localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(value));
+      publish({ type: 'set', key: key, value: value });
+      emit(changeListeners, [key, value, 'local']);
+      if (keyListeners[key]) emit(keyListeners[key], [value, 'local']);
+      return true;
+    } catch (e) { return false; }
+  };
+
+  api.get = function(key, defaultValue) {
+    try {
+      var raw = localStorage.getItem(STORAGE_PREFIX + key);
+      if (raw === null) return defaultValue;
+      return JSON.parse(raw);
+    } catch (e) { return defaultValue; }
+  };
+
+  api.has = function(key) {
+    return localStorage.getItem(STORAGE_PREFIX + key) !== null;
+  };
+
+  api.delete = function(key) {
+    try {
+      localStorage.removeItem(STORAGE_PREFIX + key);
+      publish({ type: 'delete', key: key });
+      emit(changeListeners, [key, undefined, 'local']);
+      if (keyListeners[key]) emit(keyListeners[key], [undefined, 'local']);
+      return true;
+    } catch (e) { return false; }
+  };
+
+  api.keys = function() {
+    var out = [];
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k && k.indexOf(STORAGE_PREFIX) === 0) out.push(k.slice(STORAGE_PREFIX.length));
+    }
+    return out;
+  };
+
+  api.clear = function() {
+    var ks = api.keys();
+    for (var i = 0; i < ks.length; i++) api.delete(ks[i]);
+    return ks.length;
+  };
+
+  // Ephemeral pub/sub
+  api.broadcast = function(channel, data) {
+    publish({ type: 'broadcast', channel: channel, data: data });
+    return true;
+  };
+
+  api.subscribe = function(channel, callback) {
+    if (!channels[channel]) channels[channel] = [];
+    channels[channel].push(callback);
+    return function() {
+      var arr = channels[channel];
+      if (!arr) return;
+      var idx = arr.indexOf(callback);
+      if (idx >= 0) arr.splice(idx, 1);
+    };
+  };
+
+  api.onChange = function(callback) {
+    changeListeners.push(callback);
+    return function() {
+      var idx = changeListeners.indexOf(callback);
+      if (idx >= 0) changeListeners.splice(idx, 1);
+    };
+  };
+
+  api.onKeyChange = function(key, callback) {
+    if (!keyListeners[key]) keyListeners[key] = [];
+    keyListeners[key].push(callback);
+    return function() {
+      var arr = keyListeners[key];
+      if (!arr) return;
+      var idx = arr.indexOf(callback);
+      if (idx >= 0) arr.splice(idx, 1);
+    };
+  };
+
+  api.peers = function() { return peers.size; };
+  api.peerIds = function() { return Array.from(peers); };
+  api.myId = function() { return PEER_ID; };
+
+  // Reactive state primitive
+  api.state = function(key, defaultValue) {
+    if (!api.has(key) && defaultValue !== undefined) {
+      api.set(key, defaultValue);
+    }
+    var subs = [];
+    var unsub = api.onKeyChange(key, function(value, source) {
+      for (var i = 0; i < subs.length; i++) {
+        try { subs[i](value, source); } catch (e) {}
+      }
+    });
+    return {
+      get: function() { return api.get(key, defaultValue); },
+      set: function(v) { return api.set(key, v); },
+      onChange: function(fn) {
+        subs.push(fn);
+        return function() { var i = subs.indexOf(fn); if (i >= 0) subs.splice(i, 1); };
+      },
+      destroy: unsub
+    };
+  };
+
+  api.info = function() {
+    return {
+      namespace: namespace,
+      storagePrefix: STORAGE_PREFIX,
+      broadcastChannel: CHANNEL_NAME,
+      broadcastSupported: bc !== null,
+      peerId: PEER_ID,
+      peerCount: peers.size,
+      storedKeys: api.keys().length
+    };
+  };
+
+  api.destroy = function() {
+    clearInterval(heartbeatTimer);
+    publish({ type: 'goodbye' });
+    if (bc) try { bc.close(); } catch (e) {}
+  };
+
+  return api;
+}
+
+window.weld.sync = {
+  create: createSync,
+  version: '1.0.0'
+};
+
+})();
+
+</script>
+<footer class="footer-social">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>

@@ -1,0 +1,255 @@
+$meta
+  title       = weld.gen
+  description = Generator introspection: read DSL source, enumerate lists, search items, dynamic-import any public generator, mutate root.* at runtime. Pairs with dynamic-import-plugin and super-fetch-plugin.
+  tags        = weld, gen, generator, introspection, plugin
+
+dynamicImport = {import:dynamic-import-plugin}
+superFetch    = {import:super-fetch-plugin}
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.gen) { window.weld.gen.attach({dynamicImport: dynamicImport, superFetch: superFetch}); return window.weld.gen; }
+
+  // -----------------------------------------------------------------
+  // weld.gen: Generator introspection, dynamic import, runtime mutation.
+  // Provides three capability groups:
+  //   1. Self-inspection: read this generator's DSL source, lists, meta
+  //   2. Remote loading: fetch / parse / inspect other public generators
+  //   3. Runtime mutation: read/write root.* properties
+  // Two dependencies must be imported in the DSL panel for full functionality:
+  //   dynamicImport = {import:dynamic-import-plugin}
+  //   superFetch    = {import:super-fetch-plugin}
+  // The DSL form passes those in via weld.gen.attach -- see docs for keys.
+  // Without them, only self-inspection works.
+  // -----------------------------------------------------------------
+
+  var deps = {
+    dynamicImport: null,
+    superFetch: null
+  };
+
+  function attach(d) {
+    if (d && d.dynamicImport) deps.dynamicImport = d.dynamicImport;
+    if (d && d.superFetch) deps.superFetch = d.superFetch;
+  }
+
+  function _safe(fn, fallback) {
+    try { return fn(); } catch (e) { return fallback; }
+  }
+
+  // -------- SELF-INSPECTION --------
+
+  function source() {
+    return _safe(function() {
+      var r = window.root;
+      return (r && r.$perchanceCode) || '';
+    }, '');
+  }
+
+  function meta() {
+    return _safe(function() {
+      var r = window.root;
+      return (r && r.$meta) || null;
+    }, null);
+  }
+
+  function moduleName() {
+    return _safe(function() {
+      var r = window.root;
+      return (r && r.$moduleName) || window.generatorName || '';
+    }, '');
+  }
+
+  function children() {
+    return _safe(function() {
+      var r = window.root;
+      return (r && r.$children) || {};
+    }, {});
+  }
+
+  function lists() {
+    var result = {};
+    _safe(function() {
+      var ch = children();
+      if (!ch) return;
+      var keys;
+      try { keys = Object.keys(ch); } catch (e) { keys = []; }
+      for (var i = 0; i < keys.length; i++) {
+        var k = keys[i];
+        if (k.charAt(0) === '$') continue;
+        var node = ch[k];
+        var info = { name: k, type: typeof node };
+        try {
+          if (node && typeof node === 'object') {
+            if (node.getLength !== undefined) info.length = node.getLength;
+            if (node.getChildNames) info.childNames = node.getChildNames;
+            if (node.getPropertyNames) info.propertyNames = node.getPropertyNames;
+            if (node.getFunctionNames) info.functionNames = node.getFunctionNames;
+            if (node.rawText !== undefined) info.rawText = node.rawText;
+          }
+        } catch (e) { /* swallow */ }
+        result[k] = info;
+      }
+    });
+    return result;
+  }
+
+  // Search items within lists by keyword (case-insensitive substring)
+  function search(listName, query) {
+    var hits = [];
+    var ch = children();
+    if (!ch || !query) return hits;
+    var q = String(query).toLowerCase();
+    var keys = listName ? [listName] : Object.keys(ch);
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (k.charAt(0) === '$') continue;
+      var node = ch[k];
+      if (!node || typeof node.getLength !== 'number') continue;
+      var len = node.getLength;
+      for (var j = 0; j < len; j++) {
+        try {
+          var item = node[j];
+          var s = String(item == null ? '' : (item.rawText || item.toString()));
+          if (s.toLowerCase().indexOf(q) !== -1) {
+            hits.push({ list: k, index: j, item: s });
+          }
+        } catch (e) { /* swallow */ }
+      }
+    }
+    return hits;
+  }
+
+  // -------- REMOTE LOADING --------
+
+  function load(name) {
+    if (!deps.dynamicImport) {
+      return Promise.reject(new Error('weld.gen: dynamicImport not attached. Pass it via weld.gen.attach({dynamicImport}).'));
+    }
+    return Promise.resolve(deps.dynamicImport(String(name)));
+  }
+
+  function exists(name) {
+    if (!deps.superFetch) {
+      return Promise.reject(new Error('weld.gen: superFetch not attached.'));
+    }
+    var url = 'https://perchance.org/api/checkIfGeneratorExists?generatorName=' + encodeURIComponent(String(name));
+    return Promise.resolve(deps.superFetch(url)).then(function(r) {
+      try {
+        var data = typeof r === 'string' ? JSON.parse(r) : r;
+        return !!(data && (data.exists || data === true));
+      } catch (e) { return false; }
+    });
+  }
+
+  function sourceOf(name) {
+    if (!deps.superFetch) {
+      return Promise.reject(new Error('weld.gen: superFetch not attached.'));
+    }
+    var url = 'https://perchance.org/api/downloadGenerator?generatorName=' + encodeURIComponent(String(name)) + '&listsOnly=true';
+    return Promise.resolve(deps.superFetch(url)).then(function(r) { return String(r || ''); });
+  }
+
+  function inspect(name) {
+    var info = {
+      name: String(name),
+      type: null,
+      arity: null,
+      source: '',
+      lists: {},
+      functions: [],
+      imports: [],
+      loadError: null
+    };
+
+    return sourceOf(name).then(function(src) {
+      info.source = src;
+      // Extract imports from DSL source
+      var importRe = /(\w+)\s*=\s*\{\s*import\s*:\s*([^}]+)\}/g;
+      var m;
+      while ((m = importRe.exec(src)) !== null) {
+        info.imports.push(String(m[2]).trim());
+      }
+      return load(name).catch(function(e) {
+        info.loadError = String(e && e.message || e);
+        return null;
+      });
+    }).then(function(result) {
+      if (result == null) return info;
+      info.type = typeof result;
+      if (typeof result === 'function') {
+        info.arity = result.length;
+      } else if (typeof result === 'object') {
+        var keys;
+        try { keys = Object.keys(result); } catch (e) { keys = []; }
+        for (var i = 0; i < keys.length; i++) {
+          var k = keys[i];
+          if (k.charAt(0) === '$') continue;
+          var node = result[k];
+          if (node && typeof node === 'object' && node.getLength !== undefined) {
+            info.lists[k] = { length: node.getLength };
+          } else if (typeof node === 'function') {
+            info.functions.push(k);
+          }
+        }
+      }
+      return info;
+    });
+  }
+
+  // -------- RUNTIME MUTATION --------
+
+  function setProp(name, value) {
+    _safe(function() {
+      if (window.root) window.root[name] = value;
+    });
+    return value;
+  }
+
+  function getProp(name) {
+    return _safe(function() {
+      return window.root ? window.root[name] : undefined;
+    });
+  }
+
+  function delProp(name) {
+    return _safe(function() {
+      if (window.root && (name in window.root)) {
+        delete window.root[name];
+        return true;
+      }
+      return false;
+    }, false);
+  }
+
+  function hasProp(name) {
+    return _safe(function() {
+      return !!(window.root && (name in window.root));
+    }, false);
+  }
+
+  window.weld.gen = {
+    attach: attach,
+    source: source,
+    meta: meta,
+    moduleName: moduleName,
+    children: children,
+    lists: lists,
+    search: search,
+    load: load,
+    exists: exists,
+    sourceOf: sourceOf,
+    inspect: inspect,
+    set: setProp,
+    get: getProp,
+    del: delProp,
+    has: hasProp,
+    version: '1.0.0'
+  };
+
+  window.weld.gen.attach({dynamicImport: dynamicImport, superFetch: superFetch});
+
+  return window.weld.gen;
+

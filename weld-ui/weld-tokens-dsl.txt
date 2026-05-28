@@ -1,0 +1,157 @@
+$meta
+  title       = weld.tokens
+  description = Accurate tokenizer using DeepSeek-R1 (same as Perchance AI). Count, encode/decode, truncate, chunk, budget messages. Lazy-loads transformers.js on first use.
+  tags        = weld, tokens, tokenizer, budget, ai, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.tokens) return window.weld.tokens;
+
+  // -----------------------------------------------------------------
+  // Accurate tokenizer (DeepSeek-R1-0528) via transformers.js.
+  // Same tokenizer Perchance uses for the AI broker, so counts are exact.
+  // -----------------------------------------------------------------
+  var tokenizerPromise = null;
+  var tokenizer = null;
+  var loadError = null;
+
+  function load() {
+    if (tokenizerPromise) return tokenizerPromise;
+    tokenizerPromise = (function() {
+      return Promise.resolve().then(function() {
+        return import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@latest/+esm');
+      }).then(function(mod) {
+        return mod.AutoTokenizer.from_pretrained('deepseek-ai/DeepSeek-R1-0528');
+      }).then(function(t) {
+        tokenizer = t;
+        return t;
+      }).catch(function(e) {
+        loadError = e;
+        throw e;
+      });
+    })();
+    return tokenizerPromise;
+  }
+
+  function preload() { return load(); }
+  function ready()   { return load(); }
+  function isLoaded(){ return tokenizer !== null; }
+  function getLoadError() { return loadError; }
+
+  // Cheap fallback (~4 chars per token)
+  function estimate(text) {
+    return Math.ceil(String(text || '').length / 4);
+  }
+
+  // Exact count (async)
+  function count(text) {
+    return load().then(function(t) {
+      return t.encode(String(text)).length;
+    });
+  }
+
+  // Sync count -- null if not loaded yet
+  function countSync(text) {
+    if (!tokenizer) return null;
+    return tokenizer.encode(String(text)).length;
+  }
+
+  function encode(text) {
+    return load().then(function(t) { return t.encode(String(text)); });
+  }
+
+  function decode(ids) {
+    return load().then(function(t) {
+      return t.decode(ids, { skip_special_tokens: true });
+    });
+  }
+
+  function budget(text, maxTokens) {
+    return count(text).then(function(used) {
+      return {
+        used: used,
+        max: maxTokens,
+        remaining: maxTokens - used,
+        fits: used <= maxTokens,
+        percent: Math.round((used / maxTokens) * 100)
+      };
+    });
+  }
+
+  // Truncate preserving the START of the text
+  function truncate(text, maxTokens) {
+    return load().then(function(t) {
+      var ids = t.encode(String(text));
+      if (ids.length <= maxTokens) return String(text);
+      return t.decode(ids.slice(0, maxTokens), { skip_special_tokens: true });
+    });
+  }
+
+  // Truncate preserving the END of the text (useful for chat histories)
+  function truncateStart(text, maxTokens) {
+    return load().then(function(t) {
+      var ids = t.encode(String(text));
+      if (ids.length <= maxTokens) return String(text);
+      return t.decode(ids.slice(-maxTokens), { skip_special_tokens: true });
+    });
+  }
+
+  // Split text into chunks of ~N tokens each
+  function chunk(text, maxTokensPerChunk) {
+    return load().then(function(t) {
+      var ids = t.encode(String(text));
+      var chunks = [];
+      for (var i = 0; i < ids.length; i += maxTokensPerChunk) {
+        chunks.push(t.decode(ids.slice(i, i + maxTokensPerChunk), { skip_special_tokens: true }));
+      }
+      return chunks;
+    });
+  }
+
+  // Count tokens across an array of messages
+  function countMessages(messages) {
+    var total = 0;
+    function step(i) {
+      if (i >= messages.length) return Promise.resolve(total);
+      var msg = messages[i];
+      var txt = typeof msg === 'string' ? msg : (msg.content || msg.text || '');
+      return count(txt).then(function(n) {
+        total += n + 4;
+        return step(i + 1);
+      });
+    }
+    return step(0);
+  }
+
+  function info() {
+    return {
+      model: 'deepseek-ai/DeepSeek-R1-0528',
+      loaded: tokenizer !== null,
+      error: loadError ? String(loadError.message || loadError) : null,
+      vocabSize: tokenizer ? tokenizer.vocab_size : null
+    };
+  }
+
+  window.weld.tokens = {
+    preload: preload,
+    ready: ready,
+    isLoaded: isLoaded,
+    loadError: getLoadError,
+    estimate: estimate,
+    count: count,
+    countSync: countSync,
+    encode: encode,
+    decode: decode,
+    budget: budget,
+    truncate: truncate,
+    truncateStart: truncateStart,
+    chunk: chunk,
+    countMessages: countMessages,
+    info: info,
+    version: '1.0.0'
+  };
+
+  return window.weld.tokens;
+

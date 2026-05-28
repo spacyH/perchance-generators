@@ -125,8 +125,8 @@ a:hover{text-decoration:underline;}
 
   <div class="status-bar" id="status-bar">
     <span class="status-dot"></span>
-    <span id="status-text">loading plugins 0 / 12</span>
-    <span class="status-progress" id="status-progress"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span>
+    <span id="status-text">loading plugins 0 / 17</span>
+    <span class="status-progress" id="status-progress"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span>
   </div>
 
   <div class="banner">
@@ -141,7 +141,7 @@ a:hover{text-decoration:underline;}
     <div class="principle"><h4>DSL-SAFE</h4><p>Every plugin is audited for Perchance's parser quirks. Drop-in compatible with any generator.</p></div>
   </div>
 
-  <div class="section-head"><h2>Available</h2><span class="count">12 plugins</span></div>
+  <div class="section-head"><h2>Available</h2><span class="count">17 plugins</span></div>
 <div class="cards" id="stable-cards">
 <div class="card" data-plugin="ui">
   <div class="card-head">
@@ -285,6 +285,66 @@ a:hover{text-decoration:underline;}
   <div class="card-links">
     <a href="https://perchance.org/weld-branching-plugin">docs &rarr;</a>
     <a href="https://perchance.org/weld-branching-example">demo &rarr;</a>
+  </div>
+</div>
+<div class="card" data-plugin="tokens">
+  <div class="card-head">
+    <span class="card-name">weld.tokens</span>
+    <span class="card-status loading"><span class="dot"></span><span class="lbl">loading</span></span>
+  </div>
+  <div class="card-tagline">Accurate token counting</div>
+  <p class="card-desc">The real DeepSeek-R1 tokenizer Perchance uses. Exact counts, truncation, chunking, message budgets. Lazy-loads on first use.</p>
+  <div class="card-links">
+    <a href="https://perchance.org/weld-tokens-plugin">docs &rarr;</a>
+    <a href="https://perchance.org/weld-tokens-example">demo &rarr;</a>
+  </div>
+</div>
+<div class="card" data-plugin="sync">
+  <div class="card-head">
+    <span class="card-name">weld.sync</span>
+    <span class="card-status loading"><span class="dot"></span><span class="lbl">loading</span></span>
+  </div>
+  <div class="card-tagline">Cross-tab sync</div>
+  <p class="card-desc">BroadcastChannel plus namespaced localStorage. Peer presence, reactive state, ephemeral pub/sub. Same-origin tabs sync instantly.</p>
+  <div class="card-links">
+    <a href="https://perchance.org/weld-sync-plugin">docs &rarr;</a>
+    <a href="https://perchance.org/weld-sync-example">demo &rarr;</a>
+  </div>
+</div>
+<div class="card" data-plugin="spamguard">
+  <div class="card-head">
+    <span class="card-name">weld.spamguard</span>
+    <span class="card-status loading"><span class="dot"></span><span class="lbl">loading</span></span>
+  </div>
+  <div class="card-tagline">Cross-channel spam guard</div>
+  <p class="card-desc">Fingerprint plus Jaccard similarity catches copy-paste spam across channels. Configurable thresholds, optional auto-ban and auto-delete.</p>
+  <div class="card-links">
+    <a href="https://perchance.org/weld-spamguard-plugin">docs &rarr;</a>
+    <a href="https://perchance.org/weld-spamguard-example">demo &rarr;</a>
+  </div>
+</div>
+<div class="card" data-plugin="image">
+  <div class="card-head">
+    <span class="card-name">weld.image</span>
+    <span class="card-status loading"><span class="dot"></span><span class="lbl">loading</span></span>
+  </div>
+  <div class="card-tagline">Image generation pipeline</div>
+  <p class="card-desc">Promise-based wrapper over text-to-image-plugin. Style presets, resolution helpers, batching, variations, retry with backoff.</p>
+  <div class="card-links">
+    <a href="https://perchance.org/weld-image-plugin">docs &rarr;</a>
+    <a href="https://perchance.org/weld-image-example">demo &rarr;</a>
+  </div>
+</div>
+<div class="card" data-plugin="gen">
+  <div class="card-head">
+    <span class="card-name">weld.gen</span>
+    <span class="card-status loading"><span class="dot"></span><span class="lbl">loading</span></span>
+  </div>
+  <div class="card-tagline">Generator introspection</div>
+  <p class="card-desc">Read DSL source, enumerate lists, search items, dynamic-import any public generator, mutate root at runtime. The developer toolkit.</p>
+  <div class="card-links">
+    <a href="https://perchance.org/weld-gen-plugin">docs &rarr;</a>
+    <a href="https://perchance.org/weld-gen-example">demo &rarr;</a>
   </div>
 </div>
 </div>
@@ -3956,9 +4016,1113 @@ return window.weld.branching;
 
 
 })();</script>
+<script>(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.tokens) return window.weld.tokens;
+
+// -----------------------------------------------------------------
+// Accurate tokenizer (DeepSeek-R1-0528) via transformers.js.
+// Same tokenizer Perchance uses for the AI broker, so counts are exact.
+// -----------------------------------------------------------------
+var tokenizerPromise = null;
+var tokenizer = null;
+var loadError = null;
+
+function load() {
+  if (tokenizerPromise) return tokenizerPromise;
+  tokenizerPromise = (function() {
+    return Promise.resolve().then(function() {
+      return import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@latest/+esm');
+    }).then(function(mod) {
+      return mod.AutoTokenizer.from_pretrained('deepseek-ai/DeepSeek-R1-0528');
+    }).then(function(t) {
+      tokenizer = t;
+      return t;
+    }).catch(function(e) {
+      loadError = e;
+      throw e;
+    });
+  })();
+  return tokenizerPromise;
+}
+
+function preload() { return load(); }
+function ready()   { return load(); }
+function isLoaded(){ return tokenizer !== null; }
+function getLoadError() { return loadError; }
+
+// Cheap fallback (~4 chars per token)
+function estimate(text) {
+  return Math.ceil(String(text || '').length / 4);
+}
+
+// Exact count (async)
+function count(text) {
+  return load().then(function(t) {
+    return t.encode(String(text)).length;
+  });
+}
+
+// Sync count -- null if not loaded yet
+function countSync(text) {
+  if (!tokenizer) return null;
+  return tokenizer.encode(String(text)).length;
+}
+
+function encode(text) {
+  return load().then(function(t) { return t.encode(String(text)); });
+}
+
+function decode(ids) {
+  return load().then(function(t) {
+    return t.decode(ids, { skip_special_tokens: true });
+  });
+}
+
+function budget(text, maxTokens) {
+  return count(text).then(function(used) {
+    return {
+      used: used,
+      max: maxTokens,
+      remaining: maxTokens - used,
+      fits: used <= maxTokens,
+      percent: Math.round((used / maxTokens) * 100)
+    };
+  });
+}
+
+// Truncate preserving the START of the text
+function truncate(text, maxTokens) {
+  return load().then(function(t) {
+    var ids = t.encode(String(text));
+    if (ids.length <= maxTokens) return String(text);
+    return t.decode(ids.slice(0, maxTokens), { skip_special_tokens: true });
+  });
+}
+
+// Truncate preserving the END of the text (useful for chat histories)
+function truncateStart(text, maxTokens) {
+  return load().then(function(t) {
+    var ids = t.encode(String(text));
+    if (ids.length <= maxTokens) return String(text);
+    return t.decode(ids.slice(-maxTokens), { skip_special_tokens: true });
+  });
+}
+
+// Split text into chunks of ~N tokens each
+function chunk(text, maxTokensPerChunk) {
+  return load().then(function(t) {
+    var ids = t.encode(String(text));
+    var chunks = [];
+    for (var i = 0; i < ids.length; i += maxTokensPerChunk) {
+      chunks.push(t.decode(ids.slice(i, i + maxTokensPerChunk), { skip_special_tokens: true }));
+    }
+    return chunks;
+  });
+}
+
+// Count tokens across an array of messages
+function countMessages(messages) {
+  var total = 0;
+  function step(i) {
+    if (i >= messages.length) return Promise.resolve(total);
+    var msg = messages[i];
+    var txt = typeof msg === 'string' ? msg : (msg.content || msg.text || '');
+    return count(txt).then(function(n) {
+      total += n + 4;
+      return step(i + 1);
+    });
+  }
+  return step(0);
+}
+
+function info() {
+  return {
+    model: 'deepseek-ai/DeepSeek-R1-0528',
+    loaded: tokenizer !== null,
+    error: loadError ? String(loadError.message || loadError) : null,
+    vocabSize: tokenizer ? tokenizer.vocab_size : null
+  };
+}
+
+window.weld.tokens = {
+  preload: preload,
+  ready: ready,
+  isLoaded: isLoaded,
+  loadError: getLoadError,
+  estimate: estimate,
+  count: count,
+  countSync: countSync,
+  encode: encode,
+  decode: decode,
+  budget: budget,
+  truncate: truncate,
+  truncateStart: truncateStart,
+  chunk: chunk,
+  countMessages: countMessages,
+  info: info,
+  version: '1.0.0'
+};
+
+return window.weld.tokens;
+
+
+})();</script>
+<script>(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.sync) return window.weld.sync;
+
+// -----------------------------------------------------------------
+// Cross-tab sync: BroadcastChannel + namespaced localStorage.
+// Same-origin tabs of the same generator see each other's updates instantly.
+// -----------------------------------------------------------------
+function uid() {
+  return Math.random().toString(36).slice(2, 10) + '_' + Date.now();
+}
+
+function createSync(opts) {
+  opts = opts || {};
+  var namespace = String(opts.namespace || (window.generatorName || 'anon')).replace(/[^a-z0-9-]/gi, '_');
+  var STORAGE_PREFIX = 'weld-sync_' + namespace + ':';
+  var CHANNEL_NAME = 'weld-sync_' + namespace + '_channel';
+  var PEER_ID = uid();
+
+  var bc = null;
+  try { bc = new BroadcastChannel(CHANNEL_NAME); } catch (e) { /* fallback below */ }
+
+  var channels = {};
+  var changeListeners = [];
+  var keyListeners = {};
+  var peers = new Set();
+  var lastPeerHeartbeat = {};
+
+  function emit(target, args) {
+    for (var i = 0; i < target.length; i++) {
+      try { target[i].apply(null, args); } catch (e) { /* swallow */ }
+    }
+  }
+
+  function handleMessage(msg) {
+    if (!msg || typeof msg !== 'object') return;
+    if (msg.peer === PEER_ID) return;
+
+    if (msg.type === 'set') {
+      emit(changeListeners, [msg.key, msg.value, 'remote']);
+      if (keyListeners[msg.key]) emit(keyListeners[msg.key], [msg.value, 'remote']);
+    } else if (msg.type === 'delete') {
+      emit(changeListeners, [msg.key, undefined, 'remote']);
+      if (keyListeners[msg.key]) emit(keyListeners[msg.key], [undefined, 'remote']);
+    } else if (msg.type === 'broadcast') {
+      if (channels[msg.channel]) emit(channels[msg.channel], [msg.data, msg.peer]);
+    } else if (msg.type === 'heartbeat') {
+      peers.add(msg.peer);
+      lastPeerHeartbeat[msg.peer] = Date.now();
+    } else if (msg.type === 'goodbye') {
+      peers.delete(msg.peer);
+      delete lastPeerHeartbeat[msg.peer];
+    }
+  }
+
+  if (bc) bc.onmessage = function(e) { handleMessage(e.data); };
+
+  // Storage event fallback
+  window.addEventListener('storage', function(e) {
+    if (!e.key || e.key.indexOf(STORAGE_PREFIX) !== 0) return;
+    var key = e.key.slice(STORAGE_PREFIX.length);
+    var value;
+    try { value = e.newValue === null ? undefined : JSON.parse(e.newValue); }
+    catch (err) { value = e.newValue; }
+    emit(changeListeners, [key, value, 'remote']);
+    if (keyListeners[key]) emit(keyListeners[key], [value, 'remote']);
+  });
+
+  function publish(msg) {
+    if (bc) {
+      try { bc.postMessage(Object.assign({ peer: PEER_ID }, msg)); }
+      catch (e) { /* channel might be closed */ }
+    }
+  }
+
+  function heartbeat() { publish({ type: 'heartbeat' }); }
+  function pruneStale() {
+    var now = Date.now();
+    var arr = Array.from(peers);
+    for (var i = 0; i < arr.length; i++) {
+      var id = arr[i];
+      if (now - (lastPeerHeartbeat[id] || 0) > 8000) {
+        peers.delete(id);
+        delete lastPeerHeartbeat[id];
+      }
+    }
+  }
+  var heartbeatTimer = setInterval(function() { heartbeat(); pruneStale(); }, 3000);
+  heartbeat();
+
+  window.addEventListener('beforeunload', function() { publish({ type: 'goodbye' }); });
+
+  // ---------- API ----------
+  var api = {};
+
+  api.set = function(key, value) {
+    try {
+      localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(value));
+      publish({ type: 'set', key: key, value: value });
+      emit(changeListeners, [key, value, 'local']);
+      if (keyListeners[key]) emit(keyListeners[key], [value, 'local']);
+      return true;
+    } catch (e) { return false; }
+  };
+
+  api.get = function(key, defaultValue) {
+    try {
+      var raw = localStorage.getItem(STORAGE_PREFIX + key);
+      if (raw === null) return defaultValue;
+      return JSON.parse(raw);
+    } catch (e) { return defaultValue; }
+  };
+
+  api.has = function(key) {
+    return localStorage.getItem(STORAGE_PREFIX + key) !== null;
+  };
+
+  api.delete = function(key) {
+    try {
+      localStorage.removeItem(STORAGE_PREFIX + key);
+      publish({ type: 'delete', key: key });
+      emit(changeListeners, [key, undefined, 'local']);
+      if (keyListeners[key]) emit(keyListeners[key], [undefined, 'local']);
+      return true;
+    } catch (e) { return false; }
+  };
+
+  api.keys = function() {
+    var out = [];
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k && k.indexOf(STORAGE_PREFIX) === 0) out.push(k.slice(STORAGE_PREFIX.length));
+    }
+    return out;
+  };
+
+  api.clear = function() {
+    var ks = api.keys();
+    for (var i = 0; i < ks.length; i++) api.delete(ks[i]);
+    return ks.length;
+  };
+
+  // Ephemeral pub/sub
+  api.broadcast = function(channel, data) {
+    publish({ type: 'broadcast', channel: channel, data: data });
+    return true;
+  };
+
+  api.subscribe = function(channel, callback) {
+    if (!channels[channel]) channels[channel] = [];
+    channels[channel].push(callback);
+    return function() {
+      var arr = channels[channel];
+      if (!arr) return;
+      var idx = arr.indexOf(callback);
+      if (idx >= 0) arr.splice(idx, 1);
+    };
+  };
+
+  api.onChange = function(callback) {
+    changeListeners.push(callback);
+    return function() {
+      var idx = changeListeners.indexOf(callback);
+      if (idx >= 0) changeListeners.splice(idx, 1);
+    };
+  };
+
+  api.onKeyChange = function(key, callback) {
+    if (!keyListeners[key]) keyListeners[key] = [];
+    keyListeners[key].push(callback);
+    return function() {
+      var arr = keyListeners[key];
+      if (!arr) return;
+      var idx = arr.indexOf(callback);
+      if (idx >= 0) arr.splice(idx, 1);
+    };
+  };
+
+  api.peers = function() { return peers.size; };
+  api.peerIds = function() { return Array.from(peers); };
+  api.myId = function() { return PEER_ID; };
+
+  // Reactive state primitive
+  api.state = function(key, defaultValue) {
+    if (!api.has(key) && defaultValue !== undefined) {
+      api.set(key, defaultValue);
+    }
+    var subs = [];
+    var unsub = api.onKeyChange(key, function(value, source) {
+      for (var i = 0; i < subs.length; i++) {
+        try { subs[i](value, source); } catch (e) {}
+      }
+    });
+    return {
+      get: function() { return api.get(key, defaultValue); },
+      set: function(v) { return api.set(key, v); },
+      onChange: function(fn) {
+        subs.push(fn);
+        return function() { var i = subs.indexOf(fn); if (i >= 0) subs.splice(i, 1); };
+      },
+      destroy: unsub
+    };
+  };
+
+  api.info = function() {
+    return {
+      namespace: namespace,
+      storagePrefix: STORAGE_PREFIX,
+      broadcastChannel: CHANNEL_NAME,
+      broadcastSupported: bc !== null,
+      peerId: PEER_ID,
+      peerCount: peers.size,
+      storedKeys: api.keys().length
+    };
+  };
+
+  api.destroy = function() {
+    clearInterval(heartbeatTimer);
+    publish({ type: 'goodbye' });
+    if (bc) try { bc.close(); } catch (e) {}
+  };
+
+  return api;
+}
+
+window.weld.sync = {
+  create: createSync,
+  version: '1.0.0'
+};
+
+return window.weld.sync;
+
+
+})();</script>
+<script>(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.spamguard) return window.weld.spamguard;
+
+// -----------------------------------------------------------------
+// Multi-channel chat spam guard.
+// Detects copy-paste spam across channels using:
+//   1. Normalised text fingerprint (lowercase, NFKD, emoji + punct stripped,
+//      char-repeat dampened, whitespace collapsed)
+//   2. Token-set Jaccard similarity for near-identical messages
+// Cross-channel threshold + sliding time window controls ban trigger.
+// -----------------------------------------------------------------
+
+function fingerprint(text) {
+  if (typeof text !== 'string') return '';
+  return text
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/(.)\1{2,}/g, '$1$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Jaccard similarity on word-token sets, 0 (disjoint) to 1 (identical)
+function jaccard(a, b) {
+  if (a === b) return 1;
+  if (!a || !b) return 0;
+  var A = new Set(a.split(' '));
+  var B = new Set(b.split(' '));
+  var inter = 0;
+  var itr = A.values();
+  var step;
+  while (!(step = itr.next()).done) {
+    if (B.has(step.value)) inter++;
+  }
+  var union = A.size + B.size - inter;
+  return union === 0 ? 0 : inter / union;
+}
+
+function similarEnough(a, b, threshold) {
+  if (a === b) return true;
+  return jaccard(a, b) >= threshold;
+}
+
+function createGuard(opts) {
+  opts = opts || {};
+  var DEFAULTS = {
+    channelThreshold: 3,
+    windowMs: 60000,
+    similarityThreshold: 0.92,
+    minMessageLength: 5,
+    maxHistoryPerUser: 50,
+    autoBan: true,
+    autoDelete: true,
+    banDurationMs: 0,
+    whitelistUserIds: [],
+    banFn: null,
+    deleteFn: null,
+    onSpamDetected: null,
+    onBan: null
+  };
+  var merged = Object.assign({}, DEFAULTS, opts);
+
+  var history = new Map();   // userId -> array of message records
+  var banned  = new Map();   // userId -> ban record (reason / bannedAt / expiresAt)
+  var stats   = { tracked: 0, banned: 0, totalReports: 0, totalBans: 0, totalDeletes: 0 };
+
+  function pruneOld(userId, now) {
+    var arr = history.get(userId);
+    if (!arr) return;
+    var cutoff = now - merged.windowMs;
+    var i = 0;
+    while (i < arr.length && arr[i].timestamp < cutoff) i++;
+    if (i > 0) arr.splice(0, i);
+    if (arr.length > merged.maxHistoryPerUser) {
+      arr.splice(0, arr.length - merged.maxHistoryPerUser);
+    }
+  }
+
+  function checkBanExpiry(userId, now) {
+    var b = banned.get(userId);
+    if (b && b.expiresAt && b.expiresAt <= now) {
+      banned.delete(userId);
+      return false;
+    }
+    return !!b;
+  }
+
+  function classify(userId, fp, now) {
+    var arr = history.get(userId) || [];
+    var matchedByChannel = new Map();
+    for (var i = 0; i < arr.length; i++) {
+      var m = arr[i];
+      if (similarEnough(m.fp, fp, merged.similarityThreshold)) {
+        if (!matchedByChannel.has(m.channel)) matchedByChannel.set(m.channel, m);
+      }
+    }
+    if (matchedByChannel.size >= merged.channelThreshold) {
+      var matches = Array.from(matchedByChannel.values());
+      return {
+        fingerprint: fp,
+        channels: Array.from(matchedByChannel.keys()),
+        messages: matches,
+        firstSeen: Math.min.apply(null, matches.map(function(m) { return m.timestamp; })),
+        lastSeen: now
+      };
+    }
+    return null;
+  }
+
+  // -------- PUBLIC: report a new message --------
+  function report(input) {
+    return Promise.resolve().then(function() {
+      stats.totalReports++;
+      if (!input || !input.userId || !input.channel) {
+        return { ok: false, reason: 'missing userId or channel' };
+      }
+      var channel = input.channel;
+      var userId = input.userId;
+      var messageId = input.messageId;
+      var text = input.text;
+
+      if (merged.whitelistUserIds.indexOf(userId) !== -1) {
+        return { ok: true, whitelisted: true };
+      }
+
+      var now = input.timestamp || Date.now();
+      if (checkBanExpiry(userId, now)) {
+        return { ok: false, banned: true };
+      }
+
+      if (typeof text !== 'string' || text.length < merged.minMessageLength) {
+        return { ok: true };
+      }
+      var fp = fingerprint(text);
+      if (!fp) return { ok: true };
+
+      pruneOld(userId, now);
+      if (!history.has(userId)) history.set(userId, []);
+      var arr = history.get(userId);
+      arr.push({ channel: channel, fp: fp, text: text, messageId: messageId, timestamp: now });
+      stats.tracked = history.size;
+
+      var spam = classify(userId, fp, now);
+      if (!spam) return { ok: true };
+
+      // Include the triggering message itself
+      var alreadyHas = false;
+      for (var i = 0; i < spam.messages.length; i++) {
+        if (spam.messages[i].channel === channel) { alreadyHas = true; break; }
+      }
+      if (!alreadyHas) {
+        spam.channels.push(channel);
+        spam.messages.push({ channel: channel, fp: fp, text: text, messageId: messageId, timestamp: now });
+      }
+
+      var verdict = Promise.resolve(true);
+      if (typeof merged.onSpamDetected === 'function') {
+        verdict = Promise.resolve(merged.onSpamDetected(spam));
+      }
+
+      return verdict.then(function(v) {
+        if (v === false) return { ok: true, vetoed: true, spam: spam };
+
+        var actions = Promise.resolve();
+        if (merged.autoBan) {
+          var expiresAt = merged.banDurationMs > 0 ? now + merged.banDurationMs : null;
+          banned.set(userId, { reason: 'cross-channel-spam', bannedAt: now, expiresAt: expiresAt });
+          stats.banned++;
+          stats.totalBans++;
+          if (typeof merged.banFn === 'function') {
+            actions = actions.then(function() {
+              return Promise.resolve(merged.banFn(userId, { reason: 'cross-channel-spam', spam: spam }))
+                .catch(function(e) { console.error('[weld.spamguard] banFn threw:', e); });
+            });
+          }
+          if (typeof merged.onBan === 'function') {
+            actions = actions.then(function() {
+              return Promise.resolve(merged.onBan(userId, { reason: 'cross-channel-spam', spam: spam }))
+                .catch(function() {});
+            });
+          }
+        }
+
+        if (merged.autoDelete && typeof merged.deleteFn === 'function') {
+          spam.messages.forEach(function(m) {
+            actions = actions.then(function() {
+              return Promise.resolve(merged.deleteFn(m.messageId, m.channel))
+                .then(function() { stats.totalDeletes++; })
+                .catch(function(e) { console.error('[weld.spamguard] deleteFn threw:', e, m); });
+            });
+          });
+        }
+
+        return actions.then(function() {
+          history.delete(userId);
+          return { ok: false, banned: true, spam: spam };
+        });
+      });
+    });
+  }
+
+  function ban(userId, reason) {
+    banned.set(userId, { reason: reason || 'manual', bannedAt: Date.now(), expiresAt: null });
+    stats.banned++;
+    stats.totalBans++;
+  }
+
+  function unban(userId) {
+    if (banned.delete(userId)) stats.banned = Math.max(0, stats.banned - 1);
+  }
+
+  function isBanned(userId) {
+    return checkBanExpiry(userId, Date.now());
+  }
+
+  function bannedUsers() {
+    var now = Date.now();
+    return Array.from(banned.keys()).filter(function(id) { return checkBanExpiry(id, now); });
+  }
+
+  function getHistory(userId) {
+    return (history.get(userId) || []).slice();
+  }
+
+  function flush() {
+    history.clear();
+    stats.tracked = 0;
+  }
+
+  function getStats() {
+    return Object.assign({}, stats, {
+      tracked: history.size,
+      banned: bannedUsers().length
+    });
+  }
+
+  return {
+    report: report,
+    ban: ban,
+    unban: unban,
+    isBanned: isBanned,
+    bannedUsers: bannedUsers,
+    history: getHistory,
+    flush: flush,
+    options: merged,
+    stats: getStats,
+    fingerprint: fingerprint,
+    jaccard: jaccard
+  };
+}
+
+window.weld.spamguard = {
+  create: createGuard,
+  fingerprint: fingerprint,
+  jaccard: jaccard,
+  version: '1.0.0'
+};
+
+return window.weld.spamguard;
+
+
+})();</script>
+<script>(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+
+// -----------------------------------------------------------------
+// weld.image: Promise-based wrapper around Perchance's text-to-image-plugin.
+// Adds batching, style presets, retry, resolution helpers.
+//
+// The actual t2i function comes from Perchance's text-to-image-plugin,
+// which must be imported in the DSL panel:
+//   image = {import:text-to-image-plugin}
+// Standalone JS callers must call weld.image.setT2i(fn) themselves.
+// -----------------------------------------------------------------
+
+var t2iFn = null;
+
+// Resolution presets
+var RESOLUTIONS = {
+  square:      '512x512',
+  portrait:    '512x768',
+  landscape:   '768x512',
+  largeSquare: '768x768'
+};
+
+// Positive-only style presets (Perchance backend ignores negatives)
+var STYLES = {
+  photo:      ', photorealistic, sharp focus, detailed, 8k, professional photography',
+  cinematic:  ', cinematic shot, dramatic lighting, depth of field, film grain, atmospheric',
+  anime:      ', anime style, cel shaded, vibrant, detailed line art',
+  painting:   ', oil painting, classical art, brush strokes, painterly, masterpiece',
+  digital:    ', digital art, concept art, trending on artstation, highly detailed',
+  watercolor: ', watercolor painting, soft edges, paper texture, flowing colors',
+  sketch:     ', pencil sketch, hand drawn, graphite, shading, detailed lines',
+  lowpoly:    ', low poly 3d render, geometric, isometric, minimalist',
+  pixelart:   ', pixel art, 16-bit style, retro game graphics, pixelated',
+  cyberpunk:  ', cyberpunk, neon lights, futuristic, blade runner aesthetic, rain'
+};
+
+function setT2i(fn) {
+  t2iFn = fn;
+}
+
+function getT2i() {
+  if (!t2iFn) {
+  }
+  return t2iFn;
+}
+
+function styleNames() { return Object.keys(STYLES); }
+function resolutionNames() { return Object.keys(RESOLUTIONS); }
+
+function withStyle(prompt, styleName) {
+  var suffix = STYLES[styleName] || '';
+  return String(prompt) + suffix;
+}
+
+function withResolution(opts, resName) {
+  var res = RESOLUTIONS[resName];
+  if (!res) return Object.assign({}, opts);
+  var parts = res.split('x');
+  return Object.assign({}, opts, { width: parseInt(parts[0], 10), height: parseInt(parts[1], 10) });
+}
+
+// Synchronous embed -- returns the iframe HTML for direct insertion
+function embed(opts) {
+  return String(getT2i()(opts));
+}
+
+// Async single generation -- resolves with the result data
+function generate(opts) {
+  return new Promise(function(resolve, reject) {
+    var settled = false;
+    var fn = getT2i();
+    var enriched = Object.assign({}, opts, {
+      onFinish: function(data) {
+        if (settled) return;
+        settled = true;
+        resolve(data);
+      }
+    });
+    var html;
+    try {
+      html = String(fn(enriched));
+    } catch (e) {
+      reject(e);
+      return;
+    }
+
+    try {
+      if (opts && opts.into) {
+        var target = typeof opts.into === 'string' ? document.querySelector(opts.into) : opts.into;
+        if (target) target.innerHTML = html;
+      }
+    } catch (e) { /* ignore */ }
+
+    var ms = (opts && opts.timeoutMs) || 120000;
+    setTimeout(function() {
+      if (!settled) {
+        settled = true;
+        reject(new Error('weld.image: generation timeout after ' + ms + 'ms'));
+      }
+    }, ms);
+  });
+}
+
+// Generate N images sequentially with the same prompt (variation via seed)
+function batch(opts, count, onProgress) {
+  return new Promise(function(resolve) {
+    var results = [];
+    var i = 0;
+    function step() {
+      if (i >= count) { resolve(results); return; }
+      var cellOpts = Object.assign({}, opts);
+      if (cellOpts.seed === undefined || cellOpts.seed === -1) {
+        cellOpts.seed = Math.floor(Math.random() * 1000000);
+      } else if (i > 0) {
+        cellOpts.seed = opts.seed + i;
+      }
+      generate(cellOpts).then(function(data) {
+        results.push(data);
+        if (onProgress) onProgress(i + 1, count, data);
+        i++;
+        step();
+      }).catch(function(e) {
+        results.push({ error: e.message });
+        if (onProgress) onProgress(i + 1, count, { error: e.message });
+        i++;
+        step();
+      });
+    }
+    step();
+  });
+}
+
+// Variations: same opts but different prompts
+function variations(prompts, sharedOpts, onProgress) {
+  return new Promise(function(resolve) {
+    var results = [];
+    var i = 0;
+    function step() {
+      if (i >= prompts.length) { resolve(results); return; }
+      var cellOpts = Object.assign({}, sharedOpts, { prompt: prompts[i] });
+      generate(cellOpts).then(function(data) {
+        results.push(data);
+        if (onProgress) onProgress(i + 1, prompts.length, data);
+        i++;
+        step();
+      }).catch(function(e) {
+        results.push({ error: e.message, prompt: prompts[i] });
+        if (onProgress) onProgress(i + 1, prompts.length, { error: e.message });
+        i++;
+        step();
+      });
+    }
+    step();
+  });
+}
+
+// Auto-retry on failure with exponential backoff
+function generateWithRetry(opts, maxRetries) {
+  maxRetries = maxRetries || 3;
+  return new Promise(function(resolve, reject) {
+    var attempt = 0;
+    var lastError = null;
+    function tryOnce() {
+      generate(opts).then(resolve).catch(function(e) {
+        lastError = e;
+        attempt++;
+        if (attempt >= maxRetries) { reject(lastError); return; }
+        var backoff = 1000 * Math.pow(2, attempt - 1);
+        setTimeout(tryOnce, backoff);
+      });
+    }
+    tryOnce();
+  });
+}
+
+window.weld.image = {
+  setT2i: setT2i,
+  withStyle: withStyle,
+  withResolution: withResolution,
+  styleNames: styleNames,
+  resolutionNames: resolutionNames,
+  styles: STYLES,
+  resolutions: RESOLUTIONS,
+  embed: embed,
+  generate: generate,
+  batch: batch,
+  variations: variations,
+  generateWithRetry: generateWithRetry,
+  version: '1.0.0'
+};
+
+
+return window.weld.image;
+
+
+})();</script>
+<script>(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+
+// -----------------------------------------------------------------
+// weld.gen: Generator introspection, dynamic import, runtime mutation.
+// Provides three capability groups:
+//   1. Self-inspection: read this generator's DSL source, lists, meta
+//   2. Remote loading: fetch / parse / inspect other public generators
+//   3. Runtime mutation: read/write root.* properties
+// Two dependencies must be imported in the DSL panel for full functionality:
+//   dynamicImport = {import:dynamic-import-plugin}
+//   superFetch    = {import:super-fetch-plugin}
+// The DSL form passes those in via weld.gen.attach -- see docs for keys.
+// Without them, only self-inspection works.
+// -----------------------------------------------------------------
+
+var deps = {
+  dynamicImport: null,
+  superFetch: null
+};
+
+function attach(d) {
+  if (d && d.dynamicImport) deps.dynamicImport = d.dynamicImport;
+  if (d && d.superFetch) deps.superFetch = d.superFetch;
+}
+
+function _safe(fn, fallback) {
+  try { return fn(); } catch (e) { return fallback; }
+}
+
+// -------- SELF-INSPECTION --------
+
+function source() {
+  return _safe(function() {
+    var r = window.root;
+    return (r && r.$perchanceCode) || '';
+  }, '');
+}
+
+function meta() {
+  return _safe(function() {
+    var r = window.root;
+    return (r && r.$meta) || null;
+  }, null);
+}
+
+function moduleName() {
+  return _safe(function() {
+    var r = window.root;
+    return (r && r.$moduleName) || window.generatorName || '';
+  }, '');
+}
+
+function children() {
+  return _safe(function() {
+    var r = window.root;
+    return (r && r.$children) || {};
+  }, {});
+}
+
+function lists() {
+  var result = {};
+  _safe(function() {
+    var ch = children();
+    if (!ch) return;
+    var keys;
+    try { keys = Object.keys(ch); } catch (e) { keys = []; }
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (k.charAt(0) === '$') continue;
+      var node = ch[k];
+      var info = { name: k, type: typeof node };
+      try {
+        if (node && typeof node === 'object') {
+          if (node.getLength !== undefined) info.length = node.getLength;
+          if (node.getChildNames) info.childNames = node.getChildNames;
+          if (node.getPropertyNames) info.propertyNames = node.getPropertyNames;
+          if (node.getFunctionNames) info.functionNames = node.getFunctionNames;
+          if (node.rawText !== undefined) info.rawText = node.rawText;
+        }
+      } catch (e) { /* swallow */ }
+      result[k] = info;
+    }
+  });
+  return result;
+}
+
+// Search items within lists by keyword (case-insensitive substring)
+function search(listName, query) {
+  var hits = [];
+  var ch = children();
+  if (!ch || !query) return hits;
+  var q = String(query).toLowerCase();
+  var keys = listName ? [listName] : Object.keys(ch);
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    if (k.charAt(0) === '$') continue;
+    var node = ch[k];
+    if (!node || typeof node.getLength !== 'number') continue;
+    var len = node.getLength;
+    for (var j = 0; j < len; j++) {
+      try {
+        var item = node[j];
+        var s = String(item == null ? '' : (item.rawText || item.toString()));
+        if (s.toLowerCase().indexOf(q) !== -1) {
+          hits.push({ list: k, index: j, item: s });
+        }
+      } catch (e) { /* swallow */ }
+    }
+  }
+  return hits;
+}
+
+// -------- REMOTE LOADING --------
+
+function load(name) {
+  if (!deps.dynamicImport) {
+    return Promise.reject(new Error('weld.gen: dynamicImport not attached. Pass it via weld.gen.attach({dynamicImport}).'));
+  }
+  return Promise.resolve(deps.dynamicImport(String(name)));
+}
+
+function exists(name) {
+  if (!deps.superFetch) {
+    return Promise.reject(new Error('weld.gen: superFetch not attached.'));
+  }
+  var url = 'https://perchance.org/api/checkIfGeneratorExists?generatorName=' + encodeURIComponent(String(name));
+  return Promise.resolve(deps.superFetch(url)).then(function(r) {
+    try {
+      var data = typeof r === 'string' ? JSON.parse(r) : r;
+      return !!(data && (data.exists || data === true));
+    } catch (e) { return false; }
+  });
+}
+
+function sourceOf(name) {
+  if (!deps.superFetch) {
+    return Promise.reject(new Error('weld.gen: superFetch not attached.'));
+  }
+  var url = 'https://perchance.org/api/downloadGenerator?generatorName=' + encodeURIComponent(String(name)) + '&listsOnly=true';
+  return Promise.resolve(deps.superFetch(url)).then(function(r) { return String(r || ''); });
+}
+
+function inspect(name) {
+  var info = {
+    name: String(name),
+    type: null,
+    arity: null,
+    source: '',
+    lists: {},
+    functions: [],
+    imports: [],
+    loadError: null
+  };
+
+  return sourceOf(name).then(function(src) {
+    info.source = src;
+    // Extract imports from DSL source
+    var importRe = /(\w+)\s*=\s*\{\s*import\s*:\s*([^}]+)\}/g;
+    var m;
+    while ((m = importRe.exec(src)) !== null) {
+      info.imports.push(String(m[2]).trim());
+    }
+    return load(name).catch(function(e) {
+      info.loadError = String(e && e.message || e);
+      return null;
+    });
+  }).then(function(result) {
+    if (result == null) return info;
+    info.type = typeof result;
+    if (typeof result === 'function') {
+      info.arity = result.length;
+    } else if (typeof result === 'object') {
+      var keys;
+      try { keys = Object.keys(result); } catch (e) { keys = []; }
+      for (var i = 0; i < keys.length; i++) {
+        var k = keys[i];
+        if (k.charAt(0) === '$') continue;
+        var node = result[k];
+        if (node && typeof node === 'object' && node.getLength !== undefined) {
+          info.lists[k] = { length: node.getLength };
+        } else if (typeof node === 'function') {
+          info.functions.push(k);
+        }
+      }
+    }
+    return info;
+  });
+}
+
+// -------- RUNTIME MUTATION --------
+
+function setProp(name, value) {
+  _safe(function() {
+    if (window.root) window.root[name] = value;
+  });
+  return value;
+}
+
+function getProp(name) {
+  return _safe(function() {
+    return window.root ? window.root[name] : undefined;
+  });
+}
+
+function delProp(name) {
+  return _safe(function() {
+    if (window.root && (name in window.root)) {
+      delete window.root[name];
+      return true;
+    }
+    return false;
+  }, false);
+}
+
+function hasProp(name) {
+  return _safe(function() {
+    return !!(window.root && (name in window.root));
+  }, false);
+}
+
+window.weld.gen = {
+  attach: attach,
+  source: source,
+  meta: meta,
+  moduleName: moduleName,
+  children: children,
+  lists: lists,
+  search: search,
+  load: load,
+  exists: exists,
+  sourceOf: sourceOf,
+  inspect: inspect,
+  set: setProp,
+  get: getProp,
+  del: delProp,
+  has: hasProp,
+  version: '1.0.0'
+};
+
+
+return window.weld.gen;
+
+
+})();</script>
 <script>
 (function(){
-  var snippet = 'output\n  weldUi        = \{import:weld-ui-plugin\}\n  weldMigrate   = \{import:weld-migrate-plugin\}\n  weldBackup    = \{import:weld-backup-plugin\}\n  weldDiag      = \{import:weld-diag-plugin\}\n  weldQuota     = \{import:weld-quota-plugin\}\n  weldUndo      = \{import:weld-undo-plugin\}\n  weldSettings  = \{import:weld-settings-plugin\}\n  weldToast     = \{import:weld-toast-plugin\}\n  weldMarkdown  = \{import:weld-markdown-plugin\}\n  weldChatui    = \{import:weld-chatui-plugin\}\n  weldLorebook  = \{import:weld-lorebook-plugin\}\n  weldBranching = \{import:weld-branching-plugin\}';
+  var snippet = 'output\n  weldUi        = \{import:weld-ui-plugin\}\n  weldMigrate   = \{import:weld-migrate-plugin\}\n  weldBackup    = \{import:weld-backup-plugin\}\n  weldDiag      = \{import:weld-diag-plugin\}\n  weldQuota     = \{import:weld-quota-plugin\}\n  weldUndo      = \{import:weld-undo-plugin\}\n  weldSettings  = \{import:weld-settings-plugin\}\n  weldToast     = \{import:weld-toast-plugin\}\n  weldMarkdown  = \{import:weld-markdown-plugin\}\n  weldChatui    = \{import:weld-chatui-plugin\}\n  weldLorebook  = \{import:weld-lorebook-plugin\}\n  weldBranching = \{import:weld-branching-plugin\}\n  weldTokens    = \{import:weld-tokens-plugin\}\n  weldSync      = \{import:weld-sync-plugin\}\n  weldSpamguard = \{import:weld-spamguard-plugin\}\n  weldImage     = \{import:weld-image-plugin\}\n  weldGen       = \{import:weld-gen-plugin\}';
   function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   function fill(){
     var el = document.querySelector('[data-codeid="install"]');
@@ -3971,8 +5135,8 @@ return window.weld.branching;
 </script>
 <script>
 (function(){
-  var REQUIRED = ['ui', 'migrate', 'backup', 'diag', 'quota', 'undo', 'settings', 'toast', 'markdown', 'chatui', 'lorebook', 'branching'];
-  var readyState = { ui: false, migrate: false, backup: false, diag: false, quota: false, undo: false, settings: false, toast: false, markdown: false, chatui: false, lorebook: false, branching: false };
+  var REQUIRED = ['ui', 'migrate', 'backup', 'diag', 'quota', 'undo', 'settings', 'toast', 'markdown', 'chatui', 'lorebook', 'branching', 'tokens', 'sync', 'spamguard', 'image', 'gen'];
+  var readyState = { ui: false, migrate: false, backup: false, diag: false, quota: false, undo: false, settings: false, toast: false, markdown: false, chatui: false, lorebook: false, branching: false, tokens: false, sync: false, spamguard: false, image: false, gen: false };
 
   function triggerImports(){
     try { if (typeof root !== 'undefined' && typeof root.weldUi       === 'function') root.weldUi(); } catch(e){}
@@ -3987,6 +5151,22 @@ return window.weld.branching;
     try { if (typeof root !== 'undefined' && typeof root.weldChatui   === 'function') root.weldChatui(); } catch(e){}
     try { if (typeof root !== 'undefined' && typeof root.weldLorebook === 'function') root.weldLorebook(); } catch(e){}
     try { if (typeof root !== 'undefined' && typeof root.weldBranching === 'function') root.weldBranching(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldTokens   === 'function') root.weldTokens(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldSync     === 'function') root.weldSync(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldSpamguard === 'function') root.weldSpamguard(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldImage    === 'function') root.weldImage(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldGen      === 'function') root.weldGen(); } catch(e){}
+    // Wire image + gen optional Perchance deps from the index DSL imports, if present.
+    try {
+      if (window.weld && window.weld.image && typeof root !== 'undefined' && typeof root.imageT2i === 'function') {
+        window.weld.image.setT2i(root.imageT2i);
+      }
+    } catch(e){}
+    try {
+      if (window.weld && window.weld.gen && typeof root !== 'undefined') {
+        window.weld.gen.attach({ dynamicImport: root.dynamicImport, superFetch: root.superFetch });
+      }
+    } catch(e){}
   }
 
   function setReady(name){
