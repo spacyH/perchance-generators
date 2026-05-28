@@ -1,0 +1,398 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+.footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--border);
+  color:var(--muted);font-size:12px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+
+.footer-social{text-align:center;font-family:var(--mono);max-width:720px;margin:48px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer-social span,.footer-social a{color:var(--muted);}
+.footer-social a{margin:0 2px;}
+.footer-social a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.image<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-image-example">demo &rarr;</a></span></div>  <div class="hdr">
+    <div class="hdr-row">
+      <h1>weld.image</h1>
+      <span class="ver">v1.0.0</span>
+    </div>
+    <p class="lead">Promise-based text-to-image: styles, batching, retry. A thin wrapper around Perchance's text-to-image-plugin with the ergonomics you actually want.</p>
+  </div>
+  <h2>Overview</h2>
+<p>weld.image wraps Perchance's <code>text-to-image-plugin</code> with the things you want when actually using it: Promise-based generation (instead of callback-based), batched runs with progress callbacks, ten style presets, four resolution presets, automatic retry with exponential backoff, and an <code>into</code> shortcut for direct DOM insertion.</p>
+<p>The underlying generator is unchanged -- Perchance's backend ignores negative prompts, so the style presets are positive-only suffixes that nudge the model toward a specific aesthetic.</p>
+<h2>Quick start</h2>
+<p>In your lists editor, weld.image needs the text-to-image-plugin imported alongside it. The plugin auto-wires them together:</p>
+<pre data-codeid="code1"></pre>
+
+<p>The plugin's own DSL already imports text-to-image-plugin (under the alias <code>t2iSource</code>) and calls <code>weld.image.setT2i(t2iSource)</code> after the IIFE runs, so by the time <code>root.weldImage()</code> returns, generation is wired up.</p>
+
+<p>Generate one image:</p>
+<pre data-codeid="code2"></pre>
+
+<p>Apply a style preset:</p>
+<pre data-codeid="code3"></pre>
+<h2>Single generation</h2><h3>weld.image.generate(opts)</h3>
+<div class="sig" data-codeid="sig4"></div>
+<p>Wraps the text-to-image plugin in a Promise. Resolves with the result data (typically <code>\{imageId, prompt, seed\}</code>) when generation finishes, or rejects on timeout.</p>
+<p>Options are passed straight through to the underlying plugin, plus three weld-specific ones:</p>
+<ul>
+<li><code>into</code>: CSS selector or element. The generated iframe is inserted there automatically.</li>
+<li><code>timeoutMs</code>: how long to wait before rejecting. Default 120 seconds.</li>
+<li><code>onFinish</code>: optional callback fired in parallel with the Promise resolution.</li>
+</ul>
+<h3>weld.image.embed(opts)</h3>
+<div class="sig" data-codeid="sig5"></div>
+<p>Synchronous version that returns the iframe HTML for you to insert manually. Useful when you want to position multiple images precisely or batch insertion into a list.</p>
+<pre data-codeid="code6"></pre>
+<h2>Styles and resolutions</h2><h3>weld.image.withStyle(prompt, styleName)</h3>
+<p>Append a positive-only style suffix to a prompt. The ten built-in styles:</p>
+<ul>
+<li><code>photo</code> -- photorealistic, sharp focus, detailed, 8k</li>
+<li><code>cinematic</code> -- cinematic shot, dramatic lighting, depth of field</li>
+<li><code>anime</code> -- anime style, cel shaded, vibrant</li>
+<li><code>painting</code> -- oil painting, classical art, painterly</li>
+<li><code>digital</code> -- digital art, concept art, trending on artstation</li>
+<li><code>watercolor</code> -- watercolor painting, soft edges, paper texture</li>
+<li><code>sketch</code> -- pencil sketch, hand drawn, graphite</li>
+<li><code>lowpoly</code> -- low poly 3d render, geometric, isometric</li>
+<li><code>pixelart</code> -- pixel art, 16-bit style, retro game graphics</li>
+<li><code>cyberpunk</code> -- cyberpunk, neon lights, futuristic</li>
+</ul>
+<p>You can also access the raw style strings via <code>weld.image.styles[name]</code> if you want to inspect or modify them.</p>
+<h3>weld.image.withResolution(opts, resName)</h3>
+<div class="sig" data-codeid="sig7"></div>
+<p>Add <code>width</code> and <code>height</code> to an options object. Four built-ins: <code>square</code> (512x512), <code>portrait</code> (512x768), <code>landscape</code> (768x512), <code>largeSquare</code> (768x768).</p>
+<pre data-codeid="code8"></pre>
+<h2>Batch generation</h2><h3>weld.image.batch(opts, count, onProgress?)</h3>
+<div class="sig" data-codeid="sig9"></div>
+<p>Run the same prompt N times with auto-incrementing seeds. Returns an array of result data (or <code>\{error\}</code> entries for failed cells).</p>
+<pre data-codeid="code10"></pre>
+<p>If <code>opts.seed</code> is omitted or set to <code>-1</code>, each cell gets a random seed instead.</p>
+<h3>weld.image.variations(prompts, sharedOpts, onProgress?)</h3>
+<div class="sig" data-codeid="sig11"></div>
+<p>Generate one image per prompt, sharing the rest of the options. Useful for character sheets, scene variations, or A/B prompts.</p>
+<pre data-codeid="code12"></pre>
+<h2>Retry on failure</h2>
+<div class="sig" data-codeid="sig13"></div>
+<p>Wraps <code>generate</code> with exponential backoff. First retry after 1s, then 2s, 4s, etc. Default <code>maxRetries</code> is 3.</p>
+<pre data-codeid="code14"></pre>
+<h2>Wiring it manually</h2>
+<p>If you're using weld.image from a custom JS context (not via the standard plugin DSL), the text-to-image function isn't auto-wired. Call <code>setT2i</code> once, passing in your t2i function:</p>
+<pre data-codeid="code15"></pre>
+<p>The standard DSL form does this automatically -- you only need <code>setT2i</code> if you're loading weld.image's source directly (e.g. through a script tag) without going through the DSL <code>$output</code> closure.</p>
+<h2>Negative prompts</h2><div class="note">
+Perchance's text-to-image backend silently ignores the <code>negativePrompt</code> option, so weld.image doesn't include negative styling in its presets. If you need to suppress something, work it into the positive prompt explicitly (e.g. <em>"daylight scene, blue sky"</em> instead of <em>negativePrompt: "night"</em>).
+</div>
+  <div class="footer">Part of the <a href="https://perchance.org/weld-ui-index">weld plugin suite</a>. Stashed at <code>window.weld.image</code>. This page loads the plugin so you can inspect it in DevTools.</div>
+</div>
+<script>
+(function(){
+  var examples = {
+  'code1': 'output\n  weld-image = \{import:weld-image-plugin\}',
+  'code2': 'root.weldImage();   // trigger $output\n\nconst data = await weld.image.generate(\{\n  prompt: \'A castle at sunset\',\n  into: \'#image-host\'   // optional: inject the iframe into this element\n\});\nconsole.log(data.imageId, data.seed);',
+  'code3': 'const prompt = weld.image.withStyle(\'A castle at sunset\', \'cinematic\');\n// "A castle at sunset, cinematic shot, dramatic lighting, ..."\n\nconst data = await weld.image.generate(\{ prompt, into: \'#image-host\' \});',
+  'sig4': 'weld.image.generate(opts)  ->  Promise<data>',
+  'sig5': 'weld.image.embed(opts)  ->  string  (iframe HTML)',
+  'code6': 'const html = weld.image.embed(\{ prompt: \'A red car\', seed: 42 \});\ndocument.getElementById(\'host\').innerHTML = html;',
+  'sig7': 'weld.image.withResolution(opts, resName)  ->  newOpts',
+  'code8': 'const opts = weld.image.withResolution(\{ prompt: \'A river\' \}, \'landscape\');\n// \{ prompt: \'A river\', width: 768, height: 512 \}',
+  'sig9': 'weld.image.batch(opts, count, onProgress?)  ->  Promise<data\[\]>',
+  'code10': 'const results = await weld.image.batch(\n  \{ prompt: \'A dragon\', seed: 100 \},\n  4,\n  (i, total, data) => console.log(`done $\{\{i\}\}/$\{\{total\}\}`)\n);\n// results\[0\].seed === 100\n// results\[1\].seed === 101\n// results\[2\].seed === 102\n// results\[3\].seed === 103',
+  'sig11': 'weld.image.variations(prompts, sharedOpts, onProgress?)  ->  Promise<data\[\]>',
+  'code12': 'const results = await weld.image.variations(\n  \[\'Knight in armor\', \'Knight casting a spell\', \'Knight in a tavern\'\],\n  \{ width: 512, height: 768, seed: 42 \}\n);',
+  'sig13': 'weld.image.generateWithRetry(opts, maxRetries?)  ->  Promise<data>',
+  'code14': 'try \{\n  const data = await weld.image.generateWithRetry(\n    \{ prompt: \'A volcano\' \},\n    5\n  );\n\} catch (lastError) \{\n  console.error(\'All 5 attempts failed:\', lastError);\n\}',
+  'code15': '// In a generator that imports text-to-image-plugin under a different name:\nimager = \{import:text-to-image-plugin\}\n\n// In HTML JS:\nweld.image.setT2i(root.imager);'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    var nodes = document.querySelectorAll('[data-codeid]');
+    nodes.forEach(function(n){
+      var id = n.getAttribute('data-codeid');
+      var src = examples[id];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.image) return; // already loaded
+
+// -----------------------------------------------------------------
+// weld.image: Promise-based wrapper around Perchance's text-to-image-plugin.
+// Adds batching, style presets, retry, resolution helpers.
+//
+// The actual t2i function comes from Perchance's text-to-image-plugin,
+// which must be imported in the DSL panel under any alias, e.g.:
+//   t2iSource = the import of text-to-image-plugin
+// The DSL form passes that function into weld.image.setT2i(...).
+// Standalone JS callers must call weld.image.setT2i(fn) themselves.
+// -----------------------------------------------------------------
+
+var t2iFn = null;
+
+// Resolution presets
+var RESOLUTIONS = {
+  square:      '512x512',
+  portrait:    '512x768',
+  landscape:   '768x512',
+  largeSquare: '768x768'
+};
+
+// Positive-only style presets (Perchance backend ignores negatives)
+var STYLES = {
+  photo:      ', photorealistic, sharp focus, detailed, 8k, professional photography',
+  cinematic:  ', cinematic shot, dramatic lighting, depth of field, film grain, atmospheric',
+  anime:      ', anime style, cel shaded, vibrant, detailed line art',
+  painting:   ', oil painting, classical art, brush strokes, painterly, masterpiece',
+  digital:    ', digital art, concept art, trending on artstation, highly detailed',
+  watercolor: ', watercolor painting, soft edges, paper texture, flowing colors',
+  sketch:     ', pencil sketch, hand drawn, graphite, shading, detailed lines',
+  lowpoly:    ', low poly 3d render, geometric, isometric, minimalist',
+  pixelart:   ', pixel art, 16-bit style, retro game graphics, pixelated',
+  cyberpunk:  ', cyberpunk, neon lights, futuristic, blade runner aesthetic, rain'
+};
+
+function setT2i(fn) {
+  t2iFn = fn;
+}
+
+function getT2i() {
+  if (!t2iFn) {
+    throw new Error('weld.image: no text-to-image function set. Call weld.image.setT2i(fn) where fn is the imported text-to-image-plugin.');
+  }
+  return t2iFn;
+}
+
+function styleNames() { return Object.keys(STYLES); }
+function resolutionNames() { return Object.keys(RESOLUTIONS); }
+
+function withStyle(prompt, styleName) {
+  var suffix = STYLES[styleName] || '';
+  return String(prompt) + suffix;
+}
+
+function withResolution(opts, resName) {
+  var res = RESOLUTIONS[resName];
+  if (!res) return Object.assign({}, opts);
+  var parts = res.split('x');
+  return Object.assign({}, opts, { width: parseInt(parts[0], 10), height: parseInt(parts[1], 10) });
+}
+
+// Synchronous embed -- returns the iframe HTML for direct insertion
+function embed(opts) {
+  return String(getT2i()(opts));
+}
+
+// Async single generation -- resolves with the result data
+function generate(opts) {
+  return new Promise(function(resolve, reject) {
+    var settled = false;
+    var fn = getT2i();
+    var enriched = Object.assign({}, opts, {
+      onFinish: function(data) {
+        if (settled) return;
+        settled = true;
+        resolve(data);
+      }
+    });
+    var html;
+    try {
+      html = String(fn(enriched));
+    } catch (e) {
+      reject(e);
+      return;
+    }
+
+    try {
+      if (opts && opts.into) {
+        var target = typeof opts.into === 'string' ? document.querySelector(opts.into) : opts.into;
+        if (target) target.innerHTML = html;
+      }
+    } catch (e) { /* ignore */ }
+
+    var ms = (opts && opts.timeoutMs) || 120000;
+    setTimeout(function() {
+      if (!settled) {
+        settled = true;
+        reject(new Error('weld.image: generation timeout after ' + ms + 'ms'));
+      }
+    }, ms);
+  });
+}
+
+// Generate N images sequentially with the same prompt (variation via seed)
+function batch(opts, count, onProgress) {
+  return new Promise(function(resolve) {
+    var results = [];
+    var i = 0;
+    function step() {
+      if (i >= count) { resolve(results); return; }
+      var cellOpts = Object.assign({}, opts);
+      if (cellOpts.seed === undefined || cellOpts.seed === -1) {
+        cellOpts.seed = Math.floor(Math.random() * 1000000);
+      } else if (i > 0) {
+        cellOpts.seed = opts.seed + i;
+      }
+      generate(cellOpts).then(function(data) {
+        results.push(data);
+        if (onProgress) onProgress(i + 1, count, data);
+        i++;
+        step();
+      }).catch(function(e) {
+        results.push({ error: e.message });
+        if (onProgress) onProgress(i + 1, count, { error: e.message });
+        i++;
+        step();
+      });
+    }
+    step();
+  });
+}
+
+// Variations: same opts but different prompts
+function variations(prompts, sharedOpts, onProgress) {
+  return new Promise(function(resolve) {
+    var results = [];
+    var i = 0;
+    function step() {
+      if (i >= prompts.length) { resolve(results); return; }
+      var cellOpts = Object.assign({}, sharedOpts, { prompt: prompts[i] });
+      generate(cellOpts).then(function(data) {
+        results.push(data);
+        if (onProgress) onProgress(i + 1, prompts.length, data);
+        i++;
+        step();
+      }).catch(function(e) {
+        results.push({ error: e.message, prompt: prompts[i] });
+        if (onProgress) onProgress(i + 1, prompts.length, { error: e.message });
+        i++;
+        step();
+      });
+    }
+    step();
+  });
+}
+
+// Auto-retry on failure with exponential backoff
+function generateWithRetry(opts, maxRetries) {
+  maxRetries = maxRetries || 3;
+  return new Promise(function(resolve, reject) {
+    var attempt = 0;
+    var lastError = null;
+    function tryOnce() {
+      generate(opts).then(resolve).catch(function(e) {
+        lastError = e;
+        attempt++;
+        if (attempt >= maxRetries) { reject(lastError); return; }
+        var backoff = 1000 * Math.pow(2, attempt - 1);
+        setTimeout(tryOnce, backoff);
+      });
+    }
+    tryOnce();
+  });
+}
+
+window.weld.image = {
+  setT2i: setT2i,
+  withStyle: withStyle,
+  withResolution: withResolution,
+  styleNames: styleNames,
+  resolutionNames: resolutionNames,
+  styles: STYLES,
+  resolutions: RESOLUTIONS,
+  embed: embed,
+  generate: generate,
+  batch: batch,
+  variations: variations,
+  generateWithRetry: generateWithRetry,
+  version: '1.0.0'
+};
+
+})();
+
+</script>
+<footer class="footer-social">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>

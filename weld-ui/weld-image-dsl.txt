@@ -1,0 +1,208 @@
+$meta
+  title       = weld.image
+  description = Promise-based wrapper around text-to-image-plugin. Style presets, resolution helpers, batching with progress callbacks, variations, retry with exponential backoff.
+  tags        = weld, image, t2i, generation, plugin
+
+t2iSource     = {import:text-to-image-plugin}
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.image) { window.weld.image.setT2i(t2iSource); return window.weld.image; }
+
+  // -----------------------------------------------------------------
+  // weld.image: Promise-based wrapper around Perchance's text-to-image-plugin.
+  // Adds batching, style presets, retry, resolution helpers.
+  //
+  // The actual t2i function comes from Perchance's text-to-image-plugin,
+  // which must be imported in the DSL panel under any alias, e.g.:
+  //   t2iSource = the import of text-to-image-plugin
+  // The DSL form passes that function into weld.image.setT2i(...).
+  // Standalone JS callers must call weld.image.setT2i(fn) themselves.
+  // -----------------------------------------------------------------
+
+  var t2iFn = null;
+
+  // Resolution presets
+  var RESOLUTIONS = {
+    square:      '512x512',
+    portrait:    '512x768',
+    landscape:   '768x512',
+    largeSquare: '768x768'
+  };
+
+  // Positive-only style presets (Perchance backend ignores negatives)
+  var STYLES = {
+    photo:      ', photorealistic, sharp focus, detailed, 8k, professional photography',
+    cinematic:  ', cinematic shot, dramatic lighting, depth of field, film grain, atmospheric',
+    anime:      ', anime style, cel shaded, vibrant, detailed line art',
+    painting:   ', oil painting, classical art, brush strokes, painterly, masterpiece',
+    digital:    ', digital art, concept art, trending on artstation, highly detailed',
+    watercolor: ', watercolor painting, soft edges, paper texture, flowing colors',
+    sketch:     ', pencil sketch, hand drawn, graphite, shading, detailed lines',
+    lowpoly:    ', low poly 3d render, geometric, isometric, minimalist',
+    pixelart:   ', pixel art, 16-bit style, retro game graphics, pixelated',
+    cyberpunk:  ', cyberpunk, neon lights, futuristic, blade runner aesthetic, rain'
+  };
+
+  function setT2i(fn) {
+    t2iFn = fn;
+  }
+
+  function getT2i() {
+    if (!t2iFn) {
+      throw new Error('weld.image: no text-to-image function set. Call weld.image.setT2i(fn) where fn is the imported text-to-image-plugin.');
+    }
+    return t2iFn;
+  }
+
+  function styleNames() { return Object.keys(STYLES); }
+  function resolutionNames() { return Object.keys(RESOLUTIONS); }
+
+  function withStyle(prompt, styleName) {
+    var suffix = STYLES[styleName] || '';
+    return String(prompt) + suffix;
+  }
+
+  function withResolution(opts, resName) {
+    var res = RESOLUTIONS[resName];
+    if (!res) return Object.assign({}, opts);
+    var parts = res.split('x');
+    return Object.assign({}, opts, { width: parseInt(parts[0], 10), height: parseInt(parts[1], 10) });
+  }
+
+  // Synchronous embed -- returns the iframe HTML for direct insertion
+  function embed(opts) {
+    return String(getT2i()(opts));
+  }
+
+  // Async single generation -- resolves with the result data
+  function generate(opts) {
+    return new Promise(function(resolve, reject) {
+      var settled = false;
+      var fn = getT2i();
+      var enriched = Object.assign({}, opts, {
+        onFinish: function(data) {
+          if (settled) return;
+          settled = true;
+          resolve(data);
+        }
+      });
+      var html;
+      try {
+        html = String(fn(enriched));
+      } catch (e) {
+        reject(e);
+        return;
+      }
+
+      try {
+        if (opts && opts.into) {
+          var target = typeof opts.into === 'string' ? document.querySelector(opts.into) : opts.into;
+          if (target) target.innerHTML = html;
+        }
+      } catch (e) { /* ignore */ }
+
+      var ms = (opts && opts.timeoutMs) || 120000;
+      setTimeout(function() {
+        if (!settled) {
+          settled = true;
+          reject(new Error('weld.image: generation timeout after ' + ms + 'ms'));
+        }
+      }, ms);
+    });
+  }
+
+  // Generate N images sequentially with the same prompt (variation via seed)
+  function batch(opts, count, onProgress) {
+    return new Promise(function(resolve) {
+      var results = [];
+      var i = 0;
+      function step() {
+        if (i >= count) { resolve(results); return; }
+        var cellOpts = Object.assign({}, opts);
+        if (cellOpts.seed === undefined || cellOpts.seed === -1) {
+          cellOpts.seed = Math.floor(Math.random() * 1000000);
+        } else if (i > 0) {
+          cellOpts.seed = opts.seed + i;
+        }
+        generate(cellOpts).then(function(data) {
+          results.push(data);
+          if (onProgress) onProgress(i + 1, count, data);
+          i++;
+          step();
+        }).catch(function(e) {
+          results.push({ error: e.message });
+          if (onProgress) onProgress(i + 1, count, { error: e.message });
+          i++;
+          step();
+        });
+      }
+      step();
+    });
+  }
+
+  // Variations: same opts but different prompts
+  function variations(prompts, sharedOpts, onProgress) {
+    return new Promise(function(resolve) {
+      var results = [];
+      var i = 0;
+      function step() {
+        if (i >= prompts.length) { resolve(results); return; }
+        var cellOpts = Object.assign({}, sharedOpts, { prompt: prompts[i] });
+        generate(cellOpts).then(function(data) {
+          results.push(data);
+          if (onProgress) onProgress(i + 1, prompts.length, data);
+          i++;
+          step();
+        }).catch(function(e) {
+          results.push({ error: e.message, prompt: prompts[i] });
+          if (onProgress) onProgress(i + 1, prompts.length, { error: e.message });
+          i++;
+          step();
+        });
+      }
+      step();
+    });
+  }
+
+  // Auto-retry on failure with exponential backoff
+  function generateWithRetry(opts, maxRetries) {
+    maxRetries = maxRetries || 3;
+    return new Promise(function(resolve, reject) {
+      var attempt = 0;
+      var lastError = null;
+      function tryOnce() {
+        generate(opts).then(resolve).catch(function(e) {
+          lastError = e;
+          attempt++;
+          if (attempt >= maxRetries) { reject(lastError); return; }
+          var backoff = 1000 * Math.pow(2, attempt - 1);
+          setTimeout(tryOnce, backoff);
+        });
+      }
+      tryOnce();
+    });
+  }
+
+  window.weld.image = {
+    setT2i: setT2i,
+    withStyle: withStyle,
+    withResolution: withResolution,
+    styleNames: styleNames,
+    resolutionNames: resolutionNames,
+    styles: STYLES,
+    resolutions: RESOLUTIONS,
+    embed: embed,
+    generate: generate,
+    batch: batch,
+    variations: variations,
+    generateWithRetry: generateWithRetry,
+    version: '1.0.0'
+  };
+
+  window.weld.image.setT2i(t2iSource);
+
+  return window.weld.image;
+

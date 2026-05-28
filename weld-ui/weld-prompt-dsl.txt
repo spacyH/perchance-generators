@@ -1,0 +1,263 @@
+$meta
+  title       = weld.prompt
+  description = Structured prompt assembly with token-aware context-window packing. Named sections with priorities, Perchance wire format serialization, template variables, budget-driven truncation.
+  tags        = weld, prompt, ai, context, budget, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.prompt) return window.weld.prompt;
+
+  // -----------------------------------------------------------------
+  // weld.prompt: Structured prompt assembly with token-aware packing.
+  // Builds the instruction string for aiTextPlugin from named sections
+  // (system, character card, lorebook, reminder) plus serialized chat
+  // history, fitting everything into a token budget.
+  //
+  // The wire format matches the Perchance AI character chat convention:
+  //   Name: Message content (double-bracketed)
+  // separated by double newlines, with standard stop sequences.
+  // -----------------------------------------------------------------
+
+  var DEFAULT_SEPARATOR = '\n\n';
+  var DEFAULT_STOP_SEQUENCES = ['\n\n' + '[' + '[', '\n' + '[' + '['];
+  var HIDDEN_AI_START = '<!--hidden-from-ai-start-->';
+  var HIDDEN_AI_END   = '<!--hidden-from-ai-end-->';
+
+  function estimateTokens(text) {
+    if (!text) return 0;
+    // Use weld.tokens.countSync if available (exact); otherwise chars/4
+    if (window.weld && window.weld.tokens && window.weld.tokens.isLoaded && window.weld.tokens.isLoaded()) {
+      var n = window.weld.tokens.countSync(text);
+      if (n !== null) return n;
+    }
+    return Math.ceil(String(text).length / 4);
+  }
+
+  function substituteVars(text, vars) {
+    if (!text || !vars) return text || '';
+    var result = String(text);
+    for (var key in vars) {
+      // Replace double-brace vars: user/char are standard
+      // Build the target pattern without literal double-brace in source
+      var target = '\x7b\x7b' + key + '\x7d\x7d';
+      var idx = result.indexOf(target);
+      while (idx !== -1) {
+        result = result.slice(0, idx) + String(vars[key]) + result.slice(idx + target.length);
+        idx = result.indexOf(target, idx + String(vars[key]).length);
+      }
+    }
+    return result;
+  }
+
+  function stripHiddenFromAi(text) {
+    if (!text) return '';
+    var s = String(text);
+    var startIdx = s.indexOf(HIDDEN_AI_START);
+    while (startIdx !== -1) {
+      var endIdx = s.indexOf(HIDDEN_AI_END, startIdx);
+      if (endIdx === -1) {
+        s = s.slice(0, startIdx);
+        break;
+      }
+      s = s.slice(0, startIdx) + s.slice(endIdx + HIDDEN_AI_END.length);
+      startIdx = s.indexOf(HIDDEN_AI_START);
+    }
+    return s;
+  }
+
+  // Serialize a single message to wire format
+  function serializeMessage(msg, vars) {
+    var name = msg.name || msg.role || 'Unknown';
+    var content = msg.content || msg.message || msg.text || '';
+    content = stripHiddenFromAi(content);
+    content = substituteVars(content, vars);
+    return '[' + '[' + name + ']' + ']: ' + content.trim();
+  }
+
+  // Serialize an array of messages to the Perchance wire format
+  function serializeHistory(messages, vars) {
+    if (!messages || messages.length === 0) return '';
+    var lines = [];
+    for (var i = 0; i < messages.length; i++) {
+      var msg = messages[i];
+      // Skip AI-hidden messages
+      if (msg.hiddenFrom && msg.hiddenFrom.indexOf('ai') !== -1) continue;
+      lines.push(serializeMessage(msg, vars));
+    }
+    return lines.join(DEFAULT_SEPARATOR);
+  }
+
+  // -----------------------------------------------------------------
+  // Builder factory
+  // -----------------------------------------------------------------
+  function createBuilder(opts) {
+    opts = opts || {};
+    var budget = opts.budget || 4000;
+    var counter = opts.counter || estimateTokens;
+    var separator = opts.separator || DEFAULT_SEPARATOR;
+    var vars = {};
+    var _r = opts.roles || {};
+    if (_r.user) vars.user = _r.user;
+    if (_r.assistant) vars.char = _r.assistant;
+    if (opts.vars) {
+      for (var k in opts.vars) vars[k] = opts.vars[k];
+    }
+    var assistantName = _r.assistant || 'Assistant';
+
+    // Sections: each has name / text / priority / position
+    // position: 'start' (before history) or 'end' (after history)
+    var sections = [];
+    var historyMessages = [];
+
+    function count(text) {
+      if (typeof counter === 'function') return counter(text);
+      return estimateTokens(text);
+    }
+
+    function addSection(name, text, sectionOpts) {
+      sectionOpts = sectionOpts || {};
+      sections.push({
+        name: name,
+        text: substituteVars(String(text || ''), vars),
+        priority: typeof sectionOpts.priority === 'number' ? sectionOpts.priority : 50,
+        position: sectionOpts.position || 'start'
+      });
+    }
+
+    // -------- Convenience methods --------
+    function system(text, priority) {
+      addSection('system', text, { priority: priority || 100, position: 'start' });
+    }
+
+    function character(text, priority) {
+      addSection('character', text, { priority: priority || 90, position: 'start' });
+    }
+
+    function lorebook(text, priority) {
+      addSection('lorebook', text, { priority: priority || 70, position: 'start' });
+    }
+
+    function reminder(text, priority) {
+      addSection('reminder', text, { priority: priority || 95, position: 'end' });
+    }
+
+    function history(messages) {
+      historyMessages = (messages || []).slice();
+    }
+
+    function user(text) {
+      var name = vars.user || 'User';
+      historyMessages.push({ name: name, content: text, role: 'user' });
+    }
+
+    // -------- Main packing logic --------
+    function pack() {
+      // 1. Sort sections: start-positioned first (by priority desc), then end-positioned
+      var startSections = [];
+      var endSections = [];
+      for (var i = 0; i < sections.length; i++) {
+        var s = sections[i];
+        if (s.position === 'end') endSections.push(s);
+        else startSections.push(s);
+      }
+      startSections.sort(function(a, b) { return b.priority - a.priority; });
+      endSections.sort(function(a, b) { return b.priority - a.priority; });
+
+      // 2. Serialize history
+      var historyText = serializeHistory(historyMessages, vars);
+
+      // 3. Build the instruction by fitting sections + history into the budget.
+      //    Strategy: start with everything, then drop lowest-priority sections,
+      //    then truncate history from the oldest end.
+
+      // Start with all sections included
+      var includedStart = startSections.slice();
+      var includedEnd = endSections.slice();
+      var currentHistory = historyText;
+
+      function assemble() {
+        var parts = [];
+        for (var j = 0; j < includedStart.length; j++) parts.push(includedStart[j].text);
+        if (currentHistory) parts.push(currentHistory);
+        for (var k = 0; k < includedEnd.length; k++) parts.push(includedEnd[k].text);
+        return parts.filter(Boolean).join(separator);
+      }
+
+      var instruction = assemble();
+      var tokens = count(instruction);
+
+      // Drop lowest-priority sections until we fit (or run out of droppable sections)
+      if (tokens > budget) {
+        // Collect all sections sorted by priority ascending (lowest first to drop)
+        var allSorted = startSections.concat(endSections).slice();
+        allSorted.sort(function(a, b) { return a.priority - b.priority; });
+
+        for (var d = 0; d < allSorted.length && tokens > budget; d++) {
+          var toDrop = allSorted[d];
+          includedStart = includedStart.filter(function(s) { return s !== toDrop; });
+          includedEnd = includedEnd.filter(function(s) { return s !== toDrop; });
+          instruction = assemble();
+          tokens = count(instruction);
+        }
+      }
+
+      // If still over budget, truncate history from the oldest end
+      if (tokens > budget && historyMessages.length > 0) {
+        var trimmedMessages = historyMessages.slice();
+        while (tokens > budget && trimmedMessages.length > 1) {
+          trimmedMessages.shift();
+          currentHistory = serializeHistory(trimmedMessages, vars);
+          instruction = assemble();
+          tokens = count(instruction);
+        }
+      }
+
+      // Build the startWith for continuation
+      var startWith = '[' + '[' + assistantName + ']' + ']:';
+
+      return {
+        instruction: instruction,
+        startWith: startWith,
+        stopSequences: opts.stopSequences || DEFAULT_STOP_SEQUENCES,
+        hideStartWith: true,
+        tokens: tokens,
+        budget: budget,
+        fits: tokens <= budget,
+        sectionsIncluded: includedStart.concat(includedEnd).map(function(s) { return s.name; }),
+        historyLength: historyMessages.length
+      };
+    }
+
+    // -------- Reset --------
+    function reset() {
+      sections = [];
+      historyMessages = [];
+    }
+
+    return {
+      section: addSection,
+      system: system,
+      character: character,
+      lorebook: lorebook,
+      reminder: reminder,
+      history: history,
+      user: user,
+      pack: pack,
+      reset: reset
+    };
+  }
+
+  window.weld.prompt = {
+    create: createBuilder,
+    serializeHistory: serializeHistory,
+    serializeMessage: serializeMessage,
+    substituteVars: substituteVars,
+    stripHiddenFromAi: stripHiddenFromAi,
+    estimateTokens: estimateTokens,
+    version: '1.0.0'
+  };
+
+  return window.weld.prompt;
+

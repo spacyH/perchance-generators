@@ -1,0 +1,485 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+.footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--border);
+  color:var(--muted);font-size:12px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+
+.footer-social{text-align:center;font-family:var(--mono);max-width:720px;margin:48px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer-social span,.footer-social a{color:var(--muted);}
+.footer-social a{margin:0 2px;}
+.footer-social a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.persist<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-persist-example">demo &rarr;</a></span></div>  <div class="hdr">
+    <div class="hdr-row">
+      <h1>weld.persist</h1>
+      <span class="ver">v1.0.0</span>
+    </div>
+    <p class="lead">Collection-based CRUD over IndexedDB. No Dexie, no schema migrations for new collections, export/import for backup integration. The storage layer underneath weld.history.</p>
+  </div>
+  <h2>Overview</h2>
+<p>weld.persist is the storage layer the rest of the weld suite can sit on top of. It provides collection-based CRUD over IndexedDB: put, get, getAll, query, delete, update. No Dexie dependency — it wraps the raw IndexedDB API with a simple interface that handles transactions, key management, and schema setup for you.</p>
+<p>Internally it uses a single object store with logical collections via compound keys, so adding new collections never requires a database version bump or schema migration. Export and import methods integrate naturally with weld.backup.</p>
+<h2>Quick start</h2>
+<pre data-codeid="code1"></pre>
+<pre data-codeid="code2"></pre>
+<h2>Opening a database</h2>
+<div class="sig" data-codeid="sig3"></div>
+<p>Returns a database handle. If <code>dbName</code> is omitted, defaults to <code>'weld-persist'</code>. The database is created lazily on the first operation. Multiple calls with the same name return the same connection.</p>
+<h2>Collection API</h2><h3>db.collection(name)</h3>
+<div class="sig" data-codeid="sig4"></div>
+<p>Returns a handle for a logical collection. Collections are just key partitions — creating a new collection name doesn't require any schema changes. All methods return Promises.</p>
+<h3>put / putMany</h3>
+<div class="sig" data-codeid="sig5"></div>
+<div class="sig" data-codeid="sig6"></div>
+<p>Upsert a record. If the record has no <code>id</code> field, one is auto-generated. <code>putMany</code> inserts an array in a single transaction for better performance.</p>
+<h3>get / getAll / query</h3>
+<div class="sig" data-codeid="sig7"></div>
+<div class="sig" data-codeid="sig8"></div>
+<div class="sig" data-codeid="sig9"></div>
+<p><code>get</code> returns a single record by id (or null). <code>getAll</code> returns every record in the collection. <code>query</code> filters with a predicate function after loading all records — suitable for small-to-medium collections.</p>
+<h3>update / delete / deleteMany / clear / count</h3>
+<div class="sig" data-codeid="sig10"></div>
+<div class="sig" data-codeid="sig11"></div>
+<div class="sig" data-codeid="sig12"></div>
+<div class="sig" data-codeid="sig13"></div>
+<div class="sig" data-codeid="sig14"></div>
+<p><code>update</code> merges a patch object into an existing record. <code>clear</code> removes all records in the collection. <code>deleteMany</code> removes multiple records in a single transaction.</p>
+<h2>Database-level operations</h2><h3>db.collections() / .exportAll() / .importAll()</h3>
+<div class="sig" data-codeid="sig15"></div>
+<p>Returns the names of all collections that have data.</p>
+<div class="sig" data-codeid="sig16"></div>
+<p>Exports the entire database as a JSON-safe object, suitable for passing to weld.backup. The shape is <code>\{ dbName, collections: \{ name: records\[\] \}, exportedAt \}</code>.</p>
+<div class="sig" data-codeid="sig17"></div>
+<p>Imports data from an exported object. Records are upserted — existing records with the same id are overwritten.</p>
+<h3>db.destroy()</h3>
+<p>Deletes the entire IndexedDB database. This is irreversible.</p>
+<h2>Design notes</h2><div class="note">
+Collections are logical partitions inside a single IndexedDB object store. This means you never need schema migrations when adding a new collection — just call <code>db.collection('newName')</code> and start writing. The tradeoff: <code>query()</code> loads all records in the collection first, then filters in JS. For collections with thousands of records, consider using multiple databases (one per entity type) with proper indexed keys.
+</div>
+  <div class="footer">Part of the <a href="https://perchance.org/weld-ui-index">weld plugin suite</a>. Stashed at <code>window.weld.persist</code>. This page loads the plugin so you can inspect it in DevTools.</div>
+</div>
+<script>
+(function(){
+  var examples = {
+  'code1': 'output\n  weld-persist = \{import:weld-persist-plugin\}',
+  'code2': 'root.weldPersist();\n\nconst db = weld.persist.open(\'my-app\');\nconst chars = db.collection(\'characters\');\n\n// CRUD\nawait chars.put(\{ id: \'c1\', name: \'Alice\', role: \'mage\' \});\nconst alice = await chars.get(\'c1\');\nconst all = await chars.getAll();\nconst mages = await chars.query(r => r.role === \'mage\');\nawait chars.update(\'c1\', \{ level: 10 \});\nawait chars.delete(\'c1\');',
+  'sig3': 'weld.persist.open(dbName?)  ->  db handle',
+  'sig4': 'db.collection(name)  ->  collection handle',
+  'sig5': 'collection.put(record)  ->  Promise<id>',
+  'sig6': 'collection.putMany(records)  ->  Promise<id\[\]>',
+  'sig7': 'collection.get(id)  ->  Promise<record | null>',
+  'sig8': 'collection.getAll()  ->  Promise<record\[\]>',
+  'sig9': 'collection.query(filterFn)  ->  Promise<record\[\]>',
+  'sig10': 'collection.update(id, patch)  ->  Promise<id>',
+  'sig11': 'collection.delete(id)  ->  Promise<true>',
+  'sig12': 'collection.deleteMany(ids)  ->  Promise<count>',
+  'sig13': 'collection.clear()  ->  Promise',
+  'sig14': 'collection.count()  ->  Promise<number>',
+  'sig15': 'db.collections()  ->  Promise<string\[\]>',
+  'sig16': 'db.exportAll()  ->  Promise<object>',
+  'sig17': 'db.importAll(data)  ->  Promise'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    var nodes = document.querySelectorAll('[data-codeid]');
+    nodes.forEach(function(n){
+      var id = n.getAttribute('data-codeid');
+      var src = examples[id];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.persist) return; // already loaded
+
+// -----------------------------------------------------------------
+// weld.persist: Collection-based CRUD over IndexedDB.
+// One database, one object store, logical collections via a compound
+// key of (collection + id). No schema versioning needed when collections
+// are added (they're just key prefixes). No Dexie dependency.
+//
+// Usage:
+//   var db = weld.persist.open('my-app');
+//   var chars = db.collection('characters');
+//   await chars.put({ id: 'c1', name: 'Alice' });
+//   var alice = await chars.get('c1');
+//   var all = await chars.getAll();
+//   await chars.delete('c1');
+// -----------------------------------------------------------------
+
+var STORE_NAME = 'records';
+var DB_VERSION = 1;
+
+// Cache of opened databases: dbName -> Promise<IDBDatabase>
+var dbCache = {};
+
+function openDatabase(dbName) {
+  if (dbCache[dbName]) return dbCache[dbName];
+  dbCache[dbName] = new Promise(function(resolve, reject) {
+    var request = indexedDB.open(dbName, DB_VERSION);
+    request.onupgradeneeded = function(e) {
+      var db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        var store = db.createObjectStore(STORE_NAME, { keyPath: ['_col', '_id'] });
+        store.createIndex('by_col', '_col', { unique: false });
+      }
+    };
+    request.onsuccess = function(e) { resolve(e.target.result); };
+    request.onerror = function(e) {
+      delete dbCache[dbName];
+      reject(new Error('weld.persist: failed to open "' + dbName + '": ' + (e.target.error || 'unknown')));
+    };
+  });
+  return dbCache[dbName];
+}
+
+function uid() {
+  return Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+}
+
+// -----------------------------------------------------------------
+// Collection handle
+// -----------------------------------------------------------------
+function makeCollection(dbName, colName) {
+  function getStore(mode) {
+    return openDatabase(dbName).then(function(db) {
+      var tx = db.transaction(STORE_NAME, mode);
+      return tx.objectStore(STORE_NAME);
+    });
+  }
+
+  function wrapRequest(req) {
+    return new Promise(function(resolve, reject) {
+      req.onsuccess = function() { resolve(req.result); };
+      req.onerror = function() { reject(req.error); };
+    });
+  }
+
+  // Put: upsert a record. If record has no .id, one is generated.
+  function put(record) {
+    if (!record || typeof record !== 'object') {
+      return Promise.reject(new Error('persist.put: record must be an object'));
+    }
+    var rec = Object.assign({}, record);
+    if (rec.id == null) rec.id = uid();
+    rec._col = colName;
+    rec._id = String(rec.id);
+    return getStore('readwrite').then(function(store) {
+      return wrapRequest(store.put(rec));
+    }).then(function() {
+      return rec.id;
+    });
+  }
+
+  // Put many records in a single transaction
+  function putMany(records) {
+    if (!Array.isArray(records)) return Promise.reject(new Error('persist.putMany: expected array'));
+    return openDatabase(dbName).then(function(db) {
+      return new Promise(function(resolve, reject) {
+        var tx = db.transaction(STORE_NAME, 'readwrite');
+        var store = tx.objectStore(STORE_NAME);
+        var ids = [];
+        for (var i = 0; i < records.length; i++) {
+          var rec = Object.assign({}, records[i]);
+          if (rec.id == null) rec.id = uid();
+          rec._col = colName;
+          rec._id = String(rec.id);
+          ids.push(rec.id);
+          store.put(rec);
+        }
+        tx.oncomplete = function() { resolve(ids); };
+        tx.onerror = function() { reject(tx.error); };
+      });
+    });
+  }
+
+  // Get a single record by id
+  function get(id) {
+    return getStore('readonly').then(function(store) {
+      return wrapRequest(store.get([colName, String(id)]));
+    }).then(function(rec) {
+      if (!rec) return null;
+      var out = Object.assign({}, rec);
+      delete out._col;
+      delete out._id;
+      return out;
+    });
+  }
+
+  // Get all records in this collection
+  function getAll() {
+    return getStore('readonly').then(function(store) {
+      var index = store.index('by_col');
+      return wrapRequest(index.getAll(colName));
+    }).then(function(recs) {
+      return (recs || []).map(function(rec) {
+        var out = Object.assign({}, rec);
+        delete out._col;
+        delete out._id;
+        return out;
+      });
+    });
+  }
+
+  // Query: get all records matching a filter function
+  function query(filterFn) {
+    return getAll().then(function(all) {
+      if (typeof filterFn !== 'function') return all;
+      return all.filter(filterFn);
+    });
+  }
+
+  // Delete a single record by id
+  function del(id) {
+    return getStore('readwrite').then(function(store) {
+      return wrapRequest(store.delete([colName, String(id)]));
+    }).then(function() { return true; });
+  }
+
+  // Delete many records by id array
+  function delMany(ids) {
+    if (!Array.isArray(ids)) return Promise.reject(new Error('persist.delMany: expected array'));
+    return openDatabase(dbName).then(function(db) {
+      return new Promise(function(resolve, reject) {
+        var tx = db.transaction(STORE_NAME, 'readwrite');
+        var store = tx.objectStore(STORE_NAME);
+        for (var i = 0; i < ids.length; i++) {
+          store.delete([colName, String(ids[i])]);
+        }
+        tx.oncomplete = function() { resolve(ids.length); };
+        tx.onerror = function() { reject(tx.error); };
+      });
+    });
+  }
+
+  // Clear all records in this collection
+  function clear() {
+    return getAll().then(function(all) {
+      var ids = all.map(function(r) { return r.id; });
+      return delMany(ids);
+    });
+  }
+
+  // Count records in this collection
+  function count() {
+    return getStore('readonly').then(function(store) {
+      var index = store.index('by_col');
+      return wrapRequest(index.count(colName));
+    });
+  }
+
+  // Update: merge a patch into an existing record
+  function update(id, patch) {
+    return get(id).then(function(existing) {
+      if (!existing) return Promise.reject(new Error('persist.update: record not found: ' + id));
+      var merged = Object.assign({}, existing, patch, { id: id });
+      return put(merged);
+    });
+  }
+
+  return {
+    put: put,
+    putMany: putMany,
+    get: get,
+    getAll: getAll,
+    query: query,
+    delete: del,
+    deleteMany: delMany,
+    clear: clear,
+    count: count,
+    update: update
+  };
+}
+
+// -----------------------------------------------------------------
+// Database handle
+// -----------------------------------------------------------------
+function openDb(dbName) {
+  dbName = dbName || 'weld-persist';
+
+  function collection(name) {
+    if (!name) throw new Error('persist: collection name required');
+    return makeCollection(dbName, String(name));
+  }
+
+  // List all collection names that have data
+  function collections() {
+    return openDatabase(dbName).then(function(db) {
+      return new Promise(function(resolve, reject) {
+        var tx = db.transaction(STORE_NAME, 'readonly');
+        var store = tx.objectStore(STORE_NAME);
+        var index = store.index('by_col');
+        var req = index.openKeyCursor();
+        var names = {};
+        req.onsuccess = function(e) {
+          var cursor = e.target.result;
+          if (cursor) {
+            names[cursor.key] = true;
+            cursor.continue();
+          } else {
+            resolve(Object.keys(names));
+          }
+        };
+        req.onerror = function() { reject(req.error); };
+      });
+    });
+  }
+
+  // Export the entire database as a JSON-safe object (for weld.backup)
+  function exportAll() {
+    return openDatabase(dbName).then(function(db) {
+      return new Promise(function(resolve, reject) {
+        var tx = db.transaction(STORE_NAME, 'readonly');
+        var store = tx.objectStore(STORE_NAME);
+        var req = store.getAll();
+        req.onsuccess = function() {
+          var records = req.result || [];
+          var byCol = {};
+          for (var i = 0; i < records.length; i++) {
+            var r = records[i];
+            var col = r._col;
+            if (!byCol[col]) byCol[col] = [];
+            var out = Object.assign({}, r);
+            delete out._col;
+            delete out._id;
+            byCol[col].push(out);
+          }
+          resolve({ dbName: dbName, collections: byCol, exportedAt: Date.now() });
+        };
+        req.onerror = function() { reject(req.error); };
+      });
+    });
+  }
+
+  // Import data from an exported object
+  function importAll(data) {
+    if (!data || !data.collections) {
+      return Promise.reject(new Error('persist.importAll: invalid data'));
+    }
+    var colNames = Object.keys(data.collections);
+    var chain = Promise.resolve();
+    for (var i = 0; i < colNames.length; i++) {
+      (function(colName) {
+        var records = data.collections[colName];
+        chain = chain.then(function() {
+          return collection(colName).putMany(records);
+        });
+      })(colNames[i]);
+    }
+    return chain;
+  }
+
+  // Delete the entire database
+  function destroy() {
+    delete dbCache[dbName];
+    return new Promise(function(resolve, reject) {
+      var req = indexedDB.deleteDatabase(dbName);
+      req.onsuccess = function() { resolve(true); };
+      req.onerror = function() { reject(req.error); };
+    });
+  }
+
+  return {
+    collection: collection,
+    collections: collections,
+    exportAll: exportAll,
+    importAll: importAll,
+    destroy: destroy,
+    name: dbName
+  };
+}
+
+window.weld.persist = {
+  open: openDb,
+  version: '1.0.0'
+};
+
+})();
+
+</script>
+<footer class="footer-social">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>

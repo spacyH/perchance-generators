@@ -1,0 +1,881 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--yellow:#d29922;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;--weld-ink:var(--ink);--weld-faint:var(--faint);--weld-border:var(--border);--weld-muted:var(--muted);}
+*{box-sizing:border-box;margin:0;}body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;min-height:100vh;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:960px;margin:0 auto;padding:48px 24px 32px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;border-bottom:1px solid var(--border);}.breadcrumb .crumb a{color:var(--muted);}.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}.breadcrumb .crumb-cur{color:var(--ink);}.breadcrumb .crumb-action a{color:var(--accent);}
+.hdr{text-align:center;margin-bottom:32px;}.hdr h1{font:700 32px var(--mono);letter-spacing:-1px;color:var(--ink);margin-bottom:8px;}.hdr p{font-size:14px;color:var(--muted);max-width:600px;margin:0 auto;}
+.workspace{display:grid;grid-template-columns:1fr 1fr;gap:14px;}@media(max-width:760px){.workspace{grid-template-columns:1fr;}}
+.card{background:var(--faint);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:14px;}
+.card h3{font:600 11px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+.record-list{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto;}
+.record-row{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font:12px var(--mono);display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.record-row .id{color:var(--muted);font-size:10px;}.record-row .data{color:#c9d1d9;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.record-row .actions{display:flex;gap:4px;}
+.record-row .actions button{padding:3px 8px;font:600 10px var(--mono);background:var(--faint);color:var(--muted);border:1px solid var(--border);border-radius:3px;cursor:pointer;text-transform:uppercase;}.record-row .actions button:hover{color:var(--ink);}
+.record-row .actions button.danger:hover{color:var(--red);border-color:var(--red);}
+.output-box{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px;font:11px/1.5 var(--mono);color:#c9d1d9;white-space:pre-wrap;max-height:240px;overflow-y:auto;}
+.empty{color:var(--muted);font-style:italic;font:12px var(--mono);padding:14px;text-align:center;}
+.stats{font:11px var(--mono);color:var(--muted);line-height:1.8;margin-top:8px;}.stats strong{color:var(--ink);}.stats .val{color:var(--accent);}
+.footer-social{text-align:center;font-family:var(--mono);max-width:720px;margin:48px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}.footer-social span,.footer-social a{color:var(--muted);}.footer-social a{margin:0 2px;}.footer-social a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.persist<span class="crumb-sep">/</span><span class="crumb-cur">examples</span></span><span class="crumb-action"><a href="https://perchance.org/weld-persist-plugin">docs &rarr;</a></span></div>
+<div class="hdr"><h1>weld.persist</h1><p>Live IndexedDB CRUD. Add, edit, and delete records in switchable collections. Data persists across page reloads. Export the full database as JSON and import it back.</p></div>
+<div class="toolbar" id="toolbar"><select id="col-select" style="padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--ink);font:12px var(--mono);"></select></div>
+<div class="workspace">
+<div class="card"><h3>Records <span class="stats" id="col-stats"></span></h3><div class="record-list" id="record-list"></div></div>
+<div>
+<div class="card"><h3>Database info</h3><div class="stats" id="db-info"></div></div>
+<div class="card"><h3>Export / Import <span style="display:flex;gap:4px;" id="export-btn"></span><span id="import-btn"></span></h3><div class="output-box" id="export-box" contenteditable="true"></div></div>
+</div>
+</div>
+</div>
+<script>(function(){
+'use strict';
+
+// Namespace
+if (!window.weld) window.weld = {};
+if (window.weld.ui) return; // already loaded
+
+// THEME
+var defaultTheme = {
+  bg:        '#0d1117',
+  surface:   '#161b22',
+  faint:     '#21262d',
+  ink:       '#e6edf3',
+  muted:     '#7d8590',
+  accent:    '#4493f8',
+  accentInk: '#0d1117',
+  green:     '#3fb950',
+  red:       '#f85149',
+  yellow:    '#d29922',
+  blue:      '#58a6ff',
+  border:    'rgba(255,255,255,0.10)',
+  borderHi:  'rgba(255,255,255,0.20)',
+  radius:    '6px',
+  radiusSm:  '4px',
+  radiusLg:  '10px',
+  font:      "'DM Sans', system-ui, sans-serif",
+  fontMono:  "'JetBrains Mono', monospace",
+  shadow:    '0 8px 32px rgba(0,0,0,0.5)',
+  transit:   '120ms cubic-bezier(0.4, 0, 0.2, 1)',
+};
+
+var theme = Object.assign({}, defaultTheme);
+
+function setTheme(updates) {
+  Object.assign(theme, updates);
+  applyThemeVars();
+}
+
+function getTheme() { return Object.assign({}, theme); }
+
+function applyThemeVars() {
+  var root = document.documentElement;
+  Object.keys(theme).forEach(function(k){
+    root.style.setProperty('--w-' + k, theme[k]);
+  });
+}
+
+// CSS - injected once. All values use CSS vars.
+var CSS = [
+"@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');",
+".w-btn{font:500 13px var(--w-font);background:var(--w-bg);color:var(--w-ink);",
+"  border:1px solid var(--w-border);border-radius:var(--w-radius);padding:7px 14px;",
+"  cursor:pointer;display:inline-flex;align-items:center;gap:6px;line-height:1;",
+"  transition:border-color var(--w-transit), background var(--w-transit);outline:none;}",
+".w-btn:hover:not(:disabled){border-color:var(--w-borderHi);}",
+".w-btn:focus-visible{border-color:var(--w-accent);box-shadow:0 0 0 2px rgba(68,147,248,0.3);}",
+".w-btn:disabled{opacity:.4;cursor:not-allowed;}",
+".w-btn-primary{background:var(--w-accent);color:var(--w-accentInk);border-color:var(--w-accent);font-weight:600;}",
+".w-btn-primary:hover:not(:disabled){background:#58a6ff;border-color:#58a6ff;}",
+".w-btn-danger{color:var(--w-red);border-color:rgba(248,81,73,0.4);}",
+".w-btn-danger:hover:not(:disabled){background:rgba(248,81,73,0.1);border-color:var(--w-red);}",
+".w-btn-ghost{background:transparent;border-color:transparent;}",
+".w-btn-ghost:hover:not(:disabled){background:var(--w-faint);}",
+".w-btn-sm{padding:4px 10px;font-size:12px;}",
+".w-btn-lg{padding:10px 20px;font-size:14px;}",
+".w-input,.w-select,.w-textarea{font:13px var(--w-fontMono);background:var(--w-bg);color:var(--w-ink);",
+"  border:1px solid var(--w-border);border-radius:var(--w-radiusSm);padding:7px 10px;outline:none;",
+"  width:100%;box-sizing:border-box;transition:border-color var(--w-transit);}",
+".w-input:focus,.w-select:focus,.w-textarea:focus{border-color:var(--w-accent);box-shadow:0 0 0 2px rgba(68,147,248,0.2);}",
+".w-textarea{resize:vertical;min-height:60px;line-height:1.45;font-size:12px;}",
+".w-select{cursor:pointer;}",
+".w-checkbox{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font:13px var(--w-font);color:var(--w-ink);}",
+".w-checkbox input{margin:0;cursor:pointer;}",
+".w-range{width:100%;height:4px;-webkit-appearance:none;appearance:none;background:var(--w-faint);border-radius:2px;outline:none;}",
+".w-range::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--w-accent);cursor:pointer;border:0;}",
+".w-range::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--w-accent);cursor:pointer;border:0;}",
+".w-label{display:block;font:600 10px var(--w-fontMono);letter-spacing:1px;text-transform:uppercase;",
+"  color:var(--w-muted);margin-bottom:5px;}",
+".w-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;",
+"  display:flex;align-items:center;justify-content:center;padding:20px;",
+"  animation:w-fade-in 150ms ease-out;}",
+"@keyframes w-fade-in{from{opacity:0;}to{opacity:1;}}",
+"@keyframes w-pop-in{from{opacity:0;transform:scale(0.96);}to{opacity:1;transform:scale(1);}}",
+".w-modal{background:var(--w-surface);border:1px solid var(--w-border);border-radius:var(--w-radiusLg);",
+"  box-shadow:var(--w-shadow);max-height:90vh;display:flex;flex-direction:column;",
+"  animation:w-pop-in 160ms ease-out;color:var(--w-ink);font:14px var(--w-font);}",
+".w-modal-sm{width:380px;max-width:100%;}",
+".w-modal-md{width:560px;max-width:100%;}",
+".w-modal-lg{width:800px;max-width:100%;}",
+".w-modal-full{width:96vw;height:90vh;}",
+".w-modal-hdr{padding:16px 20px;border-bottom:1px solid var(--w-border);display:flex;",
+"  align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;}",
+".w-modal-title{font-size:15px;font-weight:600;margin:0;}",
+".w-modal-close{background:transparent;border:0;color:var(--w-muted);cursor:pointer;",
+"  padding:4px;border-radius:var(--w-radiusSm);line-height:0;transition:color var(--w-transit);}",
+".w-modal-close:hover{color:var(--w-ink);background:var(--w-faint);}",
+".w-modal-body{padding:20px;overflow-y:auto;flex:1;font-size:14px;line-height:1.55;}",
+".w-modal-actions{padding:14px 20px;border-top:1px solid var(--w-border);display:flex;",
+"  gap:8px;justify-content:flex-end;flex-shrink:0;}",
+".w-spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--w-faint);",
+"  border-top-color:var(--w-accent);border-radius:50%;animation:w-spin 700ms linear infinite;}",
+".w-spinner-lg{width:24px;height:24px;border-width:3px;}",
+"@keyframes w-spin{to{transform:rotate(360deg);}}",
+".w-disclosure{border:1px solid var(--w-border);border-radius:var(--w-radius);overflow:hidden;}",
+".w-disclosure summary{padding:10px 14px;cursor:pointer;font:600 13px var(--w-font);",
+"  color:var(--w-ink);background:var(--w-faint);outline:none;list-style:none;",
+"  display:flex;align-items:center;justify-content:space-between;}",
+".w-disclosure summary::-webkit-details-marker{display:none;}",
+".w-disclosure summary::after{content:'+';color:var(--w-muted);font-family:var(--w-fontMono);font-size:14px;}",
+".w-disclosure\[open\] summary::after{content:'-';}",
+".w-disclosure-body{padding:14px;}",
+".w-tabs{display:flex;gap:0;border-bottom:1px solid var(--w-border);}",
+".w-tab{padding:9px 16px;background:transparent;border:0;border-bottom:2px solid transparent;",
+"  color:var(--w-muted);font:500 13px var(--w-font);cursor:pointer;transition:color var(--w-transit);",
+"  margin-bottom:-1px;}",
+".w-tab:hover{color:var(--w-ink);}",
+".w-tab-active{color:var(--w-accent);border-bottom-color:var(--w-accent);}",
+".w-row{display:flex;gap:8px;align-items:center;}",
+".w-col{display:flex;flex-direction:column;gap:8px;}",
+".w-stack{display:flex;flex-direction:column;gap:14px;}",
+".w-card{background:var(--w-faint);border:1px solid var(--w-border);border-radius:var(--w-radius);padding:14px;}",
+".w-divider{height:1px;background:var(--w-border);margin:14px 0;border:0;}",
+].join('\n');
+
+var STYLE_ID = 'weld-ui-styles';
+function injectCSS() {
+  if (document.getElementById(STYLE_ID)) return;
+  var style = document.createElement('style');
+  style.id = STYLE_ID;
+  style.textContent = CSS;
+  document.head.appendChild(style);
+}
+
+// DOM HELPER
+// el(tag, attrs, children) - children is string or element or array
+function el(tag, attrs, children) {
+  var node = document.createElement(tag);
+  if (attrs) {
+    Object.keys(attrs).forEach(function(k){
+      var v = attrs[k];
+      if (v == null) return;
+      if (k === 'class' || k === 'className') node.className = v;
+      else if (k === 'style' && typeof v === 'object') Object.assign(node.style, v);
+      else if (k === 'dataset' && typeof v === 'object') Object.assign(node.dataset, v);
+      else if (k.indexOf('on') === 0 && typeof v === 'function') node.addEventListener(k.slice(2).toLowerCase(), v);
+      else if (k === 'html') node.innerHTML = v;
+      else if (k === 'text') node.textContent = v;
+      else node.setAttribute(k, v);
+    });
+  }
+  if (children != null) {
+    if (!Array.isArray(children)) children = [children];
+    children.forEach(function(c){
+      if (c == null) return;
+      if (typeof c === 'string' || typeof c === 'number') node.appendChild(document.createTextNode(c));
+      else if (c.nodeType) node.appendChild(c);
+    });
+  }
+  return node;
+}
+
+// ICONS (small embedded SVG set, lucide-style stroke icons)
+var ICONS = {
+  'x':       'M18 6L6 18M6 6l12 12',
+  'check':   'M20 6L9 17l-5-5',
+  'plus':    'M12 5v14M5 12h14',
+  'minus':   'M5 12h14',
+  'trash':   'M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2',
+  'edit':    'M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z',
+  'save':    'M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2zM17 21v-8H7v8M7 3v5h8',
+  'copy':    'M20 9h-9a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-9a2 2 0 00-2-2zM5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1',
+  'download':'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3',
+  'upload':  'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12',
+  'refresh': 'M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15',
+  'settings':'M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2zM15 12a3 3 0 11-6 0 3 3 0 016 0z',
+  'info':    'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM12 16v-4M12 8h.01',
+  'warn':    'M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01',
+  'error':   'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM15 9l-6 6M9 9l6 6',
+  'search':  'M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z',
+  'chevDown':'M6 9l6 6 6-6',
+  'chevUp':  'M18 15l-6-6-6 6',
+  'chevRight':'M9 18l6-6-6-6',
+  'chevLeft':'M15 18l-9-6 6-6',
+  'external':'M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3',
+};
+
+function icon(name, opts) {
+  opts = opts || {};
+  var size = opts.size || 16;
+  var path = ICONS[name];
+  if (!path) return el('span', { text: '?' });
+  var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('width', size);
+  svg.setAttribute('height', size);
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', opts.color || 'currentColor');
+  svg.setAttribute('stroke-width', opts.weight || '2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  p.setAttribute('d', path);
+  svg.appendChild(p);
+  return svg;
+}
+
+function registerIcon(name, pathD) { ICONS[name] = pathD; }
+
+// COMPONENTS
+function button(opts) {
+  opts = opts || {};
+  var classes = ['w-btn'];
+  if (opts.variant === 'primary') classes.push('w-btn-primary');
+  else if (opts.variant === 'danger') classes.push('w-btn-danger');
+  else if (opts.variant === 'ghost') classes.push('w-btn-ghost');
+  if (opts.size === 'sm') classes.push('w-btn-sm');
+  else if (opts.size === 'lg') classes.push('w-btn-lg');
+  var children = [];
+  if (opts.icon) children.push(icon(opts.icon, { size: opts.size === 'sm' ? 14 : 16 }));
+  if (opts.label != null) children.push(opts.label);
+  return el('button', {
+    class: classes.join(' '),
+    type: opts.type || 'button',
+    disabled: opts.disabled ? 'disabled' : null,
+    onclick: opts.onClick,
+  }, children);
+}
+
+function input(opts) {
+  opts = opts || {};
+  return el('input', {
+    class: 'w-input',
+    type: opts.type || 'text',
+    placeholder: opts.placeholder,
+    value: opts.value != null ? opts.value : '',
+    oninput: opts.onInput ? function(e){ opts.onInput(e.target.value, e); } : null,
+    onchange: opts.onChange ? function(e){ opts.onChange(e.target.value, e); } : null,
+    disabled: opts.disabled ? 'disabled' : null,
+    readonly: opts.readonly ? 'readonly' : null,
+  });
+}
+
+function select(opts) {
+  opts = opts || {};
+  var options = (opts.options || []).map(function(o){
+    if (typeof o === 'string') o = { value: o, label: o };
+    return el('option', {
+      value: o.value,
+      selected: o.value === opts.value ? 'selected' : null,
+    }, o.label);
+  });
+  return el('select', {
+    class: 'w-select',
+    onchange: opts.onChange ? function(e){ opts.onChange(e.target.value, e); } : null,
+    disabled: opts.disabled ? 'disabled' : null,
+  }, options);
+}
+
+function textarea(opts) {
+  opts = opts || {};
+  return el('textarea', {
+    class: 'w-textarea',
+    rows: opts.rows || 4,
+    placeholder: opts.placeholder,
+    oninput: opts.onInput ? function(e){ opts.onInput(e.target.value, e); } : null,
+    onchange: opts.onChange ? function(e){ opts.onChange(e.target.value, e); } : null,
+  }, opts.value || '');
+}
+
+function checkbox(opts) {
+  opts = opts || {};
+  var box = el('input', {
+    type: 'checkbox',
+    checked: opts.checked ? 'checked' : null,
+    onchange: opts.onChange ? function(e){ opts.onChange(e.target.checked, e); } : null,
+  });
+  return el('label', { class: 'w-checkbox' }, [box, opts.label || '']);
+}
+
+function range(opts) {
+  opts = opts || {};
+  return el('input', {
+    class: 'w-range',
+    type: 'range',
+    min: opts.min != null ? opts.min : 0,
+    max: opts.max != null ? opts.max : 100,
+    step: opts.step != null ? opts.step : 1,
+    value: opts.value != null ? opts.value : 0,
+    oninput: opts.onInput ? function(e){ opts.onInput(parseFloat(e.target.value), e); } : null,
+    onchange: opts.onChange ? function(e){ opts.onChange(parseFloat(e.target.value), e); } : null,
+  });
+}
+
+function spinner(opts) {
+  opts = opts || {};
+  var classes = ['w-spinner'];
+  if (opts.size === 'lg') classes.push('w-spinner-lg');
+  return el('span', { class: classes.join(' '), role: 'status' });
+}
+
+function label(text) {
+  return el('label', { class: 'w-label', text: text });
+}
+
+function disclosure(opts) {
+  opts = opts || {};
+  var summary = el('summary', { text: opts.title || '' });
+  var body = el('div', { class: 'w-disclosure-body' }, opts.content);
+  return el('details', {
+    class: 'w-disclosure',
+    open: opts.open ? 'open' : null,
+  }, [summary, body]);
+}
+
+function tabs(opts) {
+  opts = opts || {};
+  var items = opts.items || [];
+  var active = opts.active || (items[0] && items[0].id);
+  var tabBar = el('div', { class: 'w-tabs' });
+  var panel = el('div', { class: 'w-tab-panel' });
+
+  function render(activeId) {
+    tabBar.innerHTML = '';
+    items.forEach(function(it){
+      var btn = el('button', {
+        class: 'w-tab' + (it.id === activeId ? ' w-tab-active' : ''),
+        onclick: function(){ render(it.id); if (opts.onChange) opts.onChange(it.id); },
+      }, it.label);
+      tabBar.appendChild(btn);
+    });
+    panel.innerHTML = '';
+    var found = items.find(function(it){ return it.id === activeId; });
+    if (found && found.content) {
+      panel.appendChild(typeof found.content === 'function' ? found.content() : found.content);
+    }
+  }
+  render(active);
+
+  var wrap = el('div', { class: 'w-tabs-wrap' }, [tabBar, panel]);
+  wrap.setActive = function(id){ render(id); };
+  return wrap;
+}
+
+function row(children, gap) {
+  var r = el('div', { class: 'w-row' }, children);
+  if (gap != null) r.style.gap = gap + 'px';
+  return r;
+}
+function col(children, gap) {
+  var c = el('div', { class: 'w-col' }, children);
+  if (gap != null) c.style.gap = gap + 'px';
+  return c;
+}
+function stack(children, gap) {
+  var s = el('div', { class: 'w-stack' }, children);
+  if (gap != null) s.style.gap = gap + 'px';
+  return s;
+}
+function card(children) { return el('div', { class: 'w-card' }, children); }
+function divider() { return el('hr', { class: 'w-divider' }); }
+
+// MODAL
+// Returns { el, close } and is auto-attached to body
+function modal(opts) {
+  opts = opts || {};
+  var sizeClass = 'w-modal-' + (opts.size || 'md');
+  var closeBtn = el('button', {
+    class: 'w-modal-close',
+    onclick: function(){ close(); },
+    'aria-label': 'Close',
+  }, [icon('x', { size: 18 })]);
+
+  var header = opts.title || opts.dismissable !== false
+    ? el('div', { class: 'w-modal-hdr' }, [
+        opts.title ? el('h3', { class: 'w-modal-title', text: opts.title }) : el('div'),
+        opts.dismissable !== false ? closeBtn : null,
+      ])
+    : null;
+
+  var bodyContent = opts.content;
+  if (typeof bodyContent === 'string') bodyContent = el('div', { html: bodyContent });
+  var body = el('div', { class: 'w-modal-body' }, bodyContent);
+
+  var actions = opts.actions ? el('div', { class: 'w-modal-actions' },
+    opts.actions.map(function(a){
+      return button({
+        label: a.label,
+        variant: a.variant || (a.primary ? 'primary' : null),
+        onClick: function(){
+          if (a.onClick) {
+            var res = a.onClick();
+            if (res !== false) close();
+          } else { close(); }
+        },
+      });
+    })
+  ) : null;
+
+  var modalEl = el('div', { class: 'w-modal ' + sizeClass }, [header, body, actions]);
+
+  var overlay = el('div', {
+    class: 'w-modal-overlay',
+    onclick: function(e){ if (e.target === overlay && opts.dismissable !== false) close(); },
+  }, [modalEl]);
+
+  var closed = false;
+  function close() {
+    if (closed) return;
+    closed = true;
+    overlay.remove();
+    document.removeEventListener('keydown', escHandler);
+    if (opts.onClose) opts.onClose();
+  }
+  function escHandler(e) {
+    if (e.key === 'Escape' && opts.dismissable !== false) close();
+  }
+  document.addEventListener('keydown', escHandler);
+
+  document.body.appendChild(overlay);
+  return { el: overlay, close: close, body: body };
+}
+
+// PUBLIC API
+window.weld.ui = {
+  theme: theme,
+  setTheme: setTheme,
+  getTheme: getTheme,
+  el: el,
+  button: button,
+  input: input,
+  select: select,
+  textarea: textarea,
+  checkbox: checkbox,
+  range: range,
+  label: label,
+  spinner: spinner,
+  icon: icon,
+  registerIcon: registerIcon,
+  disclosure: disclosure,
+  tabs: tabs,
+  row: row,
+  col: col,
+  stack: stack,
+  card: card,
+  divider: divider,
+  modal: modal,
+  injectCSS: injectCSS,
+  version: '1.0.0',
+};
+
+// INIT
+function init() {
+  injectCSS();
+  applyThemeVars();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+})();
+</script>
+<script>(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.persist) return; // already loaded
+
+// -----------------------------------------------------------------
+// weld.persist: Collection-based CRUD over IndexedDB.
+// One database, one object store, logical collections via a compound
+// key of (collection + id). No schema versioning needed when collections
+// are added (they're just key prefixes). No Dexie dependency.
+//
+// Usage:
+//   var db = weld.persist.open('my-app');
+//   var chars = db.collection('characters');
+//   await chars.put({ id: 'c1', name: 'Alice' });
+//   var alice = await chars.get('c1');
+//   var all = await chars.getAll();
+//   await chars.delete('c1');
+// -----------------------------------------------------------------
+
+var STORE_NAME = 'records';
+var DB_VERSION = 1;
+
+// Cache of opened databases: dbName -> Promise<IDBDatabase>
+var dbCache = {};
+
+function openDatabase(dbName) {
+  if (dbCache[dbName]) return dbCache[dbName];
+  dbCache[dbName] = new Promise(function(resolve, reject) {
+    var request = indexedDB.open(dbName, DB_VERSION);
+    request.onupgradeneeded = function(e) {
+      var db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        var store = db.createObjectStore(STORE_NAME, { keyPath: ['_col', '_id'] });
+        store.createIndex('by_col', '_col', { unique: false });
+      }
+    };
+    request.onsuccess = function(e) { resolve(e.target.result); };
+    request.onerror = function(e) {
+      delete dbCache[dbName];
+      reject(new Error('weld.persist: failed to open "' + dbName + '": ' + (e.target.error || 'unknown')));
+    };
+  });
+  return dbCache[dbName];
+}
+
+function uid() {
+  return Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+}
+
+// -----------------------------------------------------------------
+// Collection handle
+// -----------------------------------------------------------------
+function makeCollection(dbName, colName) {
+  function getStore(mode) {
+    return openDatabase(dbName).then(function(db) {
+      var tx = db.transaction(STORE_NAME, mode);
+      return tx.objectStore(STORE_NAME);
+    });
+  }
+
+  function wrapRequest(req) {
+    return new Promise(function(resolve, reject) {
+      req.onsuccess = function() { resolve(req.result); };
+      req.onerror = function() { reject(req.error); };
+    });
+  }
+
+  // Put: upsert a record. If record has no .id, one is generated.
+  function put(record) {
+    if (!record || typeof record !== 'object') {
+      return Promise.reject(new Error('persist.put: record must be an object'));
+    }
+    var rec = Object.assign({}, record);
+    if (rec.id == null) rec.id = uid();
+    rec._col = colName;
+    rec._id = String(rec.id);
+    return getStore('readwrite').then(function(store) {
+      return wrapRequest(store.put(rec));
+    }).then(function() {
+      return rec.id;
+    });
+  }
+
+  // Put many records in a single transaction
+  function putMany(records) {
+    if (!Array.isArray(records)) return Promise.reject(new Error('persist.putMany: expected array'));
+    return openDatabase(dbName).then(function(db) {
+      return new Promise(function(resolve, reject) {
+        var tx = db.transaction(STORE_NAME, 'readwrite');
+        var store = tx.objectStore(STORE_NAME);
+        var ids = [];
+        for (var i = 0; i < records.length; i++) {
+          var rec = Object.assign({}, records[i]);
+          if (rec.id == null) rec.id = uid();
+          rec._col = colName;
+          rec._id = String(rec.id);
+          ids.push(rec.id);
+          store.put(rec);
+        }
+        tx.oncomplete = function() { resolve(ids); };
+        tx.onerror = function() { reject(tx.error); };
+      });
+    });
+  }
+
+  // Get a single record by id
+  function get(id) {
+    return getStore('readonly').then(function(store) {
+      return wrapRequest(store.get([colName, String(id)]));
+    }).then(function(rec) {
+      if (!rec) return null;
+      var out = Object.assign({}, rec);
+      delete out._col;
+      delete out._id;
+      return out;
+    });
+  }
+
+  // Get all records in this collection
+  function getAll() {
+    return getStore('readonly').then(function(store) {
+      var index = store.index('by_col');
+      return wrapRequest(index.getAll(colName));
+    }).then(function(recs) {
+      return (recs || []).map(function(rec) {
+        var out = Object.assign({}, rec);
+        delete out._col;
+        delete out._id;
+        return out;
+      });
+    });
+  }
+
+  // Query: get all records matching a filter function
+  function query(filterFn) {
+    return getAll().then(function(all) {
+      if (typeof filterFn !== 'function') return all;
+      return all.filter(filterFn);
+    });
+  }
+
+  // Delete a single record by id
+  function del(id) {
+    return getStore('readwrite').then(function(store) {
+      return wrapRequest(store.delete([colName, String(id)]));
+    }).then(function() { return true; });
+  }
+
+  // Delete many records by id array
+  function delMany(ids) {
+    if (!Array.isArray(ids)) return Promise.reject(new Error('persist.delMany: expected array'));
+    return openDatabase(dbName).then(function(db) {
+      return new Promise(function(resolve, reject) {
+        var tx = db.transaction(STORE_NAME, 'readwrite');
+        var store = tx.objectStore(STORE_NAME);
+        for (var i = 0; i < ids.length; i++) {
+          store.delete([colName, String(ids[i])]);
+        }
+        tx.oncomplete = function() { resolve(ids.length); };
+        tx.onerror = function() { reject(tx.error); };
+      });
+    });
+  }
+
+  // Clear all records in this collection
+  function clear() {
+    return getAll().then(function(all) {
+      var ids = all.map(function(r) { return r.id; });
+      return delMany(ids);
+    });
+  }
+
+  // Count records in this collection
+  function count() {
+    return getStore('readonly').then(function(store) {
+      var index = store.index('by_col');
+      return wrapRequest(index.count(colName));
+    });
+  }
+
+  // Update: merge a patch into an existing record
+  function update(id, patch) {
+    return get(id).then(function(existing) {
+      if (!existing) return Promise.reject(new Error('persist.update: record not found: ' + id));
+      var merged = Object.assign({}, existing, patch, { id: id });
+      return put(merged);
+    });
+  }
+
+  return {
+    put: put,
+    putMany: putMany,
+    get: get,
+    getAll: getAll,
+    query: query,
+    delete: del,
+    deleteMany: delMany,
+    clear: clear,
+    count: count,
+    update: update
+  };
+}
+
+// -----------------------------------------------------------------
+// Database handle
+// -----------------------------------------------------------------
+function openDb(dbName) {
+  dbName = dbName || 'weld-persist';
+
+  function collection(name) {
+    if (!name) throw new Error('persist: collection name required');
+    return makeCollection(dbName, String(name));
+  }
+
+  // List all collection names that have data
+  function collections() {
+    return openDatabase(dbName).then(function(db) {
+      return new Promise(function(resolve, reject) {
+        var tx = db.transaction(STORE_NAME, 'readonly');
+        var store = tx.objectStore(STORE_NAME);
+        var index = store.index('by_col');
+        var req = index.openKeyCursor();
+        var names = {};
+        req.onsuccess = function(e) {
+          var cursor = e.target.result;
+          if (cursor) {
+            names[cursor.key] = true;
+            cursor.continue();
+          } else {
+            resolve(Object.keys(names));
+          }
+        };
+        req.onerror = function() { reject(req.error); };
+      });
+    });
+  }
+
+  // Export the entire database as a JSON-safe object (for weld.backup)
+  function exportAll() {
+    return openDatabase(dbName).then(function(db) {
+      return new Promise(function(resolve, reject) {
+        var tx = db.transaction(STORE_NAME, 'readonly');
+        var store = tx.objectStore(STORE_NAME);
+        var req = store.getAll();
+        req.onsuccess = function() {
+          var records = req.result || [];
+          var byCol = {};
+          for (var i = 0; i < records.length; i++) {
+            var r = records[i];
+            var col = r._col;
+            if (!byCol[col]) byCol[col] = [];
+            var out = Object.assign({}, r);
+            delete out._col;
+            delete out._id;
+            byCol[col].push(out);
+          }
+          resolve({ dbName: dbName, collections: byCol, exportedAt: Date.now() });
+        };
+        req.onerror = function() { reject(req.error); };
+      });
+    });
+  }
+
+  // Import data from an exported object
+  function importAll(data) {
+    if (!data || !data.collections) {
+      return Promise.reject(new Error('persist.importAll: invalid data'));
+    }
+    var colNames = Object.keys(data.collections);
+    var chain = Promise.resolve();
+    for (var i = 0; i < colNames.length; i++) {
+      (function(colName) {
+        var records = data.collections[colName];
+        chain = chain.then(function() {
+          return collection(colName).putMany(records);
+        });
+      })(colNames[i]);
+    }
+    return chain;
+  }
+
+  // Delete the entire database
+  function destroy() {
+    delete dbCache[dbName];
+    return new Promise(function(resolve, reject) {
+      var req = indexedDB.deleteDatabase(dbName);
+      req.onsuccess = function() { resolve(true); };
+      req.onerror = function() { reject(req.error); };
+    });
+  }
+
+  return {
+    collection: collection,
+    collections: collections,
+    exportAll: exportAll,
+    importAll: importAll,
+    destroy: destroy,
+    name: dbName
+  };
+}
+
+window.weld.persist = {
+  open: openDb,
+  version: '1.0.0'
+};
+
+})();
+</script>
+<script>
+(function(){
+  function start(){if(!window.weld||!window.weld.ui||!window.weld.persist){setTimeout(start,150);return;}buildDemo();}
+  function buildDemo(){
+    var ui=window.weld.ui;
+    var db=weld.persist.open('weld-persist-demo');
+    var colName='characters';
+    var col=db.collection(colName);
+
+    function escapeHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+    async function renderList(){
+      var all=await col.getAll();
+      var n=await col.count();
+      var listEl=document.getElementById('record-list');
+      listEl.innerHTML='';
+      if(all.length===0){listEl.innerHTML='<div class="empty">No records. Click "Add random" to create some.</div>';document.getElementById('col-stats').innerHTML='<strong>Count:</strong> <span class="val">0</span>';return;}
+      all.forEach(function(r){
+        var row=document.createElement('div');row.className='record-row';
+        row.innerHTML='<span class="id">'+escapeHtml(r.id)+'</span><span class="data">'+escapeHtml(r.name||'')+' / '+escapeHtml(r.role||'')+(r.level?' L'+r.level:'')+'</span><div class="actions"><button onclick="this._edit()">Edit</button><button class="danger" onclick="this._del()">Del</button></div>';
+        row.querySelector('button')._edit=function(){
+          var newName=prompt('New name:',r.name);
+          if(newName){col.update(r.id,{name:newName}).then(renderList);}
+        };
+        row.querySelector('.danger')._del=function(){col.delete(r.id).then(renderList);};
+        listEl.appendChild(row);
+      });
+      document.getElementById('col-stats').innerHTML='<strong>Count:</strong> <span class="val">'+n+'</span>';
+    }
+
+    var NAMES=['Alice','Bob','Chloe','Drake','Elara','Finn','Gwen','Hugo'];
+    var ROLES=['mage','warrior','rogue','healer','ranger','bard'];
+    function randomChar(){
+      return{name:NAMES[Math.floor(Math.random()*NAMES.length)],role:ROLES[Math.floor(Math.random()*ROLES.length)],level:Math.floor(Math.random()*20)+1};
+    }
+
+    // Toolbar
+    var tb=document.getElementById('toolbar');
+    tb.appendChild(ui.button({label:'Add random',size:'sm',onClick:function(){col.put(randomChar()).then(renderList);}}));
+    tb.appendChild(ui.button({label:'Add 5',size:'sm',variant:'ghost',onClick:function(){var batch=[];for(var i=0;i<5;i++)batch.push(randomChar());col.putMany(batch).then(renderList);}}));
+    tb.appendChild(ui.button({label:'Clear all',size:'sm',variant:'ghost',icon:'trash',onClick:function(){if(confirm('Clear all records?'))col.clear().then(renderList);}}));
+
+    // Collection switcher
+    var selEl=document.getElementById('col-select');
+    ['characters','items','quests'].forEach(function(c){var o=document.createElement('option');o.value=c;o.textContent=c;selEl.appendChild(o);});
+    selEl.value=colName;
+    selEl.onchange=function(){colName=selEl.value;col=db.collection(colName);renderList();};
+
+    // Export/import
+    document.getElementById('export-btn').appendChild(ui.button({label:'Export DB',size:'sm',variant:'ghost',onClick:function(){
+      db.exportAll().then(function(data){document.getElementById('export-box').textContent=JSON.stringify(data,null,2);});
+    }}));
+    document.getElementById('import-btn').appendChild(ui.button({label:'Import',size:'sm',variant:'ghost',onClick:function(){
+      var raw=document.getElementById('export-box').textContent.trim();
+      if(!raw){alert('Paste JSON into the export box first.');return;}
+      try{var data=JSON.parse(raw);db.importAll(data).then(renderList);}catch(e){alert('Invalid JSON: '+e.message);}
+    }}));
+
+    // DB info
+    async function renderInfo(){
+      var cols=await db.collections();
+      document.getElementById('db-info').innerHTML='<strong>Database:</strong> <span class="val">'+db.name+'</span><br><strong>Collections with data:</strong> <span class="val">'+cols.join(', ')+'</span>';
+    }
+
+    renderList();renderInfo();
+    // Refresh info after mutations
+    var origRender=renderList;
+    renderList=async function(){await origRender();await renderInfo();};
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
+})();
+</script>
+<footer class="footer-social"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>

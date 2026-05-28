@@ -1,0 +1,436 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+.footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--border);
+  color:var(--muted);font-size:12px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+
+.footer-social{text-align:center;font-family:var(--mono);max-width:720px;margin:48px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer-social span,.footer-social a{color:var(--muted);}
+.footer-social a{margin:0 2px;}
+.footer-social a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.prompt<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-prompt-example">demo &rarr;</a></span></div>  <div class="hdr">
+    <div class="hdr-row">
+      <h1>weld.prompt</h1>
+      <span class="ver">v1.0.0</span>
+    </div>
+    <p class="lead">Structured prompt assembly for AI chat apps. Named sections with priorities, token-aware budget packing, Perchance wire format, template variables. The glue between your character card, lorebook, history, and aiTextPlugin.</p>
+  </div>
+  <h2>Overview</h2>
+<p>weld.prompt assembles the instruction string for aiTextPlugin from named, prioritized sections plus serialized chat history, and packs everything into a token budget. When the prompt is too long, it drops the lowest-priority sections first, then trims history from the oldest end.</p>
+<p>The wire format matches the Perchance AI character chat convention: double-bracketed names, double-newline separators, standard stop sequences. Template variables, AI-hidden message filtering, and inline hidden-section stripping are built in.</p>
+<p>Soft integration: uses weld.tokens for exact counting when loaded, otherwise falls back to chars/4.</p>
+<h2>Quick start</h2>
+<p>In your lists editor:</p>
+<pre data-codeid="code1"></pre>
+<pre data-codeid="code2"></pre>
+<h2>Configuration</h2>
+<p>Options passed to <code>create()</code>:</p>
+<ul>
+<li><code>budget</code>: token limit for the packed instruction. Default 4000.</li>
+<li><code>counter</code>: function <code>(text) =&gt; number</code> for token counting. Default auto-detects weld.tokens, falls back to chars/4.</li>
+<li><code>roles</code>: <code>\{user, assistant\}</code> — names used in serialization and template vars. Sets <code>startWith</code> to <code>\[\[assistant\]\]:</code>.</li>
+<li><code>vars</code>: additional template variables beyond user/char.</li>
+<li><code>separator</code>: between sections and messages. Default <code>"\n\n"</code>.</li>
+<li><code>stopSequences</code>: passed through in pack() output. Default <code>\["\n\n\[\[", "\n\[\["\]</code>.</li>
+</ul>
+<h2>Adding sections</h2>
+<div class="sig" data-codeid="sig3"></div>
+<div class="sig" data-codeid="sig4"></div>
+<div class="sig" data-codeid="sig5"></div>
+<div class="sig" data-codeid="sig6"></div>
+<div class="sig" data-codeid="sig7"></div>
+<p>Each section has a <code>name</code>, <code>text</code>, <code>priority</code> (higher = more important), and <code>position</code> (<code>'start'</code> = before history, <code>'end'</code> = after history). When the budget is tight, the lowest-priority sections are dropped first.</p>
+<p><code>reminder</code> defaults to <code>position: 'end'</code> — it appears after the chat history, close to the model's generation point, matching the Perchance convention for reinforcement messages.</p>
+<h2>History and user messages</h2>
+<div class="sig" data-codeid="sig8"></div>
+<div class="sig" data-codeid="sig9"></div>
+<p>Messages should have <code>name</code> (or <code>role</code>) and <code>content</code> (or <code>message</code>/<code>text</code>). Messages with <code>hiddenFrom: ['ai']</code> are automatically filtered. Inline hidden sections (<code>&lt;!--hidden-from-ai-start--&gt;...&lt;!--hidden-from-ai-end--&gt;</code>) are stripped from message content.</p>
+<p>When the budget overflows after dropping all droppable sections, pack() trims history from the oldest end one message at a time.</p>
+<h2>Packing</h2>
+<div class="sig" data-codeid="sig10"></div>
+<p>Returns an object directly passable to <code>aiTextPlugin</code>:</p>
+<ul>
+<li><code>instruction</code>: the assembled prompt string</li>
+<li><code>startWith</code>: <code>"\[\[AssistantName\]\]:"</code></li>
+<li><code>stopSequences</code>: from config</li>
+<li><code>hideStartWith</code>: always true</li>
+<li><code>tokens</code>: count of the final instruction</li>
+<li><code>budget</code>: the configured budget</li>
+<li><code>fits</code>: whether tokens &lt;= budget</li>
+<li><code>sectionsIncluded</code>: names of sections that made the cut</li>
+<li><code>historyLength</code>: total messages in history (before trim)</li>
+</ul>
+<h2>Template variables</h2>
+<p>The builder substitutes double-brace variables in all section text and message content. The <code>roles</code> config auto-sets <code>user</code> and <code>char</code>:</p>
+<pre data-codeid="code11"></pre>
+<h2>Standalone utilities</h2>
+<p>Available without creating a builder:</p>
+<pre data-codeid="code12"></pre>
+
+  <div class="footer">Part of the <a href="https://perchance.org/weld-ui-index">weld plugin suite</a>. Stashed at <code>window.weld.prompt</code>. This page loads the plugin so you can inspect it in DevTools.</div>
+</div>
+<script>
+(function(){
+  var examples = {
+  'code1': 'output\n  weld-prompt = \{import:weld-prompt-plugin\}',
+  'code2': 'root.weldPrompt();\n\nconst builder = weld.prompt.create(\{\n  budget: 4000,\n  roles: \{ user: \'Player\', assistant: \'Narrator\' \}\n\});\n\nbuilder.system(\'You are a fantasy narrator. Use vivid language.\');\nbuilder.character(characterCard);\nbuilder.lorebook(weld.lorebook.inject(userMessage));\nbuilder.reminder(\'Stay in character!\');\nbuilder.history(weld.branching.activeBranch().map(n => n.data));\nbuilder.user(userMessage);\n\nconst packed = builder.pack();\n// packed.instruction  — the assembled prompt string\n// packed.startWith    — "\[\[Narrator\]\]:"\n// packed.stopSequences\n// packed.fits         — true if within budget\n\nconst result = await root.aiTextPlugin(packed);',
+  'sig3': 'builder.system(text, priority?)  — priority default 100',
+  'sig4': 'builder.character(text, priority?)  — default 90',
+  'sig5': 'builder.lorebook(text, priority?)  — default 70',
+  'sig6': 'builder.reminder(text, priority?)  — default 95, positioned after history',
+  'sig7': 'builder.section(name, text, \{priority?, position?\})',
+  'sig8': 'builder.history(messages)  — array of message objects',
+  'sig9': 'builder.user(text)  — append a user message to history',
+  'sig10': 'builder.pack()  ->  result object',
+  'code11': 'const builder = weld.prompt.create(\{\n  roles: \{ user: \'Alice\', assistant: \'Chloe\' \},\n  vars: \{ world: \'Aetheria\' \}\n\});\nbuilder.system(\'In \{\{world\}\}, \{\{char\}\} guides \{\{user\}\} through the story.\');\n// Resolves to: "In Aetheria, Chloe guides Alice through the story."',
+  'code12': 'weld.prompt.serializeHistory(messages, vars);   // -> wire-format string\nweld.prompt.serializeMessage(msg, vars);        // -> single message string\nweld.prompt.substituteVars(text, vars);         // -> text with vars replaced\nweld.prompt.stripHiddenFromAi(text);            // -> text with hidden sections removed\nweld.prompt.estimateTokens(text);               // -> token count (exact or chars/4)'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    var nodes = document.querySelectorAll('[data-codeid]');
+    nodes.forEach(function(n){
+      var id = n.getAttribute('data-codeid');
+      var src = examples[id];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.prompt) return; // already loaded
+
+// -----------------------------------------------------------------
+// weld.prompt: Structured prompt assembly with token-aware packing.
+// Builds the instruction string for aiTextPlugin from named sections
+// (system, character card, lorebook, reminder) plus serialized chat
+// history, fitting everything into a token budget.
+//
+// The wire format matches the Perchance AI character chat convention:
+//   Name: Message content (double-bracketed)
+// separated by double newlines, with standard stop sequences.
+// -----------------------------------------------------------------
+
+var DEFAULT_SEPARATOR = '\n\n';
+var DEFAULT_STOP_SEQUENCES = ['\n\n' + '[' + '[', '\n' + '[' + '['];
+var HIDDEN_AI_START = '<!--hidden-from-ai-start-->';
+var HIDDEN_AI_END   = '<!--hidden-from-ai-end-->';
+
+function estimateTokens(text) {
+  if (!text) return 0;
+  // Use weld.tokens.countSync if available (exact); otherwise chars/4
+  if (window.weld && window.weld.tokens && window.weld.tokens.isLoaded && window.weld.tokens.isLoaded()) {
+    var n = window.weld.tokens.countSync(text);
+    if (n !== null) return n;
+  }
+  return Math.ceil(String(text).length / 4);
+}
+
+function substituteVars(text, vars) {
+  if (!text || !vars) return text || '';
+  var result = String(text);
+  for (var key in vars) {
+    // Replace double-brace vars: user/char are standard
+    // Build the target pattern without literal double-brace in source
+    var target = '\x7b\x7b' + key + '\x7d\x7d';
+    var idx = result.indexOf(target);
+    while (idx !== -1) {
+      result = result.slice(0, idx) + String(vars[key]) + result.slice(idx + target.length);
+      idx = result.indexOf(target, idx + String(vars[key]).length);
+    }
+  }
+  return result;
+}
+
+function stripHiddenFromAi(text) {
+  if (!text) return '';
+  var s = String(text);
+  var startIdx = s.indexOf(HIDDEN_AI_START);
+  while (startIdx !== -1) {
+    var endIdx = s.indexOf(HIDDEN_AI_END, startIdx);
+    if (endIdx === -1) {
+      s = s.slice(0, startIdx);
+      break;
+    }
+    s = s.slice(0, startIdx) + s.slice(endIdx + HIDDEN_AI_END.length);
+    startIdx = s.indexOf(HIDDEN_AI_START);
+  }
+  return s;
+}
+
+// Serialize a single message to wire format
+function serializeMessage(msg, vars) {
+  var name = msg.name || msg.role || 'Unknown';
+  var content = msg.content || msg.message || msg.text || '';
+  content = stripHiddenFromAi(content);
+  content = substituteVars(content, vars);
+  return '[' + '[' + name + ']' + ']: ' + content.trim();
+}
+
+// Serialize an array of messages to the Perchance wire format
+function serializeHistory(messages, vars) {
+  if (!messages || messages.length === 0) return '';
+  var lines = [];
+  for (var i = 0; i < messages.length; i++) {
+    var msg = messages[i];
+    // Skip AI-hidden messages
+    if (msg.hiddenFrom && msg.hiddenFrom.indexOf('ai') !== -1) continue;
+    lines.push(serializeMessage(msg, vars));
+  }
+  return lines.join(DEFAULT_SEPARATOR);
+}
+
+// -----------------------------------------------------------------
+// Builder factory
+// -----------------------------------------------------------------
+function createBuilder(opts) {
+  opts = opts || {};
+  var budget = opts.budget || 4000;
+  var counter = opts.counter || estimateTokens;
+  var separator = opts.separator || DEFAULT_SEPARATOR;
+  var vars = {};
+  var _r = opts.roles || {};
+  if (_r.user) vars.user = _r.user;
+  if (_r.assistant) vars.char = _r.assistant;
+  if (opts.vars) {
+    for (var k in opts.vars) vars[k] = opts.vars[k];
+  }
+  var assistantName = _r.assistant || 'Assistant';
+
+  // Sections: each has name / text / priority / position
+  // position: 'start' (before history) or 'end' (after history)
+  var sections = [];
+  var historyMessages = [];
+
+  function count(text) {
+    if (typeof counter === 'function') return counter(text);
+    return estimateTokens(text);
+  }
+
+  function addSection(name, text, sectionOpts) {
+    sectionOpts = sectionOpts || {};
+    sections.push({
+      name: name,
+      text: substituteVars(String(text || ''), vars),
+      priority: typeof sectionOpts.priority === 'number' ? sectionOpts.priority : 50,
+      position: sectionOpts.position || 'start'
+    });
+  }
+
+  // -------- Convenience methods --------
+  function system(text, priority) {
+    addSection('system', text, { priority: priority || 100, position: 'start' });
+  }
+
+  function character(text, priority) {
+    addSection('character', text, { priority: priority || 90, position: 'start' });
+  }
+
+  function lorebook(text, priority) {
+    addSection('lorebook', text, { priority: priority || 70, position: 'start' });
+  }
+
+  function reminder(text, priority) {
+    addSection('reminder', text, { priority: priority || 95, position: 'end' });
+  }
+
+  function history(messages) {
+    historyMessages = (messages || []).slice();
+  }
+
+  function user(text) {
+    var name = vars.user || 'User';
+    historyMessages.push({ name: name, content: text, role: 'user' });
+  }
+
+  // -------- Main packing logic --------
+  function pack() {
+    // 1. Sort sections: start-positioned first (by priority desc), then end-positioned
+    var startSections = [];
+    var endSections = [];
+    for (var i = 0; i < sections.length; i++) {
+      var s = sections[i];
+      if (s.position === 'end') endSections.push(s);
+      else startSections.push(s);
+    }
+    startSections.sort(function(a, b) { return b.priority - a.priority; });
+    endSections.sort(function(a, b) { return b.priority - a.priority; });
+
+    // 2. Serialize history
+    var historyText = serializeHistory(historyMessages, vars);
+
+    // 3. Build the instruction by fitting sections + history into the budget.
+    //    Strategy: start with everything, then drop lowest-priority sections,
+    //    then truncate history from the oldest end.
+
+    // Start with all sections included
+    var includedStart = startSections.slice();
+    var includedEnd = endSections.slice();
+    var currentHistory = historyText;
+
+    function assemble() {
+      var parts = [];
+      for (var j = 0; j < includedStart.length; j++) parts.push(includedStart[j].text);
+      if (currentHistory) parts.push(currentHistory);
+      for (var k = 0; k < includedEnd.length; k++) parts.push(includedEnd[k].text);
+      return parts.filter(Boolean).join(separator);
+    }
+
+    var instruction = assemble();
+    var tokens = count(instruction);
+
+    // Drop lowest-priority sections until we fit (or run out of droppable sections)
+    if (tokens > budget) {
+      // Collect all sections sorted by priority ascending (lowest first to drop)
+      var allSorted = startSections.concat(endSections).slice();
+      allSorted.sort(function(a, b) { return a.priority - b.priority; });
+
+      for (var d = 0; d < allSorted.length && tokens > budget; d++) {
+        var toDrop = allSorted[d];
+        includedStart = includedStart.filter(function(s) { return s !== toDrop; });
+        includedEnd = includedEnd.filter(function(s) { return s !== toDrop; });
+        instruction = assemble();
+        tokens = count(instruction);
+      }
+    }
+
+    // If still over budget, truncate history from the oldest end
+    if (tokens > budget && historyMessages.length > 0) {
+      var trimmedMessages = historyMessages.slice();
+      while (tokens > budget && trimmedMessages.length > 1) {
+        trimmedMessages.shift();
+        currentHistory = serializeHistory(trimmedMessages, vars);
+        instruction = assemble();
+        tokens = count(instruction);
+      }
+    }
+
+    // Build the startWith for continuation
+    var startWith = '[' + '[' + assistantName + ']' + ']:';
+
+    return {
+      instruction: instruction,
+      startWith: startWith,
+      stopSequences: opts.stopSequences || DEFAULT_STOP_SEQUENCES,
+      hideStartWith: true,
+      tokens: tokens,
+      budget: budget,
+      fits: tokens <= budget,
+      sectionsIncluded: includedStart.concat(includedEnd).map(function(s) { return s.name; }),
+      historyLength: historyMessages.length
+    };
+  }
+
+  // -------- Reset --------
+  function reset() {
+    sections = [];
+    historyMessages = [];
+  }
+
+  return {
+    section: addSection,
+    system: system,
+    character: character,
+    lorebook: lorebook,
+    reminder: reminder,
+    history: history,
+    user: user,
+    pack: pack,
+    reset: reset
+  };
+}
+
+window.weld.prompt = {
+  create: createBuilder,
+  serializeHistory: serializeHistory,
+  serializeMessage: serializeMessage,
+  substituteVars: substituteVars,
+  stripHiddenFromAi: stripHiddenFromAi,
+  estimateTokens: estimateTokens,
+  version: '1.0.0'
+};
+
+})();
+
+</script>
+<footer class="footer-social"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>

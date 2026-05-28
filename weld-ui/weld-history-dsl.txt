@@ -1,0 +1,317 @@
+$meta
+  title       = weld.history
+  description = Chat session manager with auto-save. Each session wraps a branching tree plus metadata. Save, load, list, rename, delete, search. Backed by weld.persist, uses weld.branching for tree ops.
+  tags        = weld, history, session, chat, save, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.history) return window.weld.history;
+
+  // -----------------------------------------------------------------
+  // weld.history: Chat session manager.
+  // Each session = metadata (title, character, timestamps, message count)
+  //              + a serialized weld.branching tree.
+  // Backed by weld.persist for storage. Uses weld.branching for in-memory
+  // tree operations.
+  //
+  // Soft dependencies:
+  //   weld.persist  - required for persistent storage (fatal without it)
+  //   weld.branching - optional; if not loaded, sessions store raw message
+  //                    arrays instead of branching trees
+  // -----------------------------------------------------------------
+
+  function uid() {
+    return 's_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  function createHistory(opts) {
+    opts = opts || {};
+    var dbName = opts.dbName || 'weld-history';
+    var autoSave = opts.autoSave !== false;
+    var autoSaveDebounce = opts.autoSaveDebounceMs || 2000;
+
+    // Require weld.persist
+    if (!window.weld || !window.weld.persist) {
+      throw new Error('weld.history requires weld.persist to be loaded first.');
+    }
+
+    var db = window.weld.persist.open(dbName);
+    var sessions = db.collection('sessions');
+    var trees = db.collection('trees');
+
+    var activeSessionId = null;
+    var activeTree = null;        // weld.branching instance if available
+    var activeMessages = null;    // fallback: plain array of messages
+    var saveTimer = null;
+    var changeListeners = [];
+
+    function hasBranching() {
+      return !!(window.weld && window.weld.branching);
+    }
+
+    function emit(event, data) {
+      for (var i = 0; i < changeListeners.length; i++) {
+        try { changeListeners[i](event, data); } catch (e) { /* swallow */ }
+      }
+    }
+
+    function scheduleSave() {
+      if (!autoSave || !activeSessionId) return;
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(function() {
+        saveTimer = null;
+        save().catch(function(e) {
+          console.error('[weld.history] auto-save failed:', e);
+        });
+      }, autoSaveDebounce);
+    }
+
+    // -------- Create a new session --------
+    function create(meta) {
+      meta = meta || {};
+      var id = meta.id || uid();
+      var now = Date.now();
+      var session = {
+        id: id,
+        title: meta.title || 'New conversation',
+        characterId: meta.characterId || null,
+        characterName: meta.characterName || null,
+        createdAt: now,
+        updatedAt: now,
+        messageCount: 0,
+        metadata: meta.metadata || null
+      };
+
+      // Initialize tree or message array
+      if (hasBranching()) {
+        activeTree = window.weld.branching.create();
+        activeMessages = null;
+      } else {
+        activeTree = null;
+        activeMessages = [];
+      }
+      activeSessionId = id;
+
+      return sessions.put(session).then(function() {
+        return saveTree();
+      }).then(function() {
+        emit('create', { sessionId: id });
+        return id;
+      });
+    }
+
+    // -------- Load a session --------
+    function load(sessionId) {
+      activeSessionId = null;
+      activeTree = null;
+      activeMessages = null;
+
+      return sessions.get(sessionId).then(function(session) {
+        if (!session) throw new Error('weld.history: session not found: ' + sessionId);
+        return trees.get(sessionId).then(function(treeData) {
+          activeSessionId = sessionId;
+          if (treeData && treeData.tree && hasBranching()) {
+            activeTree = window.weld.branching.create();
+            activeTree.deserialize(treeData.tree);
+            activeMessages = null;
+          } else if (treeData && treeData.messages) {
+            activeTree = null;
+            activeMessages = treeData.messages;
+          } else {
+            // Empty session
+            if (hasBranching()) {
+              activeTree = window.weld.branching.create();
+              activeMessages = null;
+            } else {
+              activeTree = null;
+              activeMessages = [];
+            }
+          }
+          // Update view time
+          return sessions.update(sessionId, { updatedAt: Date.now() });
+        });
+      }).then(function() {
+        emit('load', { sessionId: sessionId });
+        return sessionId;
+      });
+    }
+
+    // -------- Save the active session --------
+    function save() {
+      if (!activeSessionId) return Promise.reject(new Error('weld.history: no active session'));
+      var treeData = { id: activeSessionId };
+      if (activeTree) {
+        treeData.tree = activeTree.serialize();
+        treeData.messages = null;
+      } else {
+        treeData.tree = null;
+        treeData.messages = activeMessages ? activeMessages.slice() : [];
+      }
+      var msgCount = activeTree ? activeTree.size() : (activeMessages ? activeMessages.length : 0);
+      return Promise.all([
+        trees.put(treeData),
+        sessions.update(activeSessionId, {
+          updatedAt: Date.now(),
+          messageCount: msgCount
+        })
+      ]).then(function() {
+        emit('save', { sessionId: activeSessionId });
+      });
+    }
+
+    function saveTree() {
+      var treeData = { id: activeSessionId };
+      if (activeTree) {
+        treeData.tree = activeTree.serialize();
+        treeData.messages = null;
+      } else {
+        treeData.tree = null;
+        treeData.messages = activeMessages ? activeMessages.slice() : [];
+      }
+      return trees.put(treeData);
+    }
+
+    // -------- Append a message to the active session --------
+    function append(message) {
+      if (!activeSessionId) throw new Error('weld.history: no active session');
+      if (activeTree) {
+        var id = activeTree.append(message);
+        scheduleSave();
+        emit('append', { sessionId: activeSessionId, nodeId: id });
+        return id;
+      } else {
+        if (!message.id) message.id = uid();
+        activeMessages.push(message);
+        scheduleSave();
+        emit('append', { sessionId: activeSessionId, messageId: message.id });
+        return message.id;
+      }
+    }
+
+    // -------- Get the active conversation --------
+    function getMessages() {
+      if (!activeSessionId) return [];
+      if (activeTree) {
+        return activeTree.activeBranch().map(function(n) { return n.data; });
+      }
+      return activeMessages ? activeMessages.slice() : [];
+    }
+
+    function getTree() {
+      return activeTree;
+    }
+
+    // -------- List sessions --------
+    function list(listOpts) {
+      listOpts = listOpts || {};
+      return sessions.getAll().then(function(all) {
+        // Filter
+        if (listOpts.characterId) {
+          all = all.filter(function(s) { return s.characterId === listOpts.characterId; });
+        }
+        if (listOpts.search) {
+          var q = String(listOpts.search).toLowerCase();
+          all = all.filter(function(s) {
+            var t = s.title ? s.title.toLowerCase() : '';
+            var cn = s.characterName ? s.characterName.toLowerCase() : '';
+            return t.indexOf(q) !== -1 || cn.indexOf(q) !== -1;
+          });
+        }
+        // Sort by updatedAt descending (most recent first)
+        all.sort(function(a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); });
+        // Limit
+        if (listOpts.limit && listOpts.limit > 0) {
+          all = all.slice(0, listOpts.limit);
+        }
+        return all;
+      });
+    }
+
+    // -------- Session metadata operations --------
+    function rename(sessionId, title) {
+      return sessions.update(sessionId, { title: String(title), updatedAt: Date.now() }).then(function() {
+        emit('rename', { sessionId: sessionId, title: title });
+      });
+    }
+
+    function getMeta(sessionId) {
+      return sessions.get(sessionId || activeSessionId);
+    }
+
+    function updateMeta(sessionId, patch) {
+      return sessions.update(sessionId, Object.assign({}, patch, { updatedAt: Date.now() }));
+    }
+
+    // -------- Delete --------
+    function del(sessionId) {
+      if (sessionId === activeSessionId) {
+        activeSessionId = null;
+        activeTree = null;
+        activeMessages = null;
+      }
+      return Promise.all([
+        sessions.delete(sessionId),
+        trees.delete(sessionId)
+      ]).then(function() {
+        emit('delete', { sessionId: sessionId });
+        return true;
+      });
+    }
+
+    function clear() {
+      activeSessionId = null;
+      activeTree = null;
+      activeMessages = null;
+      return Promise.all([
+        sessions.clear(),
+        trees.clear()
+      ]).then(function() {
+        emit('clear', {});
+      });
+    }
+
+    // -------- Listeners --------
+    function onChange(fn) {
+      changeListeners.push(fn);
+      return function() {
+        var idx = changeListeners.indexOf(fn);
+        if (idx >= 0) changeListeners.splice(idx, 1);
+      };
+    }
+
+    function getActiveId() {
+      return activeSessionId;
+    }
+
+    function isActive() {
+      return activeSessionId !== null;
+    }
+
+    return {
+      create: create,
+      load: load,
+      save: save,
+      append: append,
+      getMessages: getMessages,
+      getTree: getTree,
+      list: list,
+      rename: rename,
+      getMeta: getMeta,
+      updateMeta: updateMeta,
+      delete: del,
+      clear: clear,
+      onChange: onChange,
+      getActiveId: getActiveId,
+      isActive: isActive
+    };
+  }
+
+  window.weld.history = {
+    create: createHistory,
+    version: '1.0.0'
+  };
+
+  return window.weld.history;
+
