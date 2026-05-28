@@ -1,0 +1,997 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);
+  -webkit-font-smoothing:antialiased;min-height:100vh;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:900px;margin:0 auto;padding:48px 24px 32px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+.hdr{text-align:center;margin-bottom:40px;}
+.hdr h1{font:700 32px var(--mono);letter-spacing:-1px;color:var(--ink);margin-bottom:8px;}
+.hdr p{font-size:14px;color:var(--muted);max-width:560px;margin:0 auto;}
+.section{margin:40px 0;}
+.section h2{font:600 12px var(--mono);color:var(--muted);text-transform:uppercase;
+  letter-spacing:1.5px;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+.demo-card{background:var(--faint);border:1px solid var(--border);border-radius:8px;
+  padding:20px;margin-bottom:14px;}
+.demo-card .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
+.demo-card .desc{font-size:13px;color:#c9d1d9;margin-bottom:14px;line-height:1.5;}
+.demo-card code{font:12px var(--mono);color:var(--accent);background:var(--bg);padding:1px 6px;border-radius:3px;}
+
+/* Storage usage bar */
+.storage-bar{height:32px;background:var(--bg);border:1px solid var(--border);
+  border-radius:6px;position:relative;overflow:hidden;margin:14px 0 8px;}
+.storage-fill{height:100%;background:linear-gradient(90deg, var(--accent) 0%, var(--accent) 60%, var(--yellow) 80%, var(--red) 95%);
+  transition:width 400ms ease;width:0%;}
+.storage-label{position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;font:600 12px var(--mono);color:var(--ink);
+  text-shadow:0 1px 2px rgba(0,0,0,0.5);}
+.storage-details{font:12px var(--mono);color:var(--muted);text-align:center;margin-top:6px;}
+
+/* Rate limiter visualization */
+.rate-meter{display:flex;gap:3px;margin:14px 0 8px;}
+.rate-slot{flex:1;height:24px;background:var(--bg);border:1px solid var(--border);
+  border-radius:3px;transition:all 240ms;}
+.rate-slot.used{background:var(--accent);border-color:var(--accent);}
+.rate-slot.warn{background:var(--yellow);border-color:var(--yellow);}
+.rate-slot.danger{background:var(--red);border-color:var(--red);}
+.rate-info{display:grid;grid-template-columns:repeat(4, 1fr);gap:8px;margin-top:10px;}
+.rate-stat{background:var(--bg);border:1px solid var(--border);border-radius:4px;
+  padding:8px 10px;text-align:center;}
+.rate-stat .num{font:700 16px var(--mono);color:var(--accent);}
+.rate-stat .lbl{font:600 9px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px;}
+
+.watcher-log{background:var(--bg);border:1px solid var(--border);border-radius:6px;
+  padding:12px 14px;font:12px var(--mono);color:#c9d1d9;line-height:1.6;
+  max-height:160px;overflow-y:auto;margin-top:12px;}
+.watcher-log .entry{padding:2px 0;}
+.watcher-log .entry.warn{color:var(--yellow);}
+.watcher-log .empty{color:var(--muted);font-style:italic;}
+
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;
+  padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+<div id="page">
+  <div class="breadcrumb">
+    <span class="crumb">
+      <a href="https://perchance.org/weld-ui-index">weld</a>
+      <span class="crumb-sep">/</span>
+      weld.quota
+      <span class="crumb-sep">/</span>
+      <span class="crumb-cur">examples</span>
+    </span>
+    <span class="crumb-action">
+      <a href="https://perchance.org/weld-quota-plugin">docs &rarr;</a>
+    </span>
+  </div>
+  <div class="hdr">
+    <h1>weld.quota</h1>
+    <p>Fill up storage, watch the meter climb. Hammer a rate limiter and watch it block. All live, all in this page.</p>
+  </div>
+
+  <div class="section">
+    <h2>Storage estimate</h2>
+    <div class="demo-card" id="storage-card">
+      <div class="desc">Wraps <code>navigator.storage.estimate()</code>. The fill buttons write blob data to an IndexedDB store called <code>weld-quota-demo</code> so you can watch the percentage move.</div>
+      <div class="storage-bar">
+        <div class="storage-fill" id="storage-fill"></div>
+        <div class="storage-label" id="storage-label">measuring...</div>
+      </div>
+      <div class="storage-details" id="storage-details">--</div>
+      <div class="row" style="margin-top:14px"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Threshold watcher</h2>
+    <div class="demo-card" id="watcher-card">
+      <div class="desc">Set up a watcher with a deliberately tiny <span id="threshold-label">0.5%</span> threshold so you can trigger it by filling some data. Crosses fire once on the way up and once on the way down.</div>
+      <div class="row"></div>
+      <div class="watcher-log" id="watcher-log"><div class="empty">No watcher events yet</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Rate limiter</h2>
+    <div class="demo-card" id="rate-card">
+      <div class="desc">A limiter configured for <strong>10 calls per 30 seconds</strong>. State persists in <code>localStorage</code>, so reload the page and your consumed slots are still there.</div>
+      <div class="rate-meter" id="rate-meter"></div>
+      <div class="rate-info">
+        <div class="rate-stat"><div class="num" id="rate-used">0</div><div class="lbl">used</div></div>
+        <div class="rate-stat"><div class="num" id="rate-remaining">10</div><div class="lbl">remaining</div></div>
+        <div class="rate-stat"><div class="num" id="rate-total">10</div><div class="lbl">total</div></div>
+        <div class="rate-stat"><div class="num" id="rate-resets">--</div><div class="lbl">resets in</div></div>
+      </div>
+      <div class="row" style="margin-top:14px"></div>
+      <div class="watcher-log" id="rate-log"><div class="empty">No rate calls yet</div></div>
+    </div>
+  </div>
+
+</div>
+<script>(function(){
+'use strict';
+
+// Namespace
+if (!window.weld) window.weld = {};
+if (window.weld.ui) return; // already loaded
+
+// THEME
+var defaultTheme = {
+  bg:        '#0d1117',
+  surface:   '#161b22',
+  faint:     '#21262d',
+  ink:       '#e6edf3',
+  muted:     '#7d8590',
+  accent:    '#4493f8',
+  accentInk: '#0d1117',
+  green:     '#3fb950',
+  red:       '#f85149',
+  yellow:    '#d29922',
+  blue:      '#58a6ff',
+  border:    'rgba(255,255,255,0.10)',
+  borderHi:  'rgba(255,255,255,0.20)',
+  radius:    '6px',
+  radiusSm:  '4px',
+  radiusLg:  '10px',
+  font:      "'DM Sans', system-ui, sans-serif",
+  fontMono:  "'JetBrains Mono', monospace",
+  shadow:    '0 8px 32px rgba(0,0,0,0.5)',
+  transit:   '120ms cubic-bezier(0.4, 0, 0.2, 1)',
+};
+
+var theme = Object.assign({}, defaultTheme);
+
+function setTheme(updates) {
+  Object.assign(theme, updates);
+  applyThemeVars();
+}
+
+function getTheme() { return Object.assign({}, theme); }
+
+function applyThemeVars() {
+  var root = document.documentElement;
+  Object.keys(theme).forEach(function(k){
+    root.style.setProperty('--w-' + k, theme[k]);
+  });
+}
+
+// CSS - injected once. All values use CSS vars.
+var CSS = [
+"@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');",
+".w-btn{font:500 13px var(--w-font);background:var(--w-bg);color:var(--w-ink);",
+"  border:1px solid var(--w-border);border-radius:var(--w-radius);padding:7px 14px;",
+"  cursor:pointer;display:inline-flex;align-items:center;gap:6px;line-height:1;",
+"  transition:border-color var(--w-transit), background var(--w-transit);outline:none;}",
+".w-btn:hover:not(:disabled){border-color:var(--w-borderHi);}",
+".w-btn:focus-visible{border-color:var(--w-accent);box-shadow:0 0 0 2px rgba(68,147,248,0.3);}",
+".w-btn:disabled{opacity:.4;cursor:not-allowed;}",
+".w-btn-primary{background:var(--w-accent);color:var(--w-accentInk);border-color:var(--w-accent);font-weight:600;}",
+".w-btn-primary:hover:not(:disabled){background:#58a6ff;border-color:#58a6ff;}",
+".w-btn-danger{color:var(--w-red);border-color:rgba(248,81,73,0.4);}",
+".w-btn-danger:hover:not(:disabled){background:rgba(248,81,73,0.1);border-color:var(--w-red);}",
+".w-btn-ghost{background:transparent;border-color:transparent;}",
+".w-btn-ghost:hover:not(:disabled){background:var(--w-faint);}",
+".w-btn-sm{padding:4px 10px;font-size:12px;}",
+".w-btn-lg{padding:10px 20px;font-size:14px;}",
+".w-input,.w-select,.w-textarea{font:13px var(--w-fontMono);background:var(--w-bg);color:var(--w-ink);",
+"  border:1px solid var(--w-border);border-radius:var(--w-radiusSm);padding:7px 10px;outline:none;",
+"  width:100%;box-sizing:border-box;transition:border-color var(--w-transit);}",
+".w-input:focus,.w-select:focus,.w-textarea:focus{border-color:var(--w-accent);box-shadow:0 0 0 2px rgba(68,147,248,0.2);}",
+".w-textarea{resize:vertical;min-height:60px;line-height:1.45;font-size:12px;}",
+".w-select{cursor:pointer;}",
+".w-checkbox{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font:13px var(--w-font);color:var(--w-ink);}",
+".w-checkbox input{margin:0;cursor:pointer;}",
+".w-range{width:100%;height:4px;-webkit-appearance:none;appearance:none;background:var(--w-faint);border-radius:2px;outline:none;}",
+".w-range::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--w-accent);cursor:pointer;border:0;}",
+".w-range::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--w-accent);cursor:pointer;border:0;}",
+".w-label{display:block;font:600 10px var(--w-fontMono);letter-spacing:1px;text-transform:uppercase;",
+"  color:var(--w-muted);margin-bottom:5px;}",
+".w-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;",
+"  display:flex;align-items:center;justify-content:center;padding:20px;",
+"  animation:w-fade-in 150ms ease-out;}",
+"@keyframes w-fade-in{from{opacity:0;}to{opacity:1;}}",
+"@keyframes w-pop-in{from{opacity:0;transform:scale(0.96);}to{opacity:1;transform:scale(1);}}",
+".w-modal{background:var(--w-surface);border:1px solid var(--w-border);border-radius:var(--w-radiusLg);",
+"  box-shadow:var(--w-shadow);max-height:90vh;display:flex;flex-direction:column;",
+"  animation:w-pop-in 160ms ease-out;color:var(--w-ink);font:14px var(--w-font);}",
+".w-modal-sm{width:380px;max-width:100%;}",
+".w-modal-md{width:560px;max-width:100%;}",
+".w-modal-lg{width:800px;max-width:100%;}",
+".w-modal-full{width:96vw;height:90vh;}",
+".w-modal-hdr{padding:16px 20px;border-bottom:1px solid var(--w-border);display:flex;",
+"  align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;}",
+".w-modal-title{font-size:15px;font-weight:600;margin:0;}",
+".w-modal-close{background:transparent;border:0;color:var(--w-muted);cursor:pointer;",
+"  padding:4px;border-radius:var(--w-radiusSm);line-height:0;transition:color var(--w-transit);}",
+".w-modal-close:hover{color:var(--w-ink);background:var(--w-faint);}",
+".w-modal-body{padding:20px;overflow-y:auto;flex:1;font-size:14px;line-height:1.55;}",
+".w-modal-actions{padding:14px 20px;border-top:1px solid var(--w-border);display:flex;",
+"  gap:8px;justify-content:flex-end;flex-shrink:0;}",
+".w-spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--w-faint);",
+"  border-top-color:var(--w-accent);border-radius:50%;animation:w-spin 700ms linear infinite;}",
+".w-spinner-lg{width:24px;height:24px;border-width:3px;}",
+"@keyframes w-spin{to{transform:rotate(360deg);}}",
+".w-disclosure{border:1px solid var(--w-border);border-radius:var(--w-radius);overflow:hidden;}",
+".w-disclosure summary{padding:10px 14px;cursor:pointer;font:600 13px var(--w-font);",
+"  color:var(--w-ink);background:var(--w-faint);outline:none;list-style:none;",
+"  display:flex;align-items:center;justify-content:space-between;}",
+".w-disclosure summary::-webkit-details-marker{display:none;}",
+".w-disclosure summary::after{content:'+';color:var(--w-muted);font-family:var(--w-fontMono);font-size:14px;}",
+".w-disclosure\[open\] summary::after{content:'-';}",
+".w-disclosure-body{padding:14px;}",
+".w-tabs{display:flex;gap:0;border-bottom:1px solid var(--w-border);}",
+".w-tab{padding:9px 16px;background:transparent;border:0;border-bottom:2px solid transparent;",
+"  color:var(--w-muted);font:500 13px var(--w-font);cursor:pointer;transition:color var(--w-transit);",
+"  margin-bottom:-1px;}",
+".w-tab:hover{color:var(--w-ink);}",
+".w-tab-active{color:var(--w-accent);border-bottom-color:var(--w-accent);}",
+".w-row{display:flex;gap:8px;align-items:center;}",
+".w-col{display:flex;flex-direction:column;gap:8px;}",
+".w-stack{display:flex;flex-direction:column;gap:14px;}",
+".w-card{background:var(--w-faint);border:1px solid var(--w-border);border-radius:var(--w-radius);padding:14px;}",
+".w-divider{height:1px;background:var(--w-border);margin:14px 0;border:0;}",
+].join('\n');
+
+var STYLE_ID = 'weld-ui-styles';
+function injectCSS() {
+  if (document.getElementById(STYLE_ID)) return;
+  var style = document.createElement('style');
+  style.id = STYLE_ID;
+  style.textContent = CSS;
+  document.head.appendChild(style);
+}
+
+// DOM HELPER
+// el(tag, attrs, children) - children is string or element or array
+function el(tag, attrs, children) {
+  var node = document.createElement(tag);
+  if (attrs) {
+    Object.keys(attrs).forEach(function(k){
+      var v = attrs[k];
+      if (v == null) return;
+      if (k === 'class' || k === 'className') node.className = v;
+      else if (k === 'style' && typeof v === 'object') Object.assign(node.style, v);
+      else if (k === 'dataset' && typeof v === 'object') Object.assign(node.dataset, v);
+      else if (k.indexOf('on') === 0 && typeof v === 'function') node.addEventListener(k.slice(2).toLowerCase(), v);
+      else if (k === 'html') node.innerHTML = v;
+      else if (k === 'text') node.textContent = v;
+      else node.setAttribute(k, v);
+    });
+  }
+  if (children != null) {
+    if (!Array.isArray(children)) children = [children];
+    children.forEach(function(c){
+      if (c == null) return;
+      if (typeof c === 'string' || typeof c === 'number') node.appendChild(document.createTextNode(c));
+      else if (c.nodeType) node.appendChild(c);
+    });
+  }
+  return node;
+}
+
+// ICONS (small embedded SVG set, lucide-style stroke icons)
+var ICONS = {
+  'x':       'M18 6L6 18M6 6l12 12',
+  'check':   'M20 6L9 17l-5-5',
+  'plus':    'M12 5v14M5 12h14',
+  'minus':   'M5 12h14',
+  'trash':   'M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2',
+  'edit':    'M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z',
+  'save':    'M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2zM17 21v-8H7v8M7 3v5h8',
+  'copy':    'M20 9h-9a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-9a2 2 0 00-2-2zM5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1',
+  'download':'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3',
+  'upload':  'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12',
+  'refresh': 'M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15',
+  'settings':'M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2zM15 12a3 3 0 11-6 0 3 3 0 016 0z',
+  'info':    'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM12 16v-4M12 8h.01',
+  'warn':    'M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01',
+  'error':   'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM15 9l-6 6M9 9l6 6',
+  'search':  'M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z',
+  'chevDown':'M6 9l6 6 6-6',
+  'chevUp':  'M18 15l-6-6-6 6',
+  'chevRight':'M9 18l6-6-6-6',
+  'chevLeft':'M15 18l-9-6 6-6',
+  'external':'M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3',
+};
+
+function icon(name, opts) {
+  opts = opts || {};
+  var size = opts.size || 16;
+  var path = ICONS[name];
+  if (!path) return el('span', { text: '?' });
+  var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('width', size);
+  svg.setAttribute('height', size);
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', opts.color || 'currentColor');
+  svg.setAttribute('stroke-width', opts.weight || '2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  p.setAttribute('d', path);
+  svg.appendChild(p);
+  return svg;
+}
+
+function registerIcon(name, pathD) { ICONS[name] = pathD; }
+
+// COMPONENTS
+function button(opts) {
+  opts = opts || {};
+  var classes = ['w-btn'];
+  if (opts.variant === 'primary') classes.push('w-btn-primary');
+  else if (opts.variant === 'danger') classes.push('w-btn-danger');
+  else if (opts.variant === 'ghost') classes.push('w-btn-ghost');
+  if (opts.size === 'sm') classes.push('w-btn-sm');
+  else if (opts.size === 'lg') classes.push('w-btn-lg');
+  var children = [];
+  if (opts.icon) children.push(icon(opts.icon, { size: opts.size === 'sm' ? 14 : 16 }));
+  if (opts.label != null) children.push(opts.label);
+  return el('button', {
+    class: classes.join(' '),
+    type: opts.type || 'button',
+    disabled: opts.disabled ? 'disabled' : null,
+    onclick: opts.onClick,
+  }, children);
+}
+
+function input(opts) {
+  opts = opts || {};
+  return el('input', {
+    class: 'w-input',
+    type: opts.type || 'text',
+    placeholder: opts.placeholder,
+    value: opts.value != null ? opts.value : '',
+    oninput: opts.onInput ? function(e){ opts.onInput(e.target.value, e); } : null,
+    onchange: opts.onChange ? function(e){ opts.onChange(e.target.value, e); } : null,
+    disabled: opts.disabled ? 'disabled' : null,
+    readonly: opts.readonly ? 'readonly' : null,
+  });
+}
+
+function select(opts) {
+  opts = opts || {};
+  var options = (opts.options || []).map(function(o){
+    if (typeof o === 'string') o = { value: o, label: o };
+    return el('option', {
+      value: o.value,
+      selected: o.value === opts.value ? 'selected' : null,
+    }, o.label);
+  });
+  return el('select', {
+    class: 'w-select',
+    onchange: opts.onChange ? function(e){ opts.onChange(e.target.value, e); } : null,
+    disabled: opts.disabled ? 'disabled' : null,
+  }, options);
+}
+
+function textarea(opts) {
+  opts = opts || {};
+  return el('textarea', {
+    class: 'w-textarea',
+    rows: opts.rows || 4,
+    placeholder: opts.placeholder,
+    oninput: opts.onInput ? function(e){ opts.onInput(e.target.value, e); } : null,
+    onchange: opts.onChange ? function(e){ opts.onChange(e.target.value, e); } : null,
+  }, opts.value || '');
+}
+
+function checkbox(opts) {
+  opts = opts || {};
+  var box = el('input', {
+    type: 'checkbox',
+    checked: opts.checked ? 'checked' : null,
+    onchange: opts.onChange ? function(e){ opts.onChange(e.target.checked, e); } : null,
+  });
+  return el('label', { class: 'w-checkbox' }, [box, opts.label || '']);
+}
+
+function range(opts) {
+  opts = opts || {};
+  return el('input', {
+    class: 'w-range',
+    type: 'range',
+    min: opts.min != null ? opts.min : 0,
+    max: opts.max != null ? opts.max : 100,
+    step: opts.step != null ? opts.step : 1,
+    value: opts.value != null ? opts.value : 0,
+    oninput: opts.onInput ? function(e){ opts.onInput(parseFloat(e.target.value), e); } : null,
+    onchange: opts.onChange ? function(e){ opts.onChange(parseFloat(e.target.value), e); } : null,
+  });
+}
+
+function spinner(opts) {
+  opts = opts || {};
+  var classes = ['w-spinner'];
+  if (opts.size === 'lg') classes.push('w-spinner-lg');
+  return el('span', { class: classes.join(' '), role: 'status' });
+}
+
+function label(text) {
+  return el('label', { class: 'w-label', text: text });
+}
+
+function disclosure(opts) {
+  opts = opts || {};
+  var summary = el('summary', { text: opts.title || '' });
+  var body = el('div', { class: 'w-disclosure-body' }, opts.content);
+  return el('details', {
+    class: 'w-disclosure',
+    open: opts.open ? 'open' : null,
+  }, [summary, body]);
+}
+
+function tabs(opts) {
+  opts = opts || {};
+  var items = opts.items || [];
+  var active = opts.active || (items[0] && items[0].id);
+  var tabBar = el('div', { class: 'w-tabs' });
+  var panel = el('div', { class: 'w-tab-panel' });
+
+  function render(activeId) {
+    tabBar.innerHTML = '';
+    items.forEach(function(it){
+      var btn = el('button', {
+        class: 'w-tab' + (it.id === activeId ? ' w-tab-active' : ''),
+        onclick: function(){ render(it.id); if (opts.onChange) opts.onChange(it.id); },
+      }, it.label);
+      tabBar.appendChild(btn);
+    });
+    panel.innerHTML = '';
+    var found = items.find(function(it){ return it.id === activeId; });
+    if (found && found.content) {
+      panel.appendChild(typeof found.content === 'function' ? found.content() : found.content);
+    }
+  }
+  render(active);
+
+  var wrap = el('div', { class: 'w-tabs-wrap' }, [tabBar, panel]);
+  wrap.setActive = function(id){ render(id); };
+  return wrap;
+}
+
+function row(children, gap) {
+  var r = el('div', { class: 'w-row' }, children);
+  if (gap != null) r.style.gap = gap + 'px';
+  return r;
+}
+function col(children, gap) {
+  var c = el('div', { class: 'w-col' }, children);
+  if (gap != null) c.style.gap = gap + 'px';
+  return c;
+}
+function stack(children, gap) {
+  var s = el('div', { class: 'w-stack' }, children);
+  if (gap != null) s.style.gap = gap + 'px';
+  return s;
+}
+function card(children) { return el('div', { class: 'w-card' }, children); }
+function divider() { return el('hr', { class: 'w-divider' }); }
+
+// MODAL
+// Returns { el, close } and is auto-attached to body
+function modal(opts) {
+  opts = opts || {};
+  var sizeClass = 'w-modal-' + (opts.size || 'md');
+  var closeBtn = el('button', {
+    class: 'w-modal-close',
+    onclick: function(){ close(); },
+    'aria-label': 'Close',
+  }, [icon('x', { size: 18 })]);
+
+  var header = opts.title || opts.dismissable !== false
+    ? el('div', { class: 'w-modal-hdr' }, [
+        opts.title ? el('h3', { class: 'w-modal-title', text: opts.title }) : el('div'),
+        opts.dismissable !== false ? closeBtn : null,
+      ])
+    : null;
+
+  var bodyContent = opts.content;
+  if (typeof bodyContent === 'string') bodyContent = el('div', { html: bodyContent });
+  var body = el('div', { class: 'w-modal-body' }, bodyContent);
+
+  var actions = opts.actions ? el('div', { class: 'w-modal-actions' },
+    opts.actions.map(function(a){
+      return button({
+        label: a.label,
+        variant: a.variant || (a.primary ? 'primary' : null),
+        onClick: function(){
+          if (a.onClick) {
+            var res = a.onClick();
+            if (res !== false) close();
+          } else { close(); }
+        },
+      });
+    })
+  ) : null;
+
+  var modalEl = el('div', { class: 'w-modal ' + sizeClass }, [header, body, actions]);
+
+  var overlay = el('div', {
+    class: 'w-modal-overlay',
+    onclick: function(e){ if (e.target === overlay && opts.dismissable !== false) close(); },
+  }, [modalEl]);
+
+  var closed = false;
+  function close() {
+    if (closed) return;
+    closed = true;
+    overlay.remove();
+    document.removeEventListener('keydown', escHandler);
+    if (opts.onClose) opts.onClose();
+  }
+  function escHandler(e) {
+    if (e.key === 'Escape' && opts.dismissable !== false) close();
+  }
+  document.addEventListener('keydown', escHandler);
+
+  document.body.appendChild(overlay);
+  return { el: overlay, close: close, body: body };
+}
+
+// PUBLIC API
+window.weld.ui = {
+  theme: theme,
+  setTheme: setTheme,
+  getTheme: getTheme,
+  el: el,
+  button: button,
+  input: input,
+  select: select,
+  textarea: textarea,
+  checkbox: checkbox,
+  range: range,
+  label: label,
+  spinner: spinner,
+  icon: icon,
+  registerIcon: registerIcon,
+  disclosure: disclosure,
+  tabs: tabs,
+  row: row,
+  col: col,
+  stack: stack,
+  card: card,
+  divider: divider,
+  modal: modal,
+  injectCSS: injectCSS,
+  version: '1.0.0',
+};
+
+// INIT
+function init() {
+  injectCSS();
+  applyThemeVars();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+})();
+</script>
+<script>(function(){
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.quota) return;
+
+  var STORAGE_KEY = 'weld-quota-state';
+  var watchers = [];
+  var lastEstimate = null;
+
+  // -----------------------------------------------------------------
+  // STORAGE ESTIMATION
+  // -----------------------------------------------------------------
+  function estimate() {
+    if (!navigator.storage || typeof navigator.storage.estimate !== 'function') {
+      var unsupported = {
+        used: 0, available: 0, total: 0, percentUsed: 0,
+        supported: false, usageDetails: null
+      };
+      lastEstimate = unsupported;
+      return Promise.resolve(unsupported);
+    }
+    return navigator.storage.estimate().then(function(est) {
+      var used = est.usage || 0;
+      var total = est.quota || 0;
+      var available = Math.max(0, total - used);
+      var percentUsed = total > 0 ? (used / total) * 100 : 0;
+      var result = {
+        used: used,
+        available: available,
+        total: total,
+        percentUsed: percentUsed,
+        supported: true,
+        usageDetails: est.usageDetails || null
+      };
+      lastEstimate = result;
+      checkWatchers(result);
+      return result;
+    });
+  }
+
+  function formatBytes(bytes) {
+    if (bytes == null || isNaN(bytes)) return '?';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+    return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+  }
+
+  // -----------------------------------------------------------------
+  // STORAGE WATCHERS
+  // -----------------------------------------------------------------
+  function watch(opts) {
+    opts = opts || {};
+    var w = {
+      threshold: opts.threshold != null ? opts.threshold : 80,
+      onCross: typeof opts.onCross === 'function' ? opts.onCross : function(){},
+      every: opts.every || 60000,
+      crossed: false,
+      interval: null
+    };
+    watchers.push(w);
+    w.interval = setInterval(estimate, w.every);
+    estimate(); // initial check
+    return function stop() {
+      clearInterval(w.interval);
+      var i = watchers.indexOf(w);
+      if (i !== -1) watchers.splice(i, 1);
+    };
+  }
+
+  function checkWatchers(est) {
+    for (var i = 0; i < watchers.length; i++) {
+      var w = watchers[i];
+      var over = est.percentUsed >= w.threshold;
+      if (over !== w.crossed) {
+        w.crossed = over;
+        try { w.onCross(est, over); } catch (e) { /* swallow */ }
+      }
+    }
+  }
+
+  // -----------------------------------------------------------------
+  // RATE LIMITERS - sliding window, persisted
+  // -----------------------------------------------------------------
+  var rateConfigs = {};
+
+  function loadRateState() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return {};
+      return JSON.parse(raw) || {};
+    } catch (e) { return {}; }
+  }
+
+  function saveRateState(state) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+    catch (e) { /* quota or disabled */ }
+  }
+
+  function pruneOld(timestamps, windowMs) {
+    var cutoff = Date.now() - windowMs;
+    var out = [];
+    for (var i = 0; i < timestamps.length; i++) {
+      if (timestamps[i] >= cutoff) out.push(timestamps[i]);
+    }
+    return out;
+  }
+
+  function makeStatus(name, timestamps, cfg, allowed) {
+    var remaining = Math.max(0, cfg.maxPerWindow - timestamps.length);
+    var resetsIn = timestamps.length > 0
+      ? Math.max(0, (timestamps[0] + cfg.windowMs) - Date.now())
+      : 0;
+    return {
+      name: name,
+      allowed: allowed,
+      remaining: remaining,
+      used: timestamps.length,
+      total: cfg.maxPerWindow,
+      windowMs: cfg.windowMs,
+      resetsIn: resetsIn
+    };
+  }
+
+  function createRate(name, opts) {
+    if (!name || typeof name !== 'string') throw new Error('rate name required');
+    opts = opts || {};
+    rateConfigs[name] = {
+      maxPerWindow: opts.maxPerWindow || 60,
+      windowMs: opts.windowMs || 60000
+    };
+    return getRate(name);
+  }
+
+  function getRate(name) {
+    return {
+      name: name,
+      check: function() { return checkRate(name); },
+      consume: function() { return consumeRate(name); },
+      reset: function() { return resetRate(name); },
+      history: function() { return rateHistory(name); }
+    };
+  }
+
+  function checkRate(name) {
+    var cfg = rateConfigs[name];
+    if (!cfg) throw new Error('unknown rate: ' + name);
+    var state = loadRateState();
+    var timestamps = pruneOld(state[name] || [], cfg.windowMs);
+    return makeStatus(name, timestamps, cfg, timestamps.length < cfg.maxPerWindow);
+  }
+
+  function consumeRate(name) {
+    var cfg = rateConfigs[name];
+    if (!cfg) throw new Error('unknown rate: ' + name);
+    var state = loadRateState();
+    var timestamps = pruneOld(state[name] || [], cfg.windowMs);
+    if (timestamps.length >= cfg.maxPerWindow) {
+      return makeStatus(name, timestamps, cfg, false);
+    }
+    timestamps.push(Date.now());
+    state[name] = timestamps;
+    saveRateState(state);
+    return makeStatus(name, timestamps, cfg, true);
+  }
+
+  function resetRate(name) {
+    var state = loadRateState();
+    delete state[name];
+    saveRateState(state);
+    return true;
+  }
+
+  function rateHistory(name) {
+    var cfg = rateConfigs[name];
+    if (!cfg) return [];
+    var state = loadRateState();
+    return pruneOld(state[name] || [], cfg.windowMs);
+  }
+
+  function listRates() { return Object.keys(rateConfigs); }
+
+  // -----------------------------------------------------------------
+  // API
+  // -----------------------------------------------------------------
+  window.weld.quota = {
+    // Storage
+    estimate: estimate,
+    lastEstimate: function() { return lastEstimate; },
+    watch: watch,
+    formatBytes: formatBytes,
+
+    // Rate limiting
+    rate: {
+      create: createRate,
+      get: getRate,
+      check: checkRate,
+      consume: consumeRate,
+      reset: resetRate,
+      history: rateHistory,
+      list: listRates
+    },
+
+    version: '1.0.0'
+  };
+})();
+</script>
+<script>
+(function(){
+  function start() {
+    if (!window.weld || !window.weld.ui || !window.weld.quota) {
+      setTimeout(start, 150);
+      return;
+    }
+    buildDemo();
+  }
+
+  function buildDemo() {
+    var ui = window.weld.ui;
+    var quota = window.weld.quota;
+
+    // -------- STORAGE CARD --------
+    var storageCard = document.getElementById('storage-card');
+    var storageRow = storageCard.querySelector('.row');
+
+    storageRow.appendChild(ui.button({
+      label: 'Refresh estimate', variant: 'primary', icon: 'refresh', size: 'sm',
+      onClick: refreshStorage
+    }));
+    storageRow.appendChild(ui.button({
+      label: 'Fill 1MB to IndexedDB', icon: 'plus', size: 'sm',
+      onClick: function() { fillIdb(1).then(refreshStorage); }
+    }));
+    storageRow.appendChild(ui.button({
+      label: 'Fill 5MB', icon: 'plus', size: 'sm',
+      onClick: function() { fillIdb(5).then(refreshStorage); }
+    }));
+    storageRow.appendChild(ui.button({
+      label: 'Wipe demo data', variant: 'danger', size: 'sm', icon: 'trash',
+      onClick: function() { wipeIdb().then(refreshStorage); }
+    }));
+
+    function refreshStorage() {
+      quota.estimate().then(function(e) {
+        var fill = document.getElementById('storage-fill');
+        var label = document.getElementById('storage-label');
+        var details = document.getElementById('storage-details');
+
+        if (!e.supported) {
+          fill.style.width = '0%';
+          label.textContent = 'storage estimate not supported';
+          details.textContent = '';
+          return;
+        }
+        var pct = Math.min(100, e.percentUsed);
+        fill.style.width = pct.toFixed(1) + '%';
+        label.textContent = pct.toFixed(2) + '% used';
+        details.textContent = quota.formatBytes(e.used) + ' of ' + quota.formatBytes(e.total) +
+                              ' (' + quota.formatBytes(e.available) + ' available)';
+      });
+    }
+
+    function fillIdb(mb) {
+      return new Promise(function(resolve) {
+        var req = indexedDB.open('weld-quota-demo', 1);
+        req.onupgradeneeded = function(e){
+          var db = e.target.result;
+          if (!db.objectStoreNames.contains('blobs')) db.createObjectStore('blobs', {autoIncrement:true});
+        };
+        req.onsuccess = function(){
+          var db = req.result;
+          var tx = db.transaction('blobs', 'readwrite');
+          var store = tx.objectStore('blobs');
+          // Generate ~1MB blob
+          var chunk = new Uint8Array(1024 * 1024 * mb);
+          for (var i = 0; i < chunk.length; i++) chunk[i] = i & 0xff;
+          store.add(chunk);
+          tx.oncomplete = function(){ db.close(); resolve(); };
+          tx.onerror = function(){ db.close(); resolve(); };
+        };
+        req.onerror = function(){ resolve(); };
+      });
+    }
+
+    function wipeIdb() {
+      return new Promise(function(resolve) {
+        var req = indexedDB.deleteDatabase('weld-quota-demo');
+        req.onsuccess = req.onerror = function(){ resolve(); };
+      });
+    }
+
+    // -------- WATCHER CARD --------
+    var watcherCard = document.getElementById('watcher-card');
+    var watcherRow = watcherCard.querySelector('.row');
+    var threshold = 0.5;  // 0.5% for easy testing
+    var thresholdLabel = document.getElementById('threshold-label');
+    var stopFn = null;
+
+    watcherRow.appendChild(ui.button({
+      label: 'Start watching at 0.5%', variant: 'primary', size: 'sm', icon: 'eye',
+      onClick: function(){
+        if (stopFn) { stopFn(); stopFn = null; }
+        logWatcher('Watcher started (threshold 0.5%, polling every 3s)');
+        stopFn = quota.watch({
+          threshold: 0.5, every: 3000,
+          onCross: function(est, isOver) {
+            logWatcher((isOver ? '[CROSSED ABOVE] ' : '[DROPPED BELOW] ') +
+                       est.percentUsed.toFixed(2) + '% (' + quota.formatBytes(est.used) + ')',
+                       isOver ? 'warn' : '');
+          }
+        });
+      }
+    }));
+    watcherRow.appendChild(ui.button({
+      label: 'Stop watcher', size: 'sm', variant: 'ghost',
+      onClick: function(){
+        if (stopFn) { stopFn(); stopFn = null; logWatcher('Watcher stopped'); }
+        else logWatcher('No watcher running');
+      }
+    }));
+
+    function logWatcher(msg, cls) {
+      var log = document.getElementById('watcher-log');
+      if (log.querySelector('.empty')) log.innerHTML = '';
+      var entry = document.createElement('div');
+      entry.className = 'entry' + (cls ? ' ' + cls : '');
+      entry.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+      log.insertBefore(entry, log.firstChild);
+    }
+
+    // -------- RATE LIMITER CARD --------
+    var rateCard = document.getElementById('rate-card');
+    var rateRow = rateCard.querySelector('.row');
+
+    var rateLimit = quota.rate.create('demo-api', { maxPerWindow: 10, windowMs: 30000 });
+
+    rateRow.appendChild(ui.button({
+      label: 'Consume (call API)', variant: 'primary', size: 'sm', icon: 'send',
+      onClick: function(){
+        var s = rateLimit.consume();
+        renderRate();
+        if (!s.allowed) {
+          logRate('BLOCKED -- ' + Math.ceil(s.resetsIn/1000) + 's until reset', 'danger');
+        } else {
+          logRate('Consumed ' + s.used + '/' + s.total + ' (' + s.remaining + ' remaining)');
+        }
+      }
+    }));
+    rateRow.appendChild(ui.button({
+      label: 'Check (no consume)', size: 'sm', icon: 'info',
+      onClick: function(){
+        var s = rateLimit.check();
+        logRate('Check: ' + s.used + '/' + s.total + ' used, ' +
+                Math.ceil(s.resetsIn/1000) + 's until reset');
+      }
+    }));
+    rateRow.appendChild(ui.button({
+      label: 'Reset rate', size: 'sm', variant: 'ghost', icon: 'refresh',
+      onClick: function(){ rateLimit.reset(); renderRate(); logRate('Rate state cleared'); }
+    }));
+
+    function renderRate() {
+      var meter = document.getElementById('rate-meter');
+      var s = rateLimit.check();
+      meter.innerHTML = '';
+      for (var i = 0; i < s.total; i++) {
+        var slot = document.createElement('div');
+        slot.className = 'rate-slot';
+        if (i < s.used) {
+          slot.className += ' used';
+          if (s.used >= s.total) slot.className = 'rate-slot danger';
+          else if (s.used / s.total >= 0.7) slot.className = 'rate-slot warn';
+        }
+        meter.appendChild(slot);
+      }
+      document.getElementById('rate-used').textContent = s.used;
+      document.getElementById('rate-remaining').textContent = s.remaining;
+      document.getElementById('rate-total').textContent = s.total;
+      document.getElementById('rate-resets').textContent = s.used > 0 ? Math.ceil(s.resetsIn/1000) + 's' : '--';
+    }
+
+    function logRate(msg, cls) {
+      var log = document.getElementById('rate-log');
+      if (log.querySelector('.empty')) log.innerHTML = '';
+      var entry = document.createElement('div');
+      entry.className = 'entry' + (cls ? ' ' + cls : '');
+      entry.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+      log.insertBefore(entry, log.firstChild);
+    }
+
+    // Live tick to update reset timer
+    setInterval(renderRate, 1000);
+    renderRate();
+    refreshStorage();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>

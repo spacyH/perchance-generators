@@ -1,0 +1,501 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+/* footer below */
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.settings<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-settings-example">demo &rarr;</a></span></div>  <div class="hdr">
+    <div class="hdr-row">
+      <h1>weld.settings</h1>
+      <span class="ver">v1.0.0</span>
+    </div>
+    <p class="lead">Declarative settings panels: schema in, persisted accessor and rendered UI out.</p>
+  </div>
+  <h2>Overview</h2>
+<p>weld.settings handles the perennial "preferences panel" problem: define a schema, get a typed object you can read and write, automatic persistence, automatic UI. Define your settings once, and the plugin gives you both a programmatic accessor and a working settings panel UI without you writing any DOM code.</p>
+<p>Values persist to <code>localStorage</code> by default. Type validation happens on every <code>set</code> call -- numbers get clamped to their range, selects reject unknown options, booleans get coerced.</p>
+<h2>Quick start</h2>
+<p>In your lists editor:</p>
+<pre data-codeid="code1"></pre>
+
+<p>Define your schema and create a settings instance:</p>
+<pre data-codeid="code2"></pre>
+
+<p>Build and mount a panel:</p>
+<pre data-codeid="code3"></pre>
+<h2>Schema fields</h2>
+<p>Each schema entry is an object describing one setting. Supported field types:</p>
+
+<h3>type: 'string'</h3>
+<pre data-codeid="code4"></pre>
+<p>For sensitive values, add <code>secret: true</code> -- the panel renders a password field.</p>
+
+<h3>type: 'number'</h3>
+<pre data-codeid="code5"></pre>
+<p>Values are clamped to <code>min</code>/<code>max</code>. <code>step</code> is passed to the input.</p>
+
+<h3>type: 'boolean'</h3>
+<pre data-codeid="code6"></pre>
+<p>Coerced to true/false. Renders as a checkbox.</p>
+
+<h3>type: 'select'</h3>
+<pre data-codeid="code7"></pre>
+
+<h3>type: 'color'</h3>
+<pre data-codeid="code8"></pre>
+<p>Renders an HTML color picker. Value is a hex string.</p>
+
+<h3>type: 'textarea'</h3>
+<pre data-codeid="code9"></pre>
+<h2>Reading and writing</h2><h3>settings.get(key) / .getAll()</h3>
+<div class="sig" data-codeid="sig10"></div>
+<div class="sig" data-codeid="sig11"></div>
+<p>Retrieve a single value or a shallow copy of all values.</p>
+<pre data-codeid="code12"></pre>
+<h3>settings.set(key, value)</h3>
+<div class="sig" data-codeid="sig13"></div>
+<p>Set a value. Validates against the schema, coerces if needed (number clamping, boolean coercion), throws for unknown keys or invalid select options. Returns <code>true</code> if the value actually changed; <code>false</code> if the new value equaled the old.</p>
+<pre data-codeid="code14"></pre>
+<h3>settings.reset(key?)</h3>
+<div class="sig" data-codeid="sig15"></div>
+<p>Reset one key (if given) or all keys to their schema defaults. Fires <code>subscribe</code> callbacks for each changed value.</p>
+<h2>Subscriptions</h2><h3>settings.subscribe(key, fn)</h3>
+<div class="sig" data-codeid="sig16"></div>
+<div class="sig" data-codeid="sig17"></div>
+<p>Listen for changes. Per-key subscribers get <code>(newValue, oldValue)</code>. The wildcard <code>'*'</code> subscriber gets <code>(key, newValue, oldValue)</code>.</p>
+<pre data-codeid="code18"></pre>
+<h2>Building UI</h2><h3>settings.buildPanel(opts?)</h3>
+<div class="sig" data-codeid="sig19"></div>
+<p>Returns a complete, mounted-ready settings panel. Without <code>sections</code>, every schema key is rendered in order. With <code>sections</code>, keys are grouped under headers; any keys not assigned to a section are rendered at the bottom.</p>
+<pre data-codeid="code20"></pre>
+<p>The panel uses CSS variables (<code>--weld-ink</code>, <code>--weld-faint</code>, <code>--weld-border</code>, <code>--weld-muted</code>) so it inherits the surrounding theme. If weld.ui is loaded, those variables are already set by the theme system.</p>
+<h3>settings.buildField(key)</h3>
+<div class="sig" data-codeid="sig21"></div>
+<p>Build just one field. Useful for embedding a setting inside a custom layout rather than a full panel.</p>
+<h2>Common patterns</h2><h3>Apply settings as they change</h3>
+<pre data-codeid="code22"></pre>
+<h3>Persistent state with a custom store</h3>
+<p>Pass a custom <code>storage</code> with <code>getItem</code> / <code>setItem</code> to swap out localStorage -- useful for switching to IndexedDB via weld.migrate, or for in-memory state during tests.</p>
+<pre data-codeid="code23"></pre>
+<h2>Caveats</h2><div class="note">
+Storage is JSON-serialized. Schema values that don't round-trip through JSON (functions, class instances, Symbols) won't persist correctly. Stick to primitives, arrays of primitives, and plain objects.
+</div>
+  <div class="footer">Part of the <a href="https://perchance.org/weld-ui-index">weld plugin suite</a>. Stashed at <code>window.weld.settings</code>. This page loads the plugin so you can inspect it in DevTools.</div>
+</div>
+<script>
+(function(){
+  var examples = {
+  'code1': 'output\n  weld-settings = \{import:weld-settings-plugin\}',
+  'code2': 'root.weldSettings();   // trigger $output\n\nconst settings = weld.settings.create(\{\n  storageKey: \'my-app-settings\',\n  schema: \{\n    theme:      \{ type: \'select\', options: \[\'dark\', \'light\'\], default: \'dark\' \},\n    fontSize:   \{ type: \'number\', min: 10, max: 24, default: 14 \},\n    showAvatar: \{ type: \'boolean\', default: true \},\n    apiKey:     \{ type: \'string\', secret: true, default: \'\' \}\n  \}\n\});\n\nsettings.get(\'theme\');               // \'dark\'\nsettings.set(\'fontSize\', 18);        // saves to localStorage\nsettings.set(\'fontSize\', 999);       // gets clamped to 24',
+  'code3': 'const panel = settings.buildPanel(\{\n  title: \'Preferences\',\n  sections: \[\n    \{ title: \'Appearance\', keys: \[\'theme\', \'fontSize\'\] \},\n    \{ title: \'Behavior\',   keys: \[\'showAvatar\'\] \},\n    \{ title: \'API\',        keys: \[\'apiKey\'\] \}\n  \]\n\});\ndocument.body.appendChild(panel);',
+  'code4': '\{ type: \'string\', default: \'\', label: \'Display name\', help: \'Shown in headers\' \}',
+  'code5': '\{ type: \'number\', min: 10, max: 100, step: 1, default: 14 \}',
+  'code6': '\{ type: \'boolean\', default: true, label: \'Enable feature X\' \}',
+  'code7': '// Simple form: array of strings\n\{ type: \'select\', options: \[\'low\', \'medium\', \'high\'\], default: \'medium\' \}\n\n// Labeled form: array of objects\n\{ type: \'select\', default: \'sm\', options: \[\n    \{ value: \'sm\', label: \'Small\' \},\n    \{ value: \'md\', label: \'Medium\' \},\n    \{ value: \'lg\', label: \'Large\' \}\n\]\}',
+  'code8': '\{ type: \'color\', default: \'#3b82f6\', label: \'Accent color\' \}',
+  'code9': '\{ type: \'textarea\', rows: 4, default: \'\', label: \'Notes\', placeholder: \'...\' \}',
+  'sig10': 'settings.get(key)  ->  value',
+  'sig11': 'settings.getAll()  ->  object',
+  'code12': 'console.log(settings.get(\'theme\'));    // \'dark\'\nconsole.log(settings.getAll());        // \{theme: \'dark\', fontSize: 14, ...\}',
+  'sig13': 'settings.set(key, value)  ->  boolean (true if changed)',
+  'code14': 'settings.set(\'fontSize\', 16);         // returns true\nsettings.set(\'fontSize\', 16);         // returns false (unchanged)\nsettings.set(\'theme\', \'monokai\');     // throws (not in options)\nsettings.set(\'unknownKey\', \'x\');      // throws (not in schema)',
+  'sig15': 'settings.reset(key?)  ->  void',
+  'sig16': 'settings.subscribe(key, fn)  ->  unsubscribe()',
+  'sig17': 'settings.subscribe(\'*\', fn)  ->  unsubscribe()',
+  'code18': 'const offTheme = settings.subscribe(\'theme\', (next, prev) => \{\n  document.body.dataset.theme = next;\n\});\n\nconst offAll = settings.subscribe(\'*\', (key, next, prev) => \{\n  console.log(\'changed\', key, prev, \'->\', next);\n\});\n\n// later: offTheme(); offAll();',
+  'sig19': 'settings.buildPanel(\{title?, sections?\})  ->  HTMLElement',
+  'code20': 'const panel = settings.buildPanel(\{\n  title: \'Settings\',\n  sections: \[\n    \{ title: \'Display\',  keys: \[\'theme\', \'fontSize\'\] \},\n    \{ title: \'Advanced\', keys: \[\'apiKey\'\] \}\n  \]\n\});',
+  'sig21': 'settings.buildField(key)  ->  HTMLElement | null',
+  'code22': 'const settings = weld.settings.create(\{\n  schema: \{\n    fontSize: \{ type: \'number\', min: 10, max: 24, default: 14 \}\n  \}\n\});\n\n// Apply once at startup:\ndocument.body.style.fontSize = settings.get(\'fontSize\') + \'px\';\n\n// Apply continuously on change:\nsettings.subscribe(\'fontSize\', (size) => \{\n  document.body.style.fontSize = size + \'px\';\n\});',
+  'code23': 'const settings = weld.settings.create(\{\n  storage: customStore,    // anything with getItem(key) / setItem(key, value)\n  storageKey: \'my-app\',\n  schema: \{/* ... */\}\n\});'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    var nodes = document.querySelectorAll('[data-codeid]');
+    nodes.forEach(function(n){
+      var id = n.getAttribute('data-codeid');
+      var src = examples[id];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.settings) return; // already loaded
+
+// -----------------------------------------------------------------
+// CSS injection -- once
+// -----------------------------------------------------------------
+function injectCss() {
+  if (window.__weldSettingsCss) return;
+  window.__weldSettingsCss = true;
+  var s = document.createElement('style');
+  s.textContent =
+    '.weld-settings-panel{font:14px system-ui,sans-serif;color:var(--weld-ink,#e6edf3);}' +
+    '.weld-settings-panel h3{font-size:16px;margin-bottom:16px;font-weight:600;}' +
+    '.weld-settings-panel h4{font-size:11px;font-weight:600;color:var(--weld-muted,#7d8590);' +
+      'text-transform:uppercase;letter-spacing:1px;margin:20px 0 10px;}' +
+    '.weld-settings-row{display:grid;grid-template-columns:140px 1fr;gap:12px;' +
+      'align-items:center;padding:8px 0;}' +
+    '.weld-settings-row > label{font-size:13px;color:var(--weld-ink,#e6edf3);}' +
+    '.weld-settings-row > input,.weld-settings-row > select,.weld-settings-row > textarea{' +
+      'padding:6px 10px;background:var(--weld-faint,#21262d);' +
+      'border:1px solid var(--weld-border,rgba(255,255,255,0.10));border-radius:4px;' +
+      'color:var(--weld-ink,#e6edf3);font:13px system-ui,sans-serif;}' +
+    '.weld-settings-row > input[type=checkbox]{justify-self:start;width:auto;}' +
+    '.weld-settings-row > input[type=color]{padding:2px;width:60px;height:30px;cursor:pointer;}' +
+    '.weld-settings-row > textarea{resize:vertical;min-height:60px;font-family:inherit;}' +
+    '.weld-settings-help{grid-column:2;font-size:11px;color:var(--weld-muted,#7d8590);margin-top:-4px;}' +
+    '.weld-settings-section{border-top:1px solid var(--weld-border,rgba(255,255,255,0.10));' +
+      'padding-top:12px;margin-top:12px;}' +
+    '.weld-settings-section:first-child{border-top:0;padding-top:0;margin-top:0;}';
+  document.head.appendChild(s);
+}
+
+// -----------------------------------------------------------------
+// Validation and coercion per type
+// -----------------------------------------------------------------
+function coerce(s, value) {
+  if (s.type === 'number') {
+    var n = Number(value);
+    if (isNaN(n)) throw new Error('not a number');
+    if (s.min != null && n < s.min) n = s.min;
+    if (s.max != null && n > s.max) n = s.max;
+    return n;
+  }
+  if (s.type === 'boolean') return !!value;
+  if (s.type === 'select') {
+    var opts = s.options || [];
+    var vals = opts.map(function(o) { return typeof o === 'object' ? o.value : o; });
+    if (vals.indexOf(value) === -1) {
+      throw new Error('value not in options');
+    }
+    return value;
+  }
+  // string, color, textarea
+  return value == null ? '' : String(value);
+}
+
+// -----------------------------------------------------------------
+// Schema instance factory
+// -----------------------------------------------------------------
+function createSettings(opts) {
+  opts = opts || {};
+  var schema = opts.schema || {};
+  var storageKey = opts.storageKey || 'weld-settings';
+  var storage = opts.storage;
+  if (storage === undefined) {
+    storage = (typeof localStorage !== 'undefined') ? localStorage : null;
+  }
+
+  var values = {};
+  var listeners = {};
+  listeners['*'] = [];
+
+  // Seed defaults
+  for (var key in schema) {
+    var def = schema[key]['default'];
+    values[key] = def !== undefined ? def : null;
+  }
+
+  // Load persisted
+  if (storage) {
+    try {
+      var raw = storage.getItem(storageKey);
+      if (raw) {
+        var loaded = JSON.parse(raw);
+        for (var k in loaded) {
+          if (schema[k]) values[k] = loaded[k];
+        }
+      }
+    } catch (e) { /* swallow */ }
+  }
+
+  function save() {
+    if (!storage) return;
+    try { storage.setItem(storageKey, JSON.stringify(values)); }
+    catch (e) { /* swallow */ }
+  }
+
+  function get(key) {
+    return values[key];
+  }
+
+  function getAll() {
+    var out = {};
+    for (var k in values) out[k] = values[k];
+    return out;
+  }
+
+  function set(key, value) {
+    if (!schema[key]) throw new Error('unknown setting: ' + key);
+    value = coerce(schema[key], value);
+    var old = values[key];
+    if (old === value) return false;
+    values[key] = value;
+    save();
+    fireListeners(key, value, old);
+    return true;
+  }
+
+  function fireListeners(key, value, old) {
+    var L = listeners[key];
+    if (L) {
+      for (var i = 0; i < L.length; i++) {
+        try { L[i](value, old); } catch (e) { /* swallow */ }
+      }
+    }
+    var Lall = listeners['*'];
+    for (var j = 0; j < Lall.length; j++) {
+      try { Lall[j](key, value, old); } catch (e) { /* swallow */ }
+    }
+  }
+
+  function reset(key) {
+    if (key) {
+      if (schema[key]) set(key, schema[key]['default']);
+    } else {
+      for (var k in schema) {
+        var d = schema[k]['default'];
+        if (d !== undefined) set(k, d);
+      }
+    }
+  }
+
+  function subscribe(key, fn) {
+    if (typeof fn !== 'function') throw new Error('subscribe requires a function');
+    if (!listeners[key]) listeners[key] = [];
+    listeners[key].push(fn);
+    return function() {
+      var idx = listeners[key].indexOf(fn);
+      if (idx !== -1) listeners[key].splice(idx, 1);
+    };
+  }
+
+  function buildField(key) {
+    var s = schema[key];
+    if (!s) return null;
+
+    var row = document.createElement('div');
+    row.className = 'weld-settings-row';
+
+    var label = document.createElement('label');
+    label.textContent = s.label || key;
+    row.appendChild(label);
+
+    var control;
+    if (s.type === 'boolean') {
+      control = document.createElement('input');
+      control.type = 'checkbox';
+      control.checked = !!values[key];
+      control.addEventListener('change', function() { set(key, control.checked); });
+    } else if (s.type === 'select') {
+      control = document.createElement('select');
+      var opts = s.options || [];
+      for (var i = 0; i < opts.length; i++) {
+        var opt = opts[i];
+        var val = typeof opt === 'object' ? opt.value : opt;
+        var lbl = typeof opt === 'object' ? opt.label : opt;
+        var o = document.createElement('option');
+        o.value = val;
+        o.textContent = lbl;
+        if (values[key] === val) o.selected = true;
+        control.appendChild(o);
+      }
+      control.addEventListener('change', function() { set(key, control.value); });
+    } else if (s.type === 'number') {
+      control = document.createElement('input');
+      control.type = 'number';
+      if (s.min != null) control.min = s.min;
+      if (s.max != null) control.max = s.max;
+      if (s.step != null) control.step = s.step;
+      control.value = values[key];
+      control.addEventListener('change', function() {
+        var v = parseFloat(control.value);
+        if (!isNaN(v)) set(key, v);
+      });
+    } else if (s.type === 'color') {
+      control = document.createElement('input');
+      control.type = 'color';
+      control.value = values[key] || '#000000';
+      control.addEventListener('change', function() { set(key, control.value); });
+    } else if (s.type === 'textarea') {
+      control = document.createElement('textarea');
+      control.rows = s.rows || 3;
+      control.value = values[key] || '';
+      control.addEventListener('change', function() { set(key, control.value); });
+    } else {
+      control = document.createElement('input');
+      control.type = s.secret ? 'password' : 'text';
+      control.value = values[key] || '';
+      control.addEventListener('change', function() { set(key, control.value); });
+    }
+
+    row.appendChild(control);
+
+    if (s.help) {
+      var helpEl = document.createElement('div');
+      helpEl.className = 'weld-settings-help';
+      helpEl.textContent = s.help;
+      row.appendChild(helpEl);
+    }
+
+    return row;
+  }
+
+  function buildPanel(panelOpts) {
+    injectCss();
+    panelOpts = panelOpts || {};
+    var panel = document.createElement('div');
+    panel.className = 'weld-settings-panel';
+
+    if (panelOpts.title) {
+      var h = document.createElement('h3');
+      h.textContent = panelOpts.title;
+      panel.appendChild(h);
+    }
+
+    var sections = panelOpts.sections;
+    var rendered = {};
+
+    if (sections && sections.length) {
+      for (var i = 0; i < sections.length; i++) {
+        var section = sections[i];
+        var sec = document.createElement('div');
+        sec.className = 'weld-settings-section';
+        if (section.title) {
+          var t = document.createElement('h4');
+          t.textContent = section.title;
+          sec.appendChild(t);
+        }
+        var keys = section.keys || [];
+        for (var j = 0; j < keys.length; j++) {
+          var field = buildField(keys[j]);
+          if (field) {
+            sec.appendChild(field);
+            rendered[keys[j]] = true;
+          }
+        }
+        panel.appendChild(sec);
+      }
+    }
+
+    // Render any keys not yet in a section
+    for (var key in schema) {
+      if (rendered[key]) continue;
+      var f = buildField(key);
+      if (f) panel.appendChild(f);
+    }
+
+    return panel;
+  }
+
+  return {
+    get: get,
+    set: set,
+    getAll: getAll,
+    reset: reset,
+    subscribe: subscribe,
+    buildPanel: buildPanel,
+    buildField: buildField,
+    schema: schema
+  };
+}
+
+window.weld.settings = {
+  create: createSettings,
+  version: '1.0.0'
+};
+
+})();
+
+</script>
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>

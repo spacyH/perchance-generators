@@ -1,0 +1,411 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+/* footer below */
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.undo<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-undo-example">demo &rarr;</a></span></div>  <div class="hdr">
+    <div class="hdr-row">
+      <h1>weld.undo</h1>
+      <span class="ver">v1.0.0</span>
+    </div>
+    <p class="lead">Undo and redo with state snapshots, atomic transactions, and keyboard shortcuts. Works with any state shape.</p>
+  </div>
+  <h2>Overview</h2>
+<p>weld.undo gives you undo and redo for any application state, without any framework. You define how to read and write your state, and the plugin manages a stack of snapshots. Transactions let you group multiple changes into one atomic undo step; an optional keyboard binding installs Cmd+Z and Cmd+Shift+Z (and Cmd+Y) handlers.</p>
+<p>Snapshots are deep clones -- the plugin uses <code>structuredClone</code> where available and falls back to JSON round-trip. That means your state needs to be serializable, but you don't need to write any merge/diff logic.</p>
+<h2>Quick start</h2>
+<p>In your lists editor:</p>
+<pre data-codeid="code1"></pre>
+
+<p>Create a stack against your state:</p>
+<pre data-codeid="code2"></pre>
+
+<p>An initial snapshot is taken automatically when you call <code>create</code>, so <code>undo()</code> always has somewhere to go back to.</p>
+<h2>Core API</h2><h3>weld.undo.create(\{getState, setState, maxDepth?\})</h3>
+<div class="sig" data-codeid="sig3"></div>
+<p>Create a new stack. Both <code>getState</code> and <code>setState</code> are required.</p>
+<ul>
+<li><code>getState()</code> returns the current state -- must be serializable.</li>
+<li><code>setState(state)</code> applies a state. The plugin passes you a deep clone, so you can mutate freely without affecting history.</li>
+<li><code>maxDepth</code> caps the stack size (default 50). Oldest snapshots drop off when exceeded.</li>
+</ul>
+<h3>stack.snapshot(label?)</h3>
+<div class="sig" data-codeid="sig4"></div>
+<p>Take a snapshot of the current state and push it onto the stack. The optional <code>label</code> is for your own debugging (shown in <code>history()</code>). Returns the new snapshot, or <code>null</code> if called inside a transaction.</p>
+<pre data-codeid="code5"></pre>
+
+<p>Taking a snapshot truncates any redo history past the current position -- this matches editor expectations (after undo, doing something new clears the future).</p>
+<h3>stack.undo() / stack.redo()</h3>
+<div class="sig" data-codeid="sig6"></div>
+<div class="sig" data-codeid="sig7"></div>
+<p>Move backward or forward in history. Calls <code>setState</code> with the appropriate snapshot. Return the snapshot that was applied, or <code>null</code> if at the boundary.</p>
+<h3>stack.canUndo() / stack.canRedo()</h3>
+<p>Booleans -- useful for enabling/disabling toolbar buttons.</p>
+<pre data-codeid="code8"></pre>
+<h2>Transactions</h2><h3>stack.transaction(fn, label?)</h3>
+<div class="sig" data-codeid="sig9"></div>
+<p>Run multiple state changes as one atomic undo step. Snapshots taken <em>inside</em> the function are deferred -- only one snapshot is created when the function returns. Supports both sync and async functions.</p>
+
+<pre data-codeid="code10"></pre>
+
+<p>Async transactions work too:</p>
+<pre data-codeid="code11"></pre>
+
+<p>If the function throws (or the Promise rejects), no snapshot is taken -- the state stays whatever you left it as. Roll back manually if you need to.</p>
+<h2>Inspection</h2><h3>stack.peek() / .depth() / .position()</h3>
+<p><code>peek()</code> returns the current snapshot. <code>depth()</code> is the total number of snapshots. <code>position()</code> is the cursor's index (0 = oldest).</p>
+<pre data-codeid="code12"></pre>
+<h3>stack.history()</h3>
+<div class="sig" data-codeid="sig13"></div>
+<p>Returns a copy of the entire snapshot array, oldest first. Useful for building a history panel or timeline UI.</p>
+<pre data-codeid="code14"></pre>
+<h3>stack.clear()</h3>
+<p>Drop all snapshots. The current state is unchanged, but undo/redo no longer works until you take a new snapshot.</p>
+<h2>Reactive UI</h2><h3>stack.onChange(fn)</h3>
+<div class="sig" data-codeid="sig15"></div>
+<p>Get called every time the stack changes. <code>event</code> is one of <code>'snapshot'</code>, <code>'undo'</code>, <code>'redo'</code>, or <code>'clear'</code>. Use this to update toolbar button state, status bars, or live history panels.</p>
+<pre data-codeid="code16"></pre>
+<h2>Keyboard shortcuts</h2><h3>stack.bindKeyboard(\{target?, preventDefault?\})</h3>
+<div class="sig" data-codeid="sig17"></div>
+<p>Install global keyboard handlers for Cmd+Z (undo), Cmd+Shift+Z (redo), and Cmd+Y (redo). Ctrl+ also works on Windows/Linux. Returns an unbind function.</p>
+<ul>
+<li><code>target</code>: where to attach the listener. Defaults to <code>document</code>.</li>
+<li><code>preventDefault</code>: whether to call <code>preventDefault()</code> on matched keys. Defaults to true.</li>
+</ul>
+<pre data-codeid="code18"></pre>
+
+<p>Only one binding is installed per stack -- calling <code>bindKeyboard</code> twice returns the same unbind function.</p>
+<h2>Common patterns</h2><h3>A toolbar with undo/redo buttons</h3>
+<pre data-codeid="code19"></pre>
+<h3>Snapshotting at coarse boundaries, not every keystroke</h3>
+<p>Snapshotting on every keystroke makes undo unusable (one undo per character). Snapshot on logical events instead -- when the user finishes typing, or commits a change.</p>
+<pre data-codeid="code20"></pre>
+<h2>Caveats</h2><div class="warn">
+<strong>Serializable state only.</strong> Snapshots are JSON round-trips by default (with <code>structuredClone</code> upgraded if available). That means DOM elements, functions, class instances with prototypes, and circular references won't survive. Keep your state plain objects, arrays, primitives, dates, and the like.
+</div>
+  <div class="footer">Part of the <a href="https://perchance.org/weld-ui-index">weld plugin suite</a>. Stashed at <code>window.weld.undo</code>. This page loads the plugin so you can inspect it in DevTools.</div>
+</div>
+<script>
+(function(){
+  var examples = {
+  'code1': 'output\n  weld-undo = \{import:weld-undo-plugin\}',
+  'code2': 'root.weldUndo();   // triggers $output\n\nlet appState = \{ count: 0, items: \[\] \};\n\nconst stack = weld.undo.create(\{\n  getState: () => appState,\n  setState: (s) => \{ appState = s; renderUI(); \},\n  maxDepth: 50\n\});\n\n// Take a snapshot whenever state changes:\nappState.count++;\nstack.snapshot(\'increment\');\n\n// Undo and redo:\nstack.undo();    // appState rolls back to before snapshot\nstack.redo();    // forward again',
+  'sig3': 'weld.undo.create(opts)  ->  stack',
+  'sig4': 'stack.snapshot(label?)  ->  \{state, label, timestamp\} | null',
+  'code5': 'appState.items.push(\'new item\');\nstack.snapshot(\'add item\');',
+  'sig6': 'stack.undo()  ->  snapshot | null',
+  'sig7': 'stack.redo()  ->  snapshot | null',
+  'code8': 'undoBtn.disabled = !stack.canUndo();\nredoBtn.disabled = !stack.canRedo();',
+  'sig9': 'stack.transaction(fn, label?)  ->  fn\'s return value',
+  'code10': 'stack.transaction(() => \{\n  appState.items.push(\'a\');\n  appState.items.push(\'b\');\n  appState.items.push(\'c\');\n  // No intermediate snapshots\n\}, \'add three items\');\n\n// Now stack.undo() rolls back all three at once.',
+  'code11': 'await stack.transaction(async () => \{\n  const data = await fetch(\'/import\').then(r => r.json());\n  appState.imported = data;\n  appState.lastImport = Date.now();\n\}, \'import data\');',
+  'code12': 'console.log(stack.peek().label);     // "add three items"\nconsole.log(stack.depth());          // 5\nconsole.log(stack.position());       // 4',
+  'sig13': 'stack.history()  ->  Array<snapshot>',
+  'code14': 'stack.history().forEach((s, i) => \{\n  const isCurrent = i === stack.position();\n  console.log((isCurrent ? \'>\' : \' \') + \' \' + i + \': \' + s.label);\n\});',
+  'sig15': 'stack.onChange((event, stack) => \{\{ ... \}\})  ->  unsubscribe()',
+  'code16': 'const off = stack.onChange((event, s) => \{\n  undoBtn.disabled = !s.canUndo();\n  redoBtn.disabled = !s.canRedo();\n  statusBar.textContent = \'history: \' + s.depth();\n\});',
+  'sig17': 'stack.bindKeyboard(opts?)  ->  unbind()',
+  'code18': 'const unbind = stack.bindKeyboard();\n// User can now Cmd+Z / Cmd+Shift+Z anywhere on the page.\n\n// In a scoped widget:\nstack.bindKeyboard(\{ target: myEditor, preventDefault: true \});',
+  'code19': 'const undoBtn = weld.ui.button(\{\n  label: \'Undo\', icon: \'undo\',\n  onClick: () => stack.undo()\n\});\nconst redoBtn = weld.ui.button(\{\n  label: \'Redo\', icon: \'redo\',\n  onClick: () => stack.redo()\n\});\n\nstack.onChange((ev, s) => \{\n  undoBtn.disabled = !s.canUndo();\n  redoBtn.disabled = !s.canRedo();\n\});',
+  'code20': 'let pendingSnap = null;\nfunction onChange() \{\n  appState.text = inputEl.value;\n  // Coalesce rapid edits into one snapshot 800ms after the last keystroke\n  clearTimeout(pendingSnap);\n  pendingSnap = setTimeout(() => stack.snapshot(\'edit text\'), 800);\n\}'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    var nodes = document.querySelectorAll('[data-codeid]');
+    nodes.forEach(function(n){
+      var id = n.getAttribute('data-codeid');
+      var src = examples[id];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.undo) return; // already loaded
+
+  var stacks = [];
+
+  // -----------------------------------------------------------------
+  // DEEP CLONE
+  // -----------------------------------------------------------------
+  function deepClone(v) {
+    if (v == null || typeof v !== 'object') return v;
+    if (typeof structuredClone === 'function') {
+      try { return structuredClone(v); } catch (e) { /* fall through */ }
+    }
+    try { return JSON.parse(JSON.stringify(v)); }
+    catch (e) { throw new Error('weld.undo: state is not serializable'); }
+  }
+
+  // -----------------------------------------------------------------
+  // STACK FACTORY
+  // -----------------------------------------------------------------
+  function createStack(opts) {
+    opts = opts || {};
+    var maxDepth = opts.maxDepth || 50;
+    var getState = opts.getState;
+    var setState = opts.setState;
+
+    if (typeof getState !== 'function' || typeof setState !== 'function') {
+      throw new Error('weld.undo.create requires opts.getState and opts.setState functions');
+    }
+
+    var snapshots = [];   // each: state / label / timestamp
+    var cursor = -1;
+    var inTransaction = false;
+    var transactionLabel = null;
+    var listeners = [];
+    var bound = false;
+    var unbindKbd = null;
+
+    function notify(event) {
+      for (var i = 0; i < listeners.length; i++) {
+        try { listeners[i](event, api); } catch (e) { /* swallow */ }
+      }
+    }
+
+    function snapshot(label) {
+      if (inTransaction) return null;  // deferred
+      var s = {
+        state: deepClone(getState()),
+        label: label || '',
+        timestamp: Date.now()
+      };
+      // truncate any redo history past cursor
+      if (cursor < snapshots.length - 1) {
+        snapshots = snapshots.slice(0, cursor + 1);
+      }
+      snapshots.push(s);
+      while (snapshots.length > maxDepth) snapshots.shift();
+      cursor = snapshots.length - 1;
+      notify('snapshot');
+      return s;
+    }
+
+    function undo() {
+      if (!canUndo()) return null;
+      cursor--;
+      var s = snapshots[cursor];
+      try { setState(deepClone(s.state)); }
+      catch (e) { cursor++; throw e; }
+      notify('undo');
+      return s;
+    }
+
+    function redo() {
+      if (!canRedo()) return null;
+      cursor++;
+      var s = snapshots[cursor];
+      try { setState(deepClone(s.state)); }
+      catch (e) { cursor--; throw e; }
+      notify('redo');
+      return s;
+    }
+
+    function canUndo() { return cursor > 0; }
+    function canRedo() { return cursor >= 0 && cursor < snapshots.length - 1; }
+
+    function transaction(fn, label) {
+      if (typeof fn !== 'function') throw new Error('transaction requires a function');
+      if (inTransaction) return fn();   // nested: just run
+
+      inTransaction = true;
+      transactionLabel = label || '';
+
+      var finish = function() {
+        inTransaction = false;
+        snapshot(transactionLabel);
+      };
+
+      try {
+        var result = fn();
+        if (result && typeof result.then === 'function') {
+          // async: resolve, then snapshot
+          return result.then(
+            function(r) { finish(); return r; },
+            function(err) { inTransaction = false; throw err; }
+          );
+        }
+        finish();
+        return result;
+      } catch (e) {
+        inTransaction = false;
+        throw e;
+      }
+    }
+
+    function clear() {
+      snapshots.length = 0;
+      cursor = -1;
+      notify('clear');
+    }
+
+    function peek() { return cursor >= 0 ? snapshots[cursor] : null; }
+    function history() { return snapshots.slice(); }
+    function depth() { return snapshots.length; }
+    function position() { return cursor; }
+
+    function onChange(fn) {
+      if (typeof fn !== 'function') throw new Error('onChange requires a function');
+      listeners.push(fn);
+      return function() {
+        var i = listeners.indexOf(fn);
+        if (i !== -1) listeners.splice(i, 1);
+      };
+    }
+
+    function bindKeyboard(kbdOpts) {
+      if (bound) return unbindKbd;
+      kbdOpts = kbdOpts || {};
+      var target = kbdOpts.target || document;
+      var preventDefault = kbdOpts.preventDefault !== false;
+
+      function handler(e) {
+        var meta = e.metaKey || e.ctrlKey;
+        if (!meta) return;
+        var k = e.key.toLowerCase();
+        if (k === 'z') {
+          if (e.shiftKey) {
+            if (canRedo()) { if (preventDefault) e.preventDefault(); redo(); }
+          } else {
+            if (canUndo()) { if (preventDefault) e.preventDefault(); undo(); }
+          }
+        } else if (k === 'y') {
+          if (canRedo()) { if (preventDefault) e.preventDefault(); redo(); }
+        }
+      }
+      target.addEventListener('keydown', handler);
+      bound = true;
+      unbindKbd = function() {
+        target.removeEventListener('keydown', handler);
+        bound = false;
+        unbindKbd = null;
+      };
+      return unbindKbd;
+    }
+
+    // Take initial snapshot so the user has a baseline
+    snapshot('initial');
+
+    var api = {
+      snapshot: snapshot,
+      undo: undo,
+      redo: redo,
+      canUndo: canUndo,
+      canRedo: canRedo,
+      transaction: transaction,
+      clear: clear,
+      peek: peek,
+      history: history,
+      depth: depth,
+      position: position,
+      onChange: onChange,
+      bindKeyboard: bindKeyboard,
+      maxDepth: maxDepth
+    };
+
+    stacks.push(api);
+    return api;
+  }
+
+  // -----------------------------------------------------------------
+  // API
+  // -----------------------------------------------------------------
+  window.weld.undo = {
+    create: createStack,
+    stacks: function() { return stacks.slice(); },
+    version: '1.0.0'
+  };
+})();
+
+</script>
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>

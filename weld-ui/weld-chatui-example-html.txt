@@ -1,0 +1,1328 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+  --weld-ink:var(--ink); --weld-faint:var(--faint); --weld-border:var(--border);
+  --weld-muted:var(--muted); --weld-surface:var(--surface); --weld-accent:var(--accent);
+  --weld-bg:var(--bg); --weld-mono:var(--mono);
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);
+  -webkit-font-smoothing:antialiased;min-height:100vh;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:960px;margin:0 auto;padding:48px 24px 32px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+.hdr{text-align:center;margin-bottom:40px;}
+.hdr h1{font:700 32px var(--mono);letter-spacing:-1px;color:var(--ink);margin-bottom:8px;}
+.hdr p{font-size:14px;color:var(--muted);max-width:600px;margin:0 auto;}
+
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}
+.toolbar .group{display:flex;gap:8px;align-items:center;}
+.toolbar .label{font:600 11px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:1px;}
+
+#chat-host{height:560px;background:var(--faint);border:1px solid var(--border);
+  border-radius:8px;overflow:hidden;display:flex;flex-direction:column;}
+@media (max-width:760px){ #chat-host{height:500px;} }
+
+.info-card{background:var(--faint);border:1px solid var(--border);border-radius:8px;
+  padding:16px 20px;margin-top:14px;font-size:13px;color:var(--muted);line-height:1.6;}
+.info-card strong{color:var(--ink);}
+
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;
+  padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+<div id="page">
+  <div class="breadcrumb">
+    <span class="crumb">
+      <a href="https://perchance.org/weld-ui-index">weld</a>
+      <span class="crumb-sep">/</span>
+      weld.chatui
+      <span class="crumb-sep">/</span>
+      <span class="crumb-cur">examples</span>
+    </span>
+    <span class="crumb-action">
+      <a href="https://perchance.org/weld-chatui-plugin">docs &rarr;</a>
+    </span>
+  </div>
+  <div class="hdr">
+    <h1>weld.chatui</h1>
+    <p>A working chat with streaming replies, typing indicator, markdown rendering, system notes. Type below to chat; use the toolbar to trigger individual features.</p>
+  </div>
+
+  <div class="toolbar" id="toolbar"></div>
+
+  <div id="chat-host"></div>
+
+  <div class="info-card">
+    <strong>What you're seeing:</strong> Replies are pre-canned text streamed character-by-character to mimic an LLM response. The "typing indicator" runs briefly before each reply. Toggle markdown to see raw text rendering. Messages persist in memory only -- a refresh clears the chat.
+  </div>
+
+</div>
+<script>(function(){
+'use strict';
+
+// Namespace
+if (!window.weld) window.weld = {};
+if (window.weld.ui) return; // already loaded
+
+// THEME
+var defaultTheme = {
+  bg:        '#0d1117',
+  surface:   '#161b22',
+  faint:     '#21262d',
+  ink:       '#e6edf3',
+  muted:     '#7d8590',
+  accent:    '#4493f8',
+  accentInk: '#0d1117',
+  green:     '#3fb950',
+  red:       '#f85149',
+  yellow:    '#d29922',
+  blue:      '#58a6ff',
+  border:    'rgba(255,255,255,0.10)',
+  borderHi:  'rgba(255,255,255,0.20)',
+  radius:    '6px',
+  radiusSm:  '4px',
+  radiusLg:  '10px',
+  font:      "'DM Sans', system-ui, sans-serif",
+  fontMono:  "'JetBrains Mono', monospace",
+  shadow:    '0 8px 32px rgba(0,0,0,0.5)',
+  transit:   '120ms cubic-bezier(0.4, 0, 0.2, 1)',
+};
+
+var theme = Object.assign({}, defaultTheme);
+
+function setTheme(updates) {
+  Object.assign(theme, updates);
+  applyThemeVars();
+}
+
+function getTheme() { return Object.assign({}, theme); }
+
+function applyThemeVars() {
+  var root = document.documentElement;
+  Object.keys(theme).forEach(function(k){
+    root.style.setProperty('--w-' + k, theme[k]);
+  });
+}
+
+// CSS - injected once. All values use CSS vars.
+var CSS = [
+"@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');",
+".w-btn{font:500 13px var(--w-font);background:var(--w-bg);color:var(--w-ink);",
+"  border:1px solid var(--w-border);border-radius:var(--w-radius);padding:7px 14px;",
+"  cursor:pointer;display:inline-flex;align-items:center;gap:6px;line-height:1;",
+"  transition:border-color var(--w-transit), background var(--w-transit);outline:none;}",
+".w-btn:hover:not(:disabled){border-color:var(--w-borderHi);}",
+".w-btn:focus-visible{border-color:var(--w-accent);box-shadow:0 0 0 2px rgba(68,147,248,0.3);}",
+".w-btn:disabled{opacity:.4;cursor:not-allowed;}",
+".w-btn-primary{background:var(--w-accent);color:var(--w-accentInk);border-color:var(--w-accent);font-weight:600;}",
+".w-btn-primary:hover:not(:disabled){background:#58a6ff;border-color:#58a6ff;}",
+".w-btn-danger{color:var(--w-red);border-color:rgba(248,81,73,0.4);}",
+".w-btn-danger:hover:not(:disabled){background:rgba(248,81,73,0.1);border-color:var(--w-red);}",
+".w-btn-ghost{background:transparent;border-color:transparent;}",
+".w-btn-ghost:hover:not(:disabled){background:var(--w-faint);}",
+".w-btn-sm{padding:4px 10px;font-size:12px;}",
+".w-btn-lg{padding:10px 20px;font-size:14px;}",
+".w-input,.w-select,.w-textarea{font:13px var(--w-fontMono);background:var(--w-bg);color:var(--w-ink);",
+"  border:1px solid var(--w-border);border-radius:var(--w-radiusSm);padding:7px 10px;outline:none;",
+"  width:100%;box-sizing:border-box;transition:border-color var(--w-transit);}",
+".w-input:focus,.w-select:focus,.w-textarea:focus{border-color:var(--w-accent);box-shadow:0 0 0 2px rgba(68,147,248,0.2);}",
+".w-textarea{resize:vertical;min-height:60px;line-height:1.45;font-size:12px;}",
+".w-select{cursor:pointer;}",
+".w-checkbox{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font:13px var(--w-font);color:var(--w-ink);}",
+".w-checkbox input{margin:0;cursor:pointer;}",
+".w-range{width:100%;height:4px;-webkit-appearance:none;appearance:none;background:var(--w-faint);border-radius:2px;outline:none;}",
+".w-range::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--w-accent);cursor:pointer;border:0;}",
+".w-range::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--w-accent);cursor:pointer;border:0;}",
+".w-label{display:block;font:600 10px var(--w-fontMono);letter-spacing:1px;text-transform:uppercase;",
+"  color:var(--w-muted);margin-bottom:5px;}",
+".w-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;",
+"  display:flex;align-items:center;justify-content:center;padding:20px;",
+"  animation:w-fade-in 150ms ease-out;}",
+"@keyframes w-fade-in{from{opacity:0;}to{opacity:1;}}",
+"@keyframes w-pop-in{from{opacity:0;transform:scale(0.96);}to{opacity:1;transform:scale(1);}}",
+".w-modal{background:var(--w-surface);border:1px solid var(--w-border);border-radius:var(--w-radiusLg);",
+"  box-shadow:var(--w-shadow);max-height:90vh;display:flex;flex-direction:column;",
+"  animation:w-pop-in 160ms ease-out;color:var(--w-ink);font:14px var(--w-font);}",
+".w-modal-sm{width:380px;max-width:100%;}",
+".w-modal-md{width:560px;max-width:100%;}",
+".w-modal-lg{width:800px;max-width:100%;}",
+".w-modal-full{width:96vw;height:90vh;}",
+".w-modal-hdr{padding:16px 20px;border-bottom:1px solid var(--w-border);display:flex;",
+"  align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;}",
+".w-modal-title{font-size:15px;font-weight:600;margin:0;}",
+".w-modal-close{background:transparent;border:0;color:var(--w-muted);cursor:pointer;",
+"  padding:4px;border-radius:var(--w-radiusSm);line-height:0;transition:color var(--w-transit);}",
+".w-modal-close:hover{color:var(--w-ink);background:var(--w-faint);}",
+".w-modal-body{padding:20px;overflow-y:auto;flex:1;font-size:14px;line-height:1.55;}",
+".w-modal-actions{padding:14px 20px;border-top:1px solid var(--w-border);display:flex;",
+"  gap:8px;justify-content:flex-end;flex-shrink:0;}",
+".w-spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--w-faint);",
+"  border-top-color:var(--w-accent);border-radius:50%;animation:w-spin 700ms linear infinite;}",
+".w-spinner-lg{width:24px;height:24px;border-width:3px;}",
+"@keyframes w-spin{to{transform:rotate(360deg);}}",
+".w-disclosure{border:1px solid var(--w-border);border-radius:var(--w-radius);overflow:hidden;}",
+".w-disclosure summary{padding:10px 14px;cursor:pointer;font:600 13px var(--w-font);",
+"  color:var(--w-ink);background:var(--w-faint);outline:none;list-style:none;",
+"  display:flex;align-items:center;justify-content:space-between;}",
+".w-disclosure summary::-webkit-details-marker{display:none;}",
+".w-disclosure summary::after{content:'+';color:var(--w-muted);font-family:var(--w-fontMono);font-size:14px;}",
+".w-disclosure\[open\] summary::after{content:'-';}",
+".w-disclosure-body{padding:14px;}",
+".w-tabs{display:flex;gap:0;border-bottom:1px solid var(--w-border);}",
+".w-tab{padding:9px 16px;background:transparent;border:0;border-bottom:2px solid transparent;",
+"  color:var(--w-muted);font:500 13px var(--w-font);cursor:pointer;transition:color var(--w-transit);",
+"  margin-bottom:-1px;}",
+".w-tab:hover{color:var(--w-ink);}",
+".w-tab-active{color:var(--w-accent);border-bottom-color:var(--w-accent);}",
+".w-row{display:flex;gap:8px;align-items:center;}",
+".w-col{display:flex;flex-direction:column;gap:8px;}",
+".w-stack{display:flex;flex-direction:column;gap:14px;}",
+".w-card{background:var(--w-faint);border:1px solid var(--w-border);border-radius:var(--w-radius);padding:14px;}",
+".w-divider{height:1px;background:var(--w-border);margin:14px 0;border:0;}",
+].join('\n');
+
+var STYLE_ID = 'weld-ui-styles';
+function injectCSS() {
+  if (document.getElementById(STYLE_ID)) return;
+  var style = document.createElement('style');
+  style.id = STYLE_ID;
+  style.textContent = CSS;
+  document.head.appendChild(style);
+}
+
+// DOM HELPER
+// el(tag, attrs, children) - children is string or element or array
+function el(tag, attrs, children) {
+  var node = document.createElement(tag);
+  if (attrs) {
+    Object.keys(attrs).forEach(function(k){
+      var v = attrs[k];
+      if (v == null) return;
+      if (k === 'class' || k === 'className') node.className = v;
+      else if (k === 'style' && typeof v === 'object') Object.assign(node.style, v);
+      else if (k === 'dataset' && typeof v === 'object') Object.assign(node.dataset, v);
+      else if (k.indexOf('on') === 0 && typeof v === 'function') node.addEventListener(k.slice(2).toLowerCase(), v);
+      else if (k === 'html') node.innerHTML = v;
+      else if (k === 'text') node.textContent = v;
+      else node.setAttribute(k, v);
+    });
+  }
+  if (children != null) {
+    if (!Array.isArray(children)) children = [children];
+    children.forEach(function(c){
+      if (c == null) return;
+      if (typeof c === 'string' || typeof c === 'number') node.appendChild(document.createTextNode(c));
+      else if (c.nodeType) node.appendChild(c);
+    });
+  }
+  return node;
+}
+
+// ICONS (small embedded SVG set, lucide-style stroke icons)
+var ICONS = {
+  'x':       'M18 6L6 18M6 6l12 12',
+  'check':   'M20 6L9 17l-5-5',
+  'plus':    'M12 5v14M5 12h14',
+  'minus':   'M5 12h14',
+  'trash':   'M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2',
+  'edit':    'M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z',
+  'save':    'M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2zM17 21v-8H7v8M7 3v5h8',
+  'copy':    'M20 9h-9a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-9a2 2 0 00-2-2zM5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1',
+  'download':'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3',
+  'upload':  'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12',
+  'refresh': 'M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15',
+  'settings':'M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2zM15 12a3 3 0 11-6 0 3 3 0 016 0z',
+  'info':    'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM12 16v-4M12 8h.01',
+  'warn':    'M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01',
+  'error':   'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM15 9l-6 6M9 9l6 6',
+  'search':  'M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z',
+  'chevDown':'M6 9l6 6 6-6',
+  'chevUp':  'M18 15l-6-6-6 6',
+  'chevRight':'M9 18l6-6-6-6',
+  'chevLeft':'M15 18l-9-6 6-6',
+  'external':'M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3',
+};
+
+function icon(name, opts) {
+  opts = opts || {};
+  var size = opts.size || 16;
+  var path = ICONS[name];
+  if (!path) return el('span', { text: '?' });
+  var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('width', size);
+  svg.setAttribute('height', size);
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', opts.color || 'currentColor');
+  svg.setAttribute('stroke-width', opts.weight || '2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  p.setAttribute('d', path);
+  svg.appendChild(p);
+  return svg;
+}
+
+function registerIcon(name, pathD) { ICONS[name] = pathD; }
+
+// COMPONENTS
+function button(opts) {
+  opts = opts || {};
+  var classes = ['w-btn'];
+  if (opts.variant === 'primary') classes.push('w-btn-primary');
+  else if (opts.variant === 'danger') classes.push('w-btn-danger');
+  else if (opts.variant === 'ghost') classes.push('w-btn-ghost');
+  if (opts.size === 'sm') classes.push('w-btn-sm');
+  else if (opts.size === 'lg') classes.push('w-btn-lg');
+  var children = [];
+  if (opts.icon) children.push(icon(opts.icon, { size: opts.size === 'sm' ? 14 : 16 }));
+  if (opts.label != null) children.push(opts.label);
+  return el('button', {
+    class: classes.join(' '),
+    type: opts.type || 'button',
+    disabled: opts.disabled ? 'disabled' : null,
+    onclick: opts.onClick,
+  }, children);
+}
+
+function input(opts) {
+  opts = opts || {};
+  return el('input', {
+    class: 'w-input',
+    type: opts.type || 'text',
+    placeholder: opts.placeholder,
+    value: opts.value != null ? opts.value : '',
+    oninput: opts.onInput ? function(e){ opts.onInput(e.target.value, e); } : null,
+    onchange: opts.onChange ? function(e){ opts.onChange(e.target.value, e); } : null,
+    disabled: opts.disabled ? 'disabled' : null,
+    readonly: opts.readonly ? 'readonly' : null,
+  });
+}
+
+function select(opts) {
+  opts = opts || {};
+  var options = (opts.options || []).map(function(o){
+    if (typeof o === 'string') o = { value: o, label: o };
+    return el('option', {
+      value: o.value,
+      selected: o.value === opts.value ? 'selected' : null,
+    }, o.label);
+  });
+  return el('select', {
+    class: 'w-select',
+    onchange: opts.onChange ? function(e){ opts.onChange(e.target.value, e); } : null,
+    disabled: opts.disabled ? 'disabled' : null,
+  }, options);
+}
+
+function textarea(opts) {
+  opts = opts || {};
+  return el('textarea', {
+    class: 'w-textarea',
+    rows: opts.rows || 4,
+    placeholder: opts.placeholder,
+    oninput: opts.onInput ? function(e){ opts.onInput(e.target.value, e); } : null,
+    onchange: opts.onChange ? function(e){ opts.onChange(e.target.value, e); } : null,
+  }, opts.value || '');
+}
+
+function checkbox(opts) {
+  opts = opts || {};
+  var box = el('input', {
+    type: 'checkbox',
+    checked: opts.checked ? 'checked' : null,
+    onchange: opts.onChange ? function(e){ opts.onChange(e.target.checked, e); } : null,
+  });
+  return el('label', { class: 'w-checkbox' }, [box, opts.label || '']);
+}
+
+function range(opts) {
+  opts = opts || {};
+  return el('input', {
+    class: 'w-range',
+    type: 'range',
+    min: opts.min != null ? opts.min : 0,
+    max: opts.max != null ? opts.max : 100,
+    step: opts.step != null ? opts.step : 1,
+    value: opts.value != null ? opts.value : 0,
+    oninput: opts.onInput ? function(e){ opts.onInput(parseFloat(e.target.value), e); } : null,
+    onchange: opts.onChange ? function(e){ opts.onChange(parseFloat(e.target.value), e); } : null,
+  });
+}
+
+function spinner(opts) {
+  opts = opts || {};
+  var classes = ['w-spinner'];
+  if (opts.size === 'lg') classes.push('w-spinner-lg');
+  return el('span', { class: classes.join(' '), role: 'status' });
+}
+
+function label(text) {
+  return el('label', { class: 'w-label', text: text });
+}
+
+function disclosure(opts) {
+  opts = opts || {};
+  var summary = el('summary', { text: opts.title || '' });
+  var body = el('div', { class: 'w-disclosure-body' }, opts.content);
+  return el('details', {
+    class: 'w-disclosure',
+    open: opts.open ? 'open' : null,
+  }, [summary, body]);
+}
+
+function tabs(opts) {
+  opts = opts || {};
+  var items = opts.items || [];
+  var active = opts.active || (items[0] && items[0].id);
+  var tabBar = el('div', { class: 'w-tabs' });
+  var panel = el('div', { class: 'w-tab-panel' });
+
+  function render(activeId) {
+    tabBar.innerHTML = '';
+    items.forEach(function(it){
+      var btn = el('button', {
+        class: 'w-tab' + (it.id === activeId ? ' w-tab-active' : ''),
+        onclick: function(){ render(it.id); if (opts.onChange) opts.onChange(it.id); },
+      }, it.label);
+      tabBar.appendChild(btn);
+    });
+    panel.innerHTML = '';
+    var found = items.find(function(it){ return it.id === activeId; });
+    if (found && found.content) {
+      panel.appendChild(typeof found.content === 'function' ? found.content() : found.content);
+    }
+  }
+  render(active);
+
+  var wrap = el('div', { class: 'w-tabs-wrap' }, [tabBar, panel]);
+  wrap.setActive = function(id){ render(id); };
+  return wrap;
+}
+
+function row(children, gap) {
+  var r = el('div', { class: 'w-row' }, children);
+  if (gap != null) r.style.gap = gap + 'px';
+  return r;
+}
+function col(children, gap) {
+  var c = el('div', { class: 'w-col' }, children);
+  if (gap != null) c.style.gap = gap + 'px';
+  return c;
+}
+function stack(children, gap) {
+  var s = el('div', { class: 'w-stack' }, children);
+  if (gap != null) s.style.gap = gap + 'px';
+  return s;
+}
+function card(children) { return el('div', { class: 'w-card' }, children); }
+function divider() { return el('hr', { class: 'w-divider' }); }
+
+// MODAL
+// Returns { el, close } and is auto-attached to body
+function modal(opts) {
+  opts = opts || {};
+  var sizeClass = 'w-modal-' + (opts.size || 'md');
+  var closeBtn = el('button', {
+    class: 'w-modal-close',
+    onclick: function(){ close(); },
+    'aria-label': 'Close',
+  }, [icon('x', { size: 18 })]);
+
+  var header = opts.title || opts.dismissable !== false
+    ? el('div', { class: 'w-modal-hdr' }, [
+        opts.title ? el('h3', { class: 'w-modal-title', text: opts.title }) : el('div'),
+        opts.dismissable !== false ? closeBtn : null,
+      ])
+    : null;
+
+  var bodyContent = opts.content;
+  if (typeof bodyContent === 'string') bodyContent = el('div', { html: bodyContent });
+  var body = el('div', { class: 'w-modal-body' }, bodyContent);
+
+  var actions = opts.actions ? el('div', { class: 'w-modal-actions' },
+    opts.actions.map(function(a){
+      return button({
+        label: a.label,
+        variant: a.variant || (a.primary ? 'primary' : null),
+        onClick: function(){
+          if (a.onClick) {
+            var res = a.onClick();
+            if (res !== false) close();
+          } else { close(); }
+        },
+      });
+    })
+  ) : null;
+
+  var modalEl = el('div', { class: 'w-modal ' + sizeClass }, [header, body, actions]);
+
+  var overlay = el('div', {
+    class: 'w-modal-overlay',
+    onclick: function(e){ if (e.target === overlay && opts.dismissable !== false) close(); },
+  }, [modalEl]);
+
+  var closed = false;
+  function close() {
+    if (closed) return;
+    closed = true;
+    overlay.remove();
+    document.removeEventListener('keydown', escHandler);
+    if (opts.onClose) opts.onClose();
+  }
+  function escHandler(e) {
+    if (e.key === 'Escape' && opts.dismissable !== false) close();
+  }
+  document.addEventListener('keydown', escHandler);
+
+  document.body.appendChild(overlay);
+  return { el: overlay, close: close, body: body };
+}
+
+// PUBLIC API
+window.weld.ui = {
+  theme: theme,
+  setTheme: setTheme,
+  getTheme: getTheme,
+  el: el,
+  button: button,
+  input: input,
+  select: select,
+  textarea: textarea,
+  checkbox: checkbox,
+  range: range,
+  label: label,
+  spinner: spinner,
+  icon: icon,
+  registerIcon: registerIcon,
+  disclosure: disclosure,
+  tabs: tabs,
+  row: row,
+  col: col,
+  stack: stack,
+  card: card,
+  divider: divider,
+  modal: modal,
+  injectCSS: injectCSS,
+  version: '1.0.0',
+};
+
+// INIT
+function init() {
+  injectCSS();
+  applyThemeVars();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+})();
+</script>
+<script>(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.markdown) return; // already loaded
+
+// -----------------------------------------------------------------
+// HTML escape -- the foundation of safety
+// -----------------------------------------------------------------
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// -----------------------------------------------------------------
+// URL sanitization -- reject javascript:, vbscript:, data: (except images)
+// -----------------------------------------------------------------
+var SAFE_URL_RE = /^(?:https?:|mailto:|tel:|\/|#|\.\/|\.\.\/|[a-zA-Z0-9_\-]+\.)/;
+var SAFE_IMG_URL_RE = /^(?:https?:|data:image\/(?:png|jpe?g|gif|webp|svg\+xml);|\/|\.\/|\.\.\/)/;
+
+function safeUrl(url, forImg) {
+  url = String(url).trim();
+  var re = forImg ? SAFE_IMG_URL_RE : SAFE_URL_RE;
+  return re.test(url) ? url : '#';
+}
+
+// -----------------------------------------------------------------
+// Inline formatting: bold, italic, strikethrough -- applied to text
+// where no HTML has been injected yet
+// -----------------------------------------------------------------
+function applyFormatting(text) {
+  // Bold first (longer marker wins)
+  text = text.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/__([^_\n]+)__/g, '<strong>$1</strong>');
+  // Italic (single marker)
+  text = text.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
+  text = text.replace(/(^|[^_])_([^_\n]+)_(?!_)/g, '$1<em>$2</em>');
+  // Strikethrough
+  text = text.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+  return text;
+}
+
+// -----------------------------------------------------------------
+// Inline parsing -- code, images, links, auto-links, then formatting
+// -----------------------------------------------------------------
+function parseInline(text) {
+  var slots = [];
+  function slot(html) {
+    slots.push(html);
+    return '\u0001S' + (slots.length - 1) + '\u0001';
+  }
+
+  // 1. Code spans -- extract first, content escaped, no further processing
+  text = text.replace(/`([^`]+)`/g, function(_, code) {
+    return slot('<code>' + escapeHtml(code) + '</code>');
+  });
+
+  // 2. Images:  exclamation + label-in-brackets + paren-url
+  text = text.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g, function(_, alt, url, title) {
+    var t = title ? ' title="' + escapeHtml(title) + '"' : '';
+    return slot('<img src="' + safeUrl(url, true) + '" alt="' + escapeHtml(alt) + '"' + t + '>');
+  });
+
+  // 3. Links: label-in-brackets followed by paren-url
+  text = text.replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g, function(_, label, url, title) {
+    var t = title ? ' title="' + escapeHtml(title) + '"' : '';
+    // Allow inline formatting inside link label
+    var inner = applyFormatting(escapeHtml(label));
+    return slot('<a href="' + safeUrl(url) + '"' + t + ' target="_blank" rel="noopener">' + inner + '</a>');
+  });
+
+  // 4. Auto-links: bare URLs (not already inside a slot)
+  text = text.replace(/\b(https?:\/\/[^\s<]+[^\s<.,;:?!])/g, function(url) {
+    return slot('<a href="' + safeUrl(url) + '" target="_blank" rel="noopener">' + escapeHtml(url) + '</a>');
+  });
+
+  // 5. Escape any remaining HTML in the plain text
+  text = escapeHtml(text);
+
+  // 6. Apply bold/italic/strikethrough on the now-safe text
+  text = applyFormatting(text);
+
+  // 7. Restore slot placeholders
+  text = text.replace(/\u0001S(\d+)\u0001/g, function(_, idx) {
+    return slots[parseInt(idx, 10)];
+  });
+
+  return text;
+}
+
+// -----------------------------------------------------------------
+// Block-level parsing
+// -----------------------------------------------------------------
+function render(input, opts) {
+  opts = opts || {};
+  if (typeof input !== 'string') input = String(input == null ? '' : input);
+
+  // Normalize line endings
+  input = input.replace(/\r\n?/g, '\n');
+
+  var lines = input.split('\n');
+  var out = [];
+  var i = 0;
+
+  while (i < lines.length) {
+    var line = lines[i];
+
+    // Fenced code block: ``` or ~~~
+    var fence = line.match(/^(```|~~~)\s*([a-zA-Z0-9_-]*)\s*$/);
+    if (fence) {
+      var marker = fence[1];
+      var lang = fence[2] || '';
+      i++;
+      var code = [];
+      while (i < lines.length && lines[i].indexOf(marker) !== 0) {
+        code.push(lines[i]);
+        i++;
+      }
+      i++;
+      var langAttr = lang ? ' class="language-' + escapeHtml(lang) + '"' : '';
+      out.push('<pre><code' + langAttr + '>' + escapeHtml(code.join('\n')) + '</code></pre>');
+      continue;
+    }
+
+    // ATX header: # to ######
+    var hdr = line.match(/^(#{1,6})\s+(.+)$/);
+    if (hdr) {
+      var n = hdr[1].length;
+      out.push('<h' + n + '>' + parseInline(hdr[2]) + '</h' + n + '>');
+      i++;
+      continue;
+    }
+
+    // Horizontal rule
+    if (/^\s*([-*_])\s*\1\s*\1[\s\1]*$/.test(line)) {
+      out.push('<hr>');
+      i++;
+      continue;
+    }
+
+    // Blockquote
+    if (line.charAt(0) === '>') {
+      var quote = [];
+      while (i < lines.length && lines[i].charAt(0) === '>') {
+        quote.push(lines[i].replace(/^>\s?/, ''));
+        i++;
+      }
+      out.push('<blockquote>' + render(quote.join('\n')) + '</blockquote>');
+      continue;
+    }
+
+    // Unordered list
+    if (/^\s*[-*+]\s+/.test(line)) {
+      var items = [];
+      while (i < lines.length && /^\s*[-*+]\s+/.test(lines[i])) {
+        items.push(lines[i].replace(/^\s*[-*+]\s+/, ''));
+        i++;
+      }
+      out.push('<ul>' + items.map(function(it) { return '<li>' + parseInline(it) + '</li>'; }).join('') + '</ul>');
+      continue;
+    }
+
+    // Ordered list
+    if (/^\s*\d+\.\s+/.test(line)) {
+      var oitems = [];
+      while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
+        oitems.push(lines[i].replace(/^\s*\d+\.\s+/, ''));
+        i++;
+      }
+      out.push('<ol>' + oitems.map(function(it) { return '<li>' + parseInline(it) + '</li>'; }).join('') + '</ol>');
+      continue;
+    }
+
+    // Empty line: skip
+    if (line.trim() === '') {
+      i++;
+      continue;
+    }
+
+    // Paragraph: gather consecutive non-empty lines
+    var para = [line];
+    i++;
+    while (i < lines.length && lines[i].trim() !== '' && !/^(#{1,6}\s|```|~~~|>|\s*[-*+]\s|\s*\d+\.\s)/.test(lines[i])) {
+      para.push(lines[i]);
+      i++;
+    }
+    out.push('<p>' + parseInline(para.join(' ')) + '</p>');
+  }
+
+  return out.join('\n');
+}
+
+// -----------------------------------------------------------------
+// Convenience: render into an element
+// -----------------------------------------------------------------
+function renderInto(el, input, opts) {
+  if (typeof el === 'string') el = document.querySelector(el);
+  if (!el) throw new Error('weld.markdown.renderInto: element not found');
+  el.innerHTML = render(input, opts);
+  return el;
+}
+
+// -----------------------------------------------------------------
+// Sanitize an arbitrary HTML string -- only allow safe tags/attrs
+// -----------------------------------------------------------------
+var ALLOWED_TAGS = {
+  p: 1, br: 1, hr: 1,
+  h1: 1, h2: 1, h3: 1, h4: 1, h5: 1, h6: 1,
+  strong: 1, em: 1, del: 1, b: 1, i: 1, u: 1, s: 1,
+  ul: 1, ol: 1, li: 1,
+  blockquote: 1, pre: 1, code: 1,
+  a: 1, img: 1,
+  table: 1, thead: 1, tbody: 1, tr: 1, th: 1, td: 1,
+  div: 1, span: 1
+};
+var ALLOWED_ATTRS = {
+  a: { href: 1, title: 1, target: 1, rel: 1 },
+  img: { src: 1, alt: 1, title: 1, width: 1, height: 1 },
+  '*': { 'class': 1 }
+};
+
+function sanitize(html) {
+  var tmp = document.createElement('template');
+  tmp.innerHTML = String(html);
+  walk(tmp.content);
+  return tmp.innerHTML;
+}
+
+function walk(node) {
+  var children = Array.prototype.slice.call(node.childNodes);
+  for (var i = 0; i < children.length; i++) {
+    var child = children[i];
+    if (child.nodeType === 1) { // element
+      var tag = child.tagName.toLowerCase();
+      if (!ALLOWED_TAGS[tag]) {
+        // Replace with its text content
+        var text = document.createTextNode(child.textContent);
+        child.parentNode.replaceChild(text, child);
+        continue;
+      }
+      // Strip unsafe attributes
+      var attrs = Array.prototype.slice.call(child.attributes);
+      for (var j = 0; j < attrs.length; j++) {
+        var attr = attrs[j];
+        var tagAllowed = ALLOWED_ATTRS[tag] && ALLOWED_ATTRS[tag][attr.name];
+        var globalAllowed = ALLOWED_ATTRS['*'][attr.name];
+        if (!tagAllowed && !globalAllowed) {
+          child.removeAttribute(attr.name);
+          continue;
+        }
+        // URL attrs: sanitize
+        if (attr.name === 'href') child.setAttribute('href', safeUrl(attr.value));
+        if (attr.name === 'src') {
+          var isImg = tag === 'img';
+          child.setAttribute('src', safeUrl(attr.value, isImg));
+        }
+      }
+      walk(child);
+    }
+  }
+}
+
+// -----------------------------------------------------------------
+// API
+// -----------------------------------------------------------------
+window.weld.markdown = {
+  render: render,
+  renderInto: renderInto,
+  sanitize: sanitize,
+  parseInline: parseInline,
+  escapeHtml: escapeHtml,
+  safeUrl: safeUrl,
+  version: '1.0.0'
+};
+
+})();
+</script>
+<script>(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.chatui) return; // already loaded
+
+// -----------------------------------------------------------------
+// CSS injection
+// -----------------------------------------------------------------
+function injectCss() {
+  if (window.__weldChatuiCss) return;
+  window.__weldChatuiCss = true;
+  var s = document.createElement('style');
+  s.textContent =
+    '.weld-chat{display:flex;flex-direction:column;height:100%;min-height:0;' +
+      'font:14px system-ui,sans-serif;color:var(--weld-ink,#e6edf3);' +
+      'background:var(--weld-bg,#0d1117);}' +
+    '.weld-chat-messages{flex:1;overflow-y:auto;padding:16px;display:flex;' +
+      'flex-direction:column;gap:14px;scroll-behavior:smooth;}' +
+    '.weld-chat-row{display:flex;gap:10px;max-width:85%;align-items:flex-start;}' +
+    '.weld-chat-row.side-right{align-self:flex-end;flex-direction:row-reverse;}' +
+    '.weld-chat-row.side-left{align-self:flex-start;}' +
+    '.weld-chat-row.side-center{align-self:center;max-width:60%;}' +
+    '.weld-chat-avatar{flex:0 0 32px;width:32px;height:32px;border-radius:50%;' +
+      'background:var(--weld-faint,#21262d);color:#fff;display:flex;align-items:center;' +
+      'justify-content:center;font:600 12px var(--weld-mono,monospace);}' +
+    '.weld-chat-bubble{padding:10px 14px;background:var(--weld-faint,#21262d);' +
+      'border:1px solid var(--weld-border,rgba(255,255,255,0.10));border-radius:10px;' +
+      'line-height:1.55;word-wrap:break-word;overflow-wrap:anywhere;min-width:0;}' +
+    '.weld-chat-row.side-right .weld-chat-bubble{background:var(--weld-accent,#4493f8);' +
+      'color:#fff;border-color:transparent;}' +
+    '.weld-chat-row.side-center .weld-chat-bubble{background:transparent;border-style:dashed;' +
+      'font-style:italic;color:var(--weld-muted,#7d8590);text-align:center;}' +
+    '.weld-chat-meta{font-size:11px;color:var(--weld-muted,#7d8590);margin-top:4px;' +
+      'display:flex;gap:8px;align-items:center;}' +
+    '.weld-chat-row.side-right .weld-chat-meta{justify-content:flex-end;}' +
+    '.weld-chat-bubble p:first-child{margin-top:0;}' +
+    '.weld-chat-bubble p:last-child{margin-bottom:0;}' +
+    '.weld-chat-bubble p{margin:0.5em 0;}' +
+    '.weld-chat-bubble code{font:0.88em var(--weld-mono,monospace);' +
+      'background:rgba(0,0,0,0.25);padding:0.1em 0.3em;border-radius:3px;}' +
+    '.weld-chat-bubble pre{background:rgba(0,0,0,0.35);padding:10px;border-radius:4px;' +
+      'overflow-x:auto;font:0.88em var(--weld-mono,monospace);margin:0.5em 0;}' +
+    '.weld-chat-bubble pre code{background:transparent;padding:0;}' +
+    '.weld-chat-streaming .weld-chat-bubble::after{content:"\u258c";' +
+      'animation:weld-chat-blink 1s steps(2) infinite;margin-left:2px;opacity:0.6;}' +
+    '@keyframes weld-chat-blink{50%{opacity:0;}}' +
+    '.weld-chat-typing{display:flex;gap:10px;align-items:center;align-self:flex-start;' +
+      'padding:10px 14px;background:var(--weld-faint,#21262d);' +
+      'border:1px solid var(--weld-border,rgba(255,255,255,0.10));border-radius:10px;}' +
+    '.weld-chat-typing-dot{width:6px;height:6px;border-radius:50%;background:var(--weld-muted,#7d8590);' +
+      'animation:weld-chat-typing-pulse 1.2s ease-in-out infinite;}' +
+    '.weld-chat-typing-dot:nth-child(2){animation-delay:0.15s;}' +
+    '.weld-chat-typing-dot:nth-child(3){animation-delay:0.3s;}' +
+    '@keyframes weld-chat-typing-pulse{0%,100%{opacity:0.3;transform:translateY(0);}' +
+      '50%{opacity:1;transform:translateY(-3px);}}' +
+    '.weld-chat-input{flex:0 0 auto;padding:12px;border-top:1px solid var(--weld-border,rgba(255,255,255,0.10));' +
+      'display:flex;gap:8px;background:var(--weld-bg,#0d1117);}' +
+    '.weld-chat-input textarea{flex:1;resize:none;padding:8px 12px;' +
+      'background:var(--weld-faint,#21262d);' +
+      'border:1px solid var(--weld-border,rgba(255,255,255,0.10));border-radius:6px;' +
+      'color:var(--weld-ink,#e6edf3);font:14px system-ui,sans-serif;line-height:1.4;' +
+      'min-height:36px;max-height:140px;outline:none;}' +
+    '.weld-chat-input textarea:focus{border-color:var(--weld-accent,#4493f8);}' +
+    '.weld-chat-input button{padding:8px 16px;background:var(--weld-accent,#4493f8);' +
+      'color:#fff;border:0;border-radius:6px;font:600 13px system-ui,sans-serif;' +
+      'cursor:pointer;align-self:flex-end;height:36px;}' +
+    '.weld-chat-input button:hover{background:#3a85e0;}' +
+    '.weld-chat-input button:disabled{opacity:0.5;cursor:not-allowed;}';
+  document.head.appendChild(s);
+}
+
+// -----------------------------------------------------------------
+// Default role config
+// -----------------------------------------------------------------
+var DEFAULT_ROLES = {
+  user:      { label: 'You',       initial: 'Y', side: 'right',  color: '#4493f8' },
+  assistant: { label: 'Assistant', initial: 'A', side: 'left',   color: '#3fb950' },
+  system:    { label: 'System',    initial: 'S', side: 'center', color: '#7d8590' }
+};
+
+function uid() {
+  return 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+function resolveContainer(c) {
+  if (typeof c === 'string') return document.querySelector(c);
+  return c;
+}
+
+// -----------------------------------------------------------------
+// Chat instance factory
+// -----------------------------------------------------------------
+function createChat(opts) {
+  opts = opts || {};
+  injectCss();
+
+  var container = resolveContainer(opts.container);
+  if (!container) throw new Error('weld.chatui.create: container not found');
+
+  var roles = Object.assign({}, DEFAULT_ROLES, opts.roles || {});
+  var autoScroll = opts.autoScroll !== false;
+  var showAvatars = opts.showAvatars !== false;
+  var showLabels = opts.showLabels !== false;
+  var markdownOpt = opts.markdown == null ? 'auto' : opts.markdown;
+
+  function getMarkdownRenderer() {
+    if (markdownOpt === false) return null;
+    if (typeof markdownOpt === 'function') return markdownOpt;
+    if (markdownOpt === 'auto' || markdownOpt === true) {
+      if (window.weld && window.weld.markdown) {
+        return function(text) { return window.weld.markdown.render(text); };
+      }
+    }
+    return null;
+  }
+
+  // Build skeleton
+  container.classList.add('weld-chat');
+  container.innerHTML = '';
+  var messagesEl = document.createElement('div');
+  messagesEl.className = 'weld-chat-messages';
+  container.appendChild(messagesEl);
+
+  var inputEl = null;
+  if (opts.input !== false) {
+    inputEl = document.createElement('div');
+    inputEl.className = 'weld-chat-input';
+    var ta = document.createElement('textarea');
+    ta.placeholder = opts.placeholder || 'Type a message...';
+    ta.rows = 1;
+    ta.addEventListener('input', function() {
+      ta.style.height = 'auto';
+      ta.style.height = Math.min(ta.scrollHeight, 140) + 'px';
+    });
+    var btn = document.createElement('button');
+    btn.textContent = opts.sendLabel || 'Send';
+    function doSend() {
+      var text = ta.value.trim();
+      if (!text) return;
+      ta.value = '';
+      ta.style.height = 'auto';
+      if (typeof opts.onSend === 'function') {
+        try { opts.onSend(text, api); } catch (e) { /* swallow */ }
+      }
+    }
+    btn.addEventListener('click', doSend);
+    ta.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        doSend();
+      }
+    });
+    inputEl.appendChild(ta);
+    inputEl.appendChild(btn);
+    container.appendChild(inputEl);
+  }
+
+  // State
+  var messages = [];
+  var messageEls = {};
+  var typingEl = null;
+
+  // Track if user has scrolled away from bottom
+  var userScrolledUp = false;
+  messagesEl.addEventListener('scroll', function() {
+    var atBottom = messagesEl.scrollTop + messagesEl.clientHeight >= messagesEl.scrollHeight - 10;
+    userScrolledUp = !atBottom;
+  });
+
+  function maybeScrollToBottom() {
+    if (autoScroll && !userScrolledUp) {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+  }
+
+  function scrollToBottom() {
+    userScrolledUp = false;
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function renderContent(text) {
+    var renderer = getMarkdownRenderer();
+    if (renderer) {
+      try { return renderer(text); } catch (e) { /* fall through */ }
+    }
+    // Plain text: escape and convert newlines to <br>
+    return escapeHtml(text).replace(/\n/g, '<br>');
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function buildRowEl(msg) {
+    var role = roles[msg.role] || roles.user;
+    var row = document.createElement('div');
+    row.className = 'weld-chat-row side-' + role.side;
+    row.dataset.messageId = msg.id;
+    row.dataset.role = msg.role;
+
+    if (showAvatars && role.side !== 'center') {
+      var av = document.createElement('div');
+      av.className = 'weld-chat-avatar';
+      av.style.background = role.color;
+      av.textContent = role.initial;
+      row.appendChild(av);
+    }
+
+    var col = document.createElement('div');
+    col.style.flex = '1';
+    col.style.minWidth = '0';
+
+    var bubble = document.createElement('div');
+    bubble.className = 'weld-chat-bubble';
+    bubble.innerHTML = renderContent(msg.content);
+    col.appendChild(bubble);
+
+    if (showLabels && role.side !== 'center') {
+      var meta = document.createElement('div');
+      meta.className = 'weld-chat-meta';
+      meta.innerHTML = '<span class="role-label">' + escapeHtml(role.label) + '</span>';
+      if (msg.timestamp) {
+        var ts = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        meta.innerHTML += '<span>' + ts + '</span>';
+      }
+      col.appendChild(meta);
+    }
+
+    row.appendChild(col);
+    return row;
+  }
+
+  function addMessage(msg) {
+    msg = msg || {};
+    if (!msg.role) msg.role = 'user';
+    if (msg.content == null) msg.content = '';
+    if (!msg.id) msg.id = uid();
+    if (!msg.timestamp) msg.timestamp = Date.now();
+
+    messages.push(msg);
+    var rowEl = buildRowEl(msg);
+    messageEls[msg.id] = rowEl;
+    // Insert before typing indicator if present
+    if (typingEl && typingEl.parentNode) {
+      messagesEl.insertBefore(rowEl, typingEl);
+    } else {
+      messagesEl.appendChild(rowEl);
+    }
+    maybeScrollToBottom();
+    return msg.id;
+  }
+
+  function updateMessage(id, content) {
+    var msg = messages.find(function(m) { return m.id === id; });
+    if (!msg) return false;
+    msg.content = content;
+    var rowEl = messageEls[id];
+    if (rowEl) {
+      var bubble = rowEl.querySelector('.weld-chat-bubble');
+      if (bubble) bubble.innerHTML = renderContent(content);
+    }
+    maybeScrollToBottom();
+    return true;
+  }
+
+  function removeMessage(id) {
+    var idx = messages.findIndex(function(m) { return m.id === id; });
+    if (idx === -1) return false;
+    messages.splice(idx, 1);
+    var rowEl = messageEls[id];
+    if (rowEl && rowEl.parentNode) rowEl.parentNode.removeChild(rowEl);
+    delete messageEls[id];
+    return true;
+  }
+
+  function clearMessages() {
+    messages = [];
+    messageEls = {};
+    messagesEl.innerHTML = '';
+    if (typingEl) messagesEl.appendChild(typingEl);
+  }
+
+  function streamMessage(opts) {
+    opts = opts || {};
+    var id = addMessage({ role: opts.role || 'assistant', content: '', id: opts.id });
+    var rowEl = messageEls[id];
+    rowEl.classList.add('weld-chat-streaming');
+    var content = '';
+    var msg = messages.find(function(m) { return m.id === id; });
+
+    return {
+      id: id,
+      append: function(chunk) {
+        content += chunk;
+        msg.content = content;
+        var bubble = rowEl.querySelector('.weld-chat-bubble');
+        if (bubble) bubble.innerHTML = renderContent(content);
+        maybeScrollToBottom();
+      },
+      replace: function(newContent) {
+        content = String(newContent);
+        msg.content = content;
+        var bubble = rowEl.querySelector('.weld-chat-bubble');
+        if (bubble) bubble.innerHTML = renderContent(content);
+        maybeScrollToBottom();
+      },
+      finish: function(finalContent) {
+        if (finalContent != null) {
+          content = String(finalContent);
+          msg.content = content;
+          var bubble = rowEl.querySelector('.weld-chat-bubble');
+          if (bubble) bubble.innerHTML = renderContent(content);
+        }
+        rowEl.classList.remove('weld-chat-streaming');
+        return msg;
+      },
+      cancel: function() {
+        rowEl.classList.remove('weld-chat-streaming');
+      }
+    };
+  }
+
+  function showTyping() {
+    if (typingEl) return;
+    typingEl = document.createElement('div');
+    typingEl.className = 'weld-chat-typing';
+    typingEl.innerHTML =
+      '<div class="weld-chat-typing-dot"></div>' +
+      '<div class="weld-chat-typing-dot"></div>' +
+      '<div class="weld-chat-typing-dot"></div>';
+    messagesEl.appendChild(typingEl);
+    maybeScrollToBottom();
+  }
+
+  function hideTyping() {
+    if (typingEl && typingEl.parentNode) {
+      typingEl.parentNode.removeChild(typingEl);
+    }
+    typingEl = null;
+  }
+
+  function getMessages() {
+    return messages.slice();
+  }
+
+  function setMarkdown(opt) {
+    markdownOpt = opt;
+    // Re-render all messages
+    for (var i = 0; i < messages.length; i++) {
+      var m = messages[i];
+      var rowEl = messageEls[m.id];
+      if (rowEl) {
+        var bubble = rowEl.querySelector('.weld-chat-bubble');
+        if (bubble) bubble.innerHTML = renderContent(m.content);
+      }
+    }
+  }
+
+  function focus() {
+    if (inputEl) {
+      var ta = inputEl.querySelector('textarea');
+      if (ta) ta.focus();
+    }
+  }
+
+  var api = {
+    addMessage: addMessage,
+    updateMessage: updateMessage,
+    removeMessage: removeMessage,
+    clearMessages: clearMessages,
+    streamMessage: streamMessage,
+    showTyping: showTyping,
+    hideTyping: hideTyping,
+    getMessages: getMessages,
+    scrollToBottom: scrollToBottom,
+    setMarkdown: setMarkdown,
+    focus: focus,
+    container: container,
+    messagesEl: messagesEl,
+    inputEl: inputEl
+  };
+  return api;
+}
+
+window.weld.chatui = {
+  create: createChat,
+  version: '1.0.0'
+};
+
+})();
+</script>
+<script>
+(function(){
+  function dec(s) { return decodeURIComponent(escape(atob(s))); }
+  var FAKE_REPLIES = dec('VGhlIEVhc3Rlcm4gS2luZ2RvbSBzdHJldGNoZXMgZnJvbSB0aGUgQ3J5c3RhbCBDb2FzdCB0byB0aGUgZm9vdGhpbGxzIG9mIE1vdW50IFNldmVybi4gSXRzIGNhcGl0YWwsICoqU29sYW5hKiosIGlzIGJ1aWx0IGF0b3AgYSBuZXR3b3JrIG9mIHN1YnRlcnJhbmVhbiByaXZlcnMgdGhhdCB0aGUgZm91bmRpbmcgbWFnZXMgZGl2ZXJ0ZWQgY2VudHVyaWVzIGFnby4gVGhlIHdhdGVyIHN0aWxsIGh1bXMgYmVuZWF0aCB0aGUgc3RyZWV0cywgYW5kIGNlcnRhaW4gc3RvbmVzIGluIHRoZSBvbGRlciBkaXN0cmljdHMgZ2xvdyBmYWludGx5IGF0IGR1c2sufHx8VGhyZWUgcnVsZXMgZ292ZXJuIGRyYWdvbmtpbiBpbiB0aGlzIHJlYWxtOgoKMS4gVGhleSBicmVhdGhlICppY2UqLCBub3QgZmlyZSAtLSBhIHBlY3VsaWFyaXR5IG9mIHRoZSBjb2xkIHdpbmRzIGF0b3AgdGhlIG5vcnRoZXJuIHBlYWtzLgoyLiBUaGVpciBob2FyZHMgYXJlIG5vdCBnb2xkIGJ1dCAqbWVtb3J5KjogZXZlcnkgZHJhZ29uIGNhcnJpZXMgYW4gYXJjaGl2ZSBvZiB0aGUgc29uZ3Mgc3VuZyBpbiBpdHMgcHJlc2VuY2UuCjMuIEtpbGxpbmcgb25lIGlzIHBlcm1pdHRlZCBvbmx5IGJ5IHJveWFsIHdyaXQsIGFuZCBvbmx5IGFmdGVyIGEgZm9ybWFsIHNvbmctZXhjaGFuZ2UuCgpZb3UgY2FuIHJlYWQgbW9yZSBpbiB0aGUgW05vcnRoZXJuIENvZGV4XShodHRwczovL2V4YW1wbGUuY29tKS58fHxIZXJlJ3MgYSBxdWljayBjb2RlIHNuaXBwZXQgeW91IG1pZ2h0IGZpbmQgdXNlZnVsOgoKYGBganMKZnVuY3Rpb24gc3VtbW9uKG5hbWUpIHsKICBpZiAoIWlzTWFnZShuYW1lKSkgdGhyb3cgbmV3IEVycm9yKCJub3QgYSBtYWdlIik7CiAgcmV0dXJuIG5ldyBGYW1pbGlhcihuYW1lKTsKfQpgYGAKCkJ1dCBiZSBjYXJlZnVsIC0tIHRoZSBiaW5kaW5nIHJpdHVhbHMgYXJlIHN1YnRsZSwgYW5kIGdldHRpbmcgdGhlbSB3cm9uZyBjYW4gaGF2ZSAqY29uc2VxdWVuY2VzKi58fHxQcmluY2VzcyBBbGljZSB3YXMgbGFzdCBzZWVuIGhlYWRpbmcgbm9ydGggb24gaG9yc2ViYWNrLCBhY2NvbXBhbmllZCBieSBhIHNpbmdsZSBndWFyZCBhbmQgd2hhdCBhcHBlYXJlZCB0byBiZSBhIHNlYWxlZCBjb3BwZXIgc2Nyb2xsLiBIZXIgaXRpbmVyYXJ5IHdhcyBub3QgYW5ub3VuY2VkLiBUaGUgRWFzdGVybiBDb3VuY2lsIGhhcyBleHByZXNzZWQgY29uY2VybiwgYnV0IG5vIG9mZmljaWFsIHNlYXJjaCBwYXJ0eSBoYXMgYmVlbiBkaXNwYXRjaGVkLg==').split('|||');
+  var replyIdx = 0;
+
+  function start() {
+    if (!window.weld || !window.weld.ui || !window.weld.chatui || !window.weld.markdown) {
+      setTimeout(start, 150);
+      return;
+    }
+    buildDemo();
+  }
+
+  function buildDemo() {
+    var ui = window.weld.ui;
+    var useMarkdown = true;
+
+    var chat = weld.chatui.create({
+      container: '#chat-host',
+      markdown: 'auto',
+      onSend: handleSend
+    });
+
+    // Seed conversation
+    chat.addMessage({
+      role: 'system',
+      content: 'Demo chat: type anything below. Replies are pre-canned to show off streaming + markdown.'
+    });
+    chat.addMessage({
+      role: 'assistant',
+      content: 'Welcome. Ask me about the **Eastern Kingdom**, *dragons*, or `mages` -- or just say hello.'
+    });
+
+    function handleSend(text) {
+      chat.addMessage({ role: 'user', content: text });
+      chat.showTyping();
+
+      setTimeout(function() {
+        chat.hideTyping();
+        var reply = FAKE_REPLIES[replyIdx % FAKE_REPLIES.length];
+        replyIdx++;
+        streamReply(reply);
+      }, 600 + Math.random() * 400);
+    }
+
+    function streamReply(text) {
+      var stream = chat.streamMessage({ role: 'assistant' });
+      var chars = text.split('');
+      var i = 0;
+      function next() {
+        if (i >= chars.length) {
+          stream.finish();
+          return;
+        }
+        var chunkSize = Math.floor(Math.random() * 4) + 2;
+        var chunk = chars.slice(i, i + chunkSize).join('');
+        stream.append(chunk);
+        i += chunkSize;
+        setTimeout(next, 20 + Math.random() * 30);
+      }
+      next();
+    }
+
+    // -------- TOOLBAR --------
+    var toolbar = document.getElementById('toolbar');
+    toolbar.appendChild(ui.button({
+      label: 'Add user msg', size: 'sm', variant: 'ghost',
+      onClick: function() {
+        chat.addMessage({ role: 'user', content: 'Quick test message from button' });
+      }
+    }));
+    toolbar.appendChild(ui.button({
+      label: 'Stream a reply', size: 'sm', variant: 'ghost',
+      onClick: function() {
+        var reply = FAKE_REPLIES[replyIdx % FAKE_REPLIES.length];
+        replyIdx++;
+        streamReply(reply);
+      }
+    }));
+    toolbar.appendChild(ui.button({
+      label: 'Show typing', size: 'sm', variant: 'ghost',
+      onClick: function() { chat.showTyping(); }
+    }));
+    toolbar.appendChild(ui.button({
+      label: 'Hide typing', size: 'sm', variant: 'ghost',
+      onClick: function() { chat.hideTyping(); }
+    }));
+    toolbar.appendChild(ui.button({
+      label: 'Add system note', size: 'sm', variant: 'ghost',
+      onClick: function() {
+        chat.addMessage({ role: 'system', content: 'Hours pass, and a chill wind picks up.' });
+      }
+    }));
+    toolbar.appendChild(ui.button({
+      label: 'Toggle markdown', size: 'sm', variant: 'ghost',
+      onClick: function() {
+        useMarkdown = !useMarkdown;
+        chat.setMarkdown(useMarkdown ? 'auto' : false);
+      }
+    }));
+    toolbar.appendChild(ui.button({
+      label: 'Clear', size: 'sm', variant: 'ghost', icon: 'trash',
+      onClick: function() { chat.clearMessages(); }
+    }));
+
+    chat.focus();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>

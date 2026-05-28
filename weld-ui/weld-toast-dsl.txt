@@ -1,0 +1,331 @@
+$meta
+  title       = weld.toast
+  description = Toast notifications and modal dialogs (prompt, confirm). Promise-based async prompts, queued toasts with auto-dismiss and configurable positions, themed via CSS variables. Stash on window.weld.toast.
+  tags        = weld, toast, notifications, prompt, confirm, dialog, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.toast) return window.weld.toast;
+
+  // -----------------------------------------------------------------
+  // CSS injection -- once
+  // -----------------------------------------------------------------
+  function injectCss() {
+    if (window.__weldToastCss) return;
+    window.__weldToastCss = true;
+    var s = document.createElement('style');
+    s.textContent =
+      '.weld-toast-host{position:fixed;z-index:9999;display:flex;flex-direction:column;' +
+        'gap:8px;pointer-events:none;font:14px system-ui,sans-serif;}' +
+      '.weld-toast-host.top-right{top:20px;right:20px;align-items:flex-end;}' +
+      '.weld-toast-host.top-left{top:20px;left:20px;align-items:flex-start;}' +
+      '.weld-toast-host.top-center{top:20px;left:50%;transform:translateX(-50%);align-items:center;}' +
+      '.weld-toast-host.bottom-right{bottom:20px;right:20px;align-items:flex-end;}' +
+      '.weld-toast-host.bottom-left{bottom:20px;left:20px;align-items:flex-start;}' +
+      '.weld-toast-host.bottom-center{bottom:20px;left:50%;transform:translateX(-50%);align-items:center;}' +
+      '.weld-toast{pointer-events:auto;min-width:240px;max-width:360px;' +
+        'padding:12px 16px;background:var(--weld-surface,#161b22);' +
+        'border:1px solid var(--weld-border,rgba(255,255,255,0.10));border-radius:6px;' +
+        'box-shadow:0 8px 32px rgba(0,0,0,0.4);color:var(--weld-ink,#e6edf3);' +
+        'display:flex;gap:10px;align-items:flex-start;line-height:1.4;' +
+        'transform:translateX(20px);opacity:0;transition:transform 220ms,opacity 220ms;}' +
+      '.weld-toast.shown{transform:translateX(0);opacity:1;}' +
+      '.weld-toast .weld-toast-icon{flex:0 0 18px;height:18px;border-radius:50%;margin-top:1px;' +
+        'display:flex;align-items:center;justify-content:center;font:600 11px monospace;color:#fff;}' +
+      '.weld-toast.info  .weld-toast-icon{background:#4493f8;}' +
+      '.weld-toast.success .weld-toast-icon{background:#3fb950;}' +
+      '.weld-toast.warn  .weld-toast-icon{background:#d29922;}' +
+      '.weld-toast.error .weld-toast-icon{background:#f85149;}' +
+      '.weld-toast .weld-toast-msg{flex:1;font-size:13px;word-wrap:break-word;}' +
+      '.weld-toast .weld-toast-close{cursor:pointer;color:var(--weld-muted,#7d8590);' +
+        'font-size:16px;line-height:1;background:none;border:none;padding:0;margin-left:6px;}' +
+      '.weld-toast .weld-toast-close:hover{color:var(--weld-ink,#e6edf3);}' +
+      '.weld-toast-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9998;' +
+        'display:flex;align-items:center;justify-content:center;font:14px system-ui,sans-serif;' +
+        'opacity:0;transition:opacity 180ms;}' +
+      '.weld-toast-backdrop.shown{opacity:1;}' +
+      '.weld-toast-modal{background:var(--weld-surface,#161b22);' +
+        'border:1px solid var(--weld-border,rgba(255,255,255,0.10));border-radius:8px;' +
+        'padding:24px;min-width:320px;max-width:480px;' +
+        'color:var(--weld-ink,#e6edf3);box-shadow:0 16px 64px rgba(0,0,0,0.6);' +
+        'transform:scale(0.96);transition:transform 180ms;}' +
+      '.weld-toast-backdrop.shown .weld-toast-modal{transform:scale(1);}' +
+      '.weld-toast-modal h4{font-size:15px;font-weight:600;margin-bottom:10px;}' +
+      '.weld-toast-modal p{font-size:13px;color:var(--weld-ink,#e6edf3);margin-bottom:14px;line-height:1.5;}' +
+      '.weld-toast-modal input,.weld-toast-modal textarea{width:100%;padding:8px 10px;' +
+        'background:var(--weld-faint,#21262d);' +
+        'border:1px solid var(--weld-border,rgba(255,255,255,0.10));border-radius:4px;' +
+        'color:var(--weld-ink,#e6edf3);font:13px system-ui,sans-serif;margin-bottom:14px;}' +
+      '.weld-toast-modal textarea{resize:vertical;min-height:80px;font-family:inherit;}' +
+      '.weld-toast-actions{display:flex;gap:8px;justify-content:flex-end;}' +
+      '.weld-toast-btn{padding:6px 14px;border-radius:4px;font:600 13px system-ui,sans-serif;' +
+        'cursor:pointer;border:1px solid transparent;}' +
+      '.weld-toast-btn.primary{background:#4493f8;color:#fff;}' +
+      '.weld-toast-btn.primary:hover{background:#3a85e0;}' +
+      '.weld-toast-btn.danger{background:#f85149;color:#fff;}' +
+      '.weld-toast-btn.danger:hover{background:#e0463f;}' +
+      '.weld-toast-btn.ghost{background:transparent;color:var(--weld-ink,#e6edf3);' +
+        'border-color:var(--weld-border,rgba(255,255,255,0.10));}' +
+      '.weld-toast-btn.ghost:hover{background:var(--weld-faint,#21262d);}';
+    document.head.appendChild(s);
+  }
+
+  // -----------------------------------------------------------------
+  // Toast host management
+  // -----------------------------------------------------------------
+  var config = {
+    position: 'top-right',
+    duration: 4000,
+    max: 5
+  };
+  var hosts = {};
+  var activeToasts = [];
+
+  function getHost(position) {
+    if (hosts[position]) return hosts[position];
+    var h = document.createElement('div');
+    h.className = 'weld-toast-host ' + position;
+    document.body.appendChild(h);
+    hosts[position] = h;
+    return h;
+  }
+
+  function configure(opts) {
+    if (!opts) return;
+    if (opts.position) config.position = opts.position;
+    if (opts.duration != null) config.duration = opts.duration;
+    if (opts.max != null) config.max = opts.max;
+  }
+
+  // -----------------------------------------------------------------
+  // Toast notification
+  // -----------------------------------------------------------------
+  var ICONS = {
+    info:    'i',
+    success: '\u2713',
+    warn:    '!',
+    error:   'x'
+  };
+
+  function show(message, opts) {
+    injectCss();
+    opts = opts || {};
+    var type = opts.type || 'info';
+    var duration = opts.duration != null ? opts.duration : config.duration;
+    var position = opts.position || config.position;
+    var dismissible = opts.dismissible !== false;
+
+    var host = getHost(position);
+
+    var toast = document.createElement('div');
+    toast.className = 'weld-toast ' + type;
+
+    var icon = document.createElement('div');
+    icon.className = 'weld-toast-icon';
+    icon.textContent = ICONS[type] || ICONS.info;
+    toast.appendChild(icon);
+
+    var msg = document.createElement('div');
+    msg.className = 'weld-toast-msg';
+    msg.textContent = String(message);
+    toast.appendChild(msg);
+
+    if (dismissible) {
+      var close = document.createElement('button');
+      close.className = 'weld-toast-close';
+      close.textContent = '\u00d7';
+      close.setAttribute('aria-label', 'close');
+      close.addEventListener('click', function() { dismiss(handle); });
+      toast.appendChild(close);
+    }
+
+    // Enforce max
+    while (activeToasts.length >= config.max) {
+      var oldest = activeToasts.shift();
+      if (oldest) dismiss(oldest, true);
+    }
+
+    host.appendChild(toast);
+    // Trigger CSS transition
+    setTimeout(function() { toast.classList.add('shown'); }, 10);
+
+    var timer = null;
+    var handle = { toast: toast, host: host, dismissed: false, _t: null };
+    activeToasts.push(handle);
+
+    if (duration > 0) {
+      handle._t = setTimeout(function() { dismiss(handle); }, duration);
+    }
+
+    return handle;
+  }
+
+  function dismiss(handle, immediate) {
+    if (!handle || handle.dismissed) return;
+    handle.dismissed = true;
+    if (handle._t) clearTimeout(handle._t);
+    var idx = activeToasts.indexOf(handle);
+    if (idx !== -1) activeToasts.splice(idx, 1);
+
+    if (immediate) {
+      if (handle.toast.parentNode) handle.toast.parentNode.removeChild(handle.toast);
+      return;
+    }
+    handle.toast.classList.remove('shown');
+    setTimeout(function() {
+      if (handle.toast.parentNode) handle.toast.parentNode.removeChild(handle.toast);
+    }, 240);
+  }
+
+  function clearAll() {
+    while (activeToasts.length) {
+      dismiss(activeToasts[0], true);
+    }
+  }
+
+  // -----------------------------------------------------------------
+  // Modal helpers: prompt, confirm
+  // -----------------------------------------------------------------
+  function buildBackdrop() {
+    injectCss();
+    var bg = document.createElement('div');
+    bg.className = 'weld-toast-backdrop';
+    document.body.appendChild(bg);
+    setTimeout(function() { bg.classList.add('shown'); }, 10);
+    return bg;
+  }
+
+  function teardown(bg) {
+    bg.classList.remove('shown');
+    setTimeout(function() {
+      if (bg.parentNode) bg.parentNode.removeChild(bg);
+    }, 200);
+  }
+
+  function confirmDialog(opts) {
+    opts = opts || {};
+    var title = opts.title || 'Confirm';
+    var message = opts.message || 'Are you sure?';
+    var okLabel = opts.okLabel || 'OK';
+    var cancelLabel = opts.cancelLabel || 'Cancel';
+    var danger = opts.danger === true;
+
+    return new Promise(function(resolve) {
+      var bg = buildBackdrop();
+      var modal = document.createElement('div');
+      modal.className = 'weld-toast-modal';
+
+      var h = document.createElement('h4');
+      h.textContent = title;
+      modal.appendChild(h);
+
+      var p = document.createElement('p');
+      p.textContent = message;
+      modal.appendChild(p);
+
+      var actions = document.createElement('div');
+      actions.className = 'weld-toast-actions';
+
+      var cancel = document.createElement('button');
+      cancel.className = 'weld-toast-btn ghost';
+      cancel.textContent = cancelLabel;
+      cancel.addEventListener('click', function() { teardown(bg); resolve(false); });
+      actions.appendChild(cancel);
+
+      var ok = document.createElement('button');
+      ok.className = 'weld-toast-btn ' + (danger ? 'danger' : 'primary');
+      ok.textContent = okLabel;
+      ok.addEventListener('click', function() { teardown(bg); resolve(true); });
+      actions.appendChild(ok);
+
+      modal.appendChild(actions);
+      bg.appendChild(modal);
+      setTimeout(function() { ok.focus(); }, 100);
+    });
+  }
+
+  function promptDialog(opts) {
+    opts = opts || {};
+    var title = opts.title || 'Prompt';
+    var message = opts.message || '';
+    var placeholder = opts.placeholder || '';
+    var defaultValue = opts.defaultValue || '';
+    var multiline = opts.multiline === true;
+    var okLabel = opts.okLabel || 'OK';
+    var cancelLabel = opts.cancelLabel || 'Cancel';
+
+    return new Promise(function(resolve) {
+      var bg = buildBackdrop();
+      var modal = document.createElement('div');
+      modal.className = 'weld-toast-modal';
+
+      var h = document.createElement('h4');
+      h.textContent = title;
+      modal.appendChild(h);
+
+      if (message) {
+        var p = document.createElement('p');
+        p.textContent = message;
+        modal.appendChild(p);
+      }
+
+      var input;
+      if (multiline) {
+        input = document.createElement('textarea');
+      } else {
+        input = document.createElement('input');
+        input.type = 'text';
+      }
+      input.placeholder = placeholder;
+      input.value = defaultValue;
+      modal.appendChild(input);
+
+      var actions = document.createElement('div');
+      actions.className = 'weld-toast-actions';
+
+      var cancel = document.createElement('button');
+      cancel.className = 'weld-toast-btn ghost';
+      cancel.textContent = cancelLabel;
+      cancel.addEventListener('click', function() { teardown(bg); resolve(null); });
+      actions.appendChild(cancel);
+
+      var ok = document.createElement('button');
+      ok.className = 'weld-toast-btn primary';
+      ok.textContent = okLabel;
+      ok.addEventListener('click', function() { teardown(bg); resolve(input.value); });
+      actions.appendChild(ok);
+
+      modal.appendChild(actions);
+      bg.appendChild(modal);
+      setTimeout(function() { input.focus(); input.select(); }, 100);
+
+      if (!multiline) {
+        input.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') { teardown(bg); resolve(input.value); }
+          if (e.key === 'Escape') { teardown(bg); resolve(null); }
+        });
+      }
+    });
+  }
+
+  // -----------------------------------------------------------------
+  // API
+  // -----------------------------------------------------------------
+  window.weld.toast = {
+    show: show,
+    info:    function(m, o) { o = o || {}; o.type = 'info';    return show(m, o); },
+    success: function(m, o) { o = o || {}; o.type = 'success'; return show(m, o); },
+    warn:    function(m, o) { o = o || {}; o.type = 'warn';    return show(m, o); },
+    error:   function(m, o) { o = o || {}; o.type = 'error';   return show(m, o); },
+    dismiss: dismiss,
+    clear:   clearAll,
+    configure: configure,
+    confirm: confirmDialog,
+    prompt:  promptDialog,
+    version: '1.0.0'
+  };
+
+  return window.weld.toast;
+

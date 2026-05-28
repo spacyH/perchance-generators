@@ -1,0 +1,397 @@
+$meta
+  title       = weld.chatui
+  description = Chat UI primitives: message bubbles with role-based styling, streaming responses, typing indicators, optional input area. Auto-scroll with "follow" behavior. Soft integration with weld.markdown for rendering and weld.ui for theming. Stash on window.weld.chatui.
+  tags        = weld, chatui, chat, streaming, ui, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.chatui) return window.weld.chatui;
+
+  // -----------------------------------------------------------------
+  // CSS injection
+  // -----------------------------------------------------------------
+  function injectCss() {
+    if (window.__weldChatuiCss) return;
+    window.__weldChatuiCss = true;
+    var s = document.createElement('style');
+    s.textContent =
+      '.weld-chat{display:flex;flex-direction:column;height:100%;min-height:0;' +
+        'font:14px system-ui,sans-serif;color:var(--weld-ink,#e6edf3);' +
+        'background:var(--weld-bg,#0d1117);}' +
+      '.weld-chat-messages{flex:1;overflow-y:auto;padding:16px;display:flex;' +
+        'flex-direction:column;gap:14px;scroll-behavior:smooth;}' +
+      '.weld-chat-row{display:flex;gap:10px;max-width:85%;align-items:flex-start;}' +
+      '.weld-chat-row.side-right{align-self:flex-end;flex-direction:row-reverse;}' +
+      '.weld-chat-row.side-left{align-self:flex-start;}' +
+      '.weld-chat-row.side-center{align-self:center;max-width:60%;}' +
+      '.weld-chat-avatar{flex:0 0 32px;width:32px;height:32px;border-radius:50%;' +
+        'background:var(--weld-faint,#21262d);color:#fff;display:flex;align-items:center;' +
+        'justify-content:center;font:600 12px var(--weld-mono,monospace);}' +
+      '.weld-chat-bubble{padding:10px 14px;background:var(--weld-faint,#21262d);' +
+        'border:1px solid var(--weld-border,rgba(255,255,255,0.10));border-radius:10px;' +
+        'line-height:1.55;word-wrap:break-word;overflow-wrap:anywhere;min-width:0;}' +
+      '.weld-chat-row.side-right .weld-chat-bubble{background:var(--weld-accent,#4493f8);' +
+        'color:#fff;border-color:transparent;}' +
+      '.weld-chat-row.side-center .weld-chat-bubble{background:transparent;border-style:dashed;' +
+        'font-style:italic;color:var(--weld-muted,#7d8590);text-align:center;}' +
+      '.weld-chat-meta{font-size:11px;color:var(--weld-muted,#7d8590);margin-top:4px;' +
+        'display:flex;gap:8px;align-items:center;}' +
+      '.weld-chat-row.side-right .weld-chat-meta{justify-content:flex-end;}' +
+      '.weld-chat-bubble p:first-child{margin-top:0;}' +
+      '.weld-chat-bubble p:last-child{margin-bottom:0;}' +
+      '.weld-chat-bubble p{margin:0.5em 0;}' +
+      '.weld-chat-bubble code{font:0.88em var(--weld-mono,monospace);' +
+        'background:rgba(0,0,0,0.25);padding:0.1em 0.3em;border-radius:3px;}' +
+      '.weld-chat-bubble pre{background:rgba(0,0,0,0.35);padding:10px;border-radius:4px;' +
+        'overflow-x:auto;font:0.88em var(--weld-mono,monospace);margin:0.5em 0;}' +
+      '.weld-chat-bubble pre code{background:transparent;padding:0;}' +
+      '.weld-chat-streaming .weld-chat-bubble::after{content:"\u258c";' +
+        'animation:weld-chat-blink 1s steps(2) infinite;margin-left:2px;opacity:0.6;}' +
+      '@keyframes weld-chat-blink{50%{opacity:0;}}' +
+      '.weld-chat-typing{display:flex;gap:10px;align-items:center;align-self:flex-start;' +
+        'padding:10px 14px;background:var(--weld-faint,#21262d);' +
+        'border:1px solid var(--weld-border,rgba(255,255,255,0.10));border-radius:10px;}' +
+      '.weld-chat-typing-dot{width:6px;height:6px;border-radius:50%;background:var(--weld-muted,#7d8590);' +
+        'animation:weld-chat-typing-pulse 1.2s ease-in-out infinite;}' +
+      '.weld-chat-typing-dot:nth-child(2){animation-delay:0.15s;}' +
+      '.weld-chat-typing-dot:nth-child(3){animation-delay:0.3s;}' +
+      '@keyframes weld-chat-typing-pulse{0%,100%{opacity:0.3;transform:translateY(0);}' +
+        '50%{opacity:1;transform:translateY(-3px);}}' +
+      '.weld-chat-input{flex:0 0 auto;padding:12px;border-top:1px solid var(--weld-border,rgba(255,255,255,0.10));' +
+        'display:flex;gap:8px;background:var(--weld-bg,#0d1117);}' +
+      '.weld-chat-input textarea{flex:1;resize:none;padding:8px 12px;' +
+        'background:var(--weld-faint,#21262d);' +
+        'border:1px solid var(--weld-border,rgba(255,255,255,0.10));border-radius:6px;' +
+        'color:var(--weld-ink,#e6edf3);font:14px system-ui,sans-serif;line-height:1.4;' +
+        'min-height:36px;max-height:140px;outline:none;}' +
+      '.weld-chat-input textarea:focus{border-color:var(--weld-accent,#4493f8);}' +
+      '.weld-chat-input button{padding:8px 16px;background:var(--weld-accent,#4493f8);' +
+        'color:#fff;border:0;border-radius:6px;font:600 13px system-ui,sans-serif;' +
+        'cursor:pointer;align-self:flex-end;height:36px;}' +
+      '.weld-chat-input button:hover{background:#3a85e0;}' +
+      '.weld-chat-input button:disabled{opacity:0.5;cursor:not-allowed;}';
+    document.head.appendChild(s);
+  }
+
+  // -----------------------------------------------------------------
+  // Default role config
+  // -----------------------------------------------------------------
+  var DEFAULT_ROLES = {
+    user:      { label: 'You',       initial: 'Y', side: 'right',  color: '#4493f8' },
+    assistant: { label: 'Assistant', initial: 'A', side: 'left',   color: '#3fb950' },
+    system:    { label: 'System',    initial: 'S', side: 'center', color: '#7d8590' }
+  };
+
+  function uid() {
+    return 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  function resolveContainer(c) {
+    if (typeof c === 'string') return document.querySelector(c);
+    return c;
+  }
+
+  // -----------------------------------------------------------------
+  // Chat instance factory
+  // -----------------------------------------------------------------
+  function createChat(opts) {
+    opts = opts || {};
+    injectCss();
+
+    var container = resolveContainer(opts.container);
+    if (!container) throw new Error('weld.chatui.create: container not found');
+
+    var roles = Object.assign({}, DEFAULT_ROLES, opts.roles || {});
+    var autoScroll = opts.autoScroll !== false;
+    var showAvatars = opts.showAvatars !== false;
+    var showLabels = opts.showLabels !== false;
+    var markdownOpt = opts.markdown == null ? 'auto' : opts.markdown;
+
+    function getMarkdownRenderer() {
+      if (markdownOpt === false) return null;
+      if (typeof markdownOpt === 'function') return markdownOpt;
+      if (markdownOpt === 'auto' || markdownOpt === true) {
+        if (window.weld && window.weld.markdown) {
+          return function(text) { return window.weld.markdown.render(text); };
+        }
+      }
+      return null;
+    }
+
+    // Build skeleton
+    container.classList.add('weld-chat');
+    container.innerHTML = '';
+    var messagesEl = document.createElement('div');
+    messagesEl.className = 'weld-chat-messages';
+    container.appendChild(messagesEl);
+
+    var inputEl = null;
+    if (opts.input !== false) {
+      inputEl = document.createElement('div');
+      inputEl.className = 'weld-chat-input';
+      var ta = document.createElement('textarea');
+      ta.placeholder = opts.placeholder || 'Type a message...';
+      ta.rows = 1;
+      ta.addEventListener('input', function() {
+        ta.style.height = 'auto';
+        ta.style.height = Math.min(ta.scrollHeight, 140) + 'px';
+      });
+      var btn = document.createElement('button');
+      btn.textContent = opts.sendLabel || 'Send';
+      function doSend() {
+        var text = ta.value.trim();
+        if (!text) return;
+        ta.value = '';
+        ta.style.height = 'auto';
+        if (typeof opts.onSend === 'function') {
+          try { opts.onSend(text, api); } catch (e) { /* swallow */ }
+        }
+      }
+      btn.addEventListener('click', doSend);
+      ta.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          doSend();
+        }
+      });
+      inputEl.appendChild(ta);
+      inputEl.appendChild(btn);
+      container.appendChild(inputEl);
+    }
+
+    // State
+    var messages = [];
+    var messageEls = {};
+    var typingEl = null;
+
+    // Track if user has scrolled away from bottom
+    var userScrolledUp = false;
+    messagesEl.addEventListener('scroll', function() {
+      var atBottom = messagesEl.scrollTop + messagesEl.clientHeight >= messagesEl.scrollHeight - 10;
+      userScrolledUp = !atBottom;
+    });
+
+    function maybeScrollToBottom() {
+      if (autoScroll && !userScrolledUp) {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+    }
+
+    function scrollToBottom() {
+      userScrolledUp = false;
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function renderContent(text) {
+      var renderer = getMarkdownRenderer();
+      if (renderer) {
+        try { return renderer(text); } catch (e) { /* fall through */ }
+      }
+      // Plain text: escape and convert newlines to <br>
+      return escapeHtml(text).replace(/\n/g, '<br>');
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function buildRowEl(msg) {
+      var role = roles[msg.role] || roles.user;
+      var row = document.createElement('div');
+      row.className = 'weld-chat-row side-' + role.side;
+      row.dataset.messageId = msg.id;
+      row.dataset.role = msg.role;
+
+      if (showAvatars && role.side !== 'center') {
+        var av = document.createElement('div');
+        av.className = 'weld-chat-avatar';
+        av.style.background = role.color;
+        av.textContent = role.initial;
+        row.appendChild(av);
+      }
+
+      var col = document.createElement('div');
+      col.style.flex = '1';
+      col.style.minWidth = '0';
+
+      var bubble = document.createElement('div');
+      bubble.className = 'weld-chat-bubble';
+      bubble.innerHTML = renderContent(msg.content);
+      col.appendChild(bubble);
+
+      if (showLabels && role.side !== 'center') {
+        var meta = document.createElement('div');
+        meta.className = 'weld-chat-meta';
+        meta.innerHTML = '<span class="role-label">' + escapeHtml(role.label) + '</span>';
+        if (msg.timestamp) {
+          var ts = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          meta.innerHTML += '<span>' + ts + '</span>';
+        }
+        col.appendChild(meta);
+      }
+
+      row.appendChild(col);
+      return row;
+    }
+
+    function addMessage(msg) {
+      msg = msg || {};
+      if (!msg.role) msg.role = 'user';
+      if (msg.content == null) msg.content = '';
+      if (!msg.id) msg.id = uid();
+      if (!msg.timestamp) msg.timestamp = Date.now();
+
+      messages.push(msg);
+      var rowEl = buildRowEl(msg);
+      messageEls[msg.id] = rowEl;
+      // Insert before typing indicator if present
+      if (typingEl && typingEl.parentNode) {
+        messagesEl.insertBefore(rowEl, typingEl);
+      } else {
+        messagesEl.appendChild(rowEl);
+      }
+      maybeScrollToBottom();
+      return msg.id;
+    }
+
+    function updateMessage(id, content) {
+      var msg = messages.find(function(m) { return m.id === id; });
+      if (!msg) return false;
+      msg.content = content;
+      var rowEl = messageEls[id];
+      if (rowEl) {
+        var bubble = rowEl.querySelector('.weld-chat-bubble');
+        if (bubble) bubble.innerHTML = renderContent(content);
+      }
+      maybeScrollToBottom();
+      return true;
+    }
+
+    function removeMessage(id) {
+      var idx = messages.findIndex(function(m) { return m.id === id; });
+      if (idx === -1) return false;
+      messages.splice(idx, 1);
+      var rowEl = messageEls[id];
+      if (rowEl && rowEl.parentNode) rowEl.parentNode.removeChild(rowEl);
+      delete messageEls[id];
+      return true;
+    }
+
+    function clearMessages() {
+      messages = [];
+      messageEls = {};
+      messagesEl.innerHTML = '';
+      if (typingEl) messagesEl.appendChild(typingEl);
+    }
+
+    function streamMessage(opts) {
+      opts = opts || {};
+      var id = addMessage({ role: opts.role || 'assistant', content: '', id: opts.id });
+      var rowEl = messageEls[id];
+      rowEl.classList.add('weld-chat-streaming');
+      var content = '';
+      var msg = messages.find(function(m) { return m.id === id; });
+
+      return {
+        id: id,
+        append: function(chunk) {
+          content += chunk;
+          msg.content = content;
+          var bubble = rowEl.querySelector('.weld-chat-bubble');
+          if (bubble) bubble.innerHTML = renderContent(content);
+          maybeScrollToBottom();
+        },
+        replace: function(newContent) {
+          content = String(newContent);
+          msg.content = content;
+          var bubble = rowEl.querySelector('.weld-chat-bubble');
+          if (bubble) bubble.innerHTML = renderContent(content);
+          maybeScrollToBottom();
+        },
+        finish: function(finalContent) {
+          if (finalContent != null) {
+            content = String(finalContent);
+            msg.content = content;
+            var bubble = rowEl.querySelector('.weld-chat-bubble');
+            if (bubble) bubble.innerHTML = renderContent(content);
+          }
+          rowEl.classList.remove('weld-chat-streaming');
+          return msg;
+        },
+        cancel: function() {
+          rowEl.classList.remove('weld-chat-streaming');
+        }
+      };
+    }
+
+    function showTyping() {
+      if (typingEl) return;
+      typingEl = document.createElement('div');
+      typingEl.className = 'weld-chat-typing';
+      typingEl.innerHTML =
+        '<div class="weld-chat-typing-dot"></div>' +
+        '<div class="weld-chat-typing-dot"></div>' +
+        '<div class="weld-chat-typing-dot"></div>';
+      messagesEl.appendChild(typingEl);
+      maybeScrollToBottom();
+    }
+
+    function hideTyping() {
+      if (typingEl && typingEl.parentNode) {
+        typingEl.parentNode.removeChild(typingEl);
+      }
+      typingEl = null;
+    }
+
+    function getMessages() {
+      return messages.slice();
+    }
+
+    function setMarkdown(opt) {
+      markdownOpt = opt;
+      // Re-render all messages
+      for (var i = 0; i < messages.length; i++) {
+        var m = messages[i];
+        var rowEl = messageEls[m.id];
+        if (rowEl) {
+          var bubble = rowEl.querySelector('.weld-chat-bubble');
+          if (bubble) bubble.innerHTML = renderContent(m.content);
+        }
+      }
+    }
+
+    function focus() {
+      if (inputEl) {
+        var ta = inputEl.querySelector('textarea');
+        if (ta) ta.focus();
+      }
+    }
+
+    var api = {
+      addMessage: addMessage,
+      updateMessage: updateMessage,
+      removeMessage: removeMessage,
+      clearMessages: clearMessages,
+      streamMessage: streamMessage,
+      showTyping: showTyping,
+      hideTyping: hideTyping,
+      getMessages: getMessages,
+      scrollToBottom: scrollToBottom,
+      setMarkdown: setMarkdown,
+      focus: focus,
+      container: container,
+      messagesEl: messagesEl,
+      inputEl: inputEl
+    };
+    return api;
+  }
+
+  window.weld.chatui = {
+    create: createChat,
+    version: '1.0.0'
+  };
+
+  return window.weld.chatui;
+

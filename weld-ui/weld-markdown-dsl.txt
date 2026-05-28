@@ -1,0 +1,286 @@
+$meta
+  title       = weld.markdown
+  description = Safe markdown renderer with built-in HTML sanitization and URL safety. Handles headers, bold/italic, code spans and fenced blocks, links, images, lists, blockquotes, and auto-links. Sanitize arbitrary HTML via the sanitize helper. Stash on window.weld.markdown.
+  tags        = weld, markdown, renderer, sanitize, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.markdown) return window.weld.markdown;
+
+  // -----------------------------------------------------------------
+  // HTML escape -- the foundation of safety
+  // -----------------------------------------------------------------
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // -----------------------------------------------------------------
+  // URL sanitization -- reject javascript:, vbscript:, data: (except images)
+  // -----------------------------------------------------------------
+  var SAFE_URL_RE = /^(?:https?:|mailto:|tel:|\/|#|\.\/|\.\.\/|[a-zA-Z0-9_\-]+\.)/;
+  var SAFE_IMG_URL_RE = /^(?:https?:|data:image\/(?:png|jpe?g|gif|webp|svg\+xml);|\/|\.\/|\.\.\/)/;
+
+  function safeUrl(url, forImg) {
+    url = String(url).trim();
+    var re = forImg ? SAFE_IMG_URL_RE : SAFE_URL_RE;
+    return re.test(url) ? url : '#';
+  }
+
+  // -----------------------------------------------------------------
+  // Inline formatting: bold, italic, strikethrough -- applied to text
+  // where no HTML has been injected yet
+  // -----------------------------------------------------------------
+  function applyFormatting(text) {
+    // Bold first (longer marker wins)
+    text = text.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/__([^_\n]+)__/g, '<strong>$1</strong>');
+    // Italic (single marker)
+    text = text.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
+    text = text.replace(/(^|[^_])_([^_\n]+)_(?!_)/g, '$1<em>$2</em>');
+    // Strikethrough
+    text = text.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+    return text;
+  }
+
+  // -----------------------------------------------------------------
+  // Inline parsing -- code, images, links, auto-links, then formatting
+  // -----------------------------------------------------------------
+  function parseInline(text) {
+    var slots = [];
+    function slot(html) {
+      slots.push(html);
+      return '\u0001S' + (slots.length - 1) + '\u0001';
+    }
+
+    // 1. Code spans -- extract first, content escaped, no further processing
+    text = text.replace(/`([^`]+)`/g, function(_, code) {
+      return slot('<code>' + escapeHtml(code) + '</code>');
+    });
+
+    // 2. Images:  exclamation + label-in-brackets + paren-url
+    text = text.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g, function(_, alt, url, title) {
+      var t = title ? ' title="' + escapeHtml(title) + '"' : '';
+      return slot('<img src="' + safeUrl(url, true) + '" alt="' + escapeHtml(alt) + '"' + t + '>');
+    });
+
+    // 3. Links: label-in-brackets followed by paren-url
+    text = text.replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g, function(_, label, url, title) {
+      var t = title ? ' title="' + escapeHtml(title) + '"' : '';
+      // Allow inline formatting inside link label
+      var inner = applyFormatting(escapeHtml(label));
+      return slot('<a href="' + safeUrl(url) + '"' + t + ' target="_blank" rel="noopener">' + inner + '</a>');
+    });
+
+    // 4. Auto-links: bare URLs (not already inside a slot)
+    text = text.replace(/\b(https?:\/\/[^\s<]+[^\s<.,;:?!])/g, function(url) {
+      return slot('<a href="' + safeUrl(url) + '" target="_blank" rel="noopener">' + escapeHtml(url) + '</a>');
+    });
+
+    // 5. Escape any remaining HTML in the plain text
+    text = escapeHtml(text);
+
+    // 6. Apply bold/italic/strikethrough on the now-safe text
+    text = applyFormatting(text);
+
+    // 7. Restore slot placeholders
+    text = text.replace(/\u0001S(\d+)\u0001/g, function(_, idx) {
+      return slots[parseInt(idx, 10)];
+    });
+
+    return text;
+  }
+
+  // -----------------------------------------------------------------
+  // Block-level parsing
+  // -----------------------------------------------------------------
+  function render(input, opts) {
+    opts = opts || {};
+    if (typeof input !== 'string') input = String(input == null ? '' : input);
+
+    // Normalize line endings
+    input = input.replace(/\r\n?/g, '\n');
+
+    var lines = input.split('\n');
+    var out = [];
+    var i = 0;
+
+    while (i < lines.length) {
+      var line = lines[i];
+
+      // Fenced code block: ``` or ~~~
+      var fence = line.match(/^(```|~~~)\s*([a-zA-Z0-9_-]*)\s*$/);
+      if (fence) {
+        var marker = fence[1];
+        var lang = fence[2] || '';
+        i++;
+        var code = [];
+        while (i < lines.length && lines[i].indexOf(marker) !== 0) {
+          code.push(lines[i]);
+          i++;
+        }
+        i++;
+        var langAttr = lang ? ' class="language-' + escapeHtml(lang) + '"' : '';
+        out.push('<pre><code' + langAttr + '>' + escapeHtml(code.join('\n')) + '</code></pre>');
+        continue;
+      }
+
+      // ATX header: # to ######
+      var hdr = line.match(/^(#{1,6})\s+(.+)$/);
+      if (hdr) {
+        var n = hdr[1].length;
+        out.push('<h' + n + '>' + parseInline(hdr[2]) + '</h' + n + '>');
+        i++;
+        continue;
+      }
+
+      // Horizontal rule
+      if (/^\s*([-*_])\s*\1\s*\1[\s\1]*$/.test(line)) {
+        out.push('<hr>');
+        i++;
+        continue;
+      }
+
+      // Blockquote
+      if (line.charAt(0) === '>') {
+        var quote = [];
+        while (i < lines.length && lines[i].charAt(0) === '>') {
+          quote.push(lines[i].replace(/^>\s?/, ''));
+          i++;
+        }
+        out.push('<blockquote>' + render(quote.join('\n')) + '</blockquote>');
+        continue;
+      }
+
+      // Unordered list
+      if (/^\s*[-*+]\s+/.test(line)) {
+        var items = [];
+        while (i < lines.length && /^\s*[-*+]\s+/.test(lines[i])) {
+          items.push(lines[i].replace(/^\s*[-*+]\s+/, ''));
+          i++;
+        }
+        out.push('<ul>' + items.map(function(it) { return '<li>' + parseInline(it) + '</li>'; }).join('') + '</ul>');
+        continue;
+      }
+
+      // Ordered list
+      if (/^\s*\d+\.\s+/.test(line)) {
+        var oitems = [];
+        while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
+          oitems.push(lines[i].replace(/^\s*\d+\.\s+/, ''));
+          i++;
+        }
+        out.push('<ol>' + oitems.map(function(it) { return '<li>' + parseInline(it) + '</li>'; }).join('') + '</ol>');
+        continue;
+      }
+
+      // Empty line: skip
+      if (line.trim() === '') {
+        i++;
+        continue;
+      }
+
+      // Paragraph: gather consecutive non-empty lines
+      var para = [line];
+      i++;
+      while (i < lines.length && lines[i].trim() !== '' && !/^(#{1,6}\s|```|~~~|>|\s*[-*+]\s|\s*\d+\.\s)/.test(lines[i])) {
+        para.push(lines[i]);
+        i++;
+      }
+      out.push('<p>' + parseInline(para.join(' ')) + '</p>');
+    }
+
+    return out.join('\n');
+  }
+
+  // -----------------------------------------------------------------
+  // Convenience: render into an element
+  // -----------------------------------------------------------------
+  function renderInto(el, input, opts) {
+    if (typeof el === 'string') el = document.querySelector(el);
+    if (!el) throw new Error('weld.markdown.renderInto: element not found');
+    el.innerHTML = render(input, opts);
+    return el;
+  }
+
+  // -----------------------------------------------------------------
+  // Sanitize an arbitrary HTML string -- only allow safe tags/attrs
+  // -----------------------------------------------------------------
+  var ALLOWED_TAGS = {
+    p: 1, br: 1, hr: 1,
+    h1: 1, h2: 1, h3: 1, h4: 1, h5: 1, h6: 1,
+    strong: 1, em: 1, del: 1, b: 1, i: 1, u: 1, s: 1,
+    ul: 1, ol: 1, li: 1,
+    blockquote: 1, pre: 1, code: 1,
+    a: 1, img: 1,
+    table: 1, thead: 1, tbody: 1, tr: 1, th: 1, td: 1,
+    div: 1, span: 1
+  };
+  var ALLOWED_ATTRS = {
+    a: { href: 1, title: 1, target: 1, rel: 1 },
+    img: { src: 1, alt: 1, title: 1, width: 1, height: 1 },
+    '*': { 'class': 1 }
+  };
+
+  function sanitize(html) {
+    var tmp = document.createElement('template');
+    tmp.innerHTML = String(html);
+    walk(tmp.content);
+    return tmp.innerHTML;
+  }
+
+  function walk(node) {
+    var children = Array.prototype.slice.call(node.childNodes);
+    for (var i = 0; i < children.length; i++) {
+      var child = children[i];
+      if (child.nodeType === 1) { // element
+        var tag = child.tagName.toLowerCase();
+        if (!ALLOWED_TAGS[tag]) {
+          // Replace with its text content
+          var text = document.createTextNode(child.textContent);
+          child.parentNode.replaceChild(text, child);
+          continue;
+        }
+        // Strip unsafe attributes
+        var attrs = Array.prototype.slice.call(child.attributes);
+        for (var j = 0; j < attrs.length; j++) {
+          var attr = attrs[j];
+          var tagAllowed = ALLOWED_ATTRS[tag] && ALLOWED_ATTRS[tag][attr.name];
+          var globalAllowed = ALLOWED_ATTRS['*'][attr.name];
+          if (!tagAllowed && !globalAllowed) {
+            child.removeAttribute(attr.name);
+            continue;
+          }
+          // URL attrs: sanitize
+          if (attr.name === 'href') child.setAttribute('href', safeUrl(attr.value));
+          if (attr.name === 'src') {
+            var isImg = tag === 'img';
+            child.setAttribute('src', safeUrl(attr.value, isImg));
+          }
+        }
+        walk(child);
+      }
+    }
+  }
+
+  // -----------------------------------------------------------------
+  // API
+  // -----------------------------------------------------------------
+  window.weld.markdown = {
+    render: render,
+    renderInto: renderInto,
+    sanitize: sanitize,
+    parseInline: parseInline,
+    escapeHtml: escapeHtml,
+    safeUrl: safeUrl,
+    version: '1.0.0'
+  };
+
+  return window.weld.markdown;
+

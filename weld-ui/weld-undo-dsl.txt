@@ -1,0 +1,207 @@
+$meta
+  title       = weld.undo
+  description = Undo/redo with state snapshots for the weld plugin suite. Create snapshot stacks against any state, group operations into atomic transactions, install Cmd+Z/Cmd+Shift+Z keyboard shortcuts. Stash on window.weld.undo.
+  tags        = weld, undo, redo, snapshots, history, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.undo) return window.weld.undo;
+
+  var stacks = [];
+
+  // -----------------------------------------------------------------
+  // DEEP CLONE
+  // -----------------------------------------------------------------
+  function deepClone(v) {
+    if (v == null || typeof v !== 'object') return v;
+    if (typeof structuredClone === 'function') {
+      try { return structuredClone(v); } catch (e) { /* fall through */ }
+    }
+    try { return JSON.parse(JSON.stringify(v)); }
+    catch (e) { throw new Error('weld.undo: state is not serializable'); }
+  }
+
+  // -----------------------------------------------------------------
+  // STACK FACTORY
+  // -----------------------------------------------------------------
+  function createStack(opts) {
+    opts = opts || {};
+    var maxDepth = opts.maxDepth || 50;
+    var getState = opts.getState;
+    var setState = opts.setState;
+
+    if (typeof getState !== 'function' || typeof setState !== 'function') {
+      throw new Error('weld.undo.create requires opts.getState and opts.setState functions');
+    }
+
+    var snapshots = [];   // each: state / label / timestamp
+    var cursor = -1;
+    var inTransaction = false;
+    var transactionLabel = null;
+    var listeners = [];
+    var bound = false;
+    var unbindKbd = null;
+
+    function notify(event) {
+      for (var i = 0; i < listeners.length; i++) {
+        try { listeners[i](event, api); } catch (e) { /* swallow */ }
+      }
+    }
+
+    function snapshot(label) {
+      if (inTransaction) return null;  // deferred
+      var s = {
+        state: deepClone(getState()),
+        label: label || '',
+        timestamp: Date.now()
+      };
+      // truncate any redo history past cursor
+      if (cursor < snapshots.length - 1) {
+        snapshots = snapshots.slice(0, cursor + 1);
+      }
+      snapshots.push(s);
+      while (snapshots.length > maxDepth) snapshots.shift();
+      cursor = snapshots.length - 1;
+      notify('snapshot');
+      return s;
+    }
+
+    function undo() {
+      if (!canUndo()) return null;
+      cursor--;
+      var s = snapshots[cursor];
+      try { setState(deepClone(s.state)); }
+      catch (e) { cursor++; throw e; }
+      notify('undo');
+      return s;
+    }
+
+    function redo() {
+      if (!canRedo()) return null;
+      cursor++;
+      var s = snapshots[cursor];
+      try { setState(deepClone(s.state)); }
+      catch (e) { cursor--; throw e; }
+      notify('redo');
+      return s;
+    }
+
+    function canUndo() { return cursor > 0; }
+    function canRedo() { return cursor >= 0 && cursor < snapshots.length - 1; }
+
+    function transaction(fn, label) {
+      if (typeof fn !== 'function') throw new Error('transaction requires a function');
+      if (inTransaction) return fn();   // nested: just run
+
+      inTransaction = true;
+      transactionLabel = label || '';
+
+      var finish = function() {
+        inTransaction = false;
+        snapshot(transactionLabel);
+      };
+
+      try {
+        var result = fn();
+        if (result && typeof result.then === 'function') {
+          // async: resolve, then snapshot
+          return result.then(
+            function(r) { finish(); return r; },
+            function(err) { inTransaction = false; throw err; }
+          );
+        }
+        finish();
+        return result;
+      } catch (e) {
+        inTransaction = false;
+        throw e;
+      }
+    }
+
+    function clear() {
+      snapshots.length = 0;
+      cursor = -1;
+      notify('clear');
+    }
+
+    function peek() { return cursor >= 0 ? snapshots[cursor] : null; }
+    function history() { return snapshots.slice(); }
+    function depth() { return snapshots.length; }
+    function position() { return cursor; }
+
+    function onChange(fn) {
+      if (typeof fn !== 'function') throw new Error('onChange requires a function');
+      listeners.push(fn);
+      return function() {
+        var i = listeners.indexOf(fn);
+        if (i !== -1) listeners.splice(i, 1);
+      };
+    }
+
+    function bindKeyboard(kbdOpts) {
+      if (bound) return unbindKbd;
+      kbdOpts = kbdOpts || {};
+      var target = kbdOpts.target || document;
+      var preventDefault = kbdOpts.preventDefault !== false;
+
+      function handler(e) {
+        var meta = e.metaKey || e.ctrlKey;
+        if (!meta) return;
+        var k = e.key.toLowerCase();
+        if (k === 'z') {
+          if (e.shiftKey) {
+            if (canRedo()) { if (preventDefault) e.preventDefault(); redo(); }
+          } else {
+            if (canUndo()) { if (preventDefault) e.preventDefault(); undo(); }
+          }
+        } else if (k === 'y') {
+          if (canRedo()) { if (preventDefault) e.preventDefault(); redo(); }
+        }
+      }
+      target.addEventListener('keydown', handler);
+      bound = true;
+      unbindKbd = function() {
+        target.removeEventListener('keydown', handler);
+        bound = false;
+        unbindKbd = null;
+      };
+      return unbindKbd;
+    }
+
+    // Take initial snapshot so the user has a baseline
+    snapshot('initial');
+
+    var api = {
+      snapshot: snapshot,
+      undo: undo,
+      redo: redo,
+      canUndo: canUndo,
+      canRedo: canRedo,
+      transaction: transaction,
+      clear: clear,
+      peek: peek,
+      history: history,
+      depth: depth,
+      position: position,
+      onChange: onChange,
+      bindKeyboard: bindKeyboard,
+      maxDepth: maxDepth
+    };
+
+    stacks.push(api);
+    return api;
+  }
+
+  // -----------------------------------------------------------------
+  // API
+  // -----------------------------------------------------------------
+  window.weld.undo = {
+    create: createStack,
+    stacks: function() { return stacks.slice(); },
+    version: '1.0.0'
+  };
+
+  return window.weld.undo;
+

@@ -1,0 +1,251 @@
+$meta
+  title       = weld.lorebook
+  description = Keyword-triggered context injection. Define entries with keys, content, priority, and match mode (word or substring). Scan input text, return matched entries within token budget, format as injected context. Optional persistence. Stash on window.weld.lorebook.
+  tags        = weld, lorebook, context, injection, prompt, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.lorebook) return window.weld.lorebook;
+
+  // -----------------------------------------------------------------
+  // Token estimation -- rough char/N ratio
+  // -----------------------------------------------------------------
+  function estimateTokens(text, charsPerToken) {
+    if (!text) return 0;
+    return Math.ceil(String(text).length / (charsPerToken || 4));
+  }
+
+  // -----------------------------------------------------------------
+  // Match helpers
+  // -----------------------------------------------------------------
+  function escapeRegex(s) {
+    return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function buildKeyMatcher(key, opts) {
+    var caseSensitive = opts.caseSensitive === true;
+    var matchMode = opts.matchMode || 'word';
+    var flags = caseSensitive ? 'g' : 'gi';
+    var escaped = escapeRegex(key);
+    if (matchMode === 'substring') {
+      return new RegExp(escaped, flags);
+    }
+    // word: match whole word with non-word boundaries
+    return new RegExp('(^|[^\\w])(' + escaped + ')(?=[^\\w]|$)', flags);
+  }
+
+  function uid(prefix) {
+    return (prefix || 'lb') + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
+
+  // -----------------------------------------------------------------
+  // Lorebook instance factory
+  // -----------------------------------------------------------------
+  function createLorebook(opts) {
+    opts = opts || {};
+    var entries = [];
+    var charsPerToken = opts.charsPerToken || 4;
+    var storage = opts.storage;
+    var storageKey = opts.storageKey || 'weld-lorebook';
+
+    if (storage === undefined && typeof localStorage !== 'undefined') {
+      storage = null; // explicit opt-in for storage
+    }
+
+    // Seed entries
+    if (Array.isArray(opts.entries)) {
+      for (var i = 0; i < opts.entries.length; i++) {
+        addInternal(opts.entries[i]);
+      }
+    }
+
+    // Load from storage if provided
+    if (storage) {
+      try {
+        var raw = storage.getItem(storageKey);
+        if (raw) {
+          var loaded = JSON.parse(raw);
+          if (Array.isArray(loaded)) {
+            entries = []; // replace seed
+            for (var j = 0; j < loaded.length; j++) {
+              addInternal(loaded[j]);
+            }
+          }
+        }
+      } catch (e) { /* swallow */ }
+    }
+
+    function save() {
+      if (!storage) return;
+      try { storage.setItem(storageKey, JSON.stringify(entries)); }
+      catch (e) { /* swallow */ }
+    }
+
+    function normalizeEntry(input) {
+      if (!input || typeof input !== 'object') {
+        throw new Error('lorebook entry must be an object');
+      }
+      var keys = input.keys;
+      if (typeof keys === 'string') keys = [keys];
+      if (!Array.isArray(keys) || keys.length === 0) {
+        throw new Error('lorebook entry must have non-empty keys');
+      }
+      if (typeof input.content !== 'string' || !input.content) {
+        throw new Error('lorebook entry must have non-empty content');
+      }
+      return {
+        id: input.id || uid('lb'),
+        keys: keys.map(String),
+        content: String(input.content),
+        priority: typeof input.priority === 'number' ? input.priority : 0,
+        enabled: input.enabled !== false,
+        matchMode: input.matchMode || 'word',
+        caseSensitive: input.caseSensitive === true,
+        label: input.label || '',
+        metadata: input.metadata || null
+      };
+    }
+
+    function addInternal(input) {
+      var entry = normalizeEntry(input);
+      entries.push(entry);
+      return entry;
+    }
+
+    function add(input) {
+      var entry = addInternal(input);
+      save();
+      return entry.id;
+    }
+
+    function update(id, patch) {
+      var idx = entries.findIndex(function(e) { return e.id === id; });
+      if (idx === -1) return false;
+      var merged = Object.assign({}, entries[idx], patch);
+      entries[idx] = normalizeEntry(merged);
+      save();
+      return true;
+    }
+
+    function remove(id) {
+      var idx = entries.findIndex(function(e) { return e.id === id; });
+      if (idx === -1) return false;
+      entries.splice(idx, 1);
+      save();
+      return true;
+    }
+
+    function get(id) {
+      var found = entries.find(function(e) { return e.id === id; });
+      return found ? Object.assign({}, found) : null;
+    }
+
+    function getAll() {
+      return entries.map(function(e) { return Object.assign({}, e); });
+    }
+
+    function clear() {
+      entries = [];
+      save();
+    }
+
+    // -------- SCAN --------
+    function scan(text, scanOpts) {
+      scanOpts = scanOpts || {};
+      var maxEntries = scanOpts.maxEntries == null ? Infinity : scanOpts.maxEntries;
+      var maxTokens = scanOpts.maxTokens == null ? Infinity : scanOpts.maxTokens;
+
+      if (typeof text !== 'string' || !text) return [];
+
+      var matches = [];
+      for (var i = 0; i < entries.length; i++) {
+        var entry = entries[i];
+        if (!entry.enabled) continue;
+        for (var j = 0; j < entry.keys.length; j++) {
+          var key = entry.keys[j];
+          var re = buildKeyMatcher(key, {
+            matchMode: entry.matchMode,
+            caseSensitive: entry.caseSensitive
+          });
+          var m = re.exec(text);
+          if (m) {
+            matches.push({
+              entry: Object.assign({}, entry),
+              matchedKey: key,
+              position: m.index
+            });
+            break; // one match per entry suffices
+          }
+        }
+      }
+
+      // Sort by priority descending, then by position ascending
+      matches.sort(function(a, b) {
+        if (b.entry.priority !== a.entry.priority) return b.entry.priority - a.entry.priority;
+        return a.position - b.position;
+      });
+
+      // Enforce budgets
+      var out = [];
+      var tokens = 0;
+      for (var k = 0; k < matches.length && out.length < maxEntries; k++) {
+        var t = estimateTokens(matches[k].entry.content, charsPerToken);
+        if (tokens + t > maxTokens) continue;
+        tokens += t;
+        out.push(matches[k]);
+      }
+      return out;
+    }
+
+    function inject(text, injectOpts) {
+      injectOpts = injectOpts || {};
+      var format = injectOpts.format || 'list';
+      var header = injectOpts.header || ('[' + 'Lore' + ']');
+      var matches = scan(text, injectOpts);
+      if (matches.length === 0) return '';
+
+      if (typeof format === 'function') {
+        return format(matches);
+      }
+      var lines = [header];
+      if (format === 'list') {
+        for (var i = 0; i < matches.length; i++) {
+          lines.push('- ' + matches[i].entry.content);
+        }
+      } else if (format === 'paragraph') {
+        lines.push(matches.map(function(m) { return m.entry.content; }).join('\n\n'));
+      } else if (format === 'plain') {
+        lines.length = 0;
+        for (var j = 0; j < matches.length; j++) lines.push(matches[j].entry.content);
+      }
+      return lines.join('\n');
+    }
+
+    function estimate(text) {
+      return estimateTokens(text, charsPerToken);
+    }
+
+    return {
+      add: add,
+      update: update,
+      remove: remove,
+      get: get,
+      getAll: getAll,
+      clear: clear,
+      scan: scan,
+      inject: inject,
+      estimateTokens: estimate,
+      size: function() { return entries.length; }
+    };
+  }
+
+  window.weld.lorebook = {
+    create: createLorebook,
+    estimateTokens: estimateTokens,
+    version: '1.0.0'
+  };
+
+  return window.weld.lorebook;
+

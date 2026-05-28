@@ -1,0 +1,999 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+  --weld-ink:var(--ink); --weld-faint:var(--faint); --weld-border:var(--border); --weld-muted:var(--muted); --weld-surface:var(--surface);
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);
+  -webkit-font-smoothing:antialiased;min-height:100vh;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:1100px;margin:0 auto;padding:48px 24px 32px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+.hdr{text-align:center;margin-bottom:40px;}
+.hdr h1{font:700 32px var(--mono);letter-spacing:-1px;color:var(--ink);margin-bottom:8px;}
+.hdr p{font-size:14px;color:var(--muted);max-width:600px;margin:0 auto;}
+
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+
+.workspace{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0;}
+@media (max-width:760px){.workspace{grid-template-columns:1fr;}}
+.card{background:var(--faint);border:1px solid var(--border);border-radius:8px;
+  padding:0;overflow:hidden;display:flex;flex-direction:column;}
+.card .card-head{padding:12px 16px;border-bottom:1px solid var(--border);
+  font:600 11px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;
+  display:flex;justify-content:space-between;align-items:center;}
+.card .card-head .meta{font-weight:400;color:var(--muted);}
+.editor-box{flex:1;padding:14px;}
+#editor{width:100%;min-height:540px;padding:14px;background:var(--bg);
+  color:var(--ink);border:1px solid var(--border);border-radius:6px;
+  font:13px/1.6 var(--mono);resize:vertical;outline:none;}
+#editor:focus{border-color:var(--accent);}
+
+.preview-box{flex:1;padding:20px;background:var(--bg);overflow-y:auto;
+  min-height:540px;max-height:700px;}
+.preview-box h1{font-size:1.8em;margin:0.6em 0 0.4em;color:var(--ink);font-weight:600;}
+.preview-box h2{font-size:1.4em;margin:1em 0 0.4em;color:var(--ink);font-weight:600;
+  padding-bottom:0.2em;border-bottom:1px solid var(--border);}
+.preview-box h3{font-size:1.15em;margin:0.8em 0 0.4em;color:var(--ink);font-weight:600;}
+.preview-box p{margin:0.7em 0;line-height:1.65;color:#c9d1d9;}
+.preview-box ul,.preview-box ol{margin:0.7em 0;padding-left:2em;color:#c9d1d9;}
+.preview-box ul{list-style:disc;}.preview-box ol{list-style:decimal;}
+.preview-box li{margin:0.25em 0;}
+.preview-box code{font:0.88em var(--mono);background:var(--faint);
+  padding:0.15em 0.4em;border-radius:3px;color:#ffa657;}
+.preview-box pre{background:var(--faint);padding:14px;border-radius:6px;
+  overflow-x:auto;margin:0.8em 0;border:1px solid var(--border);}
+.preview-box pre code{background:none;padding:0;color:#c9d1d9;font-size:0.9em;}
+.preview-box blockquote{border-left:3px solid var(--accent);padding:0 0 0 14px;
+  margin:0.8em 0;color:var(--muted);font-style:italic;}
+.preview-box hr{border:0;height:1px;background:var(--border);margin:1.4em 0;}
+.preview-box img{max-width:100%;border-radius:4px;}
+.preview-box a{color:var(--accent);}
+.preview-box strong{color:var(--ink);}
+.preview-box del{color:var(--muted);}
+
+.raw-html-box{flex:1;padding:14px;background:var(--bg);overflow:auto;
+  min-height:540px;max-height:700px;}
+.raw-html-box pre{font:12px/1.5 var(--mono);color:#c9d1d9;
+  white-space:pre-wrap;word-break:break-word;margin:0;}
+
+.mode-toggle{display:flex;gap:0;border:1px solid var(--border);
+  border-radius:6px;overflow:hidden;}
+.mode-toggle button{padding:6px 14px;background:var(--bg);color:var(--muted);
+  border:0;cursor:pointer;font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;
+  transition:all 120ms;}
+.mode-toggle button:hover{color:var(--ink);}
+.mode-toggle button.active{background:var(--accent);color:var(--bg);}
+
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;
+  padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+<div id="page">
+  <div class="breadcrumb">
+    <span class="crumb">
+      <a href="https://perchance.org/weld-ui-index">weld</a>
+      <span class="crumb-sep">/</span>
+      weld.markdown
+      <span class="crumb-sep">/</span>
+      <span class="crumb-cur">examples</span>
+    </span>
+    <span class="crumb-action">
+      <a href="https://perchance.org/weld-markdown-plugin">docs &rarr;</a>
+    </span>
+  </div>
+  <div class="hdr">
+    <h1>weld.markdown</h1>
+    <p>Type markdown on the left, see safe rendered HTML on the right. Toggle to "Raw HTML" to inspect the output. Try the preset buttons -- including the XSS attempts.</p>
+  </div>
+
+  <div class="toolbar" id="toolbar"></div>
+
+  <div class="workspace">
+    <div class="card">
+      <div class="card-head">
+        <span>Markdown source</span>
+        <span class="meta" id="char-count">0 chars</span>
+      </div>
+      <div class="editor-box">
+        <textarea id="editor" spellcheck="false"></textarea>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <span>Output</span>
+        <div class="mode-toggle">
+          <button data-mode="rendered" class="active">Rendered</button>
+          <button data-mode="html">Raw HTML</button>
+        </div>
+      </div>
+      <div class="preview-box" id="preview"></div>
+      <div class="raw-html-box" id="raw-html" style="display:none"><pre></pre></div>
+    </div>
+  </div>
+
+</div>
+<script>(function(){
+'use strict';
+
+// Namespace
+if (!window.weld) window.weld = {};
+if (window.weld.ui) return; // already loaded
+
+// THEME
+var defaultTheme = {
+  bg:        '#0d1117',
+  surface:   '#161b22',
+  faint:     '#21262d',
+  ink:       '#e6edf3',
+  muted:     '#7d8590',
+  accent:    '#4493f8',
+  accentInk: '#0d1117',
+  green:     '#3fb950',
+  red:       '#f85149',
+  yellow:    '#d29922',
+  blue:      '#58a6ff',
+  border:    'rgba(255,255,255,0.10)',
+  borderHi:  'rgba(255,255,255,0.20)',
+  radius:    '6px',
+  radiusSm:  '4px',
+  radiusLg:  '10px',
+  font:      "'DM Sans', system-ui, sans-serif",
+  fontMono:  "'JetBrains Mono', monospace",
+  shadow:    '0 8px 32px rgba(0,0,0,0.5)',
+  transit:   '120ms cubic-bezier(0.4, 0, 0.2, 1)',
+};
+
+var theme = Object.assign({}, defaultTheme);
+
+function setTheme(updates) {
+  Object.assign(theme, updates);
+  applyThemeVars();
+}
+
+function getTheme() { return Object.assign({}, theme); }
+
+function applyThemeVars() {
+  var root = document.documentElement;
+  Object.keys(theme).forEach(function(k){
+    root.style.setProperty('--w-' + k, theme[k]);
+  });
+}
+
+// CSS - injected once. All values use CSS vars.
+var CSS = [
+"@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');",
+".w-btn{font:500 13px var(--w-font);background:var(--w-bg);color:var(--w-ink);",
+"  border:1px solid var(--w-border);border-radius:var(--w-radius);padding:7px 14px;",
+"  cursor:pointer;display:inline-flex;align-items:center;gap:6px;line-height:1;",
+"  transition:border-color var(--w-transit), background var(--w-transit);outline:none;}",
+".w-btn:hover:not(:disabled){border-color:var(--w-borderHi);}",
+".w-btn:focus-visible{border-color:var(--w-accent);box-shadow:0 0 0 2px rgba(68,147,248,0.3);}",
+".w-btn:disabled{opacity:.4;cursor:not-allowed;}",
+".w-btn-primary{background:var(--w-accent);color:var(--w-accentInk);border-color:var(--w-accent);font-weight:600;}",
+".w-btn-primary:hover:not(:disabled){background:#58a6ff;border-color:#58a6ff;}",
+".w-btn-danger{color:var(--w-red);border-color:rgba(248,81,73,0.4);}",
+".w-btn-danger:hover:not(:disabled){background:rgba(248,81,73,0.1);border-color:var(--w-red);}",
+".w-btn-ghost{background:transparent;border-color:transparent;}",
+".w-btn-ghost:hover:not(:disabled){background:var(--w-faint);}",
+".w-btn-sm{padding:4px 10px;font-size:12px;}",
+".w-btn-lg{padding:10px 20px;font-size:14px;}",
+".w-input,.w-select,.w-textarea{font:13px var(--w-fontMono);background:var(--w-bg);color:var(--w-ink);",
+"  border:1px solid var(--w-border);border-radius:var(--w-radiusSm);padding:7px 10px;outline:none;",
+"  width:100%;box-sizing:border-box;transition:border-color var(--w-transit);}",
+".w-input:focus,.w-select:focus,.w-textarea:focus{border-color:var(--w-accent);box-shadow:0 0 0 2px rgba(68,147,248,0.2);}",
+".w-textarea{resize:vertical;min-height:60px;line-height:1.45;font-size:12px;}",
+".w-select{cursor:pointer;}",
+".w-checkbox{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font:13px var(--w-font);color:var(--w-ink);}",
+".w-checkbox input{margin:0;cursor:pointer;}",
+".w-range{width:100%;height:4px;-webkit-appearance:none;appearance:none;background:var(--w-faint);border-radius:2px;outline:none;}",
+".w-range::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--w-accent);cursor:pointer;border:0;}",
+".w-range::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--w-accent);cursor:pointer;border:0;}",
+".w-label{display:block;font:600 10px var(--w-fontMono);letter-spacing:1px;text-transform:uppercase;",
+"  color:var(--w-muted);margin-bottom:5px;}",
+".w-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;",
+"  display:flex;align-items:center;justify-content:center;padding:20px;",
+"  animation:w-fade-in 150ms ease-out;}",
+"@keyframes w-fade-in{from{opacity:0;}to{opacity:1;}}",
+"@keyframes w-pop-in{from{opacity:0;transform:scale(0.96);}to{opacity:1;transform:scale(1);}}",
+".w-modal{background:var(--w-surface);border:1px solid var(--w-border);border-radius:var(--w-radiusLg);",
+"  box-shadow:var(--w-shadow);max-height:90vh;display:flex;flex-direction:column;",
+"  animation:w-pop-in 160ms ease-out;color:var(--w-ink);font:14px var(--w-font);}",
+".w-modal-sm{width:380px;max-width:100%;}",
+".w-modal-md{width:560px;max-width:100%;}",
+".w-modal-lg{width:800px;max-width:100%;}",
+".w-modal-full{width:96vw;height:90vh;}",
+".w-modal-hdr{padding:16px 20px;border-bottom:1px solid var(--w-border);display:flex;",
+"  align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;}",
+".w-modal-title{font-size:15px;font-weight:600;margin:0;}",
+".w-modal-close{background:transparent;border:0;color:var(--w-muted);cursor:pointer;",
+"  padding:4px;border-radius:var(--w-radiusSm);line-height:0;transition:color var(--w-transit);}",
+".w-modal-close:hover{color:var(--w-ink);background:var(--w-faint);}",
+".w-modal-body{padding:20px;overflow-y:auto;flex:1;font-size:14px;line-height:1.55;}",
+".w-modal-actions{padding:14px 20px;border-top:1px solid var(--w-border);display:flex;",
+"  gap:8px;justify-content:flex-end;flex-shrink:0;}",
+".w-spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--w-faint);",
+"  border-top-color:var(--w-accent);border-radius:50%;animation:w-spin 700ms linear infinite;}",
+".w-spinner-lg{width:24px;height:24px;border-width:3px;}",
+"@keyframes w-spin{to{transform:rotate(360deg);}}",
+".w-disclosure{border:1px solid var(--w-border);border-radius:var(--w-radius);overflow:hidden;}",
+".w-disclosure summary{padding:10px 14px;cursor:pointer;font:600 13px var(--w-font);",
+"  color:var(--w-ink);background:var(--w-faint);outline:none;list-style:none;",
+"  display:flex;align-items:center;justify-content:space-between;}",
+".w-disclosure summary::-webkit-details-marker{display:none;}",
+".w-disclosure summary::after{content:'+';color:var(--w-muted);font-family:var(--w-fontMono);font-size:14px;}",
+".w-disclosure\[open\] summary::after{content:'-';}",
+".w-disclosure-body{padding:14px;}",
+".w-tabs{display:flex;gap:0;border-bottom:1px solid var(--w-border);}",
+".w-tab{padding:9px 16px;background:transparent;border:0;border-bottom:2px solid transparent;",
+"  color:var(--w-muted);font:500 13px var(--w-font);cursor:pointer;transition:color var(--w-transit);",
+"  margin-bottom:-1px;}",
+".w-tab:hover{color:var(--w-ink);}",
+".w-tab-active{color:var(--w-accent);border-bottom-color:var(--w-accent);}",
+".w-row{display:flex;gap:8px;align-items:center;}",
+".w-col{display:flex;flex-direction:column;gap:8px;}",
+".w-stack{display:flex;flex-direction:column;gap:14px;}",
+".w-card{background:var(--w-faint);border:1px solid var(--w-border);border-radius:var(--w-radius);padding:14px;}",
+".w-divider{height:1px;background:var(--w-border);margin:14px 0;border:0;}",
+].join('\n');
+
+var STYLE_ID = 'weld-ui-styles';
+function injectCSS() {
+  if (document.getElementById(STYLE_ID)) return;
+  var style = document.createElement('style');
+  style.id = STYLE_ID;
+  style.textContent = CSS;
+  document.head.appendChild(style);
+}
+
+// DOM HELPER
+// el(tag, attrs, children) - children is string or element or array
+function el(tag, attrs, children) {
+  var node = document.createElement(tag);
+  if (attrs) {
+    Object.keys(attrs).forEach(function(k){
+      var v = attrs[k];
+      if (v == null) return;
+      if (k === 'class' || k === 'className') node.className = v;
+      else if (k === 'style' && typeof v === 'object') Object.assign(node.style, v);
+      else if (k === 'dataset' && typeof v === 'object') Object.assign(node.dataset, v);
+      else if (k.indexOf('on') === 0 && typeof v === 'function') node.addEventListener(k.slice(2).toLowerCase(), v);
+      else if (k === 'html') node.innerHTML = v;
+      else if (k === 'text') node.textContent = v;
+      else node.setAttribute(k, v);
+    });
+  }
+  if (children != null) {
+    if (!Array.isArray(children)) children = [children];
+    children.forEach(function(c){
+      if (c == null) return;
+      if (typeof c === 'string' || typeof c === 'number') node.appendChild(document.createTextNode(c));
+      else if (c.nodeType) node.appendChild(c);
+    });
+  }
+  return node;
+}
+
+// ICONS (small embedded SVG set, lucide-style stroke icons)
+var ICONS = {
+  'x':       'M18 6L6 18M6 6l12 12',
+  'check':   'M20 6L9 17l-5-5',
+  'plus':    'M12 5v14M5 12h14',
+  'minus':   'M5 12h14',
+  'trash':   'M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2',
+  'edit':    'M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z',
+  'save':    'M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2zM17 21v-8H7v8M7 3v5h8',
+  'copy':    'M20 9h-9a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-9a2 2 0 00-2-2zM5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1',
+  'download':'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3',
+  'upload':  'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12',
+  'refresh': 'M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15',
+  'settings':'M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2zM15 12a3 3 0 11-6 0 3 3 0 016 0z',
+  'info':    'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM12 16v-4M12 8h.01',
+  'warn':    'M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01',
+  'error':   'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM15 9l-6 6M9 9l6 6',
+  'search':  'M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z',
+  'chevDown':'M6 9l6 6 6-6',
+  'chevUp':  'M18 15l-6-6-6 6',
+  'chevRight':'M9 18l6-6-6-6',
+  'chevLeft':'M15 18l-9-6 6-6',
+  'external':'M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3',
+};
+
+function icon(name, opts) {
+  opts = opts || {};
+  var size = opts.size || 16;
+  var path = ICONS[name];
+  if (!path) return el('span', { text: '?' });
+  var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('width', size);
+  svg.setAttribute('height', size);
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', opts.color || 'currentColor');
+  svg.setAttribute('stroke-width', opts.weight || '2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  p.setAttribute('d', path);
+  svg.appendChild(p);
+  return svg;
+}
+
+function registerIcon(name, pathD) { ICONS[name] = pathD; }
+
+// COMPONENTS
+function button(opts) {
+  opts = opts || {};
+  var classes = ['w-btn'];
+  if (opts.variant === 'primary') classes.push('w-btn-primary');
+  else if (opts.variant === 'danger') classes.push('w-btn-danger');
+  else if (opts.variant === 'ghost') classes.push('w-btn-ghost');
+  if (opts.size === 'sm') classes.push('w-btn-sm');
+  else if (opts.size === 'lg') classes.push('w-btn-lg');
+  var children = [];
+  if (opts.icon) children.push(icon(opts.icon, { size: opts.size === 'sm' ? 14 : 16 }));
+  if (opts.label != null) children.push(opts.label);
+  return el('button', {
+    class: classes.join(' '),
+    type: opts.type || 'button',
+    disabled: opts.disabled ? 'disabled' : null,
+    onclick: opts.onClick,
+  }, children);
+}
+
+function input(opts) {
+  opts = opts || {};
+  return el('input', {
+    class: 'w-input',
+    type: opts.type || 'text',
+    placeholder: opts.placeholder,
+    value: opts.value != null ? opts.value : '',
+    oninput: opts.onInput ? function(e){ opts.onInput(e.target.value, e); } : null,
+    onchange: opts.onChange ? function(e){ opts.onChange(e.target.value, e); } : null,
+    disabled: opts.disabled ? 'disabled' : null,
+    readonly: opts.readonly ? 'readonly' : null,
+  });
+}
+
+function select(opts) {
+  opts = opts || {};
+  var options = (opts.options || []).map(function(o){
+    if (typeof o === 'string') o = { value: o, label: o };
+    return el('option', {
+      value: o.value,
+      selected: o.value === opts.value ? 'selected' : null,
+    }, o.label);
+  });
+  return el('select', {
+    class: 'w-select',
+    onchange: opts.onChange ? function(e){ opts.onChange(e.target.value, e); } : null,
+    disabled: opts.disabled ? 'disabled' : null,
+  }, options);
+}
+
+function textarea(opts) {
+  opts = opts || {};
+  return el('textarea', {
+    class: 'w-textarea',
+    rows: opts.rows || 4,
+    placeholder: opts.placeholder,
+    oninput: opts.onInput ? function(e){ opts.onInput(e.target.value, e); } : null,
+    onchange: opts.onChange ? function(e){ opts.onChange(e.target.value, e); } : null,
+  }, opts.value || '');
+}
+
+function checkbox(opts) {
+  opts = opts || {};
+  var box = el('input', {
+    type: 'checkbox',
+    checked: opts.checked ? 'checked' : null,
+    onchange: opts.onChange ? function(e){ opts.onChange(e.target.checked, e); } : null,
+  });
+  return el('label', { class: 'w-checkbox' }, [box, opts.label || '']);
+}
+
+function range(opts) {
+  opts = opts || {};
+  return el('input', {
+    class: 'w-range',
+    type: 'range',
+    min: opts.min != null ? opts.min : 0,
+    max: opts.max != null ? opts.max : 100,
+    step: opts.step != null ? opts.step : 1,
+    value: opts.value != null ? opts.value : 0,
+    oninput: opts.onInput ? function(e){ opts.onInput(parseFloat(e.target.value), e); } : null,
+    onchange: opts.onChange ? function(e){ opts.onChange(parseFloat(e.target.value), e); } : null,
+  });
+}
+
+function spinner(opts) {
+  opts = opts || {};
+  var classes = ['w-spinner'];
+  if (opts.size === 'lg') classes.push('w-spinner-lg');
+  return el('span', { class: classes.join(' '), role: 'status' });
+}
+
+function label(text) {
+  return el('label', { class: 'w-label', text: text });
+}
+
+function disclosure(opts) {
+  opts = opts || {};
+  var summary = el('summary', { text: opts.title || '' });
+  var body = el('div', { class: 'w-disclosure-body' }, opts.content);
+  return el('details', {
+    class: 'w-disclosure',
+    open: opts.open ? 'open' : null,
+  }, [summary, body]);
+}
+
+function tabs(opts) {
+  opts = opts || {};
+  var items = opts.items || [];
+  var active = opts.active || (items[0] && items[0].id);
+  var tabBar = el('div', { class: 'w-tabs' });
+  var panel = el('div', { class: 'w-tab-panel' });
+
+  function render(activeId) {
+    tabBar.innerHTML = '';
+    items.forEach(function(it){
+      var btn = el('button', {
+        class: 'w-tab' + (it.id === activeId ? ' w-tab-active' : ''),
+        onclick: function(){ render(it.id); if (opts.onChange) opts.onChange(it.id); },
+      }, it.label);
+      tabBar.appendChild(btn);
+    });
+    panel.innerHTML = '';
+    var found = items.find(function(it){ return it.id === activeId; });
+    if (found && found.content) {
+      panel.appendChild(typeof found.content === 'function' ? found.content() : found.content);
+    }
+  }
+  render(active);
+
+  var wrap = el('div', { class: 'w-tabs-wrap' }, [tabBar, panel]);
+  wrap.setActive = function(id){ render(id); };
+  return wrap;
+}
+
+function row(children, gap) {
+  var r = el('div', { class: 'w-row' }, children);
+  if (gap != null) r.style.gap = gap + 'px';
+  return r;
+}
+function col(children, gap) {
+  var c = el('div', { class: 'w-col' }, children);
+  if (gap != null) c.style.gap = gap + 'px';
+  return c;
+}
+function stack(children, gap) {
+  var s = el('div', { class: 'w-stack' }, children);
+  if (gap != null) s.style.gap = gap + 'px';
+  return s;
+}
+function card(children) { return el('div', { class: 'w-card' }, children); }
+function divider() { return el('hr', { class: 'w-divider' }); }
+
+// MODAL
+// Returns { el, close } and is auto-attached to body
+function modal(opts) {
+  opts = opts || {};
+  var sizeClass = 'w-modal-' + (opts.size || 'md');
+  var closeBtn = el('button', {
+    class: 'w-modal-close',
+    onclick: function(){ close(); },
+    'aria-label': 'Close',
+  }, [icon('x', { size: 18 })]);
+
+  var header = opts.title || opts.dismissable !== false
+    ? el('div', { class: 'w-modal-hdr' }, [
+        opts.title ? el('h3', { class: 'w-modal-title', text: opts.title }) : el('div'),
+        opts.dismissable !== false ? closeBtn : null,
+      ])
+    : null;
+
+  var bodyContent = opts.content;
+  if (typeof bodyContent === 'string') bodyContent = el('div', { html: bodyContent });
+  var body = el('div', { class: 'w-modal-body' }, bodyContent);
+
+  var actions = opts.actions ? el('div', { class: 'w-modal-actions' },
+    opts.actions.map(function(a){
+      return button({
+        label: a.label,
+        variant: a.variant || (a.primary ? 'primary' : null),
+        onClick: function(){
+          if (a.onClick) {
+            var res = a.onClick();
+            if (res !== false) close();
+          } else { close(); }
+        },
+      });
+    })
+  ) : null;
+
+  var modalEl = el('div', { class: 'w-modal ' + sizeClass }, [header, body, actions]);
+
+  var overlay = el('div', {
+    class: 'w-modal-overlay',
+    onclick: function(e){ if (e.target === overlay && opts.dismissable !== false) close(); },
+  }, [modalEl]);
+
+  var closed = false;
+  function close() {
+    if (closed) return;
+    closed = true;
+    overlay.remove();
+    document.removeEventListener('keydown', escHandler);
+    if (opts.onClose) opts.onClose();
+  }
+  function escHandler(e) {
+    if (e.key === 'Escape' && opts.dismissable !== false) close();
+  }
+  document.addEventListener('keydown', escHandler);
+
+  document.body.appendChild(overlay);
+  return { el: overlay, close: close, body: body };
+}
+
+// PUBLIC API
+window.weld.ui = {
+  theme: theme,
+  setTheme: setTheme,
+  getTheme: getTheme,
+  el: el,
+  button: button,
+  input: input,
+  select: select,
+  textarea: textarea,
+  checkbox: checkbox,
+  range: range,
+  label: label,
+  spinner: spinner,
+  icon: icon,
+  registerIcon: registerIcon,
+  disclosure: disclosure,
+  tabs: tabs,
+  row: row,
+  col: col,
+  stack: stack,
+  card: card,
+  divider: divider,
+  modal: modal,
+  injectCSS: injectCSS,
+  version: '1.0.0',
+};
+
+// INIT
+function init() {
+  injectCSS();
+  applyThemeVars();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+})();
+</script>
+<script>(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.markdown) return; // already loaded
+
+// -----------------------------------------------------------------
+// HTML escape -- the foundation of safety
+// -----------------------------------------------------------------
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// -----------------------------------------------------------------
+// URL sanitization -- reject javascript:, vbscript:, data: (except images)
+// -----------------------------------------------------------------
+var SAFE_URL_RE = /^(?:https?:|mailto:|tel:|\/|#|\.\/|\.\.\/|[a-zA-Z0-9_\-]+\.)/;
+var SAFE_IMG_URL_RE = /^(?:https?:|data:image\/(?:png|jpe?g|gif|webp|svg\+xml);|\/|\.\/|\.\.\/)/;
+
+function safeUrl(url, forImg) {
+  url = String(url).trim();
+  var re = forImg ? SAFE_IMG_URL_RE : SAFE_URL_RE;
+  return re.test(url) ? url : '#';
+}
+
+// -----------------------------------------------------------------
+// Inline formatting: bold, italic, strikethrough -- applied to text
+// where no HTML has been injected yet
+// -----------------------------------------------------------------
+function applyFormatting(text) {
+  // Bold first (longer marker wins)
+  text = text.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/__([^_\n]+)__/g, '<strong>$1</strong>');
+  // Italic (single marker)
+  text = text.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
+  text = text.replace(/(^|[^_])_([^_\n]+)_(?!_)/g, '$1<em>$2</em>');
+  // Strikethrough
+  text = text.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+  return text;
+}
+
+// -----------------------------------------------------------------
+// Inline parsing -- code, images, links, auto-links, then formatting
+// -----------------------------------------------------------------
+function parseInline(text) {
+  var slots = [];
+  function slot(html) {
+    slots.push(html);
+    return '\u0001S' + (slots.length - 1) + '\u0001';
+  }
+
+  // 1. Code spans -- extract first, content escaped, no further processing
+  text = text.replace(/`([^`]+)`/g, function(_, code) {
+    return slot('<code>' + escapeHtml(code) + '</code>');
+  });
+
+  // 2. Images:  exclamation + label-in-brackets + paren-url
+  text = text.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g, function(_, alt, url, title) {
+    var t = title ? ' title="' + escapeHtml(title) + '"' : '';
+    return slot('<img src="' + safeUrl(url, true) + '" alt="' + escapeHtml(alt) + '"' + t + '>');
+  });
+
+  // 3. Links: label-in-brackets followed by paren-url
+  text = text.replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g, function(_, label, url, title) {
+    var t = title ? ' title="' + escapeHtml(title) + '"' : '';
+    // Allow inline formatting inside link label
+    var inner = applyFormatting(escapeHtml(label));
+    return slot('<a href="' + safeUrl(url) + '"' + t + ' target="_blank" rel="noopener">' + inner + '</a>');
+  });
+
+  // 4. Auto-links: bare URLs (not already inside a slot)
+  text = text.replace(/\b(https?:\/\/[^\s<]+[^\s<.,;:?!])/g, function(url) {
+    return slot('<a href="' + safeUrl(url) + '" target="_blank" rel="noopener">' + escapeHtml(url) + '</a>');
+  });
+
+  // 5. Escape any remaining HTML in the plain text
+  text = escapeHtml(text);
+
+  // 6. Apply bold/italic/strikethrough on the now-safe text
+  text = applyFormatting(text);
+
+  // 7. Restore slot placeholders
+  text = text.replace(/\u0001S(\d+)\u0001/g, function(_, idx) {
+    return slots[parseInt(idx, 10)];
+  });
+
+  return text;
+}
+
+// -----------------------------------------------------------------
+// Block-level parsing
+// -----------------------------------------------------------------
+function render(input, opts) {
+  opts = opts || {};
+  if (typeof input !== 'string') input = String(input == null ? '' : input);
+
+  // Normalize line endings
+  input = input.replace(/\r\n?/g, '\n');
+
+  var lines = input.split('\n');
+  var out = [];
+  var i = 0;
+
+  while (i < lines.length) {
+    var line = lines[i];
+
+    // Fenced code block: ``` or ~~~
+    var fence = line.match(/^(```|~~~)\s*([a-zA-Z0-9_-]*)\s*$/);
+    if (fence) {
+      var marker = fence[1];
+      var lang = fence[2] || '';
+      i++;
+      var code = [];
+      while (i < lines.length && lines[i].indexOf(marker) !== 0) {
+        code.push(lines[i]);
+        i++;
+      }
+      i++;
+      var langAttr = lang ? ' class="language-' + escapeHtml(lang) + '"' : '';
+      out.push('<pre><code' + langAttr + '>' + escapeHtml(code.join('\n')) + '</code></pre>');
+      continue;
+    }
+
+    // ATX header: # to ######
+    var hdr = line.match(/^(#{1,6})\s+(.+)$/);
+    if (hdr) {
+      var n = hdr[1].length;
+      out.push('<h' + n + '>' + parseInline(hdr[2]) + '</h' + n + '>');
+      i++;
+      continue;
+    }
+
+    // Horizontal rule
+    if (/^\s*([-*_])\s*\1\s*\1[\s\1]*$/.test(line)) {
+      out.push('<hr>');
+      i++;
+      continue;
+    }
+
+    // Blockquote
+    if (line.charAt(0) === '>') {
+      var quote = [];
+      while (i < lines.length && lines[i].charAt(0) === '>') {
+        quote.push(lines[i].replace(/^>\s?/, ''));
+        i++;
+      }
+      out.push('<blockquote>' + render(quote.join('\n')) + '</blockquote>');
+      continue;
+    }
+
+    // Unordered list
+    if (/^\s*[-*+]\s+/.test(line)) {
+      var items = [];
+      while (i < lines.length && /^\s*[-*+]\s+/.test(lines[i])) {
+        items.push(lines[i].replace(/^\s*[-*+]\s+/, ''));
+        i++;
+      }
+      out.push('<ul>' + items.map(function(it) { return '<li>' + parseInline(it) + '</li>'; }).join('') + '</ul>');
+      continue;
+    }
+
+    // Ordered list
+    if (/^\s*\d+\.\s+/.test(line)) {
+      var oitems = [];
+      while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
+        oitems.push(lines[i].replace(/^\s*\d+\.\s+/, ''));
+        i++;
+      }
+      out.push('<ol>' + oitems.map(function(it) { return '<li>' + parseInline(it) + '</li>'; }).join('') + '</ol>');
+      continue;
+    }
+
+    // Empty line: skip
+    if (line.trim() === '') {
+      i++;
+      continue;
+    }
+
+    // Paragraph: gather consecutive non-empty lines
+    var para = [line];
+    i++;
+    while (i < lines.length && lines[i].trim() !== '' && !/^(#{1,6}\s|```|~~~|>|\s*[-*+]\s|\s*\d+\.\s)/.test(lines[i])) {
+      para.push(lines[i]);
+      i++;
+    }
+    out.push('<p>' + parseInline(para.join(' ')) + '</p>');
+  }
+
+  return out.join('\n');
+}
+
+// -----------------------------------------------------------------
+// Convenience: render into an element
+// -----------------------------------------------------------------
+function renderInto(el, input, opts) {
+  if (typeof el === 'string') el = document.querySelector(el);
+  if (!el) throw new Error('weld.markdown.renderInto: element not found');
+  el.innerHTML = render(input, opts);
+  return el;
+}
+
+// -----------------------------------------------------------------
+// Sanitize an arbitrary HTML string -- only allow safe tags/attrs
+// -----------------------------------------------------------------
+var ALLOWED_TAGS = {
+  p: 1, br: 1, hr: 1,
+  h1: 1, h2: 1, h3: 1, h4: 1, h5: 1, h6: 1,
+  strong: 1, em: 1, del: 1, b: 1, i: 1, u: 1, s: 1,
+  ul: 1, ol: 1, li: 1,
+  blockquote: 1, pre: 1, code: 1,
+  a: 1, img: 1,
+  table: 1, thead: 1, tbody: 1, tr: 1, th: 1, td: 1,
+  div: 1, span: 1
+};
+var ALLOWED_ATTRS = {
+  a: { href: 1, title: 1, target: 1, rel: 1 },
+  img: { src: 1, alt: 1, title: 1, width: 1, height: 1 },
+  '*': { 'class': 1 }
+};
+
+function sanitize(html) {
+  var tmp = document.createElement('template');
+  tmp.innerHTML = String(html);
+  walk(tmp.content);
+  return tmp.innerHTML;
+}
+
+function walk(node) {
+  var children = Array.prototype.slice.call(node.childNodes);
+  for (var i = 0; i < children.length; i++) {
+    var child = children[i];
+    if (child.nodeType === 1) { // element
+      var tag = child.tagName.toLowerCase();
+      if (!ALLOWED_TAGS[tag]) {
+        // Replace with its text content
+        var text = document.createTextNode(child.textContent);
+        child.parentNode.replaceChild(text, child);
+        continue;
+      }
+      // Strip unsafe attributes
+      var attrs = Array.prototype.slice.call(child.attributes);
+      for (var j = 0; j < attrs.length; j++) {
+        var attr = attrs[j];
+        var tagAllowed = ALLOWED_ATTRS[tag] && ALLOWED_ATTRS[tag][attr.name];
+        var globalAllowed = ALLOWED_ATTRS['*'][attr.name];
+        if (!tagAllowed && !globalAllowed) {
+          child.removeAttribute(attr.name);
+          continue;
+        }
+        // URL attrs: sanitize
+        if (attr.name === 'href') child.setAttribute('href', safeUrl(attr.value));
+        if (attr.name === 'src') {
+          var isImg = tag === 'img';
+          child.setAttribute('src', safeUrl(attr.value, isImg));
+        }
+      }
+      walk(child);
+    }
+  }
+}
+
+// -----------------------------------------------------------------
+// API
+// -----------------------------------------------------------------
+window.weld.markdown = {
+  render: render,
+  renderInto: renderInto,
+  sanitize: sanitize,
+  parseInline: parseInline,
+  escapeHtml: escapeHtml,
+  safeUrl: safeUrl,
+  version: '1.0.0'
+};
+
+})();
+</script>
+<script>
+(function(){
+  var SEED = `# weld.markdown demo
+
+Edit this on the left, see live rendering on the right. The renderer is **safe**: HTML is escaped, links sanitized, and \`javascript:\` URLs neutered.
+
+## Inline formatting
+
+You can use **bold**, *italic*, ~~strikethrough~~, and \`inline code\`. Combine them: ***both***.
+
+## Lists
+
+Unordered:
+- First item
+- Second item with **bold**
+- Third item with a [link](https://example.com)
+
+Ordered:
+1. First step
+2. Second step
+3. Third step
+
+## Code blocks
+
+\`\`\`js
+function greet(name) {
+  return 'Hello, ' + name + '!';
+}
+\`\`\`
+
+## Blockquote
+
+> Lines starting with > are blockquotes.
+> They can span multiple lines.
+
+## Links and images
+
+[Inline link](https://example.com "with title")
+
+Auto-link: https://perchance.org
+
+## Try injecting HTML
+
+<script>alert('xss')</script> is escaped, not executed.
+
+## Try a sketchy URL
+
+[click me](javascript:alert(1)) is sanitized to '#'.
+`;
+
+  function start() {
+    if (!window.weld || !window.weld.ui || !window.weld.markdown) {
+      setTimeout(start, 150);
+      return;
+    }
+    buildDemo();
+  }
+
+  function buildDemo() {
+    var ui = window.weld.ui;
+    var md = window.weld.markdown;
+    var mode = 'rendered';   // 'rendered' | 'html'
+
+    var editor = document.getElementById('editor');
+    editor.value = SEED;
+
+    function update() {
+      var src = editor.value;
+      var html = md.render(src);
+      if (mode === 'rendered') {
+        document.getElementById('preview').innerHTML = html;
+        document.getElementById('raw-html').style.display = 'none';
+        document.getElementById('preview').style.display = '';
+      } else {
+        document.getElementById('raw-html').querySelector('pre').textContent = html;
+        document.getElementById('raw-html').style.display = '';
+        document.getElementById('preview').style.display = 'none';
+      }
+      document.getElementById('char-count').textContent = src.length + ' chars';
+    }
+    editor.addEventListener('input', update);
+
+    // -------- TOOLBAR --------
+    var toolbar = document.getElementById('toolbar');
+    var presets = [
+      { label: 'Demo', md: SEED },
+      { label: 'Headers', md: '# H1\n## H2\n### H3\n#### H4\n##### H5\n###### H6' },
+      { label: 'Links', md: 'Inline [link](https://example.com).\n\nAuto-link: https://perchance.org\n\nWith title: [hover](https://example.com "Tooltip text")' },
+      { label: 'Lists', md: '- Apple\n- Banana\n- Cherry\n\n1. First\n2. Second\n3. Third' },
+      { label: 'Code', md: 'Inline: `const x = 42`\n\nFenced:\n```js\nfunction add(a, b) {\n  return a + b;\n}\n```' },
+      { label: 'XSS attempts', md: 'HTML: <script>alert(1)</script>\n\nLink: [click](javascript:alert(1))\n\nImage: ![alt](javascript:alert(2))\n\nData URI: ![bad](data:text/html,evil)' },
+      { label: 'Blockquote', md: '> A wise quote from someone.\n> It spans two lines.\n\n> > Nested blockquote' }
+    ];
+    presets.forEach(function(p) {
+      toolbar.appendChild(ui.button({
+        label: p.label, size: 'sm', variant: 'ghost',
+        onClick: function() { editor.value = p.md; update(); }
+      }));
+    });
+    toolbar.appendChild(ui.button({
+      label: 'Clear', size: 'sm', variant: 'ghost', icon: 'trash',
+      onClick: function() { editor.value = ''; update(); }
+    }));
+
+    // -------- MODE TOGGLE --------
+    document.querySelectorAll('.mode-toggle button').forEach(function(b) {
+      b.onclick = function() {
+        mode = b.dataset.mode;
+        document.querySelectorAll('.mode-toggle button').forEach(function(x) { x.classList.remove('active'); });
+        b.classList.add('active');
+        update();
+      };
+    });
+
+    update();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>

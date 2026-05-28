@@ -1,0 +1,214 @@
+$meta
+  title       = weld.quota
+  description = Storage and rate-limit awareness for the weld plugin suite. Track IndexedDB quota usage, watch for threshold crossings, and create persistent named rate limiters for API endpoints. Stash on window.weld.quota.
+  tags        = weld, quota, storage, rate-limit, indexeddb, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.quota) return;
+
+  var STORAGE_KEY = 'weld-quota-state';
+  var watchers = [];
+  var lastEstimate = null;
+
+  // -----------------------------------------------------------------
+  // STORAGE ESTIMATION
+  // -----------------------------------------------------------------
+  function estimate() {
+    if (!navigator.storage || typeof navigator.storage.estimate !== 'function') {
+      var unsupported = {
+        used: 0, available: 0, total: 0, percentUsed: 0,
+        supported: false, usageDetails: null
+      };
+      lastEstimate = unsupported;
+      return Promise.resolve(unsupported);
+    }
+    return navigator.storage.estimate().then(function(est) {
+      var used = est.usage || 0;
+      var total = est.quota || 0;
+      var available = Math.max(0, total - used);
+      var percentUsed = total > 0 ? (used / total) * 100 : 0;
+      var result = {
+        used: used,
+        available: available,
+        total: total,
+        percentUsed: percentUsed,
+        supported: true,
+        usageDetails: est.usageDetails || null
+      };
+      lastEstimate = result;
+      checkWatchers(result);
+      return result;
+    });
+  }
+
+  function formatBytes(bytes) {
+    if (bytes == null || isNaN(bytes)) return '?';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+    return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+  }
+
+  // -----------------------------------------------------------------
+  // STORAGE WATCHERS
+  // -----------------------------------------------------------------
+  function watch(opts) {
+    opts = opts || {};
+    var w = {
+      threshold: opts.threshold != null ? opts.threshold : 80,
+      onCross: typeof opts.onCross === 'function' ? opts.onCross : function(){},
+      every: opts.every || 60000,
+      crossed: false,
+      interval: null
+    };
+    watchers.push(w);
+    w.interval = setInterval(estimate, w.every);
+    estimate(); // initial check
+    return function stop() {
+      clearInterval(w.interval);
+      var i = watchers.indexOf(w);
+      if (i !== -1) watchers.splice(i, 1);
+    };
+  }
+
+  function checkWatchers(est) {
+    for (var i = 0; i < watchers.length; i++) {
+      var w = watchers[i];
+      var over = est.percentUsed >= w.threshold;
+      if (over !== w.crossed) {
+        w.crossed = over;
+        try { w.onCross(est, over); } catch (e) { /* swallow */ }
+      }
+    }
+  }
+
+  // -----------------------------------------------------------------
+  // RATE LIMITERS - sliding window, persisted
+  // -----------------------------------------------------------------
+  var rateConfigs = {};
+
+  function loadRateState() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return {};
+      return JSON.parse(raw) || {};
+    } catch (e) { return {}; }
+  }
+
+  function saveRateState(state) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+    catch (e) { /* quota or disabled */ }
+  }
+
+  function pruneOld(timestamps, windowMs) {
+    var cutoff = Date.now() - windowMs;
+    var out = [];
+    for (var i = 0; i < timestamps.length; i++) {
+      if (timestamps[i] >= cutoff) out.push(timestamps[i]);
+    }
+    return out;
+  }
+
+  function makeStatus(name, timestamps, cfg, allowed) {
+    var remaining = Math.max(0, cfg.maxPerWindow - timestamps.length);
+    var resetsIn = timestamps.length > 0
+      ? Math.max(0, (timestamps[0] + cfg.windowMs) - Date.now())
+      : 0;
+    return {
+      name: name,
+      allowed: allowed,
+      remaining: remaining,
+      used: timestamps.length,
+      total: cfg.maxPerWindow,
+      windowMs: cfg.windowMs,
+      resetsIn: resetsIn
+    };
+  }
+
+  function createRate(name, opts) {
+    if (!name || typeof name !== 'string') throw new Error('rate name required');
+    opts = opts || {};
+    rateConfigs[name] = {
+      maxPerWindow: opts.maxPerWindow || 60,
+      windowMs: opts.windowMs || 60000
+    };
+    return getRate(name);
+  }
+
+  function getRate(name) {
+    return {
+      name: name,
+      check: function() { return checkRate(name); },
+      consume: function() { return consumeRate(name); },
+      reset: function() { return resetRate(name); },
+      history: function() { return rateHistory(name); }
+    };
+  }
+
+  function checkRate(name) {
+    var cfg = rateConfigs[name];
+    if (!cfg) throw new Error('unknown rate: ' + name);
+    var state = loadRateState();
+    var timestamps = pruneOld(state[name] || [], cfg.windowMs);
+    return makeStatus(name, timestamps, cfg, timestamps.length < cfg.maxPerWindow);
+  }
+
+  function consumeRate(name) {
+    var cfg = rateConfigs[name];
+    if (!cfg) throw new Error('unknown rate: ' + name);
+    var state = loadRateState();
+    var timestamps = pruneOld(state[name] || [], cfg.windowMs);
+    if (timestamps.length >= cfg.maxPerWindow) {
+      return makeStatus(name, timestamps, cfg, false);
+    }
+    timestamps.push(Date.now());
+    state[name] = timestamps;
+    saveRateState(state);
+    return makeStatus(name, timestamps, cfg, true);
+  }
+
+  function resetRate(name) {
+    var state = loadRateState();
+    delete state[name];
+    saveRateState(state);
+    return true;
+  }
+
+  function rateHistory(name) {
+    var cfg = rateConfigs[name];
+    if (!cfg) return [];
+    var state = loadRateState();
+    return pruneOld(state[name] || [], cfg.windowMs);
+  }
+
+  function listRates() { return Object.keys(rateConfigs); }
+
+  // -----------------------------------------------------------------
+  // API
+  // -----------------------------------------------------------------
+  window.weld.quota = {
+    // Storage
+    estimate: estimate,
+    lastEstimate: function() { return lastEstimate; },
+    watch: watch,
+    formatBytes: formatBytes,
+
+    // Rate limiting
+    rate: {
+      create: createRate,
+      get: getRate,
+      check: checkRate,
+      consume: consumeRate,
+      reset: resetRate,
+      history: rateHistory,
+      list: listRates
+    },
+
+    version: '1.0.0'
+  };
+
+  return window.weld.quota;
+

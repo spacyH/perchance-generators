@@ -1,0 +1,297 @@
+$meta
+  title       = weld.settings
+  description = Settings panels with declarative schema, reactive accessors, and persistence. Define typed fields (string/number/boolean/select/color/textarea), get/set values with validation, subscribe to changes, and build a UI panel automatically. Stash on window.weld.settings.
+  tags        = weld, settings, preferences, panel, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.settings) return window.weld.settings;
+
+  // -----------------------------------------------------------------
+  // CSS injection -- once
+  // -----------------------------------------------------------------
+  function injectCss() {
+    if (window.__weldSettingsCss) return;
+    window.__weldSettingsCss = true;
+    var s = document.createElement('style');
+    s.textContent =
+      '.weld-settings-panel{font:14px system-ui,sans-serif;color:var(--weld-ink,#e6edf3);}' +
+      '.weld-settings-panel h3{font-size:16px;margin-bottom:16px;font-weight:600;}' +
+      '.weld-settings-panel h4{font-size:11px;font-weight:600;color:var(--weld-muted,#7d8590);' +
+        'text-transform:uppercase;letter-spacing:1px;margin:20px 0 10px;}' +
+      '.weld-settings-row{display:grid;grid-template-columns:140px 1fr;gap:12px;' +
+        'align-items:center;padding:8px 0;}' +
+      '.weld-settings-row > label{font-size:13px;color:var(--weld-ink,#e6edf3);}' +
+      '.weld-settings-row > input,.weld-settings-row > select,.weld-settings-row > textarea{' +
+        'padding:6px 10px;background:var(--weld-faint,#21262d);' +
+        'border:1px solid var(--weld-border,rgba(255,255,255,0.10));border-radius:4px;' +
+        'color:var(--weld-ink,#e6edf3);font:13px system-ui,sans-serif;}' +
+      '.weld-settings-row > input[type=checkbox]{justify-self:start;width:auto;}' +
+      '.weld-settings-row > input[type=color]{padding:2px;width:60px;height:30px;cursor:pointer;}' +
+      '.weld-settings-row > textarea{resize:vertical;min-height:60px;font-family:inherit;}' +
+      '.weld-settings-help{grid-column:2;font-size:11px;color:var(--weld-muted,#7d8590);margin-top:-4px;}' +
+      '.weld-settings-section{border-top:1px solid var(--weld-border,rgba(255,255,255,0.10));' +
+        'padding-top:12px;margin-top:12px;}' +
+      '.weld-settings-section:first-child{border-top:0;padding-top:0;margin-top:0;}';
+    document.head.appendChild(s);
+  }
+
+  // -----------------------------------------------------------------
+  // Validation and coercion per type
+  // -----------------------------------------------------------------
+  function coerce(s, value) {
+    if (s.type === 'number') {
+      var n = Number(value);
+      if (isNaN(n)) throw new Error('not a number');
+      if (s.min != null && n < s.min) n = s.min;
+      if (s.max != null && n > s.max) n = s.max;
+      return n;
+    }
+    if (s.type === 'boolean') return !!value;
+    if (s.type === 'select') {
+      var opts = s.options || [];
+      var vals = opts.map(function(o) { return typeof o === 'object' ? o.value : o; });
+      if (vals.indexOf(value) === -1) {
+        throw new Error('value not in options');
+      }
+      return value;
+    }
+    // string, color, textarea
+    return value == null ? '' : String(value);
+  }
+
+  // -----------------------------------------------------------------
+  // Schema instance factory
+  // -----------------------------------------------------------------
+  function createSettings(opts) {
+    opts = opts || {};
+    var schema = opts.schema || {};
+    var storageKey = opts.storageKey || 'weld-settings';
+    var storage = opts.storage;
+    if (storage === undefined) {
+      storage = (typeof localStorage !== 'undefined') ? localStorage : null;
+    }
+
+    var values = {};
+    var listeners = {};
+    listeners['*'] = [];
+
+    // Seed defaults
+    for (var key in schema) {
+      var def = schema[key]['default'];
+      values[key] = def !== undefined ? def : null;
+    }
+
+    // Load persisted
+    if (storage) {
+      try {
+        var raw = storage.getItem(storageKey);
+        if (raw) {
+          var loaded = JSON.parse(raw);
+          for (var k in loaded) {
+            if (schema[k]) values[k] = loaded[k];
+          }
+        }
+      } catch (e) { /* swallow */ }
+    }
+
+    function save() {
+      if (!storage) return;
+      try { storage.setItem(storageKey, JSON.stringify(values)); }
+      catch (e) { /* swallow */ }
+    }
+
+    function get(key) {
+      return values[key];
+    }
+
+    function getAll() {
+      var out = {};
+      for (var k in values) out[k] = values[k];
+      return out;
+    }
+
+    function set(key, value) {
+      if (!schema[key]) throw new Error('unknown setting: ' + key);
+      value = coerce(schema[key], value);
+      var old = values[key];
+      if (old === value) return false;
+      values[key] = value;
+      save();
+      fireListeners(key, value, old);
+      return true;
+    }
+
+    function fireListeners(key, value, old) {
+      var L = listeners[key];
+      if (L) {
+        for (var i = 0; i < L.length; i++) {
+          try { L[i](value, old); } catch (e) { /* swallow */ }
+        }
+      }
+      var Lall = listeners['*'];
+      for (var j = 0; j < Lall.length; j++) {
+        try { Lall[j](key, value, old); } catch (e) { /* swallow */ }
+      }
+    }
+
+    function reset(key) {
+      if (key) {
+        if (schema[key]) set(key, schema[key]['default']);
+      } else {
+        for (var k in schema) {
+          var d = schema[k]['default'];
+          if (d !== undefined) set(k, d);
+        }
+      }
+    }
+
+    function subscribe(key, fn) {
+      if (typeof fn !== 'function') throw new Error('subscribe requires a function');
+      if (!listeners[key]) listeners[key] = [];
+      listeners[key].push(fn);
+      return function() {
+        var idx = listeners[key].indexOf(fn);
+        if (idx !== -1) listeners[key].splice(idx, 1);
+      };
+    }
+
+    function buildField(key) {
+      var s = schema[key];
+      if (!s) return null;
+
+      var row = document.createElement('div');
+      row.className = 'weld-settings-row';
+
+      var label = document.createElement('label');
+      label.textContent = s.label || key;
+      row.appendChild(label);
+
+      var control;
+      if (s.type === 'boolean') {
+        control = document.createElement('input');
+        control.type = 'checkbox';
+        control.checked = !!values[key];
+        control.addEventListener('change', function() { set(key, control.checked); });
+      } else if (s.type === 'select') {
+        control = document.createElement('select');
+        var opts = s.options || [];
+        for (var i = 0; i < opts.length; i++) {
+          var opt = opts[i];
+          var val = typeof opt === 'object' ? opt.value : opt;
+          var lbl = typeof opt === 'object' ? opt.label : opt;
+          var o = document.createElement('option');
+          o.value = val;
+          o.textContent = lbl;
+          if (values[key] === val) o.selected = true;
+          control.appendChild(o);
+        }
+        control.addEventListener('change', function() { set(key, control.value); });
+      } else if (s.type === 'number') {
+        control = document.createElement('input');
+        control.type = 'number';
+        if (s.min != null) control.min = s.min;
+        if (s.max != null) control.max = s.max;
+        if (s.step != null) control.step = s.step;
+        control.value = values[key];
+        control.addEventListener('change', function() {
+          var v = parseFloat(control.value);
+          if (!isNaN(v)) set(key, v);
+        });
+      } else if (s.type === 'color') {
+        control = document.createElement('input');
+        control.type = 'color';
+        control.value = values[key] || '#000000';
+        control.addEventListener('change', function() { set(key, control.value); });
+      } else if (s.type === 'textarea') {
+        control = document.createElement('textarea');
+        control.rows = s.rows || 3;
+        control.value = values[key] || '';
+        control.addEventListener('change', function() { set(key, control.value); });
+      } else {
+        control = document.createElement('input');
+        control.type = s.secret ? 'password' : 'text';
+        control.value = values[key] || '';
+        control.addEventListener('change', function() { set(key, control.value); });
+      }
+
+      row.appendChild(control);
+
+      if (s.help) {
+        var helpEl = document.createElement('div');
+        helpEl.className = 'weld-settings-help';
+        helpEl.textContent = s.help;
+        row.appendChild(helpEl);
+      }
+
+      return row;
+    }
+
+    function buildPanel(panelOpts) {
+      injectCss();
+      panelOpts = panelOpts || {};
+      var panel = document.createElement('div');
+      panel.className = 'weld-settings-panel';
+
+      if (panelOpts.title) {
+        var h = document.createElement('h3');
+        h.textContent = panelOpts.title;
+        panel.appendChild(h);
+      }
+
+      var sections = panelOpts.sections;
+      var rendered = {};
+
+      if (sections && sections.length) {
+        for (var i = 0; i < sections.length; i++) {
+          var section = sections[i];
+          var sec = document.createElement('div');
+          sec.className = 'weld-settings-section';
+          if (section.title) {
+            var t = document.createElement('h4');
+            t.textContent = section.title;
+            sec.appendChild(t);
+          }
+          var keys = section.keys || [];
+          for (var j = 0; j < keys.length; j++) {
+            var field = buildField(keys[j]);
+            if (field) {
+              sec.appendChild(field);
+              rendered[keys[j]] = true;
+            }
+          }
+          panel.appendChild(sec);
+        }
+      }
+
+      // Render any keys not yet in a section
+      for (var key in schema) {
+        if (rendered[key]) continue;
+        var f = buildField(key);
+        if (f) panel.appendChild(f);
+      }
+
+      return panel;
+    }
+
+    return {
+      get: get,
+      set: set,
+      getAll: getAll,
+      reset: reset,
+      subscribe: subscribe,
+      buildPanel: buildPanel,
+      buildField: buildField,
+      schema: schema
+    };
+  }
+
+  window.weld.settings = {
+    create: createSettings,
+    version: '1.0.0'
+  };
+
+  return window.weld.settings;
+

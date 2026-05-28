@@ -1,0 +1,517 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+/* footer below */
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.toast<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-toast-example">demo &rarr;</a></span></div>  <div class="hdr">
+    <div class="hdr-row">
+      <h1>weld.toast</h1>
+      <span class="ver">v1.0.0</span>
+    </div>
+    <p class="lead">Toast notifications, async prompts, and confirm dialogs. Promise-first, theme-aware, keyboard-friendly.</p>
+  </div>
+  <h2>Overview</h2>
+<p>weld.toast covers the three most-needed transient UI patterns: toast notifications (auto-dismissing alerts), modal prompts (async text input), and confirms (async yes/no). All three are Promise-friendly -- await them inline rather than chaining callbacks.</p>
+<p>Toasts queue automatically with a configurable max, stack in any corner, and animate in and out. Prompts and confirms render in a centered modal with a backdrop and keyboard shortcuts (Enter to submit, Escape to cancel).</p>
+<h2>Quick start</h2>
+<p>In your lists editor:</p>
+<pre data-codeid="code1"></pre>
+
+<p>Use it:</p>
+<pre data-codeid="code2"></pre>
+<h2>Toasts</h2><h3>weld.toast.show(message, opts?)</h3>
+<div class="sig" data-codeid="sig3"></div>
+<p>Show a generic toast. Returns a handle you can pass to <code>dismiss()</code> to close early. Options:</p>
+<ul>
+<li><code>type</code>: <code>'info'</code>, <code>'success'</code>, <code>'warn'</code>, <code>'error'</code>. Default <code>'info'</code>.</li>
+<li><code>duration</code>: milliseconds until auto-dismiss. Default 4000. Pass <code>0</code> for sticky.</li>
+<li><code>position</code>: where to render this toast. Overrides the global default.</li>
+<li><code>dismissible</code>: show a close button. Default true.</li>
+</ul>
+<pre data-codeid="code4"></pre>
+<h3>Type shortcuts</h3>
+<p>Convenience wrappers for the four common types. Same return value as <code>show</code>.</p>
+<pre data-codeid="code5"></pre>
+<h3>weld.toast.dismiss(handle) / .clear()</h3>
+<p><code>dismiss(handle)</code> closes a specific toast early. <code>clear()</code> removes all active toasts immediately.</p>
+<h3>weld.toast.configure(opts)</h3>
+<div class="sig" data-codeid="sig6"></div>
+<p>Set global defaults. Apply once at startup; individual <code>show()</code> calls can override.</p>
+<ul>
+<li><code>position</code>: <code>'top-right'</code> (default), <code>'top-left'</code>, <code>'top-center'</code>, <code>'bottom-right'</code>, <code>'bottom-left'</code>, <code>'bottom-center'</code>.</li>
+<li><code>duration</code>: default auto-dismiss in ms. Default 4000.</li>
+<li><code>max</code>: maximum concurrent toasts before old ones start dropping. Default 5.</li>
+</ul>
+<h2>Prompts</h2><h3>weld.toast.prompt(opts?)</h3>
+<div class="sig" data-codeid="sig7"></div>
+<p>Show a modal text input. Resolves with the entered string, or <code>null</code> if the user cancels.</p>
+<ul>
+<li><code>title</code>, <code>message</code>: shown above the input.</li>
+<li><code>placeholder</code>, <code>defaultValue</code>: standard input attributes.</li>
+<li><code>multiline</code>: render as a textarea instead of an input. Default false.</li>
+<li><code>okLabel</code>, <code>cancelLabel</code>: button text. Default 'OK' / 'Cancel'.</li>
+</ul>
+<pre data-codeid="code8"></pre>
+<p>Single-line prompts handle Enter (submit) and Escape (cancel) automatically. Multiline prompts only respond to button clicks so newlines in the textarea aren't accidentally submitted.</p>
+<h2>Confirms</h2><h3>weld.toast.confirm(opts?)</h3>
+<div class="sig" data-codeid="sig9"></div>
+<p>Show a yes/no confirmation. Resolves <code>true</code> if the user clicks the OK button, <code>false</code> for cancel.</p>
+<ul>
+<li><code>title</code>, <code>message</code>: standard.</li>
+<li><code>okLabel</code>, <code>cancelLabel</code>: button text.</li>
+<li><code>danger</code>: render the OK button in red. Use for destructive actions. Default false.</li>
+</ul>
+<pre data-codeid="code10"></pre>
+<h2>Theming</h2>
+<p>All UI uses CSS variables: <code>--weld-ink</code>, <code>--weld-surface</code>, <code>--weld-faint</code>, <code>--weld-border</code>, <code>--weld-muted</code>. If weld.ui is loaded, the theme system sets these for you and the toasts/modals automatically match your generator's look. Without weld.ui, sensible dark-mode defaults are baked in.</p>
+<h2>Common patterns</h2><h3>Error recovery flow</h3>
+<pre data-codeid="code11"></pre>
+<h3>Long-running status toast</h3>
+<p>Pass <code>duration: 0</code> for a toast that stays until you dismiss it manually -- handy as a progress indicator.</p>
+<pre data-codeid="code12"></pre>
+<h2>Caveats</h2><div class="note">
+Both <code>prompt</code> and <code>confirm</code> are modal -- they block interaction with the page beneath the backdrop. If you have multiple actions that could race (a setTimeout firing during a prompt, etc.), make sure your code awaits the result before proceeding.
+</div>
+  <div class="footer">Part of the <a href="https://perchance.org/weld-ui-index">weld plugin suite</a>. Stashed at <code>window.weld.toast</code>. This page loads the plugin so you can inspect it in DevTools.</div>
+</div>
+<script>
+(function(){
+  var examples = {
+  'code1': 'output\n  weld-toast = \{import:weld-toast-plugin\}',
+  'code2': 'root.weldToast();   // trigger $output\n\nweld.toast.success(\'Saved!\');\nweld.toast.error(\'Failed to load: \' + err.message);\nweld.toast.info(\'New version available\', \{ duration: 8000 \});\n\nconst name = await weld.toast.prompt(\{ title: \'Your name?\' \});\nif (name) console.log(\'Hello, \' + name);\n\nconst ok = await weld.toast.confirm(\{\n  title: \'Delete character?\',\n  message: \'This action cannot be undone.\',\n  danger: true\n\});\nif (ok) deleteCharacter();',
+  'sig3': 'weld.toast.show(message, opts?)  ->  handle',
+  'code4': 'const h = weld.toast.show(\'Connected to server\', \{\n  type: \'success\',\n  duration: 3000\n\});\n// later, dismiss early:\nweld.toast.dismiss(h);',
+  'code5': 'weld.toast.info(\'Connecting...\');\nweld.toast.success(\'Saved\');\nweld.toast.warn(\'Quota at 80%\');\nweld.toast.error(\'Network failure\', \{ duration: 8000 \});',
+  'sig6': 'weld.toast.configure(\{position?, duration?, max?\})  ->  void',
+  'sig7': 'weld.toast.prompt(opts?)  ->  Promise<string | null>',
+  'code8': 'const name = await weld.toast.prompt(\{\n  title: \'Rename character\',\n  defaultValue: currentName,\n  placeholder: \'New name...\'\n\});\nif (name === null) return;   // cancelled\nrenameCharacter(name);',
+  'sig9': 'weld.toast.confirm(opts?)  ->  Promise<boolean>',
+  'code10': 'const ok = await weld.toast.confirm(\{\n  title: \'Delete all chats?\',\n  message: \'You will lose \' + chats.length + \' conversations. This cannot be undone.\',\n  okLabel: \'Delete everything\',\n  cancelLabel: \'Keep them\',\n  danger: true\n\});\nif (ok) \{\n  await deleteAllChats();\n  weld.toast.success(\'Deleted\');\n\}',
+  'code11': 'async function saveCharacter(char) \{\n  try \{\n    await db.put(\'characters\', char);\n    weld.toast.success(\'Saved\');\n  \} catch (err) \{\n    weld.toast.error(\'Save failed: \' + err.message, \{ duration: 0 \});\n    const retry = await weld.toast.confirm(\{\n      title: \'Retry?\',\n      message: \'Would you like to try saving again?\'\n    \});\n    if (retry) return saveCharacter(char);\n  \}\n\}',
+  'code12': 'const status = weld.toast.info(\'Generating...\', \{ duration: 0, dismissible: false \});\ntry \{\n  const result = await generateImage();\n  weld.toast.dismiss(status);\n  weld.toast.success(\'Done\');\n\} catch (e) \{\n  weld.toast.dismiss(status);\n  weld.toast.error(\'Failed\');\n\}'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    var nodes = document.querySelectorAll('[data-codeid]');
+    nodes.forEach(function(n){
+      var id = n.getAttribute('data-codeid');
+      var src = examples[id];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.toast) return; // already loaded
+
+// -----------------------------------------------------------------
+// CSS injection -- once
+// -----------------------------------------------------------------
+function injectCss() {
+  if (window.__weldToastCss) return;
+  window.__weldToastCss = true;
+  var s = document.createElement('style');
+  s.textContent =
+    '.weld-toast-host{position:fixed;z-index:9999;display:flex;flex-direction:column;' +
+      'gap:8px;pointer-events:none;font:14px system-ui,sans-serif;}' +
+    '.weld-toast-host.top-right{top:20px;right:20px;align-items:flex-end;}' +
+    '.weld-toast-host.top-left{top:20px;left:20px;align-items:flex-start;}' +
+    '.weld-toast-host.top-center{top:20px;left:50%;transform:translateX(-50%);align-items:center;}' +
+    '.weld-toast-host.bottom-right{bottom:20px;right:20px;align-items:flex-end;}' +
+    '.weld-toast-host.bottom-left{bottom:20px;left:20px;align-items:flex-start;}' +
+    '.weld-toast-host.bottom-center{bottom:20px;left:50%;transform:translateX(-50%);align-items:center;}' +
+    '.weld-toast{pointer-events:auto;min-width:240px;max-width:360px;' +
+      'padding:12px 16px;background:var(--weld-surface,#161b22);' +
+      'border:1px solid var(--weld-border,rgba(255,255,255,0.10));border-radius:6px;' +
+      'box-shadow:0 8px 32px rgba(0,0,0,0.4);color:var(--weld-ink,#e6edf3);' +
+      'display:flex;gap:10px;align-items:flex-start;line-height:1.4;' +
+      'transform:translateX(20px);opacity:0;transition:transform 220ms,opacity 220ms;}' +
+    '.weld-toast.shown{transform:translateX(0);opacity:1;}' +
+    '.weld-toast .weld-toast-icon{flex:0 0 18px;height:18px;border-radius:50%;margin-top:1px;' +
+      'display:flex;align-items:center;justify-content:center;font:600 11px monospace;color:#fff;}' +
+    '.weld-toast.info  .weld-toast-icon{background:#4493f8;}' +
+    '.weld-toast.success .weld-toast-icon{background:#3fb950;}' +
+    '.weld-toast.warn  .weld-toast-icon{background:#d29922;}' +
+    '.weld-toast.error .weld-toast-icon{background:#f85149;}' +
+    '.weld-toast .weld-toast-msg{flex:1;font-size:13px;word-wrap:break-word;}' +
+    '.weld-toast .weld-toast-close{cursor:pointer;color:var(--weld-muted,#7d8590);' +
+      'font-size:16px;line-height:1;background:none;border:none;padding:0;margin-left:6px;}' +
+    '.weld-toast .weld-toast-close:hover{color:var(--weld-ink,#e6edf3);}' +
+    '.weld-toast-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9998;' +
+      'display:flex;align-items:center;justify-content:center;font:14px system-ui,sans-serif;' +
+      'opacity:0;transition:opacity 180ms;}' +
+    '.weld-toast-backdrop.shown{opacity:1;}' +
+    '.weld-toast-modal{background:var(--weld-surface,#161b22);' +
+      'border:1px solid var(--weld-border,rgba(255,255,255,0.10));border-radius:8px;' +
+      'padding:24px;min-width:320px;max-width:480px;' +
+      'color:var(--weld-ink,#e6edf3);box-shadow:0 16px 64px rgba(0,0,0,0.6);' +
+      'transform:scale(0.96);transition:transform 180ms;}' +
+    '.weld-toast-backdrop.shown .weld-toast-modal{transform:scale(1);}' +
+    '.weld-toast-modal h4{font-size:15px;font-weight:600;margin-bottom:10px;}' +
+    '.weld-toast-modal p{font-size:13px;color:var(--weld-ink,#e6edf3);margin-bottom:14px;line-height:1.5;}' +
+    '.weld-toast-modal input,.weld-toast-modal textarea{width:100%;padding:8px 10px;' +
+      'background:var(--weld-faint,#21262d);' +
+      'border:1px solid var(--weld-border,rgba(255,255,255,0.10));border-radius:4px;' +
+      'color:var(--weld-ink,#e6edf3);font:13px system-ui,sans-serif;margin-bottom:14px;}' +
+    '.weld-toast-modal textarea{resize:vertical;min-height:80px;font-family:inherit;}' +
+    '.weld-toast-actions{display:flex;gap:8px;justify-content:flex-end;}' +
+    '.weld-toast-btn{padding:6px 14px;border-radius:4px;font:600 13px system-ui,sans-serif;' +
+      'cursor:pointer;border:1px solid transparent;}' +
+    '.weld-toast-btn.primary{background:#4493f8;color:#fff;}' +
+    '.weld-toast-btn.primary:hover{background:#3a85e0;}' +
+    '.weld-toast-btn.danger{background:#f85149;color:#fff;}' +
+    '.weld-toast-btn.danger:hover{background:#e0463f;}' +
+    '.weld-toast-btn.ghost{background:transparent;color:var(--weld-ink,#e6edf3);' +
+      'border-color:var(--weld-border,rgba(255,255,255,0.10));}' +
+    '.weld-toast-btn.ghost:hover{background:var(--weld-faint,#21262d);}';
+  document.head.appendChild(s);
+}
+
+// -----------------------------------------------------------------
+// Toast host management
+// -----------------------------------------------------------------
+var config = {
+  position: 'top-right',
+  duration: 4000,
+  max: 5
+};
+var hosts = {};
+var activeToasts = [];
+
+function getHost(position) {
+  if (hosts[position]) return hosts[position];
+  var h = document.createElement('div');
+  h.className = 'weld-toast-host ' + position;
+  document.body.appendChild(h);
+  hosts[position] = h;
+  return h;
+}
+
+function configure(opts) {
+  if (!opts) return;
+  if (opts.position) config.position = opts.position;
+  if (opts.duration != null) config.duration = opts.duration;
+  if (opts.max != null) config.max = opts.max;
+}
+
+// -----------------------------------------------------------------
+// Toast notification
+// -----------------------------------------------------------------
+var ICONS = {
+  info:    'i',
+  success: '\u2713',
+  warn:    '!',
+  error:   'x'
+};
+
+function show(message, opts) {
+  injectCss();
+  opts = opts || {};
+  var type = opts.type || 'info';
+  var duration = opts.duration != null ? opts.duration : config.duration;
+  var position = opts.position || config.position;
+  var dismissible = opts.dismissible !== false;
+
+  var host = getHost(position);
+
+  var toast = document.createElement('div');
+  toast.className = 'weld-toast ' + type;
+
+  var icon = document.createElement('div');
+  icon.className = 'weld-toast-icon';
+  icon.textContent = ICONS[type] || ICONS.info;
+  toast.appendChild(icon);
+
+  var msg = document.createElement('div');
+  msg.className = 'weld-toast-msg';
+  msg.textContent = String(message);
+  toast.appendChild(msg);
+
+  if (dismissible) {
+    var close = document.createElement('button');
+    close.className = 'weld-toast-close';
+    close.textContent = '\u00d7';
+    close.setAttribute('aria-label', 'close');
+    close.addEventListener('click', function() { dismiss(handle); });
+    toast.appendChild(close);
+  }
+
+  // Enforce max
+  while (activeToasts.length >= config.max) {
+    var oldest = activeToasts.shift();
+    if (oldest) dismiss(oldest, true);
+  }
+
+  host.appendChild(toast);
+  // Trigger CSS transition
+  setTimeout(function() { toast.classList.add('shown'); }, 10);
+
+  var timer = null;
+  var handle = { toast: toast, host: host, dismissed: false, _t: null };
+  activeToasts.push(handle);
+
+  if (duration > 0) {
+    handle._t = setTimeout(function() { dismiss(handle); }, duration);
+  }
+
+  return handle;
+}
+
+function dismiss(handle, immediate) {
+  if (!handle || handle.dismissed) return;
+  handle.dismissed = true;
+  if (handle._t) clearTimeout(handle._t);
+  var idx = activeToasts.indexOf(handle);
+  if (idx !== -1) activeToasts.splice(idx, 1);
+
+  if (immediate) {
+    if (handle.toast.parentNode) handle.toast.parentNode.removeChild(handle.toast);
+    return;
+  }
+  handle.toast.classList.remove('shown');
+  setTimeout(function() {
+    if (handle.toast.parentNode) handle.toast.parentNode.removeChild(handle.toast);
+  }, 240);
+}
+
+function clearAll() {
+  while (activeToasts.length) {
+    dismiss(activeToasts[0], true);
+  }
+}
+
+// -----------------------------------------------------------------
+// Modal helpers: prompt, confirm
+// -----------------------------------------------------------------
+function buildBackdrop() {
+  injectCss();
+  var bg = document.createElement('div');
+  bg.className = 'weld-toast-backdrop';
+  document.body.appendChild(bg);
+  setTimeout(function() { bg.classList.add('shown'); }, 10);
+  return bg;
+}
+
+function teardown(bg) {
+  bg.classList.remove('shown');
+  setTimeout(function() {
+    if (bg.parentNode) bg.parentNode.removeChild(bg);
+  }, 200);
+}
+
+function confirmDialog(opts) {
+  opts = opts || {};
+  var title = opts.title || 'Confirm';
+  var message = opts.message || 'Are you sure?';
+  var okLabel = opts.okLabel || 'OK';
+  var cancelLabel = opts.cancelLabel || 'Cancel';
+  var danger = opts.danger === true;
+
+  return new Promise(function(resolve) {
+    var bg = buildBackdrop();
+    var modal = document.createElement('div');
+    modal.className = 'weld-toast-modal';
+
+    var h = document.createElement('h4');
+    h.textContent = title;
+    modal.appendChild(h);
+
+    var p = document.createElement('p');
+    p.textContent = message;
+    modal.appendChild(p);
+
+    var actions = document.createElement('div');
+    actions.className = 'weld-toast-actions';
+
+    var cancel = document.createElement('button');
+    cancel.className = 'weld-toast-btn ghost';
+    cancel.textContent = cancelLabel;
+    cancel.addEventListener('click', function() { teardown(bg); resolve(false); });
+    actions.appendChild(cancel);
+
+    var ok = document.createElement('button');
+    ok.className = 'weld-toast-btn ' + (danger ? 'danger' : 'primary');
+    ok.textContent = okLabel;
+    ok.addEventListener('click', function() { teardown(bg); resolve(true); });
+    actions.appendChild(ok);
+
+    modal.appendChild(actions);
+    bg.appendChild(modal);
+    setTimeout(function() { ok.focus(); }, 100);
+  });
+}
+
+function promptDialog(opts) {
+  opts = opts || {};
+  var title = opts.title || 'Prompt';
+  var message = opts.message || '';
+  var placeholder = opts.placeholder || '';
+  var defaultValue = opts.defaultValue || '';
+  var multiline = opts.multiline === true;
+  var okLabel = opts.okLabel || 'OK';
+  var cancelLabel = opts.cancelLabel || 'Cancel';
+
+  return new Promise(function(resolve) {
+    var bg = buildBackdrop();
+    var modal = document.createElement('div');
+    modal.className = 'weld-toast-modal';
+
+    var h = document.createElement('h4');
+    h.textContent = title;
+    modal.appendChild(h);
+
+    if (message) {
+      var p = document.createElement('p');
+      p.textContent = message;
+      modal.appendChild(p);
+    }
+
+    var input;
+    if (multiline) {
+      input = document.createElement('textarea');
+    } else {
+      input = document.createElement('input');
+      input.type = 'text';
+    }
+    input.placeholder = placeholder;
+    input.value = defaultValue;
+    modal.appendChild(input);
+
+    var actions = document.createElement('div');
+    actions.className = 'weld-toast-actions';
+
+    var cancel = document.createElement('button');
+    cancel.className = 'weld-toast-btn ghost';
+    cancel.textContent = cancelLabel;
+    cancel.addEventListener('click', function() { teardown(bg); resolve(null); });
+    actions.appendChild(cancel);
+
+    var ok = document.createElement('button');
+    ok.className = 'weld-toast-btn primary';
+    ok.textContent = okLabel;
+    ok.addEventListener('click', function() { teardown(bg); resolve(input.value); });
+    actions.appendChild(ok);
+
+    modal.appendChild(actions);
+    bg.appendChild(modal);
+    setTimeout(function() { input.focus(); input.select(); }, 100);
+
+    if (!multiline) {
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { teardown(bg); resolve(input.value); }
+        if (e.key === 'Escape') { teardown(bg); resolve(null); }
+      });
+    }
+  });
+}
+
+// -----------------------------------------------------------------
+// API
+// -----------------------------------------------------------------
+window.weld.toast = {
+  show: show,
+  info:    function(m, o) { o = o || {}; o.type = 'info';    return show(m, o); },
+  success: function(m, o) { o = o || {}; o.type = 'success'; return show(m, o); },
+  warn:    function(m, o) { o = o || {}; o.type = 'warn';    return show(m, o); },
+  error:   function(m, o) { o = o || {}; o.type = 'error';   return show(m, o); },
+  dismiss: dismiss,
+  clear:   clearAll,
+  configure: configure,
+  confirm: confirmDialog,
+  prompt:  promptDialog,
+  version: '1.0.0'
+};
+
+})();
+
+</script>
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>

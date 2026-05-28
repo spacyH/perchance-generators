@@ -1,0 +1,438 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+/* footer below */
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.lorebook<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-lorebook-example">demo &rarr;</a></span></div>  <div class="hdr">
+    <div class="hdr-row">
+      <h1>weld.lorebook</h1>
+      <span class="ver">v1.0.0</span>
+    </div>
+    <p class="lead">Keyword-triggered context injection with priority sorting and token budgets. The "world bible" pattern, generalized.</p>
+  </div>
+  <h2>Overview</h2>
+<p>weld.lorebook handles the "world bible" problem for LLM-driven content: keyword-triggered context injection. Define entries with trigger keywords and content, scan an input message, get back the entries that matched -- sorted by priority, capped at a token budget.</p>
+<p>Use it to inject character backstory when a character is mentioned, world rules when relevant terms appear, or dynamic context the user can edit through a UI. The plugin handles the matching and budget logic; you handle what to do with the matched entries (prepend to a prompt, show in a side panel, whatever fits).</p>
+<h2>Quick start</h2>
+<p>In your lists editor:</p>
+<pre data-codeid="code1"></pre>
+
+<p>Create a lorebook and scan messages:</p>
+<pre data-codeid="code2"></pre>
+<h2>Entry shape</h2>
+<p>Every entry is an object with:</p>
+<ul>
+<li><code>keys</code>: a string or array of strings -- any of these triggers the entry. Required.</li>
+<li><code>content</code>: the text that gets injected when triggered. Required.</li>
+<li><code>priority</code>: number for sorting matches when multiple entries fire. Higher wins. Default 0.</li>
+<li><code>enabled</code>: false to skip without removing. Default true.</li>
+<li><code>matchMode</code>: <code>'word'</code> (default) or <code>'substring'</code>. Word mode respects word boundaries; substring matches anywhere.</li>
+<li><code>caseSensitive</code>: default false.</li>
+<li><code>label</code>: optional human-readable name (not used by the plugin itself; for your UI).</li>
+<li><code>metadata</code>: optional object for whatever you want to track.</li>
+<li><code>id</code>: optional id, otherwise auto-generated.</li>
+</ul>
+<h2>CRUD</h2><h3>book.add(entry) / .update(id, patch) / .remove(id)</h3>
+<p>Standard operations. <code>add</code> returns the entry id. <code>update</code> takes a patch object merged with the existing entry. All three persist to storage if configured.</p>
+<pre data-codeid="code3"></pre>
+<h3>book.get(id) / .getAll() / .size() / .clear()</h3>
+<p>Inspection helpers. <code>get</code> returns a shallow copy of one entry, <code>getAll</code> returns copies of all entries, <code>size</code> returns the count, <code>clear</code> removes everything.</p>
+<h2>Scanning</h2><h3>book.scan(text, opts?)</h3>
+<div class="sig" data-codeid="sig4"></div>
+<p>Scan the input text for entries whose keys appear in it. Returns an array of match objects:</p>
+<pre data-codeid="code5"></pre>
+<p>Matches are sorted by priority (descending), then by position (ascending). The budget options apply after sorting -- the highest-priority matches make it in first.</p>
+<ul>
+<li><code>maxTokens</code>: total token budget across all matches. Entries that would push past the budget are skipped (the next entry may still fit).</li>
+<li><code>maxEntries</code>: hard cap on number of matches returned.</li>
+</ul>
+<h3>book.inject(text, opts?)</h3>
+<div class="sig" data-codeid="sig6"></div>
+<p>Convenience wrapper that runs <code>scan</code> and formats the result as a string ready to inject into an LLM prompt.</p>
+<ul>
+<li><code>format</code>: <code>'list'</code> (default; bulleted), <code>'paragraph'</code> (double-newline separated), <code>'plain'</code> (no separators or header), or a function <code>(matches) =&gt; string</code>.</li>
+<li><code>header</code>: prefix line for the output. Default <code>\[Lore\]</code>.</li>
+</ul>
+<pre data-codeid="code7"></pre>
+<h2>Token budgeting</h2>
+<p>Token counts are estimated as <code>content.length / 4</code> by default. Pass <code>charsPerToken</code> to <code>create()</code> to tune for your model. This is a rough heuristic -- accurate enough for budgeting decisions, not a substitute for the real tokenizer if you need exact counts.</p>
+<pre data-codeid="code8"></pre>
+<h2>Persistence</h2>
+<p>Pass a <code>storage</code> object (anything with <code>getItem</code> / <code>setItem</code>) and a <code>storageKey</code> to enable automatic persistence:</p>
+<pre data-codeid="code9"></pre>
+<p>If <code>entries</code> seed is provided alongside <code>storage</code>, the persisted data takes precedence when present.</p>
+<h2>Match modes</h2>
+<p><strong>Word mode</strong> (default): matches the key only at word boundaries. <code>dragon</code> matches "a dragon flew" but not "dragonfly was nearby". Punctuation and whitespace count as boundaries.</p>
+<p><strong>Substring mode</strong>: matches the key as a literal substring anywhere. <code>dragon</code> would match "dragonfly". Useful when your keys are partial words or contain special characters that wouldn't match cleanly as words.</p>
+<pre data-codeid="code10"></pre>
+<h2>Common patterns</h2><h3>Prepend context to an LLM prompt</h3>
+<pre data-codeid="code11"></pre>
+<h3>UI for editing entries</h3>
+<p>weld.lorebook doesn't ship a UI -- it's a logic layer. Pair it with weld.ui for editing:</p>
+<pre data-codeid="code12"></pre>
+<h2>Sort order</h2><div class="note">
+Entries with the same priority are sorted by <em>position in the input text</em>, not insertion order. If two entries both have priority 100 and one is mentioned earlier in the message, that one comes first. This is usually what you want for context relevance.
+</div>
+  <div class="footer">Part of the <a href="https://perchance.org/weld-ui-index">weld plugin suite</a>. Stashed at <code>window.weld.lorebook</code>. This page loads the plugin so you can inspect it in DevTools.</div>
+</div>
+<script>
+(function(){
+  var examples = {
+  'code1': 'output\n  weld-lorebook = \{import:weld-lorebook-plugin\}',
+  'code2': 'root.weldLorebook();   // trigger $output\n\nconst book = weld.lorebook.create(\{\n  entries: \[\n    \{\n      keys: \[\'dragon\', \'wyrm\', \'wyvern\'\],\n      content: \'Dragons in this world breathe ice, not fire. They are sworn protectors of the northern peaks.\',\n      priority: 100\n    \},\n    \{\n      keys: \'Princess Alice\',\n      content: \'Princess Alice rules the Eastern Kingdom from her crystal tower in Solana.\',\n      priority: 50\n    \}\n  \]\n\});\n\nconst userMessage = \'I saw a dragon flying over Solana yesterday.\';\nconst matches = book.scan(userMessage);\n// matches\[0\] = \{ entry: \{...dragon entry\}, matchedKey: \'dragon\', position: 8 \}\n\nconst injected = book.inject(userMessage);\n// Returns a formatted string ready to prepend to your LLM prompt',
+  'code3': 'const id = book.add(\{\n  keys: \'griffon\',\n  content: \'Griffons mate for life and serve as royal mounts.\'\n\});\n\nbook.update(id, \{ priority: 200 \});\nbook.remove(id);',
+  'sig4': 'book.scan(text, \{maxTokens?, maxEntries?\})  ->  match\[\]',
+  'code5': '\[\n  \{\n    entry: \{ id, keys, content, priority, ... \},\n    matchedKey: \'dragon\',\n    position: 8\n  \},\n  ...\n\]',
+  'sig6': 'book.inject(text, \{maxTokens?, maxEntries?, format?, header?\})  ->  string',
+  'code7': 'const text = book.inject(userMessage, \{\n  maxTokens: 1500,\n  header: \'\[Relevant context\]\'\n\});\n// \[Relevant context\]\n// - Dragons in this world breathe ice, not fire...\n// - Princess Alice rules the Eastern Kingdom...',
+  'code8': 'const book = weld.lorebook.create(\{\n  charsPerToken: 3.5,   // tighter for English-heavy content\n  entries: \[/* ... */\]\n\});\n\nbook.estimateTokens(\'Some text\');   // 3 (with 3.5 ratio)',
+  'code9': 'const book = weld.lorebook.create(\{\n  storage: localStorage,\n  storageKey: \'my-lorebook\'\n\});\n\nbook.add(\{ keys: \'mage\', content: \'Mages exist.\' \});\n// next page load: entry is still there',
+  'code10': 'const book = weld.lorebook.create(\{\n  entries: \[\n    \{ keys: \'kingdom\', content: \'...\', matchMode: \'word\' \},\n    \{ keys: \'mancer\', content: \'...\', matchMode: \'substring\' \}  // matches "necromancer", "geomancer"\n  \]\n\});',
+  'code11': 'async function chat(userMessage) \{\n  const context = book.inject(userMessage, \{ maxTokens: 2000 \});\n  const prompt = context ? context + \'\\n\\n\' + userMessage : userMessage;\n  return await callLLM(prompt);\n\}',
+  'code12': 'function buildLorebookUI(book, container) \{\n  const list = document.createElement(\'div\');\n  book.getAll().forEach(entry => \{\n    const row = weld.ui.disclosure(\{ summary: entry.label || entry.keys\[0\] \});\n    // ... build edit fields, wire up book.update on change\n    list.appendChild(row);\n  \});\n  container.appendChild(list);\n\}'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    var nodes = document.querySelectorAll('[data-codeid]');
+    nodes.forEach(function(n){
+      var id = n.getAttribute('data-codeid');
+      var src = examples[id];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.lorebook) return; // already loaded
+
+// -----------------------------------------------------------------
+// Token estimation -- rough char/N ratio
+// -----------------------------------------------------------------
+function estimateTokens(text, charsPerToken) {
+  if (!text) return 0;
+  return Math.ceil(String(text).length / (charsPerToken || 4));
+}
+
+// -----------------------------------------------------------------
+// Match helpers
+// -----------------------------------------------------------------
+function escapeRegex(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function buildKeyMatcher(key, opts) {
+  var caseSensitive = opts.caseSensitive === true;
+  var matchMode = opts.matchMode || 'word';
+  var flags = caseSensitive ? 'g' : 'gi';
+  var escaped = escapeRegex(key);
+  if (matchMode === 'substring') {
+    return new RegExp(escaped, flags);
+  }
+  // word: match whole word with non-word boundaries
+  return new RegExp('(^|[^\\w])(' + escaped + ')(?=[^\\w]|$)', flags);
+}
+
+function uid(prefix) {
+  return (prefix || 'lb') + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+// -----------------------------------------------------------------
+// Lorebook instance factory
+// -----------------------------------------------------------------
+function createLorebook(opts) {
+  opts = opts || {};
+  var entries = [];
+  var charsPerToken = opts.charsPerToken || 4;
+  var storage = opts.storage;
+  var storageKey = opts.storageKey || 'weld-lorebook';
+
+  if (storage === undefined && typeof localStorage !== 'undefined') {
+    storage = null; // explicit opt-in for storage
+  }
+
+  // Seed entries
+  if (Array.isArray(opts.entries)) {
+    for (var i = 0; i < opts.entries.length; i++) {
+      addInternal(opts.entries[i]);
+    }
+  }
+
+  // Load from storage if provided
+  if (storage) {
+    try {
+      var raw = storage.getItem(storageKey);
+      if (raw) {
+        var loaded = JSON.parse(raw);
+        if (Array.isArray(loaded)) {
+          entries = []; // replace seed
+          for (var j = 0; j < loaded.length; j++) {
+            addInternal(loaded[j]);
+          }
+        }
+      }
+    } catch (e) { /* swallow */ }
+  }
+
+  function save() {
+    if (!storage) return;
+    try { storage.setItem(storageKey, JSON.stringify(entries)); }
+    catch (e) { /* swallow */ }
+  }
+
+  function normalizeEntry(input) {
+    if (!input || typeof input !== 'object') {
+      throw new Error('lorebook entry must be an object');
+    }
+    var keys = input.keys;
+    if (typeof keys === 'string') keys = [keys];
+    if (!Array.isArray(keys) || keys.length === 0) {
+      throw new Error('lorebook entry must have non-empty keys');
+    }
+    if (typeof input.content !== 'string' || !input.content) {
+      throw new Error('lorebook entry must have non-empty content');
+    }
+    return {
+      id: input.id || uid('lb'),
+      keys: keys.map(String),
+      content: String(input.content),
+      priority: typeof input.priority === 'number' ? input.priority : 0,
+      enabled: input.enabled !== false,
+      matchMode: input.matchMode || 'word',
+      caseSensitive: input.caseSensitive === true,
+      label: input.label || '',
+      metadata: input.metadata || null
+    };
+  }
+
+  function addInternal(input) {
+    var entry = normalizeEntry(input);
+    entries.push(entry);
+    return entry;
+  }
+
+  function add(input) {
+    var entry = addInternal(input);
+    save();
+    return entry.id;
+  }
+
+  function update(id, patch) {
+    var idx = entries.findIndex(function(e) { return e.id === id; });
+    if (idx === -1) return false;
+    var merged = Object.assign({}, entries[idx], patch);
+    entries[idx] = normalizeEntry(merged);
+    save();
+    return true;
+  }
+
+  function remove(id) {
+    var idx = entries.findIndex(function(e) { return e.id === id; });
+    if (idx === -1) return false;
+    entries.splice(idx, 1);
+    save();
+    return true;
+  }
+
+  function get(id) {
+    var found = entries.find(function(e) { return e.id === id; });
+    return found ? Object.assign({}, found) : null;
+  }
+
+  function getAll() {
+    return entries.map(function(e) { return Object.assign({}, e); });
+  }
+
+  function clear() {
+    entries = [];
+    save();
+  }
+
+  // -------- SCAN --------
+  function scan(text, scanOpts) {
+    scanOpts = scanOpts || {};
+    var maxEntries = scanOpts.maxEntries == null ? Infinity : scanOpts.maxEntries;
+    var maxTokens = scanOpts.maxTokens == null ? Infinity : scanOpts.maxTokens;
+
+    if (typeof text !== 'string' || !text) return [];
+
+    var matches = [];
+    for (var i = 0; i < entries.length; i++) {
+      var entry = entries[i];
+      if (!entry.enabled) continue;
+      for (var j = 0; j < entry.keys.length; j++) {
+        var key = entry.keys[j];
+        var re = buildKeyMatcher(key, {
+          matchMode: entry.matchMode,
+          caseSensitive: entry.caseSensitive
+        });
+        var m = re.exec(text);
+        if (m) {
+          matches.push({
+            entry: Object.assign({}, entry),
+            matchedKey: key,
+            position: m.index
+          });
+          break; // one match per entry suffices
+        }
+      }
+    }
+
+    // Sort by priority descending, then by position ascending
+    matches.sort(function(a, b) {
+      if (b.entry.priority !== a.entry.priority) return b.entry.priority - a.entry.priority;
+      return a.position - b.position;
+    });
+
+    // Enforce budgets
+    var out = [];
+    var tokens = 0;
+    for (var k = 0; k < matches.length && out.length < maxEntries; k++) {
+      var t = estimateTokens(matches[k].entry.content, charsPerToken);
+      if (tokens + t > maxTokens) continue;
+      tokens += t;
+      out.push(matches[k]);
+    }
+    return out;
+  }
+
+  function inject(text, injectOpts) {
+    injectOpts = injectOpts || {};
+    var format = injectOpts.format || 'list';
+    var header = injectOpts.header || ('[' + 'Lore' + ']');
+    var matches = scan(text, injectOpts);
+    if (matches.length === 0) return '';
+
+    if (typeof format === 'function') {
+      return format(matches);
+    }
+    var lines = [header];
+    if (format === 'list') {
+      for (var i = 0; i < matches.length; i++) {
+        lines.push('- ' + matches[i].entry.content);
+      }
+    } else if (format === 'paragraph') {
+      lines.push(matches.map(function(m) { return m.entry.content; }).join('\n\n'));
+    } else if (format === 'plain') {
+      lines.length = 0;
+      for (var j = 0; j < matches.length; j++) lines.push(matches[j].entry.content);
+    }
+    return lines.join('\n');
+  }
+
+  function estimate(text) {
+    return estimateTokens(text, charsPerToken);
+  }
+
+  return {
+    add: add,
+    update: update,
+    remove: remove,
+    get: get,
+    getAll: getAll,
+    clear: clear,
+    scan: scan,
+    inject: inject,
+    estimateTokens: estimate,
+    size: function() { return entries.length; }
+  };
+}
+
+window.weld.lorebook = {
+  create: createLorebook,
+  estimateTokens: estimateTokens,
+  version: '1.0.0'
+};
+
+})();
+
+</script>
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>

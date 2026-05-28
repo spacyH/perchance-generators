@@ -1,0 +1,478 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+/* footer below */
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.markdown<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-markdown-example">demo &rarr;</a></span></div>  <div class="hdr">
+    <div class="hdr-row">
+      <h1>weld.markdown</h1>
+      <span class="ver">v1.0.0</span>
+    </div>
+    <p class="lead">Safe markdown rendering: a compact, self-contained, HTML- and URL-sanitizing subset of common markdown.</p>
+  </div>
+  <h2>Overview</h2>
+<p>weld.markdown renders a useful subset of markdown to safe HTML. It is intentionally compact and self-contained -- no external dependencies, no CDN loads. The trade-off vs marked.js or markdown-it is feature surface (no tables, no footnotes, no GFM task lists) for a small, audited rendering path.</p>
+<p>Every HTML-shaped input is escaped. URLs in links and images are sanitized against an allow-list -- <code>javascript:</code>, <code>vbscript:</code>, and arbitrary <code>data:</code> URLs are neutered to <code>#</code>. There's also a standalone <code>sanitize</code> helper for cleaning arbitrary HTML strings to a safe whitelist of tags and attributes.</p>
+<h2>Quick start</h2>
+<p>In your lists editor:</p>
+<pre data-codeid="code1"></pre>
+
+<p>Render markdown into HTML:</p>
+<pre data-codeid="code2"></pre>
+
+<p>Or render directly into an element:</p>
+<pre data-codeid="code3"></pre>
+<h2>Supported syntax</h2>
+<p>Block-level:</p>
+<ul>
+<li><strong>Headers</strong>: <code>#</code> through <code>######</code></li>
+<li><strong>Paragraphs</strong>: any line not matching another block type</li>
+<li><strong>Unordered lists</strong>: lines starting with <code>-</code>, <code>*</code>, or <code>+</code></li>
+<li><strong>Ordered lists</strong>: lines starting with a digit, period, space</li>
+<li><strong>Blockquotes</strong>: lines starting with <code>&gt;</code> (nestable -- inner content is re-rendered)</li>
+<li><strong>Fenced code blocks</strong>: triple-backtick or triple-tilde, optionally with a language tag</li>
+<li><strong>Horizontal rules</strong>: three or more <code>-</code>, <code>*</code>, or <code>_</code></li>
+</ul>
+
+<p>Inline:</p>
+<ul>
+<li><strong>Bold</strong>: <code>**text**</code> or <code>__text__</code></li>
+<li><strong>Italic</strong>: <code>*text*</code> or <code>_text_</code></li>
+<li><strong>Strikethrough</strong>: <code>~~text~~</code></li>
+<li><strong>Inline code</strong>: backtick-wrapped</li>
+<li><strong>Links</strong>: label in brackets + URL in parens, optional title in quotes</li>
+<li><strong>Images</strong>: exclamation prefix + same shape as links</li>
+<li><strong>Auto-links</strong>: bare <code>http://</code> and <code>https://</code> URLs are wrapped automatically</li>
+</ul>
+
+<p>Not supported (kept out by design): tables, footnotes, GFM task lists, definition lists, raw HTML pass-through, autolinked email addresses, reference-style links.</p>
+<h2>API</h2><h3>weld.markdown.render(text, opts?)</h3>
+<div class="sig" data-codeid="sig4"></div>
+<p>The core renderer. Returns an HTML string. Safe to inject via <code>innerHTML</code>.</p>
+<pre data-codeid="code5"></pre>
+<h3>weld.markdown.renderInto(target, text, opts?)</h3>
+<div class="sig" data-codeid="sig6"></div>
+<p>Convenience wrapper that renders and assigns to <code>innerHTML</code>. <code>target</code> can be an element or a CSS selector string. Returns the element.</p>
+<h3>weld.markdown.sanitize(html)</h3>
+<div class="sig" data-codeid="sig7"></div>
+<p>Take an arbitrary HTML string and return a safe version. Strips any tag not on the allow-list (scripts, iframes, event handlers all gone). Within allowed tags, only safe attributes survive. URLs in <code>href</code> and <code>src</code> are sanitized.</p>
+<pre data-codeid="code8"></pre>
+<p>Allowed tags: <code>p, br, hr, h1-h6, strong, em, del, b, i, u, s, ul, ol, li, blockquote, pre, code, a, img, table, thead, tbody, tr, th, td, div, span</code>. Allowed attrs on <code>a</code>: <code>href, title, target, rel</code>. On <code>img</code>: <code>src, alt, title, width, height</code>. Global: <code>class</code>.</p>
+<h3>weld.markdown.parseInline(text)</h3>
+<div class="sig" data-codeid="sig9"></div>
+<p>Process just inline syntax (bold, italic, links, etc.) without wrapping in paragraphs or handling block elements. Useful when you want one-line markdown inside something like a list item you're building manually.</p>
+<h3>weld.markdown.escapeHtml(s) / .safeUrl(url, forImg?)</h3>
+<p>Two low-level helpers exposed for when you need them. <code>escapeHtml</code> replaces <code>&amp;</code>, <code>&lt;</code>, <code>&gt;</code>, <code>"</code>, <code>'</code> with their entity equivalents. <code>safeUrl(url, forImg)</code> returns the URL if it matches the allow-list, or <code>#</code> if it doesn't. Pass <code>true</code> for <code>forImg</code> to use the slightly looser allow-list that includes safe <code>data:image</code> URIs.</p>
+<h2>Security model</h2>
+<p>The renderer takes adversarial input as a baseline assumption. Three layers of defense:</p>
+<ol style="padding-left:20px;list-style:decimal;">
+<li><strong>Input escape.</strong> Any raw HTML in the input is HTML-escaped before any markdown patterns are matched. <code>&lt;script&gt;</code> becomes <code>&amp;lt;script&amp;gt;</code> and never reaches the DOM as a tag.</li>
+<li><strong>URL allow-list.</strong> Link and image URLs are checked against a regex that permits <code>http(s):</code>, <code>mailto:</code>, <code>tel:</code>, relative paths, and (for images) safe <code>data:image</code> URIs. Anything else becomes <code>#</code>.</li>
+<li><strong>No HTML pass-through.</strong> Unlike marked.js with its default options, weld.markdown will never emit a tag that the user typed literally. There is no <code>html: true</code> mode.</li>
+</ol>
+<p>This is sufficient for rendering chat messages, character descriptions, lore entries, and similar user-controlled markdown content. For anything more nuanced (e.g. allowing limited inline HTML from trusted authors), use <code>sanitize</code> on the output to add an extra layer.</p>
+<h2>Common patterns</h2><h3>Render chat messages</h3>
+<pre data-codeid="code10"></pre>
+<h3>Custom renderer hook via sanitize</h3>
+<p>Render with weld.markdown, then post-process via the DOM, then sanitize as a final defense:</p>
+<pre data-codeid="code11"></pre>
+<h2>Behavior notes</h2><div class="note">
+The default link rendering opens in a new tab (<code>target="_blank"</code> and <code>rel="noopener"</code>). If you want in-place navigation, post-process the output to strip those attributes, or wrap <code>render</code> in your own helper that does the replacement.
+</div>
+  <div class="footer">Part of the <a href="https://perchance.org/weld-ui-index">weld plugin suite</a>. Stashed at <code>window.weld.markdown</code>. This page loads the plugin so you can inspect it in DevTools.</div>
+</div>
+<script>
+(function(){
+  var examples = {
+  'code1': 'output\n  weld-markdown = \{import:weld-markdown-plugin\}',
+  'code2': 'root.weldMarkdown();   // trigger $output\n\nconst html = weld.markdown.render(\'# Hello\\n\\nSome **bold** text and a \[link\](https://example.com).\');\nconsole.log(html);\n// <h1>Hello</h1>\n// <p>Some <strong>bold</strong> text and a <a href="https://example.com" target="_blank" rel="noopener">link</a>.</p>',
+  'code3': 'weld.markdown.renderInto(\'#chat-message\', message.text);\nweld.markdown.renderInto(messageEl, message.text);   // also accepts an element',
+  'sig4': 'weld.markdown.render(text, opts?)  ->  string (HTML)',
+  'code5': 'const html = weld.markdown.render(messageText);\ncontainer.innerHTML = html;',
+  'sig6': 'weld.markdown.renderInto(target, text, opts?)  ->  HTMLElement',
+  'sig7': 'weld.markdown.sanitize(html)  ->  string (sanitized HTML)',
+  'code8': 'const safe = weld.markdown.sanitize(untrustedHtml);\ncontainer.innerHTML = safe;',
+  'sig9': 'weld.markdown.parseInline(text)  ->  string (HTML)',
+  'code10': 'function renderMessage(msg) \{\n  const el = document.createElement(\'div\');\n  el.className = \'message\';\n  weld.markdown.renderInto(el, msg.text);\n  return el;\n\}',
+  'code11': 'let html = weld.markdown.render(text);\n// Optional: post-process the HTML string with your own transforms\nhtml = html.replace(/<code>/g, \'<code class="hl">\');\n// Final sanitize pass\nhtml = weld.markdown.sanitize(html);\ncontainer.innerHTML = html;'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    var nodes = document.querySelectorAll('[data-codeid]');
+    nodes.forEach(function(n){
+      var id = n.getAttribute('data-codeid');
+      var src = examples[id];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.markdown) return; // already loaded
+
+// -----------------------------------------------------------------
+// HTML escape -- the foundation of safety
+// -----------------------------------------------------------------
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// -----------------------------------------------------------------
+// URL sanitization -- reject javascript:, vbscript:, data: (except images)
+// -----------------------------------------------------------------
+var SAFE_URL_RE = /^(?:https?:|mailto:|tel:|\/|#|\.\/|\.\.\/|[a-zA-Z0-9_\-]+\.)/;
+var SAFE_IMG_URL_RE = /^(?:https?:|data:image\/(?:png|jpe?g|gif|webp|svg\+xml);|\/|\.\/|\.\.\/)/;
+
+function safeUrl(url, forImg) {
+  url = String(url).trim();
+  var re = forImg ? SAFE_IMG_URL_RE : SAFE_URL_RE;
+  return re.test(url) ? url : '#';
+}
+
+// -----------------------------------------------------------------
+// Inline formatting: bold, italic, strikethrough -- applied to text
+// where no HTML has been injected yet
+// -----------------------------------------------------------------
+function applyFormatting(text) {
+  // Bold first (longer marker wins)
+  text = text.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/__([^_\n]+)__/g, '<strong>$1</strong>');
+  // Italic (single marker)
+  text = text.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
+  text = text.replace(/(^|[^_])_([^_\n]+)_(?!_)/g, '$1<em>$2</em>');
+  // Strikethrough
+  text = text.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+  return text;
+}
+
+// -----------------------------------------------------------------
+// Inline parsing -- code, images, links, auto-links, then formatting
+// -----------------------------------------------------------------
+function parseInline(text) {
+  var slots = [];
+  function slot(html) {
+    slots.push(html);
+    return '\u0001S' + (slots.length - 1) + '\u0001';
+  }
+
+  // 1. Code spans -- extract first, content escaped, no further processing
+  text = text.replace(/`([^`]+)`/g, function(_, code) {
+    return slot('<code>' + escapeHtml(code) + '</code>');
+  });
+
+  // 2. Images:  exclamation + label-in-brackets + paren-url
+  text = text.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g, function(_, alt, url, title) {
+    var t = title ? ' title="' + escapeHtml(title) + '"' : '';
+    return slot('<img src="' + safeUrl(url, true) + '" alt="' + escapeHtml(alt) + '"' + t + '>');
+  });
+
+  // 3. Links: label-in-brackets followed by paren-url
+  text = text.replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g, function(_, label, url, title) {
+    var t = title ? ' title="' + escapeHtml(title) + '"' : '';
+    // Allow inline formatting inside link label
+    var inner = applyFormatting(escapeHtml(label));
+    return slot('<a href="' + safeUrl(url) + '"' + t + ' target="_blank" rel="noopener">' + inner + '</a>');
+  });
+
+  // 4. Auto-links: bare URLs (not already inside a slot)
+  text = text.replace(/\b(https?:\/\/[^\s<]+[^\s<.,;:?!])/g, function(url) {
+    return slot('<a href="' + safeUrl(url) + '" target="_blank" rel="noopener">' + escapeHtml(url) + '</a>');
+  });
+
+  // 5. Escape any remaining HTML in the plain text
+  text = escapeHtml(text);
+
+  // 6. Apply bold/italic/strikethrough on the now-safe text
+  text = applyFormatting(text);
+
+  // 7. Restore slot placeholders
+  text = text.replace(/\u0001S(\d+)\u0001/g, function(_, idx) {
+    return slots[parseInt(idx, 10)];
+  });
+
+  return text;
+}
+
+// -----------------------------------------------------------------
+// Block-level parsing
+// -----------------------------------------------------------------
+function render(input, opts) {
+  opts = opts || {};
+  if (typeof input !== 'string') input = String(input == null ? '' : input);
+
+  // Normalize line endings
+  input = input.replace(/\r\n?/g, '\n');
+
+  var lines = input.split('\n');
+  var out = [];
+  var i = 0;
+
+  while (i < lines.length) {
+    var line = lines[i];
+
+    // Fenced code block: ``` or ~~~
+    var fence = line.match(/^(```|~~~)\s*([a-zA-Z0-9_-]*)\s*$/);
+    if (fence) {
+      var marker = fence[1];
+      var lang = fence[2] || '';
+      i++;
+      var code = [];
+      while (i < lines.length && lines[i].indexOf(marker) !== 0) {
+        code.push(lines[i]);
+        i++;
+      }
+      i++;
+      var langAttr = lang ? ' class="language-' + escapeHtml(lang) + '"' : '';
+      out.push('<pre><code' + langAttr + '>' + escapeHtml(code.join('\n')) + '</code></pre>');
+      continue;
+    }
+
+    // ATX header: # to ######
+    var hdr = line.match(/^(#{1,6})\s+(.+)$/);
+    if (hdr) {
+      var n = hdr[1].length;
+      out.push('<h' + n + '>' + parseInline(hdr[2]) + '</h' + n + '>');
+      i++;
+      continue;
+    }
+
+    // Horizontal rule
+    if (/^\s*([-*_])\s*\1\s*\1[\s\1]*$/.test(line)) {
+      out.push('<hr>');
+      i++;
+      continue;
+    }
+
+    // Blockquote
+    if (line.charAt(0) === '>') {
+      var quote = [];
+      while (i < lines.length && lines[i].charAt(0) === '>') {
+        quote.push(lines[i].replace(/^>\s?/, ''));
+        i++;
+      }
+      out.push('<blockquote>' + render(quote.join('\n')) + '</blockquote>');
+      continue;
+    }
+
+    // Unordered list
+    if (/^\s*[-*+]\s+/.test(line)) {
+      var items = [];
+      while (i < lines.length && /^\s*[-*+]\s+/.test(lines[i])) {
+        items.push(lines[i].replace(/^\s*[-*+]\s+/, ''));
+        i++;
+      }
+      out.push('<ul>' + items.map(function(it) { return '<li>' + parseInline(it) + '</li>'; }).join('') + '</ul>');
+      continue;
+    }
+
+    // Ordered list
+    if (/^\s*\d+\.\s+/.test(line)) {
+      var oitems = [];
+      while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
+        oitems.push(lines[i].replace(/^\s*\d+\.\s+/, ''));
+        i++;
+      }
+      out.push('<ol>' + oitems.map(function(it) { return '<li>' + parseInline(it) + '</li>'; }).join('') + '</ol>');
+      continue;
+    }
+
+    // Empty line: skip
+    if (line.trim() === '') {
+      i++;
+      continue;
+    }
+
+    // Paragraph: gather consecutive non-empty lines
+    var para = [line];
+    i++;
+    while (i < lines.length && lines[i].trim() !== '' && !/^(#{1,6}\s|```|~~~|>|\s*[-*+]\s|\s*\d+\.\s)/.test(lines[i])) {
+      para.push(lines[i]);
+      i++;
+    }
+    out.push('<p>' + parseInline(para.join(' ')) + '</p>');
+  }
+
+  return out.join('\n');
+}
+
+// -----------------------------------------------------------------
+// Convenience: render into an element
+// -----------------------------------------------------------------
+function renderInto(el, input, opts) {
+  if (typeof el === 'string') el = document.querySelector(el);
+  if (!el) throw new Error('weld.markdown.renderInto: element not found');
+  el.innerHTML = render(input, opts);
+  return el;
+}
+
+// -----------------------------------------------------------------
+// Sanitize an arbitrary HTML string -- only allow safe tags/attrs
+// -----------------------------------------------------------------
+var ALLOWED_TAGS = {
+  p: 1, br: 1, hr: 1,
+  h1: 1, h2: 1, h3: 1, h4: 1, h5: 1, h6: 1,
+  strong: 1, em: 1, del: 1, b: 1, i: 1, u: 1, s: 1,
+  ul: 1, ol: 1, li: 1,
+  blockquote: 1, pre: 1, code: 1,
+  a: 1, img: 1,
+  table: 1, thead: 1, tbody: 1, tr: 1, th: 1, td: 1,
+  div: 1, span: 1
+};
+var ALLOWED_ATTRS = {
+  a: { href: 1, title: 1, target: 1, rel: 1 },
+  img: { src: 1, alt: 1, title: 1, width: 1, height: 1 },
+  '*': { 'class': 1 }
+};
+
+function sanitize(html) {
+  var tmp = document.createElement('template');
+  tmp.innerHTML = String(html);
+  walk(tmp.content);
+  return tmp.innerHTML;
+}
+
+function walk(node) {
+  var children = Array.prototype.slice.call(node.childNodes);
+  for (var i = 0; i < children.length; i++) {
+    var child = children[i];
+    if (child.nodeType === 1) { // element
+      var tag = child.tagName.toLowerCase();
+      if (!ALLOWED_TAGS[tag]) {
+        // Replace with its text content
+        var text = document.createTextNode(child.textContent);
+        child.parentNode.replaceChild(text, child);
+        continue;
+      }
+      // Strip unsafe attributes
+      var attrs = Array.prototype.slice.call(child.attributes);
+      for (var j = 0; j < attrs.length; j++) {
+        var attr = attrs[j];
+        var tagAllowed = ALLOWED_ATTRS[tag] && ALLOWED_ATTRS[tag][attr.name];
+        var globalAllowed = ALLOWED_ATTRS['*'][attr.name];
+        if (!tagAllowed && !globalAllowed) {
+          child.removeAttribute(attr.name);
+          continue;
+        }
+        // URL attrs: sanitize
+        if (attr.name === 'href') child.setAttribute('href', safeUrl(attr.value));
+        if (attr.name === 'src') {
+          var isImg = tag === 'img';
+          child.setAttribute('src', safeUrl(attr.value, isImg));
+        }
+      }
+      walk(child);
+    }
+  }
+}
+
+// -----------------------------------------------------------------
+// API
+// -----------------------------------------------------------------
+window.weld.markdown = {
+  render: render,
+  renderInto: renderInto,
+  sanitize: sanitize,
+  parseInline: parseInline,
+  escapeHtml: escapeHtml,
+  safeUrl: safeUrl,
+  version: '1.0.0'
+};
+
+})();
+
+</script>
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>

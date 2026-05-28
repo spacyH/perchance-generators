@@ -1,0 +1,395 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.quota<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-quota-example">demo &rarr;</a></span></div>  <div class="hdr">
+    <div class="hdr-row">
+      <h1>weld.quota</h1>
+      <span class="ver">v1.0.0</span>
+    </div>
+    <p class="lead">Storage estimation and API rate limiting. Watch usage, throttle calls, prevent failures before they happen.</p>
+  </div>
+  <h2>Overview</h2>
+<p>weld.quota tracks two kinds of limit your generator can hit: <strong>storage quota</strong> (how much of the browser's IndexedDB allowance you've used) and <strong>API rate limits</strong> (how many calls you've made to a particular endpoint in a sliding window).</p>
+<p>Both are common pain points. Storage usually fails silently then catastrophically; rate limits get hit during quick demos and erode user trust. This plugin gives you cheap programmatic access to both, plus a simple watcher pattern for warning users before things break.</p>
+<h2>Quick start</h2>
+<p>In your lists editor:</p>
+<pre data-codeid="code1"></pre>
+
+<p>Trigger the plugin and check storage:</p>
+<pre data-codeid="code2"></pre>
+
+<p>Set up a rate limiter:</p>
+<pre data-codeid="code3"></pre>
+<h2>Storage estimation</h2><h3>weld.quota.estimate()</h3>
+<div class="sig" data-codeid="sig4"></div>
+<p>Wraps <code>navigator.storage.estimate()</code> and returns a normalized status object:</p>
+<pre data-codeid="code5"></pre>
+
+<p>The first call also caches the result -- <code>weld.quota.lastEstimate()</code> returns the most recent without doing another async lookup.</p>
+<h3>weld.quota.watch(\{threshold, onCross, every\})</h3>
+<div class="sig" data-codeid="sig6"></div>
+<p>Poll storage every <code>every</code> ms (default 60000) and fire <code>onCross(estimate, isOver)</code> when crossing the threshold percentage. Fires once on the way up and again on the way down -- not repeatedly while above. Returns a function to stop watching.</p>
+<pre data-codeid="code7"></pre>
+<h3>weld.quota.formatBytes(n)</h3>
+<div class="sig" data-codeid="sig8"></div>
+<p>Convenience formatter. Picks the unit (B / KB / MB / GB) and renders 1 decimal place.</p>
+<pre data-codeid="code9"></pre>
+<h2>Rate limiters</h2><h3>weld.quota.rate.create(name, \{maxPerWindow, windowMs\})</h3>
+<div class="sig" data-codeid="sig10"></div>
+<p>Create a named rate limiter. <code>maxPerWindow</code> defaults to 60, <code>windowMs</code> to 60000. State is persisted in <code>localStorage</code> so it survives page reloads.</p>
+<pre data-codeid="code11"></pre>
+<p>Returns a limiter object with these methods:</p>
+<h3>limit.check()</h3>
+<div class="sig" data-codeid="sig12"></div>
+<p>See how many calls are available without consuming. Same shape as <code>consume()</code>:</p>
+<pre data-codeid="code13"></pre>
+<h3>limit.consume()</h3>
+<div class="sig" data-codeid="sig14"></div>
+<p>Record a call. Returns the same status. If <code>allowed</code> is false, the call was not recorded -- you should not perform the action.</p>
+<pre data-codeid="code15"></pre>
+<h3>limit.reset() / limit.history()</h3>
+<p><code>reset()</code> clears the consumption history for this limit. <code>history()</code> returns the array of timestamps in the current sliding window (useful for debugging or charting).</p>
+<pre data-codeid="code16"></pre>
+<h3>weld.quota.rate.list()</h3>
+<div class="sig" data-codeid="sig17"></div>
+<p>Names of every rate limiter currently configured. Useful for diagnostics.</p>
+<h2>Common patterns</h2><h3>Warning before API calls fail</h3>
+<pre data-codeid="code18"></pre>
+<h3>Auto-pruning IndexedDB when nearly full</h3>
+<pre data-codeid="code19"></pre>
+<h2>Persistence</h2><div class="note">
+Rate limit state is stored in <code>localStorage</code> under the key <code>weld-quota-state</code>. It survives page reloads but is per-origin -- a user's rate state on perchance.org applies across all generators on that domain. If you want per-generator state, prefix your rate names: <code>weld.quota.rate.create('mygen:openai', ...)</code>.
+</div>
+  <div class="footer">Part of the <a href="https://perchance.org/weld-ui-index">weld plugin suite</a>. Stashed at <code>window.weld.quota</code>. This page loads the plugin so you can inspect it in DevTools.</div>
+</div>
+<script>
+(function(){
+  var examples = {
+  'code1': 'output\n  weld-quota = \{import:weld-quota-plugin\}',
+  'code2': 'root.weldQuota();   // triggers $output\n\nweld.quota.estimate().then(e => \{\n  console.log(weld.quota.formatBytes(e.used) + \' / \' + weld.quota.formatBytes(e.total));\n  console.log(e.percentUsed.toFixed(1) + \'% used\');\n\});',
+  'code3': 'const apiLimit = weld.quota.rate.create(\'openai-api\', \{\n  maxPerWindow: 60,\n  windowMs: 60000   // 60 calls per minute\n\});\n\n// Before each call:\nconst status = apiLimit.consume();\nif (!status.allowed) \{\n  alert(\'Rate limit hit -- resets in \' + Math.ceil(status.resetsIn / 1000) + \'s\');\n  return;\n\}\nmakeApiCall();',
+  'sig4': 'weld.quota.estimate()  ->  Promise<status>',
+  'code5': '\{\n  used: 1234567,         // bytes\n  available: 8765432,\n  total: 10000000,\n  percentUsed: 12.3,\n  supported: true,       // false in browsers without the API\n  usageDetails: \{ ... \}  // browser-specific breakdown, may be null\n\}',
+  'sig6': 'weld.quota.watch(\{threshold, onCross, every?\})  ->  stop()',
+  'code7': 'const stop = weld.quota.watch(\{\n  threshold: 80,\n  every: 30000,\n  onCross: (est, isOver) => \{\n    if (isOver) showWarning(est.percentUsed.toFixed(0) + \'% storage used\');\n    else hideWarning();\n  \}\n\});\n// later: stop();',
+  'sig8': 'weld.quota.formatBytes(n)  ->  string',
+  'code9': 'weld.quota.formatBytes(1500);          // "1.5 KB"\nweld.quota.formatBytes(2500000);       // "2.4 MB"\nweld.quota.formatBytes(3000000000);    // "2.79 GB"',
+  'sig10': 'weld.quota.rate.create(name, opts)  ->  limiter',
+  'code11': 'const limit = weld.quota.rate.create(\'image-gen\', \{\n  maxPerWindow: 10,\n  windowMs: 60000   // 10 images per minute\n\});',
+  'sig12': 'limit.check()  ->  status',
+  'code13': '\{\n  name: \'image-gen\',\n  allowed: true,           // would a consume succeed?\n  remaining: 3,            // calls left in this window\n  used: 7,                 // calls in the current window\n  total: 10,               // maxPerWindow\n  windowMs: 60000,\n  resetsIn: 42000          // ms until oldest call drops out\n\}',
+  'sig14': 'limit.consume()  ->  status',
+  'code15': 'const s = limit.consume();\nif (!s.allowed) \{\n  weld.diag.warn(\'Rate limit hit\', \{ name: s.name, resetsIn: s.resetsIn \});\n  return;\n\}\ndoTheThing();',
+  'code16': 'limit.reset();\nconsole.log(limit.history().length);  // 0',
+  'sig17': 'weld.quota.rate.list()  ->  Array<string>',
+  'code18': 'const apiLimit = weld.quota.rate.create(\'chat-api\', \{ maxPerWindow: 30, windowMs: 60000 \});\n\nasync function sendMessage(text) \{\n  const status = apiLimit.consume();\n  if (!status.allowed) \{\n    showToast(\'You hit your rate limit. Try again in \' +\n              Math.ceil(status.resetsIn / 1000) + \'s\');\n    return;\n  \}\n  if (status.remaining <= 3) \{\n    showToast(\'Heads up: \' + status.remaining + \' calls left this minute\');\n  \}\n  return await fetch(\'/chat\', \{ method: \'POST\', body: text \});\n\}',
+  'code19': 'weld.quota.watch(\{\n  threshold: 90,\n  onCross: async (est, isOver) => \{\n    if (!isOver) return;\n    const db = await weld.migrate.open(\'my-app\', schema);\n    const old = await db.getAll(\'cache\');\n    const cutoff = Date.now() - (7 * 24 * 60 * 60 * 1000);  // 7 days\n    const toDelete = old.filter(r => r.timestamp < cutoff);\n    for (const r of toDelete) await db.delete(\'cache\', r.id);\n    weld.diag.info(\'Pruned \' + toDelete.length + \' old cache entries\');\n  \}\n\});'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    var nodes = document.querySelectorAll('[data-codeid]');
+    nodes.forEach(function(n){
+      var id = n.getAttribute('data-codeid');
+      var src = examples[id];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.quota) return;
+
+  var STORAGE_KEY = 'weld-quota-state';
+  var watchers = [];
+  var lastEstimate = null;
+
+  // -----------------------------------------------------------------
+  // STORAGE ESTIMATION
+  // -----------------------------------------------------------------
+  function estimate() {
+    if (!navigator.storage || typeof navigator.storage.estimate !== 'function') {
+      var unsupported = {
+        used: 0, available: 0, total: 0, percentUsed: 0,
+        supported: false, usageDetails: null
+      };
+      lastEstimate = unsupported;
+      return Promise.resolve(unsupported);
+    }
+    return navigator.storage.estimate().then(function(est) {
+      var used = est.usage || 0;
+      var total = est.quota || 0;
+      var available = Math.max(0, total - used);
+      var percentUsed = total > 0 ? (used / total) * 100 : 0;
+      var result = {
+        used: used,
+        available: available,
+        total: total,
+        percentUsed: percentUsed,
+        supported: true,
+        usageDetails: est.usageDetails || null
+      };
+      lastEstimate = result;
+      checkWatchers(result);
+      return result;
+    });
+  }
+
+  function formatBytes(bytes) {
+    if (bytes == null || isNaN(bytes)) return '?';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+    return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+  }
+
+  // -----------------------------------------------------------------
+  // STORAGE WATCHERS
+  // -----------------------------------------------------------------
+  function watch(opts) {
+    opts = opts || {};
+    var w = {
+      threshold: opts.threshold != null ? opts.threshold : 80,
+      onCross: typeof opts.onCross === 'function' ? opts.onCross : function(){},
+      every: opts.every || 60000,
+      crossed: false,
+      interval: null
+    };
+    watchers.push(w);
+    w.interval = setInterval(estimate, w.every);
+    estimate(); // initial check
+    return function stop() {
+      clearInterval(w.interval);
+      var i = watchers.indexOf(w);
+      if (i !== -1) watchers.splice(i, 1);
+    };
+  }
+
+  function checkWatchers(est) {
+    for (var i = 0; i < watchers.length; i++) {
+      var w = watchers[i];
+      var over = est.percentUsed >= w.threshold;
+      if (over !== w.crossed) {
+        w.crossed = over;
+        try { w.onCross(est, over); } catch (e) { /* swallow */ }
+      }
+    }
+  }
+
+  // -----------------------------------------------------------------
+  // RATE LIMITERS - sliding window, persisted
+  // -----------------------------------------------------------------
+  var rateConfigs = {};
+
+  function loadRateState() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return {};
+      return JSON.parse(raw) || {};
+    } catch (e) { return {}; }
+  }
+
+  function saveRateState(state) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+    catch (e) { /* quota or disabled */ }
+  }
+
+  function pruneOld(timestamps, windowMs) {
+    var cutoff = Date.now() - windowMs;
+    var out = [];
+    for (var i = 0; i < timestamps.length; i++) {
+      if (timestamps[i] >= cutoff) out.push(timestamps[i]);
+    }
+    return out;
+  }
+
+  function makeStatus(name, timestamps, cfg, allowed) {
+    var remaining = Math.max(0, cfg.maxPerWindow - timestamps.length);
+    var resetsIn = timestamps.length > 0
+      ? Math.max(0, (timestamps[0] + cfg.windowMs) - Date.now())
+      : 0;
+    return {
+      name: name,
+      allowed: allowed,
+      remaining: remaining,
+      used: timestamps.length,
+      total: cfg.maxPerWindow,
+      windowMs: cfg.windowMs,
+      resetsIn: resetsIn
+    };
+  }
+
+  function createRate(name, opts) {
+    if (!name || typeof name !== 'string') throw new Error('rate name required');
+    opts = opts || {};
+    rateConfigs[name] = {
+      maxPerWindow: opts.maxPerWindow || 60,
+      windowMs: opts.windowMs || 60000
+    };
+    return getRate(name);
+  }
+
+  function getRate(name) {
+    return {
+      name: name,
+      check: function() { return checkRate(name); },
+      consume: function() { return consumeRate(name); },
+      reset: function() { return resetRate(name); },
+      history: function() { return rateHistory(name); }
+    };
+  }
+
+  function checkRate(name) {
+    var cfg = rateConfigs[name];
+    if (!cfg) throw new Error('unknown rate: ' + name);
+    var state = loadRateState();
+    var timestamps = pruneOld(state[name] || [], cfg.windowMs);
+    return makeStatus(name, timestamps, cfg, timestamps.length < cfg.maxPerWindow);
+  }
+
+  function consumeRate(name) {
+    var cfg = rateConfigs[name];
+    if (!cfg) throw new Error('unknown rate: ' + name);
+    var state = loadRateState();
+    var timestamps = pruneOld(state[name] || [], cfg.windowMs);
+    if (timestamps.length >= cfg.maxPerWindow) {
+      return makeStatus(name, timestamps, cfg, false);
+    }
+    timestamps.push(Date.now());
+    state[name] = timestamps;
+    saveRateState(state);
+    return makeStatus(name, timestamps, cfg, true);
+  }
+
+  function resetRate(name) {
+    var state = loadRateState();
+    delete state[name];
+    saveRateState(state);
+    return true;
+  }
+
+  function rateHistory(name) {
+    var cfg = rateConfigs[name];
+    if (!cfg) return [];
+    var state = loadRateState();
+    return pruneOld(state[name] || [], cfg.windowMs);
+  }
+
+  function listRates() { return Object.keys(rateConfigs); }
+
+  // -----------------------------------------------------------------
+  // API
+  // -----------------------------------------------------------------
+  window.weld.quota = {
+    // Storage
+    estimate: estimate,
+    lastEstimate: function() { return lastEstimate; },
+    watch: watch,
+    formatBytes: formatBytes,
+
+    // Rate limiting
+    rate: {
+      create: createRate,
+      get: getRate,
+      check: checkRate,
+      consume: consumeRate,
+      reset: resetRate,
+      history: rateHistory,
+      list: listRates
+    },
+
+    version: '1.0.0'
+  };
+})();
+
+</script>
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>

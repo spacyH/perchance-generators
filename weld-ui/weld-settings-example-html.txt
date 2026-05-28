@@ -1,0 +1,991 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+  --weld-ink:var(--ink); --weld-faint:var(--faint); --weld-border:var(--border); --weld-muted:var(--muted); --weld-surface:var(--surface);
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);
+  -webkit-font-smoothing:antialiased;min-height:100vh;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:960px;margin:0 auto;padding:48px 24px 32px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+.hdr{text-align:center;margin-bottom:40px;}
+.hdr h1{font:700 32px var(--mono);letter-spacing:-1px;color:var(--ink);margin-bottom:8px;}
+.hdr p{font-size:14px;color:var(--muted);max-width:560px;margin:0 auto;}
+.workspace{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:24px 0;}
+@media (max-width:760px){.workspace{grid-template-columns:1fr;}}
+.card{background:var(--faint);border:1px solid var(--border);border-radius:8px;padding:20px;}
+.card h3{font:600 11px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+
+/* Preview pane reflects the current settings */
+.preview{padding:20px;border-radius:6px;transition:all 240ms;
+  border:1px solid var(--border);background:var(--bg);min-height:200px;}
+.preview .head{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
+.preview .avatar{width:36px;height:36px;border-radius:50%;background:var(--accent);
+  display:flex;align-items:center;justify-content:center;font:700 14px var(--mono);color:#fff;}
+.preview .name{font-weight:600;}
+.preview .msg{line-height:1.6;color:#c9d1d9;}
+
+.state-display{background:var(--bg);border:1px solid var(--border);border-radius:6px;
+  padding:14px;font:12px var(--mono);color:#c9d1d9;overflow:auto;
+  white-space:pre-wrap;word-break:break-word;line-height:1.5;}
+.state-display .key{color:var(--accent);}
+.state-display .val{color:var(--green);}
+
+.events-log{background:var(--bg);border:1px solid var(--border);border-radius:6px;
+  padding:12px 14px;font:12px var(--mono);max-height:150px;overflow-y:auto;line-height:1.6;}
+.events-log .entry{color:#c9d1d9;padding:1px 0;}
+.events-log .entry .key{color:var(--accent);}
+.events-log .entry .val{color:var(--yellow);}
+.events-log .empty{color:var(--muted);font-style:italic;}
+
+.actions-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
+
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;
+  padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+<div id="page">
+  <div class="breadcrumb">
+    <span class="crumb">
+      <a href="https://perchance.org/weld-ui-index">weld</a>
+      <span class="crumb-sep">/</span>
+      weld.settings
+      <span class="crumb-sep">/</span>
+      <span class="crumb-cur">examples</span>
+    </span>
+    <span class="crumb-action">
+      <a href="https://perchance.org/weld-settings-plugin">docs &rarr;</a>
+    </span>
+  </div>
+  <div class="hdr">
+    <h1>weld.settings</h1>
+    <p>A live schema-driven settings panel. Every change instantly applies to the preview, gets logged, and is persisted to localStorage.</p>
+  </div>
+
+  <div class="workspace">
+    <div class="card">
+      <h3>Settings panel</h3>
+      <div id="panel-mount"></div>
+      <div class="actions-row" id="actions"></div>
+    </div>
+    <div class="card">
+      <h3>Live preview</h3>
+      <div class="preview" id="preview">
+        <div class="head">
+          <div class="avatar">A</div>
+          <div class="name">Alex</div>
+        </div>
+        <div class="msg">Hello, world!</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Current state (settings.getAll())</h3>
+    <div class="state-display" id="state"></div>
+  </div>
+
+  <div class="card" style="margin-top:14px;">
+    <h3>Subscription events (settings.subscribe("*", ...))</h3>
+    <div class="events-log" id="events"><div class="empty">No events yet -- adjust settings to see changes</div></div>
+  </div>
+
+</div>
+<script>(function(){
+'use strict';
+
+// Namespace
+if (!window.weld) window.weld = {};
+if (window.weld.ui) return; // already loaded
+
+// THEME
+var defaultTheme = {
+  bg:        '#0d1117',
+  surface:   '#161b22',
+  faint:     '#21262d',
+  ink:       '#e6edf3',
+  muted:     '#7d8590',
+  accent:    '#4493f8',
+  accentInk: '#0d1117',
+  green:     '#3fb950',
+  red:       '#f85149',
+  yellow:    '#d29922',
+  blue:      '#58a6ff',
+  border:    'rgba(255,255,255,0.10)',
+  borderHi:  'rgba(255,255,255,0.20)',
+  radius:    '6px',
+  radiusSm:  '4px',
+  radiusLg:  '10px',
+  font:      "'DM Sans', system-ui, sans-serif",
+  fontMono:  "'JetBrains Mono', monospace",
+  shadow:    '0 8px 32px rgba(0,0,0,0.5)',
+  transit:   '120ms cubic-bezier(0.4, 0, 0.2, 1)',
+};
+
+var theme = Object.assign({}, defaultTheme);
+
+function setTheme(updates) {
+  Object.assign(theme, updates);
+  applyThemeVars();
+}
+
+function getTheme() { return Object.assign({}, theme); }
+
+function applyThemeVars() {
+  var root = document.documentElement;
+  Object.keys(theme).forEach(function(k){
+    root.style.setProperty('--w-' + k, theme[k]);
+  });
+}
+
+// CSS - injected once. All values use CSS vars.
+var CSS = [
+"@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');",
+".w-btn{font:500 13px var(--w-font);background:var(--w-bg);color:var(--w-ink);",
+"  border:1px solid var(--w-border);border-radius:var(--w-radius);padding:7px 14px;",
+"  cursor:pointer;display:inline-flex;align-items:center;gap:6px;line-height:1;",
+"  transition:border-color var(--w-transit), background var(--w-transit);outline:none;}",
+".w-btn:hover:not(:disabled){border-color:var(--w-borderHi);}",
+".w-btn:focus-visible{border-color:var(--w-accent);box-shadow:0 0 0 2px rgba(68,147,248,0.3);}",
+".w-btn:disabled{opacity:.4;cursor:not-allowed;}",
+".w-btn-primary{background:var(--w-accent);color:var(--w-accentInk);border-color:var(--w-accent);font-weight:600;}",
+".w-btn-primary:hover:not(:disabled){background:#58a6ff;border-color:#58a6ff;}",
+".w-btn-danger{color:var(--w-red);border-color:rgba(248,81,73,0.4);}",
+".w-btn-danger:hover:not(:disabled){background:rgba(248,81,73,0.1);border-color:var(--w-red);}",
+".w-btn-ghost{background:transparent;border-color:transparent;}",
+".w-btn-ghost:hover:not(:disabled){background:var(--w-faint);}",
+".w-btn-sm{padding:4px 10px;font-size:12px;}",
+".w-btn-lg{padding:10px 20px;font-size:14px;}",
+".w-input,.w-select,.w-textarea{font:13px var(--w-fontMono);background:var(--w-bg);color:var(--w-ink);",
+"  border:1px solid var(--w-border);border-radius:var(--w-radiusSm);padding:7px 10px;outline:none;",
+"  width:100%;box-sizing:border-box;transition:border-color var(--w-transit);}",
+".w-input:focus,.w-select:focus,.w-textarea:focus{border-color:var(--w-accent);box-shadow:0 0 0 2px rgba(68,147,248,0.2);}",
+".w-textarea{resize:vertical;min-height:60px;line-height:1.45;font-size:12px;}",
+".w-select{cursor:pointer;}",
+".w-checkbox{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font:13px var(--w-font);color:var(--w-ink);}",
+".w-checkbox input{margin:0;cursor:pointer;}",
+".w-range{width:100%;height:4px;-webkit-appearance:none;appearance:none;background:var(--w-faint);border-radius:2px;outline:none;}",
+".w-range::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--w-accent);cursor:pointer;border:0;}",
+".w-range::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--w-accent);cursor:pointer;border:0;}",
+".w-label{display:block;font:600 10px var(--w-fontMono);letter-spacing:1px;text-transform:uppercase;",
+"  color:var(--w-muted);margin-bottom:5px;}",
+".w-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;",
+"  display:flex;align-items:center;justify-content:center;padding:20px;",
+"  animation:w-fade-in 150ms ease-out;}",
+"@keyframes w-fade-in{from{opacity:0;}to{opacity:1;}}",
+"@keyframes w-pop-in{from{opacity:0;transform:scale(0.96);}to{opacity:1;transform:scale(1);}}",
+".w-modal{background:var(--w-surface);border:1px solid var(--w-border);border-radius:var(--w-radiusLg);",
+"  box-shadow:var(--w-shadow);max-height:90vh;display:flex;flex-direction:column;",
+"  animation:w-pop-in 160ms ease-out;color:var(--w-ink);font:14px var(--w-font);}",
+".w-modal-sm{width:380px;max-width:100%;}",
+".w-modal-md{width:560px;max-width:100%;}",
+".w-modal-lg{width:800px;max-width:100%;}",
+".w-modal-full{width:96vw;height:90vh;}",
+".w-modal-hdr{padding:16px 20px;border-bottom:1px solid var(--w-border);display:flex;",
+"  align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;}",
+".w-modal-title{font-size:15px;font-weight:600;margin:0;}",
+".w-modal-close{background:transparent;border:0;color:var(--w-muted);cursor:pointer;",
+"  padding:4px;border-radius:var(--w-radiusSm);line-height:0;transition:color var(--w-transit);}",
+".w-modal-close:hover{color:var(--w-ink);background:var(--w-faint);}",
+".w-modal-body{padding:20px;overflow-y:auto;flex:1;font-size:14px;line-height:1.55;}",
+".w-modal-actions{padding:14px 20px;border-top:1px solid var(--w-border);display:flex;",
+"  gap:8px;justify-content:flex-end;flex-shrink:0;}",
+".w-spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--w-faint);",
+"  border-top-color:var(--w-accent);border-radius:50%;animation:w-spin 700ms linear infinite;}",
+".w-spinner-lg{width:24px;height:24px;border-width:3px;}",
+"@keyframes w-spin{to{transform:rotate(360deg);}}",
+".w-disclosure{border:1px solid var(--w-border);border-radius:var(--w-radius);overflow:hidden;}",
+".w-disclosure summary{padding:10px 14px;cursor:pointer;font:600 13px var(--w-font);",
+"  color:var(--w-ink);background:var(--w-faint);outline:none;list-style:none;",
+"  display:flex;align-items:center;justify-content:space-between;}",
+".w-disclosure summary::-webkit-details-marker{display:none;}",
+".w-disclosure summary::after{content:'+';color:var(--w-muted);font-family:var(--w-fontMono);font-size:14px;}",
+".w-disclosure\[open\] summary::after{content:'-';}",
+".w-disclosure-body{padding:14px;}",
+".w-tabs{display:flex;gap:0;border-bottom:1px solid var(--w-border);}",
+".w-tab{padding:9px 16px;background:transparent;border:0;border-bottom:2px solid transparent;",
+"  color:var(--w-muted);font:500 13px var(--w-font);cursor:pointer;transition:color var(--w-transit);",
+"  margin-bottom:-1px;}",
+".w-tab:hover{color:var(--w-ink);}",
+".w-tab-active{color:var(--w-accent);border-bottom-color:var(--w-accent);}",
+".w-row{display:flex;gap:8px;align-items:center;}",
+".w-col{display:flex;flex-direction:column;gap:8px;}",
+".w-stack{display:flex;flex-direction:column;gap:14px;}",
+".w-card{background:var(--w-faint);border:1px solid var(--w-border);border-radius:var(--w-radius);padding:14px;}",
+".w-divider{height:1px;background:var(--w-border);margin:14px 0;border:0;}",
+].join('\n');
+
+var STYLE_ID = 'weld-ui-styles';
+function injectCSS() {
+  if (document.getElementById(STYLE_ID)) return;
+  var style = document.createElement('style');
+  style.id = STYLE_ID;
+  style.textContent = CSS;
+  document.head.appendChild(style);
+}
+
+// DOM HELPER
+// el(tag, attrs, children) - children is string or element or array
+function el(tag, attrs, children) {
+  var node = document.createElement(tag);
+  if (attrs) {
+    Object.keys(attrs).forEach(function(k){
+      var v = attrs[k];
+      if (v == null) return;
+      if (k === 'class' || k === 'className') node.className = v;
+      else if (k === 'style' && typeof v === 'object') Object.assign(node.style, v);
+      else if (k === 'dataset' && typeof v === 'object') Object.assign(node.dataset, v);
+      else if (k.indexOf('on') === 0 && typeof v === 'function') node.addEventListener(k.slice(2).toLowerCase(), v);
+      else if (k === 'html') node.innerHTML = v;
+      else if (k === 'text') node.textContent = v;
+      else node.setAttribute(k, v);
+    });
+  }
+  if (children != null) {
+    if (!Array.isArray(children)) children = [children];
+    children.forEach(function(c){
+      if (c == null) return;
+      if (typeof c === 'string' || typeof c === 'number') node.appendChild(document.createTextNode(c));
+      else if (c.nodeType) node.appendChild(c);
+    });
+  }
+  return node;
+}
+
+// ICONS (small embedded SVG set, lucide-style stroke icons)
+var ICONS = {
+  'x':       'M18 6L6 18M6 6l12 12',
+  'check':   'M20 6L9 17l-5-5',
+  'plus':    'M12 5v14M5 12h14',
+  'minus':   'M5 12h14',
+  'trash':   'M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2',
+  'edit':    'M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z',
+  'save':    'M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2zM17 21v-8H7v8M7 3v5h8',
+  'copy':    'M20 9h-9a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-9a2 2 0 00-2-2zM5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1',
+  'download':'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3',
+  'upload':  'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12',
+  'refresh': 'M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15',
+  'settings':'M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2zM15 12a3 3 0 11-6 0 3 3 0 016 0z',
+  'info':    'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM12 16v-4M12 8h.01',
+  'warn':    'M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01',
+  'error':   'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM15 9l-6 6M9 9l6 6',
+  'search':  'M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z',
+  'chevDown':'M6 9l6 6 6-6',
+  'chevUp':  'M18 15l-6-6-6 6',
+  'chevRight':'M9 18l6-6-6-6',
+  'chevLeft':'M15 18l-9-6 6-6',
+  'external':'M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3',
+};
+
+function icon(name, opts) {
+  opts = opts || {};
+  var size = opts.size || 16;
+  var path = ICONS[name];
+  if (!path) return el('span', { text: '?' });
+  var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('width', size);
+  svg.setAttribute('height', size);
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', opts.color || 'currentColor');
+  svg.setAttribute('stroke-width', opts.weight || '2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  p.setAttribute('d', path);
+  svg.appendChild(p);
+  return svg;
+}
+
+function registerIcon(name, pathD) { ICONS[name] = pathD; }
+
+// COMPONENTS
+function button(opts) {
+  opts = opts || {};
+  var classes = ['w-btn'];
+  if (opts.variant === 'primary') classes.push('w-btn-primary');
+  else if (opts.variant === 'danger') classes.push('w-btn-danger');
+  else if (opts.variant === 'ghost') classes.push('w-btn-ghost');
+  if (opts.size === 'sm') classes.push('w-btn-sm');
+  else if (opts.size === 'lg') classes.push('w-btn-lg');
+  var children = [];
+  if (opts.icon) children.push(icon(opts.icon, { size: opts.size === 'sm' ? 14 : 16 }));
+  if (opts.label != null) children.push(opts.label);
+  return el('button', {
+    class: classes.join(' '),
+    type: opts.type || 'button',
+    disabled: opts.disabled ? 'disabled' : null,
+    onclick: opts.onClick,
+  }, children);
+}
+
+function input(opts) {
+  opts = opts || {};
+  return el('input', {
+    class: 'w-input',
+    type: opts.type || 'text',
+    placeholder: opts.placeholder,
+    value: opts.value != null ? opts.value : '',
+    oninput: opts.onInput ? function(e){ opts.onInput(e.target.value, e); } : null,
+    onchange: opts.onChange ? function(e){ opts.onChange(e.target.value, e); } : null,
+    disabled: opts.disabled ? 'disabled' : null,
+    readonly: opts.readonly ? 'readonly' : null,
+  });
+}
+
+function select(opts) {
+  opts = opts || {};
+  var options = (opts.options || []).map(function(o){
+    if (typeof o === 'string') o = { value: o, label: o };
+    return el('option', {
+      value: o.value,
+      selected: o.value === opts.value ? 'selected' : null,
+    }, o.label);
+  });
+  return el('select', {
+    class: 'w-select',
+    onchange: opts.onChange ? function(e){ opts.onChange(e.target.value, e); } : null,
+    disabled: opts.disabled ? 'disabled' : null,
+  }, options);
+}
+
+function textarea(opts) {
+  opts = opts || {};
+  return el('textarea', {
+    class: 'w-textarea',
+    rows: opts.rows || 4,
+    placeholder: opts.placeholder,
+    oninput: opts.onInput ? function(e){ opts.onInput(e.target.value, e); } : null,
+    onchange: opts.onChange ? function(e){ opts.onChange(e.target.value, e); } : null,
+  }, opts.value || '');
+}
+
+function checkbox(opts) {
+  opts = opts || {};
+  var box = el('input', {
+    type: 'checkbox',
+    checked: opts.checked ? 'checked' : null,
+    onchange: opts.onChange ? function(e){ opts.onChange(e.target.checked, e); } : null,
+  });
+  return el('label', { class: 'w-checkbox' }, [box, opts.label || '']);
+}
+
+function range(opts) {
+  opts = opts || {};
+  return el('input', {
+    class: 'w-range',
+    type: 'range',
+    min: opts.min != null ? opts.min : 0,
+    max: opts.max != null ? opts.max : 100,
+    step: opts.step != null ? opts.step : 1,
+    value: opts.value != null ? opts.value : 0,
+    oninput: opts.onInput ? function(e){ opts.onInput(parseFloat(e.target.value), e); } : null,
+    onchange: opts.onChange ? function(e){ opts.onChange(parseFloat(e.target.value), e); } : null,
+  });
+}
+
+function spinner(opts) {
+  opts = opts || {};
+  var classes = ['w-spinner'];
+  if (opts.size === 'lg') classes.push('w-spinner-lg');
+  return el('span', { class: classes.join(' '), role: 'status' });
+}
+
+function label(text) {
+  return el('label', { class: 'w-label', text: text });
+}
+
+function disclosure(opts) {
+  opts = opts || {};
+  var summary = el('summary', { text: opts.title || '' });
+  var body = el('div', { class: 'w-disclosure-body' }, opts.content);
+  return el('details', {
+    class: 'w-disclosure',
+    open: opts.open ? 'open' : null,
+  }, [summary, body]);
+}
+
+function tabs(opts) {
+  opts = opts || {};
+  var items = opts.items || [];
+  var active = opts.active || (items[0] && items[0].id);
+  var tabBar = el('div', { class: 'w-tabs' });
+  var panel = el('div', { class: 'w-tab-panel' });
+
+  function render(activeId) {
+    tabBar.innerHTML = '';
+    items.forEach(function(it){
+      var btn = el('button', {
+        class: 'w-tab' + (it.id === activeId ? ' w-tab-active' : ''),
+        onclick: function(){ render(it.id); if (opts.onChange) opts.onChange(it.id); },
+      }, it.label);
+      tabBar.appendChild(btn);
+    });
+    panel.innerHTML = '';
+    var found = items.find(function(it){ return it.id === activeId; });
+    if (found && found.content) {
+      panel.appendChild(typeof found.content === 'function' ? found.content() : found.content);
+    }
+  }
+  render(active);
+
+  var wrap = el('div', { class: 'w-tabs-wrap' }, [tabBar, panel]);
+  wrap.setActive = function(id){ render(id); };
+  return wrap;
+}
+
+function row(children, gap) {
+  var r = el('div', { class: 'w-row' }, children);
+  if (gap != null) r.style.gap = gap + 'px';
+  return r;
+}
+function col(children, gap) {
+  var c = el('div', { class: 'w-col' }, children);
+  if (gap != null) c.style.gap = gap + 'px';
+  return c;
+}
+function stack(children, gap) {
+  var s = el('div', { class: 'w-stack' }, children);
+  if (gap != null) s.style.gap = gap + 'px';
+  return s;
+}
+function card(children) { return el('div', { class: 'w-card' }, children); }
+function divider() { return el('hr', { class: 'w-divider' }); }
+
+// MODAL
+// Returns { el, close } and is auto-attached to body
+function modal(opts) {
+  opts = opts || {};
+  var sizeClass = 'w-modal-' + (opts.size || 'md');
+  var closeBtn = el('button', {
+    class: 'w-modal-close',
+    onclick: function(){ close(); },
+    'aria-label': 'Close',
+  }, [icon('x', { size: 18 })]);
+
+  var header = opts.title || opts.dismissable !== false
+    ? el('div', { class: 'w-modal-hdr' }, [
+        opts.title ? el('h3', { class: 'w-modal-title', text: opts.title }) : el('div'),
+        opts.dismissable !== false ? closeBtn : null,
+      ])
+    : null;
+
+  var bodyContent = opts.content;
+  if (typeof bodyContent === 'string') bodyContent = el('div', { html: bodyContent });
+  var body = el('div', { class: 'w-modal-body' }, bodyContent);
+
+  var actions = opts.actions ? el('div', { class: 'w-modal-actions' },
+    opts.actions.map(function(a){
+      return button({
+        label: a.label,
+        variant: a.variant || (a.primary ? 'primary' : null),
+        onClick: function(){
+          if (a.onClick) {
+            var res = a.onClick();
+            if (res !== false) close();
+          } else { close(); }
+        },
+      });
+    })
+  ) : null;
+
+  var modalEl = el('div', { class: 'w-modal ' + sizeClass }, [header, body, actions]);
+
+  var overlay = el('div', {
+    class: 'w-modal-overlay',
+    onclick: function(e){ if (e.target === overlay && opts.dismissable !== false) close(); },
+  }, [modalEl]);
+
+  var closed = false;
+  function close() {
+    if (closed) return;
+    closed = true;
+    overlay.remove();
+    document.removeEventListener('keydown', escHandler);
+    if (opts.onClose) opts.onClose();
+  }
+  function escHandler(e) {
+    if (e.key === 'Escape' && opts.dismissable !== false) close();
+  }
+  document.addEventListener('keydown', escHandler);
+
+  document.body.appendChild(overlay);
+  return { el: overlay, close: close, body: body };
+}
+
+// PUBLIC API
+window.weld.ui = {
+  theme: theme,
+  setTheme: setTheme,
+  getTheme: getTheme,
+  el: el,
+  button: button,
+  input: input,
+  select: select,
+  textarea: textarea,
+  checkbox: checkbox,
+  range: range,
+  label: label,
+  spinner: spinner,
+  icon: icon,
+  registerIcon: registerIcon,
+  disclosure: disclosure,
+  tabs: tabs,
+  row: row,
+  col: col,
+  stack: stack,
+  card: card,
+  divider: divider,
+  modal: modal,
+  injectCSS: injectCSS,
+  version: '1.0.0',
+};
+
+// INIT
+function init() {
+  injectCSS();
+  applyThemeVars();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+})();
+</script>
+<script>(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.settings) return; // already loaded
+
+// -----------------------------------------------------------------
+// CSS injection -- once
+// -----------------------------------------------------------------
+function injectCss() {
+  if (window.__weldSettingsCss) return;
+  window.__weldSettingsCss = true;
+  var s = document.createElement('style');
+  s.textContent =
+    '.weld-settings-panel{font:14px system-ui,sans-serif;color:var(--weld-ink,#e6edf3);}' +
+    '.weld-settings-panel h3{font-size:16px;margin-bottom:16px;font-weight:600;}' +
+    '.weld-settings-panel h4{font-size:11px;font-weight:600;color:var(--weld-muted,#7d8590);' +
+      'text-transform:uppercase;letter-spacing:1px;margin:20px 0 10px;}' +
+    '.weld-settings-row{display:grid;grid-template-columns:140px 1fr;gap:12px;' +
+      'align-items:center;padding:8px 0;}' +
+    '.weld-settings-row > label{font-size:13px;color:var(--weld-ink,#e6edf3);}' +
+    '.weld-settings-row > input,.weld-settings-row > select,.weld-settings-row > textarea{' +
+      'padding:6px 10px;background:var(--weld-faint,#21262d);' +
+      'border:1px solid var(--weld-border,rgba(255,255,255,0.10));border-radius:4px;' +
+      'color:var(--weld-ink,#e6edf3);font:13px system-ui,sans-serif;}' +
+    '.weld-settings-row > input[type=checkbox]{justify-self:start;width:auto;}' +
+    '.weld-settings-row > input[type=color]{padding:2px;width:60px;height:30px;cursor:pointer;}' +
+    '.weld-settings-row > textarea{resize:vertical;min-height:60px;font-family:inherit;}' +
+    '.weld-settings-help{grid-column:2;font-size:11px;color:var(--weld-muted,#7d8590);margin-top:-4px;}' +
+    '.weld-settings-section{border-top:1px solid var(--weld-border,rgba(255,255,255,0.10));' +
+      'padding-top:12px;margin-top:12px;}' +
+    '.weld-settings-section:first-child{border-top:0;padding-top:0;margin-top:0;}';
+  document.head.appendChild(s);
+}
+
+// -----------------------------------------------------------------
+// Validation and coercion per type
+// -----------------------------------------------------------------
+function coerce(s, value) {
+  if (s.type === 'number') {
+    var n = Number(value);
+    if (isNaN(n)) throw new Error('not a number');
+    if (s.min != null && n < s.min) n = s.min;
+    if (s.max != null && n > s.max) n = s.max;
+    return n;
+  }
+  if (s.type === 'boolean') return !!value;
+  if (s.type === 'select') {
+    var opts = s.options || [];
+    var vals = opts.map(function(o) { return typeof o === 'object' ? o.value : o; });
+    if (vals.indexOf(value) === -1) {
+      throw new Error('value not in options');
+    }
+    return value;
+  }
+  // string, color, textarea
+  return value == null ? '' : String(value);
+}
+
+// -----------------------------------------------------------------
+// Schema instance factory
+// -----------------------------------------------------------------
+function createSettings(opts) {
+  opts = opts || {};
+  var schema = opts.schema || {};
+  var storageKey = opts.storageKey || 'weld-settings';
+  var storage = opts.storage;
+  if (storage === undefined) {
+    storage = (typeof localStorage !== 'undefined') ? localStorage : null;
+  }
+
+  var values = {};
+  var listeners = {};
+  listeners['*'] = [];
+
+  // Seed defaults
+  for (var key in schema) {
+    var def = schema[key]['default'];
+    values[key] = def !== undefined ? def : null;
+  }
+
+  // Load persisted
+  if (storage) {
+    try {
+      var raw = storage.getItem(storageKey);
+      if (raw) {
+        var loaded = JSON.parse(raw);
+        for (var k in loaded) {
+          if (schema[k]) values[k] = loaded[k];
+        }
+      }
+    } catch (e) { /* swallow */ }
+  }
+
+  function save() {
+    if (!storage) return;
+    try { storage.setItem(storageKey, JSON.stringify(values)); }
+    catch (e) { /* swallow */ }
+  }
+
+  function get(key) {
+    return values[key];
+  }
+
+  function getAll() {
+    var out = {};
+    for (var k in values) out[k] = values[k];
+    return out;
+  }
+
+  function set(key, value) {
+    if (!schema[key]) throw new Error('unknown setting: ' + key);
+    value = coerce(schema[key], value);
+    var old = values[key];
+    if (old === value) return false;
+    values[key] = value;
+    save();
+    fireListeners(key, value, old);
+    return true;
+  }
+
+  function fireListeners(key, value, old) {
+    var L = listeners[key];
+    if (L) {
+      for (var i = 0; i < L.length; i++) {
+        try { L[i](value, old); } catch (e) { /* swallow */ }
+      }
+    }
+    var Lall = listeners['*'];
+    for (var j = 0; j < Lall.length; j++) {
+      try { Lall[j](key, value, old); } catch (e) { /* swallow */ }
+    }
+  }
+
+  function reset(key) {
+    if (key) {
+      if (schema[key]) set(key, schema[key]['default']);
+    } else {
+      for (var k in schema) {
+        var d = schema[k]['default'];
+        if (d !== undefined) set(k, d);
+      }
+    }
+  }
+
+  function subscribe(key, fn) {
+    if (typeof fn !== 'function') throw new Error('subscribe requires a function');
+    if (!listeners[key]) listeners[key] = [];
+    listeners[key].push(fn);
+    return function() {
+      var idx = listeners[key].indexOf(fn);
+      if (idx !== -1) listeners[key].splice(idx, 1);
+    };
+  }
+
+  function buildField(key) {
+    var s = schema[key];
+    if (!s) return null;
+
+    var row = document.createElement('div');
+    row.className = 'weld-settings-row';
+
+    var label = document.createElement('label');
+    label.textContent = s.label || key;
+    row.appendChild(label);
+
+    var control;
+    if (s.type === 'boolean') {
+      control = document.createElement('input');
+      control.type = 'checkbox';
+      control.checked = !!values[key];
+      control.addEventListener('change', function() { set(key, control.checked); });
+    } else if (s.type === 'select') {
+      control = document.createElement('select');
+      var opts = s.options || [];
+      for (var i = 0; i < opts.length; i++) {
+        var opt = opts[i];
+        var val = typeof opt === 'object' ? opt.value : opt;
+        var lbl = typeof opt === 'object' ? opt.label : opt;
+        var o = document.createElement('option');
+        o.value = val;
+        o.textContent = lbl;
+        if (values[key] === val) o.selected = true;
+        control.appendChild(o);
+      }
+      control.addEventListener('change', function() { set(key, control.value); });
+    } else if (s.type === 'number') {
+      control = document.createElement('input');
+      control.type = 'number';
+      if (s.min != null) control.min = s.min;
+      if (s.max != null) control.max = s.max;
+      if (s.step != null) control.step = s.step;
+      control.value = values[key];
+      control.addEventListener('change', function() {
+        var v = parseFloat(control.value);
+        if (!isNaN(v)) set(key, v);
+      });
+    } else if (s.type === 'color') {
+      control = document.createElement('input');
+      control.type = 'color';
+      control.value = values[key] || '#000000';
+      control.addEventListener('change', function() { set(key, control.value); });
+    } else if (s.type === 'textarea') {
+      control = document.createElement('textarea');
+      control.rows = s.rows || 3;
+      control.value = values[key] || '';
+      control.addEventListener('change', function() { set(key, control.value); });
+    } else {
+      control = document.createElement('input');
+      control.type = s.secret ? 'password' : 'text';
+      control.value = values[key] || '';
+      control.addEventListener('change', function() { set(key, control.value); });
+    }
+
+    row.appendChild(control);
+
+    if (s.help) {
+      var helpEl = document.createElement('div');
+      helpEl.className = 'weld-settings-help';
+      helpEl.textContent = s.help;
+      row.appendChild(helpEl);
+    }
+
+    return row;
+  }
+
+  function buildPanel(panelOpts) {
+    injectCss();
+    panelOpts = panelOpts || {};
+    var panel = document.createElement('div');
+    panel.className = 'weld-settings-panel';
+
+    if (panelOpts.title) {
+      var h = document.createElement('h3');
+      h.textContent = panelOpts.title;
+      panel.appendChild(h);
+    }
+
+    var sections = panelOpts.sections;
+    var rendered = {};
+
+    if (sections && sections.length) {
+      for (var i = 0; i < sections.length; i++) {
+        var section = sections[i];
+        var sec = document.createElement('div');
+        sec.className = 'weld-settings-section';
+        if (section.title) {
+          var t = document.createElement('h4');
+          t.textContent = section.title;
+          sec.appendChild(t);
+        }
+        var keys = section.keys || [];
+        for (var j = 0; j < keys.length; j++) {
+          var field = buildField(keys[j]);
+          if (field) {
+            sec.appendChild(field);
+            rendered[keys[j]] = true;
+          }
+        }
+        panel.appendChild(sec);
+      }
+    }
+
+    // Render any keys not yet in a section
+    for (var key in schema) {
+      if (rendered[key]) continue;
+      var f = buildField(key);
+      if (f) panel.appendChild(f);
+    }
+
+    return panel;
+  }
+
+  return {
+    get: get,
+    set: set,
+    getAll: getAll,
+    reset: reset,
+    subscribe: subscribe,
+    buildPanel: buildPanel,
+    buildField: buildField,
+    schema: schema
+  };
+}
+
+window.weld.settings = {
+  create: createSettings,
+  version: '1.0.0'
+};
+
+})();
+</script>
+<script>
+(function(){
+  function start() {
+    if (!window.weld || !window.weld.ui || !window.weld.settings) {
+      setTimeout(start, 150);
+      return;
+    }
+    buildDemo();
+  }
+
+  function buildDemo() {
+    var ui = window.weld.ui;
+    var settings = window.weld.settings.create({
+      storageKey: 'weld-settings-demo',
+      schema: {
+        userName: { type: 'string', 'default': 'Alex', label: 'Your name',
+          help: 'Shown in the preview pane' },
+        accentColor: { type: 'color', 'default': '#4493f8', label: 'Accent color',
+          help: 'Used for the avatar background' },
+        theme: { type: 'select', 'default': 'dark',
+          options: [{value:'dark', label:'Dark'}, {value:'light', label:'Light'}],
+          label: 'Theme' },
+        fontSize: { type: 'number', min: 12, max: 22, 'default': 14, step: 1,
+          label: 'Font size', help: 'Pixels' },
+        compact: { type: 'boolean', 'default': false, label: 'Compact mode',
+          help: 'Tighter spacing' },
+        greeting: { type: 'textarea', 'default': 'Hello, world!\n\nThis is markdown-ready.',
+          rows: 3, label: 'Preview text' }
+      }
+    });
+
+    // Build the panel and mount it
+    var panel = settings.buildPanel({
+      title: 'Live settings',
+      sections: [
+        { title: 'Identity',   keys: ['userName', 'accentColor'] },
+        { title: 'Appearance', keys: ['theme', 'fontSize', 'compact'] },
+        { title: 'Content',    keys: ['greeting'] }
+      ]
+    });
+    document.getElementById('panel-mount').appendChild(panel);
+
+    function renderPreview() {
+      var v = settings.getAll();
+      var p = document.getElementById('preview');
+      p.style.background = v.theme === 'light' ? '#f6f8fa' : 'var(--bg)';
+      p.style.color = v.theme === 'light' ? '#24292f' : '#c9d1d9';
+      p.style.fontSize = v.fontSize + 'px';
+      p.style.padding = v.compact ? '12px' : '20px';
+      p.querySelector('.avatar').style.background = v.accentColor;
+      p.querySelector('.avatar').textContent = (v.userName || '?').charAt(0).toUpperCase();
+      p.querySelector('.name').textContent = v.userName || 'anonymous';
+      p.querySelector('.msg').textContent = v.greeting;
+    }
+
+    function renderState() {
+      var v = settings.getAll();
+      var html = '';
+      for (var k in v) {
+        var val = v[k];
+        var quoted = typeof val === 'string' ? '"' + val.replace(/"/g, '\\"') + '"' : JSON.stringify(val);
+        html += '<span class="key">' + k + '</span>: <span class="val">' + quoted + '</span>\n';
+      }
+      document.getElementById('state').innerHTML = html;
+    }
+
+    function logChange(key, next, prev) {
+      var log = document.getElementById('events');
+      if (log.querySelector('.empty')) log.innerHTML = '';
+      var t = new Date().toLocaleTimeString();
+      var row = document.createElement('div');
+      row.className = 'entry';
+      var prevStr = typeof prev === 'string' ? JSON.stringify(prev).slice(0, 30) : String(prev);
+      var nextStr = typeof next === 'string' ? JSON.stringify(next).slice(0, 30) : String(next);
+      row.innerHTML = '[' + t + '] <span class="key">' + key + '</span>: ' + prevStr + ' &rarr; <span class="val">' + nextStr + '</span>';
+      log.insertBefore(row, log.firstChild);
+    }
+
+    settings.subscribe('*', function(key, next, prev) {
+      logChange(key, next, prev);
+      renderPreview();
+      renderState();
+    });
+
+    // Action buttons
+    var actions = document.getElementById('actions');
+    actions.appendChild(ui.button({
+      label: 'Reset to defaults', size: 'sm', variant: 'ghost', icon: 'refresh',
+      onClick: function() { settings.reset(); }
+    }));
+    actions.appendChild(ui.button({
+      label: 'Export JSON', size: 'sm', icon: 'download',
+      onClick: function() {
+        var json = JSON.stringify(settings.getAll(), null, 2);
+        var blob = new Blob([json], { type: 'application/json' });
+        var u = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = u;
+        a.download = 'settings-export.json';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function() {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(u);
+        }, 100);
+      }
+    }));
+    actions.appendChild(ui.button({
+      label: 'Clear log', size: 'sm', variant: 'ghost',
+      onClick: function() {
+        document.getElementById('events').innerHTML = '<div class="empty">No events yet -- adjust settings to see changes</div>';
+      }
+    }));
+
+    renderPreview();
+    renderState();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>
