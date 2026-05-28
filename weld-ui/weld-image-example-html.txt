@@ -605,9 +605,9 @@ if (window.weld.image) return; // already loaded
 // Adds batching, style presets, retry, resolution helpers.
 //
 // The actual t2i function comes from Perchance's text-to-image-plugin,
-// which must be imported in the DSL panel:
-//   image = {import:text-to-image-plugin}
-// The DSL form passes that function into weld.image.setT2i(image).
+// which must be imported in the DSL panel under any alias, e.g.:
+//   t2iSource = the import of text-to-image-plugin
+// The DSL form passes that function into weld.image.setT2i(...).
 // Standalone JS callers must call weld.image.setT2i(fn) themselves.
 // -----------------------------------------------------------------
 
@@ -641,7 +641,7 @@ function setT2i(fn) {
 
 function getT2i() {
   if (!t2iFn) {
-    throw new Error('weld.image: no text-to-image function set. Call weld.image.setT2i(image) where "image" is from {import:text-to-image-plugin}.');
+    throw new Error('weld.image: no text-to-image function set. Call weld.image.setT2i(fn) where fn is the imported text-to-image-plugin.');
   }
   return t2iFn;
 }
