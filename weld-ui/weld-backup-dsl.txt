@@ -1,7 +1,7 @@
 $meta
   title       = weld.backup
-  description = Versioned export and import for arbitrary data or weld.migrate databases. Format-versioned envelopes, conflict resolution, automatic migration of older backups on import. Stash on window.weld.backup.
-  tags        = weld, backup, export, import, plugin
+  description = Format-versioned export/import with conflict resolution and migration. Share links: compress + upload + URL. Consume shared data on load.
+  tags        = weld, backup, export, import, share, plugin
 
 $output() =>
   'use strict';
@@ -311,6 +311,84 @@ $output() =>
     return n;
   }
 
+  // SHARE LINK — compress + upload + URL
+  // uploader: the uploadPlugin function (from DSL import)
+  // opts: { paramName?, generatorName? }
+  function share(data, uploader, opts) {
+    opts = opts || {};
+    if (typeof uploader !== 'function') {
+      return Promise.reject(new Error('backup.share: uploader function required (pass uploadPlugin)'));
+    }
+    var json = JSON.stringify(data);
+    // Compress with gzip if available, otherwise send raw
+    var blobPromise;
+    if (typeof CompressionStream !== 'undefined') {
+      blobPromise = new Response(
+        new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'))
+      ).blob();
+    } else {
+      blobPromise = Promise.resolve(new Blob([json], { type: 'application/json' }));
+    }
+    return blobPromise.then(function(blob) {
+      return Promise.resolve(uploader(blob));
+    }).then(function(result) {
+      if (!result || result.error) {
+        throw new Error('upload failed: ' + (result && result.error || 'unknown'));
+      }
+      var url = String(result.url || result);
+      // Extract filename from CDN URL
+      var fileName = url.replace('https://user.uploads.dev/file/', '');
+      var paramName = opts.paramName || 'data';
+      var base = 'https://perchance.org/' + (opts.generatorName || window.generatorName || 'generator');
+      return base + '?' + paramName + '=' + encodeURIComponent(fileName);
+    });
+  }
+
+  // CONSUME SHARE — check URL for shared data, fetch + decompress
+  // fetcher: a fetch-compatible function (superFetch or window.fetch)
+  // opts: { paramName?, onFound? }
+  function consumeShare(fetcher, opts) {
+    opts = opts || {};
+    var paramName = opts.paramName || 'data';
+    var params;
+    try { params = new URL(window.location.href).searchParams; }
+    catch (e) { return Promise.resolve(null); }
+    var raw = params.get(paramName);
+    if (!raw) return Promise.resolve(null);
+
+    // Extract just the filename (handle legacy formats with ~ separator)
+    var fileName = raw.split('~').slice(-1)[0];
+    if (!fileName) return Promise.resolve(null);
+
+    var fetchFn = typeof fetcher === 'function' ? fetcher : window.fetch;
+    var cdnUrl = 'https://user.uploads.dev/file/' + fileName;
+    return Promise.resolve(fetchFn(cdnUrl, {
+      signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined
+    })).then(function(r) {
+      if (r && typeof r.blob === 'function') return r.blob();
+      // superFetch might return different shape
+      if (r instanceof Blob) return r;
+      return new Blob([typeof r === 'string' ? r : JSON.stringify(r)]);
+    }).then(function(blob) {
+      // Try to decompress
+      if (typeof DecompressionStream !== 'undefined') {
+        return new Response(
+          blob.stream().pipeThrough(new DecompressionStream('gzip'))
+        ).text().catch(function() {
+          // Not gzipped — try raw
+          return blob.text();
+        });
+      }
+      return blob.text();
+    }).then(function(text) {
+      try { return JSON.parse(text); }
+      catch (e) { throw new Error('backup.consumeShare: invalid JSON in share data'); }
+    }).then(function(data) {
+      if (typeof opts.onFound === 'function') opts.onFound(data);
+      return data;
+    });
+  }
+
   // PUBLIC API
   window.weld.backup = {
     exportData: exportData,
@@ -322,8 +400,10 @@ $output() =>
     fromDb: fromDb,
     downloadFromDb: downloadFromDb,
     toDb: toDb,
+    share: share,
+    consumeShare: consumeShare,
     FORMAT_VERSION: FORMAT_VERSION,
-    version: '1.0.0',
+    version: '1.1.0',
   };
 
   return window.weld.backup;
