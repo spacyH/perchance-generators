@@ -1,0 +1,273 @@
+$meta
+  title       = weld.testrig
+  description = Assertion framework for Perchance plugin testing. assertEqual, assertTrue, assertThrows, skip. Test groups, live stats, PASS/FAIL/DRIFT/SKIP, export.
+  tags        = weld, testrig, test, assert, debug, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.testrig) return window.weld.testrig;
+
+  // -----------------------------------------------------------------
+  // weld.testrig: Assertion framework for Perchance plugin testing.
+  // PASS / FAIL / DRIFT / SKIP status levels, test groups with headers,
+  // live stats, progress bar, export. The platform monitor pattern,
+  // generalized.
+  // -----------------------------------------------------------------
+
+  function createTestRig(opts) {
+    opts = opts || {};
+    var results = [];
+    var counts = { PASS: 0, FAIL: 0, DRIFT: 0, SKIP: 0, INFO: 0 };
+    var groups = {};
+    var startTime = null;
+    var listeners = [];
+    var container = typeof opts.container === 'string'
+      ? document.querySelector(opts.container) : opts.container;
+
+    function emit(event, data) {
+      for (var i = 0; i < listeners.length; i++) {
+        try { listeners[i](event, data); } catch (e) {}
+      }
+    }
+
+    function stringify(v) {
+      if (v === undefined) return 'undefined';
+      if (v === null) return 'null';
+      if (typeof v === 'string') return v.length > 80 ? JSON.stringify(v.slice(0, 80)) + '...' : JSON.stringify(v);
+      try {
+        var s = JSON.stringify(v);
+        return s.length > 100 ? s.slice(0, 100) + '...' : s;
+      } catch (e) { return String(v); }
+    }
+
+    function record(group, name, status, expected, actual, note) {
+      var entry = {
+        group: group,
+        name: name,
+        status: status,
+        expected: expected,
+        actual: actual,
+        note: note || null,
+        timestamp: Date.now()
+      };
+      results.push(entry);
+      counts[status] = (counts[status] || 0) + 1;
+      if (!groups[group]) groups[group] = [];
+      groups[group].push(entry);
+      emit('result', entry);
+      if (container) renderResult(entry);
+      return status === 'PASS';
+    }
+
+    // -------- Assertions --------
+    function assertEqual(group, name, expected, actual, assertOpts) {
+      assertOpts = assertOpts || {};
+      var cmp = assertOpts.cmp
+        ? assertOpts.cmp(expected, actual)
+        : stringify(expected) === stringify(actual);
+      var status = cmp ? 'PASS' : (assertOpts.soft ? 'DRIFT' : 'FAIL');
+      return record(group, name, status, expected, actual, assertOpts.note);
+    }
+
+    function assertTrue(group, name, actual, assertOpts) {
+      return assertEqual(group, name, true, !!actual, assertOpts);
+    }
+
+    function assertFalse(group, name, actual, assertOpts) {
+      return assertEqual(group, name, false, !!actual, assertOpts);
+    }
+
+    function assertThrows(group, name, fn, assertOpts) {
+      assertOpts = assertOpts || {};
+      var threw = false;
+      var error = null;
+      try { fn(); } catch (e) { threw = true; error = e; }
+      var status = threw ? 'PASS' : 'FAIL';
+      return record(group, name, status, 'should throw', threw ? 'threw: ' + (error && error.message || error) : 'did not throw', assertOpts.note);
+    }
+
+    // Async version: resolves the promise and checks the result
+    function assertResolves(group, name, promise, assertOpts) {
+      assertOpts = assertOpts || {};
+      return Promise.resolve(promise).then(function(val) {
+        return record(group, name, 'PASS', 'should resolve', 'resolved: ' + stringify(val), assertOpts.note);
+      }).catch(function(err) {
+        return record(group, name, 'FAIL', 'should resolve', 'rejected: ' + (err && err.message || err), assertOpts.note);
+      });
+    }
+
+    function assertRejects(group, name, promise, assertOpts) {
+      assertOpts = assertOpts || {};
+      return Promise.resolve(promise).then(function(val) {
+        return record(group, name, 'FAIL', 'should reject', 'resolved: ' + stringify(val), assertOpts.note);
+      }).catch(function(err) {
+        return record(group, name, 'PASS', 'should reject', 'rejected: ' + (err && err.message || err), assertOpts.note);
+      });
+    }
+
+    function skip(group, name, reason) {
+      return record(group, name, 'SKIP', null, null, reason || 'skipped');
+    }
+
+    function info(group, name, message) {
+      return record(group, name, 'INFO', null, null, message);
+    }
+
+    // -------- Timing --------
+    function start() {
+      startTime = Date.now();
+      results = [];
+      counts = { PASS: 0, FAIL: 0, DRIFT: 0, SKIP: 0, INFO: 0 };
+      groups = {};
+      if (container) container.innerHTML = '';
+      emit('start', {});
+    }
+
+    function finish() {
+      var elapsed = startTime ? Date.now() - startTime : 0;
+      var summary = {
+        counts: Object.assign({}, counts),
+        total: results.length,
+        elapsed: elapsed,
+        passed: counts.FAIL === 0 && counts.DRIFT === 0,
+        groups: Object.keys(groups)
+      };
+      emit('finish', summary);
+      return summary;
+    }
+
+    // -------- Progress --------
+    function progress(current, total, label) {
+      emit('progress', { current: current, total: total, label: label || '' });
+    }
+
+    // -------- Export --------
+    function exportResults() {
+      return {
+        results: results.slice(),
+        counts: Object.assign({}, counts),
+        groups: Object.keys(groups),
+        elapsed: startTime ? Date.now() - startTime : 0,
+        exportedAt: Date.now()
+      };
+    }
+
+    function exportText() {
+      var lines = [];
+      lines.push('Test results: ' + new Date().toISOString());
+      lines.push('');
+      for (var g in groups) {
+        lines.push('== ' + g + ' ==');
+        for (var i = 0; i < groups[g].length; i++) {
+          var r = groups[g][i];
+          var line = '  ' + r.status + '  ' + r.name;
+          if (r.note) line += '  -- ' + r.note;
+          if (r.status === 'FAIL' || r.status === 'DRIFT') {
+            line += '  (expected: ' + stringify(r.expected) + ', got: ' + stringify(r.actual) + ')';
+          }
+          lines.push(line);
+        }
+        lines.push('');
+      }
+      lines.push('PASS: ' + counts.PASS + '  FAIL: ' + counts.FAIL +
+        '  DRIFT: ' + counts.DRIFT + '  SKIP: ' + counts.SKIP);
+      return lines.join('\n');
+    }
+
+    // -------- Rendering --------
+    function renderResult(entry) {
+      if (!container) return;
+      // Find or create group section
+      var groupEl = container.querySelector('[data-group="' + entry.group + '"]');
+      if (!groupEl) {
+        groupEl = document.createElement('div');
+        groupEl.dataset.group = entry.group;
+        groupEl.innerHTML =
+          '<div style="font:600 11px var(--weld-mono,monospace);color:var(--weld-muted,#7d8590);' +
+          'text-transform:uppercase;letter-spacing:1.5px;padding:10px 0 6px;' +
+          'border-bottom:1px solid var(--weld-border,rgba(255,255,255,0.10));margin-top:12px;">' +
+          escapeHtml(entry.group) + '</div>';
+        container.appendChild(groupEl);
+      }
+      var row = document.createElement('div');
+      row.style.cssText = 'display:grid;grid-template-columns:60px 240px 1fr;gap:8px;' +
+        'padding:4px 0;border-bottom:1px dotted var(--weld-border,rgba(255,255,255,0.05));' +
+        'align-items:baseline;font:12px var(--weld-mono,monospace);';
+      var statusColor = { PASS: '#3fb950', FAIL: '#f85149', DRIFT: '#d29922', SKIP: '#7d8590', INFO: '#4493f8' };
+      var detail = '';
+      if (entry.status === 'PASS') detail = '<span style="color:#3fb950;">' + escapeHtml(stringify(entry.actual)) + '</span>';
+      else if (entry.status === 'SKIP' || entry.status === 'INFO') detail = '<span style="color:#7d8590;">' + escapeHtml(entry.note || '') + '</span>';
+      else detail = '<span style="color:#7d8590;">expected: ' + escapeHtml(stringify(entry.expected)) + '</span> <span style="color:#f85149;">got: ' + escapeHtml(stringify(entry.actual)) + '</span>';
+      if (entry.note && entry.status !== 'SKIP' && entry.status !== 'INFO') {
+        detail += ' <span style="color:#7d8590;">' + escapeHtml(entry.note) + '</span>';
+      }
+      row.innerHTML =
+        '<span style="font-weight:700;color:' + (statusColor[entry.status] || '#7d8590') + ';">' + entry.status + '</span>' +
+        '<span style="color:var(--weld-ink,#e6edf3);">' + escapeHtml(entry.name) + '</span>' +
+        '<span>' + detail + '</span>';
+      groupEl.appendChild(row);
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // -------- Helpers --------
+    function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+
+    function timeout(promise, ms, label) {
+      return new Promise(function(resolve, reject) {
+        var done = false;
+        var t = setTimeout(function() { if (!done) { done = true; reject(new Error('TIMEOUT' + (label ? ' ' + label : ''))); } }, ms);
+        Promise.resolve(promise).then(
+          function(v) { if (!done) { done = true; clearTimeout(t); resolve(v); } },
+          function(e) { if (!done) { done = true; clearTimeout(t); reject(e); } }
+        );
+      });
+    }
+
+    function on(fn) {
+      listeners.push(fn);
+      return function() {
+        var idx = listeners.indexOf(fn);
+        if (idx >= 0) listeners.splice(idx, 1);
+      };
+    }
+
+    return {
+      // Assertions
+      assertEqual: assertEqual,
+      assertTrue: assertTrue,
+      assertFalse: assertFalse,
+      assertThrows: assertThrows,
+      assertResolves: assertResolves,
+      assertRejects: assertRejects,
+      skip: skip,
+      info: info,
+      // Lifecycle
+      start: start,
+      finish: finish,
+      progress: progress,
+      // Export
+      exportResults: exportResults,
+      exportText: exportText,
+      // State
+      counts: function() { return Object.assign({}, counts); },
+      results: function() { return results.slice(); },
+      groupNames: function() { return Object.keys(groups); },
+      on: on,
+      // Helpers
+      sleep: sleep,
+      timeout: timeout
+    };
+  }
+
+  window.weld.testrig = {
+    create: createTestRig,
+    version: '1.0.0'
+  };
+
+  return window.weld.testrig;
+

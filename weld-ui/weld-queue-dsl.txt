@@ -1,0 +1,239 @@
+$meta
+  title       = weld.queue
+  description = Async task pipeline with configurable concurrency, progress callbacks, retry with exponential backoff, cancel, pause/resume. The image-gen queue pattern, generalized.
+  tags        = weld, queue, pipeline, async, concurrency, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.queue) return window.weld.queue;
+
+  // -----------------------------------------------------------------
+  // weld.queue: Async task pipeline.
+  // Configurable concurrency (1-N), progress callbacks, retry with
+  // backoff, cancel, pause/resume. The slideshow image-gen queue
+  // pattern, generalized.
+  // -----------------------------------------------------------------
+
+  function createQueue(opts) {
+    opts = opts || {};
+    var maxConcurrent = Math.max(1, opts.concurrency || 1);
+    var retryCount = opts.retries || 0;
+    var retryDelay = opts.retryDelay || 1000;
+    var retryBackoff = opts.retryBackoff || 2;
+
+    var pending = [];
+    var active = [];
+    var completed = [];
+    var failed = [];
+    var paused = false;
+    var listeners = { progress: [], done: [], error: [], drain: [] };
+
+    function emit(event, data) {
+      var fns = listeners[event] || [];
+      for (var i = 0; i < fns.length; i++) {
+        try { fns[i](data); } catch (e) { /* swallow */ }
+      }
+    }
+
+    function emitProgress() {
+      emit('progress', {
+        pending: pending.length,
+        active: active.length,
+        completed: completed.length,
+        failed: failed.length,
+        total: pending.length + active.length + completed.length + failed.length
+      });
+    }
+
+    function runNext() {
+      if (paused) return;
+      while (active.length < maxConcurrent && pending.length > 0) {
+        var task = pending.shift();
+        active.push(task);
+        emitProgress();
+        executeTask(task);
+      }
+    }
+
+    function executeTask(task) {
+      var attempt = 0;
+      function tryOnce() {
+        var result;
+        try {
+          result = Promise.resolve(task.fn(task.data, task));
+        } catch (e) {
+          result = Promise.reject(e);
+        }
+        result.then(function(value) {
+          var idx = active.indexOf(task);
+          if (idx >= 0) active.splice(idx, 1);
+          task.result = value;
+          task.status = 'done';
+          completed.push(task);
+          emit('done', { task: task, value: value });
+          emitProgress();
+          if (pending.length === 0 && active.length === 0) emit('drain', stats());
+          else runNext();
+        }).catch(function(err) {
+          attempt++;
+          if (attempt <= retryCount && !task.cancelled) {
+            var delay = retryDelay * Math.pow(retryBackoff, attempt - 1);
+            setTimeout(tryOnce, delay);
+          } else {
+            var idx = active.indexOf(task);
+            if (idx >= 0) active.splice(idx, 1);
+            task.error = err;
+            task.status = 'failed';
+            failed.push(task);
+            emit('error', { task: task, error: err });
+            emitProgress();
+            if (pending.length === 0 && active.length === 0) emit('drain', stats());
+            else runNext();
+          }
+        });
+      }
+      task.status = 'active';
+      tryOnce();
+    }
+
+    // -------- PUBLIC --------
+    function add(fn, data) {
+      var task = {
+        id: 't_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        fn: fn,
+        data: data || null,
+        status: 'pending',
+        result: null,
+        error: null,
+        cancelled: false,
+        addedAt: Date.now()
+      };
+      pending.push(task);
+      emitProgress();
+      runNext();
+      return task;
+    }
+
+    function addMany(fn, dataArray) {
+      var tasks = [];
+      for (var i = 0; i < dataArray.length; i++) {
+        tasks.push(add(fn, dataArray[i]));
+      }
+      return tasks;
+    }
+
+    function cancel(taskOrId) {
+      var id = typeof taskOrId === 'string' ? taskOrId : taskOrId.id;
+      // Remove from pending
+      for (var i = pending.length - 1; i >= 0; i--) {
+        if (pending[i].id === id) {
+          pending[i].status = 'cancelled';
+          pending[i].cancelled = true;
+          pending.splice(i, 1);
+          emitProgress();
+          return true;
+        }
+      }
+      // Mark active as cancelled (will reject on next attempt)
+      for (var j = 0; j < active.length; j++) {
+        if (active[j].id === id) {
+          active[j].cancelled = true;
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function cancelAll() {
+      while (pending.length) {
+        var t = pending.pop();
+        t.status = 'cancelled';
+        t.cancelled = true;
+      }
+      for (var i = 0; i < active.length; i++) active[i].cancelled = true;
+      emitProgress();
+    }
+
+    function pause() {
+      paused = true;
+    }
+
+    function resume() {
+      paused = false;
+      runNext();
+    }
+
+    function clear() {
+      cancelAll();
+      active = [];
+      pending = [];
+      completed = [];
+      failed = [];
+      emitProgress();
+    }
+
+    function stats() {
+      return {
+        pending: pending.length,
+        active: active.length,
+        completed: completed.length,
+        failed: failed.length,
+        total: pending.length + active.length + completed.length + failed.length,
+        paused: paused,
+        concurrency: maxConcurrent
+      };
+    }
+
+    function setConcurrency(n) {
+      maxConcurrent = Math.max(1, n);
+      if (!paused) runNext();
+    }
+
+    function on(event, fn) {
+      if (!listeners[event]) listeners[event] = [];
+      listeners[event].push(fn);
+      return function() {
+        var arr = listeners[event];
+        var idx = arr.indexOf(fn);
+        if (idx >= 0) arr.splice(idx, 1);
+      };
+    }
+
+    // Wait for all currently pending + active tasks to finish
+    function drain() {
+      if (pending.length === 0 && active.length === 0) {
+        return Promise.resolve(stats());
+      }
+      return new Promise(function(resolve) {
+        var unsub = on('drain', function(s) {
+          unsub();
+          resolve(s);
+        });
+      });
+    }
+
+    return {
+      add: add,
+      addMany: addMany,
+      cancel: cancel,
+      cancelAll: cancelAll,
+      pause: pause,
+      resume: resume,
+      clear: clear,
+      stats: stats,
+      setConcurrency: setConcurrency,
+      on: on,
+      drain: drain,
+      isPaused: function() { return paused; }
+    };
+  }
+
+  window.weld.queue = {
+    create: createQueue,
+    version: '1.0.0'
+  };
+
+  return window.weld.queue;
+

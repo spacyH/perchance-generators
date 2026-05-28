@@ -1,0 +1,408 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+.footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--border);
+  color:var(--muted);font-size:12px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+
+.footer-social{text-align:center;font-family:var(--mono);max-width:720px;margin:48px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer-social span,.footer-social a{color:var(--muted);}
+.footer-social a{margin:0 2px;}
+.footer-social a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.queue<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-queue-example">demo &rarr;</a></span></div>  <div class="hdr">
+    <div class="hdr-row">
+      <h1>weld.queue</h1>
+      <span class="ver">v1.0.0</span>
+    </div>
+    <p class="lead">Async task pipeline with concurrency control, retry, cancel, pause/resume. The image generation queue pattern, generalized.</p>
+  </div>
+  <h2>Overview</h2>
+<p>weld.queue is the async task pipeline every image-generating Perchance app reinvents. Add tasks, control how many run in parallel, get progress callbacks, retry on failure with exponential backoff, pause/resume, cancel individual tasks or everything, and await full drain.</p>
+<p>The slideshow's generation queue and smart-story's cutscene pipeline both ran on hand-rolled versions of this pattern. weld.queue extracts the common infrastructure so you wire up the task function and let the runner handle concurrency, retry, and lifecycle.</p>
+<h2>Quick start</h2>
+<pre data-codeid="code1"></pre>
+<pre data-codeid="code2"></pre>
+<h2>Configuration</h2>
+<p>Options passed to <code>create()</code>:</p>
+<ul>
+<li><code>concurrency</code>: max parallel tasks. Default 1 (serial). The slideshow uses 1-4 for image generation.</li>
+<li><code>retries</code>: how many times to retry a failed task. Default 0 (no retry).</li>
+<li><code>retryDelay</code>: ms before the first retry. Default 1000.</li>
+<li><code>retryBackoff</code>: multiplier for each subsequent retry. Default 2 (exponential).</li>
+</ul>
+<h2>Adding tasks</h2>
+<div class="sig" data-codeid="sig3"></div>
+<div class="sig" data-codeid="sig4"></div>
+<p>The task function <code>fn(data, task)</code> receives its data argument and the task object itself. It should return a Promise (or a value). The task object has <code>id</code>, <code>status</code> (<code>pending</code>/<code>active</code>/<code>done</code>/<code>failed</code>/<code>cancelled</code>), <code>result</code>, <code>error</code>.</p>
+<p><code>addMany</code> adds one task per element in the data array, all using the same function. Returns the array of task objects.</p>
+<pre data-codeid="code5"></pre>
+<h2>Events</h2>
+<div class="sig" data-codeid="sig6"></div>
+<p>Four events:</p>
+<ul>
+<li><code>progress</code>: fires after every state change. Receives <code>\{pending, active, completed, failed, total\}</code>.</li>
+<li><code>done</code>: fires when a single task completes. Receives <code>\{task, value\}</code>.</li>
+<li><code>error</code>: fires when a task exhausts all retries. Receives <code>\{task, error\}</code>.</li>
+<li><code>drain</code>: fires when pending + active both hit zero. Receives the final stats object.</li>
+</ul>
+<h2>Control</h2>
+<div class="sig" data-codeid="sig7"></div>
+<div class="sig" data-codeid="sig8"></div>
+<div class="sig" data-codeid="sig9"></div>
+<div class="sig" data-codeid="sig10"></div>
+<div class="sig" data-codeid="sig11"></div>
+<p><code>cancel</code> removes a pending task or marks an active one for cancellation (it won't retry). <code>pause</code> stops launching new tasks; active ones finish. <code>resume</code> restarts the runner. <code>setConcurrency</code> adjusts on the fly -- if you increase it while paused then resume, the runner fills the new slots immediately.</p>
+<h2>Waiting for completion</h2>
+<div class="sig" data-codeid="sig12"></div>
+<p>Returns a Promise that resolves when all pending and active tasks have finished (or failed). If the queue is already empty, resolves immediately. Use this for batch operations where you need to wait for everything:</p>
+<pre data-codeid="code13"></pre>
+<h2>Stats</h2>
+<div class="sig" data-codeid="sig14"></div>
+<p>Snapshot of the current queue state. Call anytime -- doesn't mutate anything.</p>
+<h2>Retry behavior</h2><div class="note">
+Tasks that throw or reject are retried <code>retries</code> times with exponential backoff before being marked as failed. A cancelled task is never retried. Active tasks can't be force-killed (Promises don't support that) -- cancellation just prevents the next retry.
+</div>
+  <div class="footer">Part of the <a href="https://perchance.org/weld-ui-index">weld plugin suite</a>. Stashed at <code>window.weld.queue</code>. This page loads the plugin so you can inspect it in DevTools.</div>
+</div>
+<script>
+(function(){
+  var examples = {
+  'code1': 'output\n  weld-queue = \{import:weld-queue-plugin\}',
+  'code2': 'root.weldQueue();\n\nconst q = weld.queue.create(\{ concurrency: 2, retries: 3 \});\n\nq.on(\'progress\', (stats) => console.log(stats.completed, \'/\', stats.total));\nq.on(\'done\', (e) => console.log(\'Task done:\', e.value));\nq.on(\'error\', (e) => console.warn(\'Task failed:\', e.error));\n\n// Add tasks — each receives its data argument and the task object\nq.add(async (data) => \{\n  const result = await generateImage(data.prompt);\n  return result;\n\}, \{ prompt: \'A castle at sunset\' \});\n\n// Wait for everything to finish\nconst finalStats = await q.drain();',
+  'sig3': 'q.add(fn, data?)  ->  task object',
+  'sig4': 'q.addMany(fn, dataArray)  ->  task\[\]',
+  'code5': '// Generate 10 images with the same prompt\nq.addMany(async (data) => \{\n  return await weld.image.generate(\{ prompt: data.prompt, seed: data.seed \});\n\}, Array.from(\{ length: 10 \}, (_, i) => (\{ prompt: \'A dragon\', seed: 100 + i \})));',
+  'sig6': 'q.on(event, fn)  ->  unsubscribe function',
+  'sig7': 'q.cancel(taskOrId)  ->  boolean',
+  'sig8': 'q.cancelAll()',
+  'sig9': 'q.pause()  /  q.resume()',
+  'sig10': 'q.setConcurrency(n)',
+  'sig11': 'q.clear()',
+  'sig12': 'q.drain()  ->  Promise<stats>',
+  'code13': 'q.addMany(generateFn, prompts);\nconst stats = await q.drain();\nconsole.log(stats.completed, \'done,\', stats.failed, \'failed\');',
+  'sig14': 'q.stats()  ->  \{ pending, active, completed, failed, total, paused, concurrency \}'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    var nodes = document.querySelectorAll('[data-codeid]');
+    nodes.forEach(function(n){
+      var id = n.getAttribute('data-codeid');
+      var src = examples[id];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.queue) return; // already loaded
+
+// -----------------------------------------------------------------
+// weld.queue: Async task pipeline.
+// Configurable concurrency (1-N), progress callbacks, retry with
+// backoff, cancel, pause/resume. The slideshow image-gen queue
+// pattern, generalized.
+// -----------------------------------------------------------------
+
+function createQueue(opts) {
+  opts = opts || {};
+  var maxConcurrent = Math.max(1, opts.concurrency || 1);
+  var retryCount = opts.retries || 0;
+  var retryDelay = opts.retryDelay || 1000;
+  var retryBackoff = opts.retryBackoff || 2;
+
+  var pending = [];
+  var active = [];
+  var completed = [];
+  var failed = [];
+  var paused = false;
+  var listeners = { progress: [], done: [], error: [], drain: [] };
+
+  function emit(event, data) {
+    var fns = listeners[event] || [];
+    for (var i = 0; i < fns.length; i++) {
+      try { fns[i](data); } catch (e) { /* swallow */ }
+    }
+  }
+
+  function emitProgress() {
+    emit('progress', {
+      pending: pending.length,
+      active: active.length,
+      completed: completed.length,
+      failed: failed.length,
+      total: pending.length + active.length + completed.length + failed.length
+    });
+  }
+
+  function runNext() {
+    if (paused) return;
+    while (active.length < maxConcurrent && pending.length > 0) {
+      var task = pending.shift();
+      active.push(task);
+      emitProgress();
+      executeTask(task);
+    }
+  }
+
+  function executeTask(task) {
+    var attempt = 0;
+    function tryOnce() {
+      var result;
+      try {
+        result = Promise.resolve(task.fn(task.data, task));
+      } catch (e) {
+        result = Promise.reject(e);
+      }
+      result.then(function(value) {
+        var idx = active.indexOf(task);
+        if (idx >= 0) active.splice(idx, 1);
+        task.result = value;
+        task.status = 'done';
+        completed.push(task);
+        emit('done', { task: task, value: value });
+        emitProgress();
+        if (pending.length === 0 && active.length === 0) emit('drain', stats());
+        else runNext();
+      }).catch(function(err) {
+        attempt++;
+        if (attempt <= retryCount && !task.cancelled) {
+          var delay = retryDelay * Math.pow(retryBackoff, attempt - 1);
+          setTimeout(tryOnce, delay);
+        } else {
+          var idx = active.indexOf(task);
+          if (idx >= 0) active.splice(idx, 1);
+          task.error = err;
+          task.status = 'failed';
+          failed.push(task);
+          emit('error', { task: task, error: err });
+          emitProgress();
+          if (pending.length === 0 && active.length === 0) emit('drain', stats());
+          else runNext();
+        }
+      });
+    }
+    task.status = 'active';
+    tryOnce();
+  }
+
+  // -------- PUBLIC --------
+  function add(fn, data) {
+    var task = {
+      id: 't_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      fn: fn,
+      data: data || null,
+      status: 'pending',
+      result: null,
+      error: null,
+      cancelled: false,
+      addedAt: Date.now()
+    };
+    pending.push(task);
+    emitProgress();
+    runNext();
+    return task;
+  }
+
+  function addMany(fn, dataArray) {
+    var tasks = [];
+    for (var i = 0; i < dataArray.length; i++) {
+      tasks.push(add(fn, dataArray[i]));
+    }
+    return tasks;
+  }
+
+  function cancel(taskOrId) {
+    var id = typeof taskOrId === 'string' ? taskOrId : taskOrId.id;
+    // Remove from pending
+    for (var i = pending.length - 1; i >= 0; i--) {
+      if (pending[i].id === id) {
+        pending[i].status = 'cancelled';
+        pending[i].cancelled = true;
+        pending.splice(i, 1);
+        emitProgress();
+        return true;
+      }
+    }
+    // Mark active as cancelled (will reject on next attempt)
+    for (var j = 0; j < active.length; j++) {
+      if (active[j].id === id) {
+        active[j].cancelled = true;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function cancelAll() {
+    while (pending.length) {
+      var t = pending.pop();
+      t.status = 'cancelled';
+      t.cancelled = true;
+    }
+    for (var i = 0; i < active.length; i++) active[i].cancelled = true;
+    emitProgress();
+  }
+
+  function pause() {
+    paused = true;
+  }
+
+  function resume() {
+    paused = false;
+    runNext();
+  }
+
+  function clear() {
+    cancelAll();
+    active = [];
+    pending = [];
+    completed = [];
+    failed = [];
+    emitProgress();
+  }
+
+  function stats() {
+    return {
+      pending: pending.length,
+      active: active.length,
+      completed: completed.length,
+      failed: failed.length,
+      total: pending.length + active.length + completed.length + failed.length,
+      paused: paused,
+      concurrency: maxConcurrent
+    };
+  }
+
+  function setConcurrency(n) {
+    maxConcurrent = Math.max(1, n);
+    if (!paused) runNext();
+  }
+
+  function on(event, fn) {
+    if (!listeners[event]) listeners[event] = [];
+    listeners[event].push(fn);
+    return function() {
+      var arr = listeners[event];
+      var idx = arr.indexOf(fn);
+      if (idx >= 0) arr.splice(idx, 1);
+    };
+  }
+
+  // Wait for all currently pending + active tasks to finish
+  function drain() {
+    if (pending.length === 0 && active.length === 0) {
+      return Promise.resolve(stats());
+    }
+    return new Promise(function(resolve) {
+      var unsub = on('drain', function(s) {
+        unsub();
+        resolve(s);
+      });
+    });
+  }
+
+  return {
+    add: add,
+    addMany: addMany,
+    cancel: cancel,
+    cancelAll: cancelAll,
+    pause: pause,
+    resume: resume,
+    clear: clear,
+    stats: stats,
+    setConcurrency: setConcurrency,
+    on: on,
+    drain: drain,
+    isPaused: function() { return paused; }
+  };
+}
+
+window.weld.queue = {
+  create: createQueue,
+  version: '1.0.0'
+};
+
+})();
+
+</script>
+<footer class="footer-social"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>

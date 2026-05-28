@@ -1,0 +1,522 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+.footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--border);
+  color:var(--muted);font-size:12px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+
+.footer-social{text-align:center;font-family:var(--mono);max-width:720px;margin:48px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer-social span,.footer-social a{color:var(--muted);}
+.footer-social a{margin:0 2px;}
+.footer-social a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.gallery<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-gallery-example">demo &rarr;</a></span></div>  <div class="hdr">
+    <div class="hdr-row">
+      <h1>weld.gallery</h1>
+      <span class="ver">v1.0.0</span>
+    </div>
+    <p class="lead">Image grid with IndexedDB blob storage, favorites, sort/filter, eviction, lightbox integration. The persistent image collection pattern, extracted.</p>
+  </div>
+  <h2>Overview</h2>
+<p>weld.gallery manages a persistent collection of images in IndexedDB: store blobs with metadata, sort and filter by date or favorites, evict old entries when full, render a responsive grid, and open images in a lightbox. The slideshow app's 200-line cache layer, extracted into a reusable plugin.</p>
+<p>Each image is an IndexedDB Blob keyed by a unique ID. A separate manifest tracks metadata per image (prompt, seed, resolution, timestamp, favorited). The two are kept in sync through atomic store/remove operations.</p>
+<p>Soft dependency: weld.ui (lightbox integration for fullscreen viewing).</p>
+<h2>Quick start</h2>
+<pre data-codeid="code1"></pre>
+<pre data-codeid="code2"></pre>
+<h2>Configuration</h2>
+<ul>
+<li><code>dbName</code>: IndexedDB database name. Default <code>'weld-gallery'</code>.</li>
+<li><code>maxItems</code>: maximum images before eviction kicks in. Default 200.</li>
+<li><code>sortMode</code>: initial sort. <code>'newest'</code> (default), <code>'oldest'</code>, or <code>'favorites'</code>.</li>
+</ul>
+<h2>Storing images</h2>
+<div class="sig" data-codeid="sig3"></div>
+<p>Store a Blob (JPEG, PNG, etc.) with optional metadata. Returns the generated ID. If the gallery is full, the oldest non-favorited entry is evicted first. Only evicts a favorite as a last resort (every slot favorited).</p>
+<p>Metadata fields: <code>prompt</code>, <code>seed</code>, <code>resolution</code>, <code>metadata</code> (arbitrary extra data).</p>
+<pre data-codeid="code4"></pre>
+<h2>Retrieval</h2>
+<div class="sig" data-codeid="sig5"></div>
+<div class="sig" data-codeid="sig6"></div>
+<div class="sig" data-codeid="sig7"></div>
+<div class="sig" data-codeid="sig8"></div>
+<p><code>getBlob</code> returns the raw Blob from IndexedDB. <code>getBlobUrl</code> returns an object URL (remember to revoke when done). <code>getManifest</code> returns the full list; <code>getView</code> returns it sorted by the current sort mode and filtered by favorites-only if set.</p>
+<h2>Favorites and sorting</h2>
+<div class="sig" data-codeid="sig9"></div>
+<div class="sig" data-codeid="sig10"></div>
+<div class="sig" data-codeid="sig11"></div>
+<p>Toggle favorites, change sort order, or filter to favorites-only. All three trigger a change event so listeners can re-render.</p>
+<h2>Deletion</h2>
+<div class="sig" data-codeid="sig12"></div>
+<div class="sig" data-codeid="sig13"></div>
+<div class="sig" data-codeid="sig14"></div>
+<p>Remove individual images, a batch, or everything. Both the Blob and manifest entry are cleaned up.</p>
+<h2>Rendering</h2>
+<div class="sig" data-codeid="sig15"></div>
+<div class="sig" data-codeid="sig16"></div>
+<p><code>render</code> sets up the container and loads the manifest from IndexedDB. <code>renderView</code> re-renders the grid from the current view (call after sort/filter changes). Images load lazily from IndexedDB into object URLs. Click any image to open the lightbox (if <code>weld.ui</code> is loaded).</p>
+<p>The grid uses CSS class <code>w-gallery</code> with responsive <code>auto-fill</code> columns. Add the class to your container element, or let <code>render</code> set it up.</p>
+<h2>Download</h2>
+<div class="sig" data-codeid="sig17"></div>
+<p>Trigger a browser download of the image Blob. Default filename is the image ID + <code>.jpg</code>.</p>
+<h2>Events</h2>
+<div class="sig" data-codeid="sig18"></div>
+<p>Called after any mutation (store, remove, toggleFavorite, sort change). Receives the current manifest. Use it to re-render a custom UI or update counters.</p>
+<h2>Eviction strategy</h2><div class="note">
+Eviction removes the oldest non-favorited entry. If every entry is favorited, the absolute oldest is evicted (with a console warning). The new image is stored after eviction, so it never evicts itself. Favorited entries survive until the user explicitly removes them or every slot is favorited and space is needed.
+</div>
+  <div class="footer">Part of the <a href="https://perchance.org/weld-ui-index">weld plugin suite</a>. Stashed at <code>window.weld.gallery</code>. This page loads the plugin so you can inspect it in DevTools.</div>
+</div>
+<script>
+(function(){
+  var examples = {
+  'code1': 'output\n  weld-gallery = \{import:weld-gallery-plugin\}',
+  'code2': 'root.weldGallery();\n\nconst gallery = weld.gallery.create(\{\{ dbName: \'my-gallery\', maxItems: 200 \}\});\nawait gallery.init();\n\n// Store a generated image\nconst blob = await getImageBlob();  // from canvas.toBlob or fetch\nconst id = await gallery.store(blob, \{\{ prompt: \'A sunset\', seed: 42 \}\});\n\n// Render the grid into a container\nawait gallery.render(\'#gallery-host\');',
+  'sig3': 'gallery.store(blob, meta?)  ->  Promise<id>',
+  'code4': 'const id = await gallery.store(blob, \{\n  prompt: \'A dragon over mountains\',\n  seed: 12345,\n  resolution: \'768x512\'\n\});',
+  'sig5': 'gallery.getBlob(id)  ->  Promise<Blob | null>',
+  'sig6': 'gallery.getBlobUrl(id)  ->  Promise<string | null>',
+  'sig7': 'gallery.getManifest()  ->  entry\[\]',
+  'sig8': 'gallery.getView()  ->  entry\[\]  (sorted/filtered)',
+  'sig9': 'gallery.toggleFavorite(id)  ->  Promise<boolean | null>',
+  'sig10': 'gallery.setSort(mode)  — \'newest\' | \'oldest\' | \'favorites\'',
+  'sig11': 'gallery.setFavOnly(boolean)',
+  'sig12': 'gallery.remove(id)  ->  Promise<true>',
+  'sig13': 'gallery.removeMany(ids)  ->  Promise',
+  'sig14': 'gallery.clear()  ->  Promise',
+  'sig15': 'gallery.render(container)  ->  Promise',
+  'sig16': 'gallery.renderView()  ->  Promise',
+  'sig17': 'gallery.downloadImage(id, filename?)  ->  Promise<boolean>',
+  'sig18': 'gallery.onChange(fn)  ->  unsubscribe function'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    var nodes = document.querySelectorAll('[data-codeid]');
+    nodes.forEach(function(n){
+      var id = n.getAttribute('data-codeid');
+      var src = examples[id];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.gallery) return; // already loaded
+
+// -----------------------------------------------------------------
+// weld.gallery: Image grid with IndexedDB blob storage.
+// Manifest tracks metadata per image (prompt, seed, timestamp, fav).
+// Integrates with weld.ui.lightbox for fullscreen viewing.
+// Eviction: when full, drop oldest non-favorited first.
+// -----------------------------------------------------------------
+
+var DB_STORE = 'blobs';
+
+function uid() {
+  return 'img_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+function createGallery(opts) {
+  opts = opts || {};
+  var dbName = opts.dbName || 'weld-gallery';
+  var maxItems = opts.maxItems || 200;
+  var manifest = [];
+  var dbInstance = null;
+  var dbPromise = null;
+  var container = null;
+  var lightboxInstance = null;
+  var sortMode = opts.sortMode || 'newest';
+  var favOnly = false;
+  var changeListeners = [];
+
+  // -------- IndexedDB for blobs --------
+  function openDb() {
+    if (dbInstance) return Promise.resolve(dbInstance);
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise(function(resolve, reject) {
+      var req = indexedDB.open(dbName, 1);
+      req.onupgradeneeded = function(e) {
+        var db = e.target.result;
+        if (!db.objectStoreNames.contains(DB_STORE)) {
+          db.createObjectStore(DB_STORE);
+        }
+        if (!db.objectStoreNames.contains('meta')) {
+          db.createObjectStore('meta');
+        }
+      };
+      req.onsuccess = function(e) { dbInstance = e.target.result; resolve(dbInstance); };
+      req.onerror = function(e) { dbPromise = null; reject(e.target.error); };
+    });
+    return dbPromise;
+  }
+
+  function idbOp(store, mode, fn) {
+    return openDb().then(function(db) {
+      return new Promise(function(resolve, reject) {
+        var tx = db.transaction(store, mode);
+        var s = tx.objectStore(store);
+        var req = fn(s);
+        if (req && req.onsuccess !== undefined) {
+          req.onsuccess = function() { resolve(req.result); };
+          req.onerror = function() { reject(req.error); };
+        } else {
+          tx.oncomplete = function() { resolve(); };
+          tx.onerror = function() { reject(tx.error); };
+        }
+      });
+    });
+  }
+
+  function saveManifest() {
+    return idbOp('meta', 'readwrite', function(s) { return s.put(manifest, 'manifest'); });
+  }
+
+  function loadManifest() {
+    return idbOp('meta', 'readonly', function(s) { return s.get('manifest'); }).then(function(m) {
+      manifest = m || [];
+    });
+  }
+
+  function emit() {
+    for (var i = 0; i < changeListeners.length; i++) {
+      try { changeListeners[i](manifest); } catch (e) {}
+    }
+  }
+
+  // -------- Core operations --------
+  function store(blob, meta) {
+    if (!(blob instanceof Blob)) {
+      return Promise.reject(new Error('gallery.store: expected a Blob'));
+    }
+    meta = meta || {};
+    var id = uid();
+    var entry = {
+      id: id,
+      prompt: meta.prompt || '',
+      seed: meta.seed != null ? meta.seed : null,
+      resolution: meta.resolution || null,
+      createdAt: Date.now(),
+      favorited: false,
+      metadata: meta.metadata || null
+    };
+
+    return idbOp(DB_STORE, 'readwrite', function(s) { return s.put(blob, id); }).then(function() {
+      // Eviction
+      while (manifest.length >= maxItems) {
+        var evictIdx = -1;
+        for (var i = 0; i < manifest.length; i++) {
+          if (!manifest[i].favorited) { evictIdx = i; break; }
+        }
+        if (evictIdx === -1) evictIdx = 0;
+        var removed = manifest.splice(evictIdx, 1)[0];
+        // Best-effort blob cleanup
+        idbOp(DB_STORE, 'readwrite', function(s) { return s.delete(removed.id); }).catch(function() {});
+      }
+      manifest.push(entry);
+      return saveManifest();
+    }).then(function() {
+      emit();
+      return id;
+    });
+  }
+
+  function remove(id) {
+    manifest = manifest.filter(function(e) { return e.id !== id; });
+    return Promise.all([
+      idbOp(DB_STORE, 'readwrite', function(s) { return s.delete(id); }).catch(function() {}),
+      saveManifest()
+    ]).then(function() { emit(); return true; });
+  }
+
+  function removeMany(ids) {
+    var idSet = {};
+    for (var i = 0; i < ids.length; i++) idSet[ids[i]] = true;
+    manifest = manifest.filter(function(e) { return !idSet[e.id]; });
+    var chain = Promise.resolve();
+    ids.forEach(function(id) {
+      chain = chain.then(function() {
+        return idbOp(DB_STORE, 'readwrite', function(s) { return s.delete(id); }).catch(function() {});
+      });
+    });
+    return chain.then(saveManifest).then(function() { emit(); });
+  }
+
+  function clear() {
+    var ids = manifest.map(function(e) { return e.id; });
+    manifest = [];
+    return removeMany(ids).then(saveManifest).then(function() { emit(); });
+  }
+
+  function toggleFavorite(id) {
+    var entry = manifest.find(function(e) { return e.id === id; });
+    if (!entry) return Promise.resolve(null);
+    entry.favorited = !entry.favorited;
+    return saveManifest().then(function() { emit(); return entry.favorited; });
+  }
+
+  function getBlob(id) {
+    return idbOp(DB_STORE, 'readonly', function(s) { return s.get(id); });
+  }
+
+  function getBlobUrl(id) {
+    return getBlob(id).then(function(blob) {
+      return blob ? URL.createObjectURL(blob) : null;
+    });
+  }
+
+  // -------- Sorted/filtered view --------
+  function getView() {
+    var view = manifest.slice();
+    if (favOnly) view = view.filter(function(e) { return e.favorited; });
+    switch (sortMode) {
+      case 'oldest':
+        view.sort(function(a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
+        break;
+      case 'favorites':
+        view.sort(function(a, b) {
+          if (a.favorited !== b.favorited) return a.favorited ? -1 : 1;
+          return (b.createdAt || 0) - (a.createdAt || 0);
+        });
+        break;
+      default:
+        view.sort(function(a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+    }
+    return view;
+  }
+
+  function setSort(mode) { sortMode = mode; emit(); }
+  function setFavOnly(v) { favOnly = !!v; emit(); }
+
+  // -------- Rendering --------
+  function render(targetEl) {
+    container = typeof targetEl === 'string' ? document.querySelector(targetEl) : targetEl;
+    if (!container) return Promise.reject(new Error('gallery.render: container not found'));
+    return loadManifest().then(function() { return renderView(); });
+  }
+
+  function renderView() {
+    if (!container) return Promise.resolve();
+    var view = getView();
+    container.innerHTML = '';
+    if (view.length === 0) {
+      container.innerHTML = '<div style="color:var(--weld-muted,#7d8590);font:13px var(--weld-mono,monospace);padding:40px;text-align:center;">No images yet.</div>';
+      return Promise.resolve();
+    }
+    var promises = [];
+    view.forEach(function(entry) {
+      var cell = document.createElement('div');
+      cell.className = 'w-gallery-item' + (entry.favorited ? ' is-fav' : '');
+      cell.dataset.id = entry.id;
+      cell.innerHTML = '<div class="w-gallery-loading"></div>';
+      container.appendChild(cell);
+      var p = getBlobUrl(entry.id).then(function(url) {
+        if (!url) { cell.innerHTML = '<div class="w-gallery-empty">missing</div>'; return; }
+        var img = document.createElement('img');
+        img.src = url;
+        img.alt = entry.prompt || '';
+        img.addEventListener('click', function() { openLightbox(entry.id); });
+        cell.innerHTML = '';
+        cell.appendChild(img);
+        // Seed tag
+        if (entry.seed != null) {
+          var tag = document.createElement('div');
+          tag.className = 'w-gallery-seed';
+          tag.textContent = 'seed ' + entry.seed;
+          cell.appendChild(tag);
+        }
+      });
+      promises.push(p);
+    });
+    return Promise.all(promises);
+  }
+
+  function openLightbox(startId) {
+    if (!window.weld || !window.weld.ui || !window.weld.ui.lightbox) return;
+    if (!lightboxInstance) lightboxInstance = window.weld.ui.lightbox();
+    var view = getView();
+    var items = [];
+    var startIdx = 0;
+    view.forEach(function(entry, i) {
+      items.push({ src: '', id: entry.id, meta: entry.prompt || '', alt: entry.prompt || '' });
+      if (entry.id === startId) startIdx = i;
+    });
+    // Resolve blob URLs
+    var chain = Promise.resolve();
+    items.forEach(function(item, idx) {
+      chain = chain.then(function() {
+        return getBlobUrl(item.id).then(function(url) { items[idx].src = url || ''; });
+      });
+    });
+    chain.then(function() {
+      lightboxInstance.open(items, { index: startIdx });
+    });
+  }
+
+  // -------- Download --------
+  function downloadImage(id, filename) {
+    return getBlob(id).then(function(blob) {
+      if (!blob) return false;
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = filename || (id + '.jpg');
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+      return true;
+    });
+  }
+
+  // -------- Init --------
+  function init() {
+    return loadManifest();
+  }
+
+  function onChange(fn) {
+    changeListeners.push(fn);
+    return function() {
+      var idx = changeListeners.indexOf(fn);
+      if (idx >= 0) changeListeners.splice(idx, 1);
+    };
+  }
+
+  return {
+    init: init,
+    store: store,
+    remove: remove,
+    removeMany: removeMany,
+    clear: clear,
+    toggleFavorite: toggleFavorite,
+    getBlob: getBlob,
+    getBlobUrl: getBlobUrl,
+    getView: getView,
+    getManifest: function() { return manifest.slice(); },
+    setSort: setSort,
+    setFavOnly: setFavOnly,
+    render: render,
+    renderView: renderView,
+    downloadImage: downloadImage,
+    onChange: onChange,
+    count: function() { return manifest.length; },
+    maxItems: function() { return maxItems; }
+  };
+}
+
+// Inject gallery grid CSS
+function injectGalleryCss() {
+  if (window.__weldGalleryCss) return;
+  window.__weldGalleryCss = true;
+  var s = document.createElement('style');
+  s.textContent =
+    '.w-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;}' +
+    '.w-gallery-item{aspect-ratio:1;background:var(--weld-faint,#21262d);' +
+      'border:1px solid var(--weld-border,rgba(255,255,255,0.10));border-radius:6px;' +
+      'overflow:hidden;position:relative;cursor:pointer;}' +
+    '.w-gallery-item img{width:100%;height:100%;object-fit:cover;display:block;' +
+      'opacity:0.9;transition:opacity 0.15s,transform 0.2s;}' +
+    '.w-gallery-item:hover img{opacity:1;transform:scale(1.03);}' +
+    '.w-gallery-item.is-fav{border-color:rgba(210,153,34,0.4);}' +
+    '.w-gallery-seed{position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.7);' +
+      'color:rgba(255,255,255,0.6);font:10px var(--weld-mono,monospace);' +
+      'padding:2px 6px;border-radius:3px;opacity:0;transition:opacity 0.15s;}' +
+    '.w-gallery-item:hover .w-gallery-seed{opacity:0.85;}' +
+    '.w-gallery-loading{width:100%;height:100%;display:flex;align-items:center;' +
+      'justify-content:center;color:var(--weld-muted,#7d8590);font-size:12px;}' +
+    '.w-gallery-loading::after{content:"loading";font:11px var(--weld-mono,monospace);}' +
+    '.w-gallery-empty{width:100%;height:100%;display:flex;align-items:center;' +
+      'justify-content:center;color:var(--weld-muted,#7d8590);font:11px var(--weld-mono,monospace);}';
+  document.head.appendChild(s);
+}
+
+window.weld.gallery = {
+  create: function(opts) {
+    injectGalleryCss();
+    return createGallery(opts);
+  },
+  version: '1.0.0'
+};
+
+})();
+
+</script>
+<footer class="footer-social"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>

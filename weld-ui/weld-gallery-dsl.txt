@@ -1,0 +1,347 @@
+$meta
+  title       = weld.gallery
+  description = Image grid with IndexedDB blob storage, metadata manifest, favorites, sort/filter, eviction, download, lightbox integration.
+  tags        = weld, gallery, image, cache, favorites, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.gallery) return window.weld.gallery;
+
+  // -----------------------------------------------------------------
+  // weld.gallery: Image grid with IndexedDB blob storage.
+  // Manifest tracks metadata per image (prompt, seed, timestamp, fav).
+  // Integrates with weld.ui.lightbox for fullscreen viewing.
+  // Eviction: when full, drop oldest non-favorited first.
+  // -----------------------------------------------------------------
+
+  var DB_STORE = 'blobs';
+
+  function uid() {
+    return 'img_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
+
+  function createGallery(opts) {
+    opts = opts || {};
+    var dbName = opts.dbName || 'weld-gallery';
+    var maxItems = opts.maxItems || 200;
+    var manifest = [];
+    var dbInstance = null;
+    var dbPromise = null;
+    var container = null;
+    var lightboxInstance = null;
+    var sortMode = opts.sortMode || 'newest';
+    var favOnly = false;
+    var changeListeners = [];
+
+    // -------- IndexedDB for blobs --------
+    function openDb() {
+      if (dbInstance) return Promise.resolve(dbInstance);
+      if (dbPromise) return dbPromise;
+      dbPromise = new Promise(function(resolve, reject) {
+        var req = indexedDB.open(dbName, 1);
+        req.onupgradeneeded = function(e) {
+          var db = e.target.result;
+          if (!db.objectStoreNames.contains(DB_STORE)) {
+            db.createObjectStore(DB_STORE);
+          }
+          if (!db.objectStoreNames.contains('meta')) {
+            db.createObjectStore('meta');
+          }
+        };
+        req.onsuccess = function(e) { dbInstance = e.target.result; resolve(dbInstance); };
+        req.onerror = function(e) { dbPromise = null; reject(e.target.error); };
+      });
+      return dbPromise;
+    }
+
+    function idbOp(store, mode, fn) {
+      return openDb().then(function(db) {
+        return new Promise(function(resolve, reject) {
+          var tx = db.transaction(store, mode);
+          var s = tx.objectStore(store);
+          var req = fn(s);
+          if (req && req.onsuccess !== undefined) {
+            req.onsuccess = function() { resolve(req.result); };
+            req.onerror = function() { reject(req.error); };
+          } else {
+            tx.oncomplete = function() { resolve(); };
+            tx.onerror = function() { reject(tx.error); };
+          }
+        });
+      });
+    }
+
+    function saveManifest() {
+      return idbOp('meta', 'readwrite', function(s) { return s.put(manifest, 'manifest'); });
+    }
+
+    function loadManifest() {
+      return idbOp('meta', 'readonly', function(s) { return s.get('manifest'); }).then(function(m) {
+        manifest = m || [];
+      });
+    }
+
+    function emit() {
+      for (var i = 0; i < changeListeners.length; i++) {
+        try { changeListeners[i](manifest); } catch (e) {}
+      }
+    }
+
+    // -------- Core operations --------
+    function store(blob, meta) {
+      if (!(blob instanceof Blob)) {
+        return Promise.reject(new Error('gallery.store: expected a Blob'));
+      }
+      meta = meta || {};
+      var id = uid();
+      var entry = {
+        id: id,
+        prompt: meta.prompt || '',
+        seed: meta.seed != null ? meta.seed : null,
+        resolution: meta.resolution || null,
+        createdAt: Date.now(),
+        favorited: false,
+        metadata: meta.metadata || null
+      };
+
+      return idbOp(DB_STORE, 'readwrite', function(s) { return s.put(blob, id); }).then(function() {
+        // Eviction
+        while (manifest.length >= maxItems) {
+          var evictIdx = -1;
+          for (var i = 0; i < manifest.length; i++) {
+            if (!manifest[i].favorited) { evictIdx = i; break; }
+          }
+          if (evictIdx === -1) evictIdx = 0;
+          var removed = manifest.splice(evictIdx, 1)[0];
+          // Best-effort blob cleanup
+          idbOp(DB_STORE, 'readwrite', function(s) { return s.delete(removed.id); }).catch(function() {});
+        }
+        manifest.push(entry);
+        return saveManifest();
+      }).then(function() {
+        emit();
+        return id;
+      });
+    }
+
+    function remove(id) {
+      manifest = manifest.filter(function(e) { return e.id !== id; });
+      return Promise.all([
+        idbOp(DB_STORE, 'readwrite', function(s) { return s.delete(id); }).catch(function() {}),
+        saveManifest()
+      ]).then(function() { emit(); return true; });
+    }
+
+    function removeMany(ids) {
+      var idSet = {};
+      for (var i = 0; i < ids.length; i++) idSet[ids[i]] = true;
+      manifest = manifest.filter(function(e) { return !idSet[e.id]; });
+      var chain = Promise.resolve();
+      ids.forEach(function(id) {
+        chain = chain.then(function() {
+          return idbOp(DB_STORE, 'readwrite', function(s) { return s.delete(id); }).catch(function() {});
+        });
+      });
+      return chain.then(saveManifest).then(function() { emit(); });
+    }
+
+    function clear() {
+      var ids = manifest.map(function(e) { return e.id; });
+      manifest = [];
+      return removeMany(ids).then(saveManifest).then(function() { emit(); });
+    }
+
+    function toggleFavorite(id) {
+      var entry = manifest.find(function(e) { return e.id === id; });
+      if (!entry) return Promise.resolve(null);
+      entry.favorited = !entry.favorited;
+      return saveManifest().then(function() { emit(); return entry.favorited; });
+    }
+
+    function getBlob(id) {
+      return idbOp(DB_STORE, 'readonly', function(s) { return s.get(id); });
+    }
+
+    function getBlobUrl(id) {
+      return getBlob(id).then(function(blob) {
+        return blob ? URL.createObjectURL(blob) : null;
+      });
+    }
+
+    // -------- Sorted/filtered view --------
+    function getView() {
+      var view = manifest.slice();
+      if (favOnly) view = view.filter(function(e) { return e.favorited; });
+      switch (sortMode) {
+        case 'oldest':
+          view.sort(function(a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
+          break;
+        case 'favorites':
+          view.sort(function(a, b) {
+            if (a.favorited !== b.favorited) return a.favorited ? -1 : 1;
+            return (b.createdAt || 0) - (a.createdAt || 0);
+          });
+          break;
+        default:
+          view.sort(function(a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+      }
+      return view;
+    }
+
+    function setSort(mode) { sortMode = mode; emit(); }
+    function setFavOnly(v) { favOnly = !!v; emit(); }
+
+    // -------- Rendering --------
+    function render(targetEl) {
+      container = typeof targetEl === 'string' ? document.querySelector(targetEl) : targetEl;
+      if (!container) return Promise.reject(new Error('gallery.render: container not found'));
+      return loadManifest().then(function() { return renderView(); });
+    }
+
+    function renderView() {
+      if (!container) return Promise.resolve();
+      var view = getView();
+      container.innerHTML = '';
+      if (view.length === 0) {
+        container.innerHTML = '<div style="color:var(--weld-muted,#7d8590);font:13px var(--weld-mono,monospace);padding:40px;text-align:center;">No images yet.</div>';
+        return Promise.resolve();
+      }
+      var promises = [];
+      view.forEach(function(entry) {
+        var cell = document.createElement('div');
+        cell.className = 'w-gallery-item' + (entry.favorited ? ' is-fav' : '');
+        cell.dataset.id = entry.id;
+        cell.innerHTML = '<div class="w-gallery-loading"></div>';
+        container.appendChild(cell);
+        var p = getBlobUrl(entry.id).then(function(url) {
+          if (!url) { cell.innerHTML = '<div class="w-gallery-empty">missing</div>'; return; }
+          var img = document.createElement('img');
+          img.src = url;
+          img.alt = entry.prompt || '';
+          img.addEventListener('click', function() { openLightbox(entry.id); });
+          cell.innerHTML = '';
+          cell.appendChild(img);
+          // Seed tag
+          if (entry.seed != null) {
+            var tag = document.createElement('div');
+            tag.className = 'w-gallery-seed';
+            tag.textContent = 'seed ' + entry.seed;
+            cell.appendChild(tag);
+          }
+        });
+        promises.push(p);
+      });
+      return Promise.all(promises);
+    }
+
+    function openLightbox(startId) {
+      if (!window.weld || !window.weld.ui || !window.weld.ui.lightbox) return;
+      if (!lightboxInstance) lightboxInstance = window.weld.ui.lightbox();
+      var view = getView();
+      var items = [];
+      var startIdx = 0;
+      view.forEach(function(entry, i) {
+        items.push({ src: '', id: entry.id, meta: entry.prompt || '', alt: entry.prompt || '' });
+        if (entry.id === startId) startIdx = i;
+      });
+      // Resolve blob URLs
+      var chain = Promise.resolve();
+      items.forEach(function(item, idx) {
+        chain = chain.then(function() {
+          return getBlobUrl(item.id).then(function(url) { items[idx].src = url || ''; });
+        });
+      });
+      chain.then(function() {
+        lightboxInstance.open(items, { index: startIdx });
+      });
+    }
+
+    // -------- Download --------
+    function downloadImage(id, filename) {
+      return getBlob(id).then(function(blob) {
+        if (!blob) return false;
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = filename || (id + '.jpg');
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+        return true;
+      });
+    }
+
+    // -------- Init --------
+    function init() {
+      return loadManifest();
+    }
+
+    function onChange(fn) {
+      changeListeners.push(fn);
+      return function() {
+        var idx = changeListeners.indexOf(fn);
+        if (idx >= 0) changeListeners.splice(idx, 1);
+      };
+    }
+
+    return {
+      init: init,
+      store: store,
+      remove: remove,
+      removeMany: removeMany,
+      clear: clear,
+      toggleFavorite: toggleFavorite,
+      getBlob: getBlob,
+      getBlobUrl: getBlobUrl,
+      getView: getView,
+      getManifest: function() { return manifest.slice(); },
+      setSort: setSort,
+      setFavOnly: setFavOnly,
+      render: render,
+      renderView: renderView,
+      downloadImage: downloadImage,
+      onChange: onChange,
+      count: function() { return manifest.length; },
+      maxItems: function() { return maxItems; }
+    };
+  }
+
+  // Inject gallery grid CSS
+  function injectGalleryCss() {
+    if (window.__weldGalleryCss) return;
+    window.__weldGalleryCss = true;
+    var s = document.createElement('style');
+    s.textContent =
+      '.w-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;}' +
+      '.w-gallery-item{aspect-ratio:1;background:var(--weld-faint,#21262d);' +
+        'border:1px solid var(--weld-border,rgba(255,255,255,0.10));border-radius:6px;' +
+        'overflow:hidden;position:relative;cursor:pointer;}' +
+      '.w-gallery-item img{width:100%;height:100%;object-fit:cover;display:block;' +
+        'opacity:0.9;transition:opacity 0.15s,transform 0.2s;}' +
+      '.w-gallery-item:hover img{opacity:1;transform:scale(1.03);}' +
+      '.w-gallery-item.is-fav{border-color:rgba(210,153,34,0.4);}' +
+      '.w-gallery-seed{position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.7);' +
+        'color:rgba(255,255,255,0.6);font:10px var(--weld-mono,monospace);' +
+        'padding:2px 6px;border-radius:3px;opacity:0;transition:opacity 0.15s;}' +
+      '.w-gallery-item:hover .w-gallery-seed{opacity:0.85;}' +
+      '.w-gallery-loading{width:100%;height:100%;display:flex;align-items:center;' +
+        'justify-content:center;color:var(--weld-muted,#7d8590);font-size:12px;}' +
+      '.w-gallery-loading::after{content:"loading";font:11px var(--weld-mono,monospace);}' +
+      '.w-gallery-empty{width:100%;height:100%;display:flex;align-items:center;' +
+        'justify-content:center;color:var(--weld-muted,#7d8590);font:11px var(--weld-mono,monospace);}';
+    document.head.appendChild(s);
+  }
+
+  window.weld.gallery = {
+    create: function(opts) {
+      injectGalleryCss();
+      return createGallery(opts);
+    },
+    version: '1.0.0'
+  };
+
+  return window.weld.gallery;
+

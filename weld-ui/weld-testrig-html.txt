@@ -1,0 +1,450 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+.footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--border);
+  color:var(--muted);font-size:12px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+
+.footer-social{text-align:center;font-family:var(--mono);max-width:720px;margin:48px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer-social span,.footer-social a{color:var(--muted);}
+.footer-social a{margin:0 2px;}
+.footer-social a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.testrig<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-testrig-example">demo &rarr;</a></span></div>  <div class="hdr">
+    <div class="hdr-row">
+      <h1>weld.testrig</h1>
+      <span class="ver">v1.0.0</span>
+    </div>
+    <p class="lead">Assertion framework for Perchance plugin testing. assertEqual, assertTrue, assertThrows, async assertions, PASS/FAIL/DRIFT/SKIP status levels, auto-rendering, export.</p>
+  </div>
+  <h2>Overview</h2>
+<p>weld.testrig is an assertion framework for Perchance plugin development. Write test groups, run assertions (equal, true, false, throws, resolves, rejects), see live PASS/FAIL/DRIFT/SKIP stats, and export results as JSON or plain text. The platform monitor's test harness, extracted and expanded.</p>
+<p>DRIFT is for assertions where the expected value changed but not critically -- behavioral drift worth noting but not blocking. SKIP marks tests that were intentionally not run (missing dependency, not applicable). INFO records diagnostic notes without asserting anything.</p>
+<h2>Quick start</h2>
+<pre data-codeid="code1"></pre>
+<pre data-codeid="code2"></pre>
+<h2>Assertions</h2><h3>assertEqual(group, name, expected, actual, opts?)</h3>
+<div class="sig" data-codeid="sig3"></div>
+<p>Deep-compares via JSON.stringify. Returns true if PASS. Options:</p>
+<ul>
+<li><code>cmp</code>: custom comparator <code>(expected, actual) =&gt; boolean</code>.</li>
+<li><code>soft</code>: if true, a mismatch records DRIFT instead of FAIL.</li>
+<li><code>note</code>: additional context string.</li>
+</ul>
+<h3>assertTrue / assertFalse</h3>
+<div class="sig" data-codeid="sig4"></div>
+<div class="sig" data-codeid="sig5"></div>
+<p>Boolean assertions. <code>actual</code> is coerced to boolean.</p>
+<h3>assertThrows</h3>
+<div class="sig" data-codeid="sig6"></div>
+<p>Passes if <code>fn()</code> throws. Catches the error and records it.</p>
+<h3>assertResolves / assertRejects</h3>
+<div class="sig" data-codeid="sig7"></div>
+<div class="sig" data-codeid="sig8"></div>
+<p>Async assertions. <code>assertResolves</code> passes if the promise fulfills; <code>assertRejects</code> passes if it rejects. Both await the promise before recording.</p>
+<h3>skip / info</h3>
+<div class="sig" data-codeid="sig9"></div>
+<div class="sig" data-codeid="sig10"></div>
+<p><code>skip</code> records a SKIP status (test intentionally not run). <code>info</code> records an INFO entry (diagnostic note, no assertion).</p>
+<h2>Lifecycle</h2>
+<div class="sig" data-codeid="sig11"></div>
+<div class="sig" data-codeid="sig12"></div>
+<p><code>finish</code> returns a summary object with <code>counts</code>, <code>total</code>, <code>elapsed</code> (ms), <code>passed</code> (boolean: no FAIL or DRIFT), and <code>groups</code> (list of group names).</p>
+<div class="sig" data-codeid="sig13"></div>
+<p>For long-running suites, call <code>progress</code> between groups to update a progress bar or status line.</p>
+<h2>Export</h2>
+<div class="sig" data-codeid="sig14"></div>
+<div class="sig" data-codeid="sig15"></div>
+<p><code>exportResults</code> returns the full results array, counts, group names, and elapsed time as a JSON-safe object. <code>exportText</code> returns a human-readable plain text report grouped by test group.</p>
+<h2>Auto-rendering</h2>
+<p>Pass a <code>container</code> element or selector to <code>create()</code> and every assertion renders automatically as a color-coded row (green PASS, red FAIL, yellow DRIFT, gray SKIP, blue INFO). Groups get auto-generated section headers.</p>
+<p>If you omit <code>container</code>, the rig runs headless -- assertions are recorded but not rendered. Use <code>exportText()</code> or <code>exportResults()</code> to read them.</p>
+<h2>Helpers</h2>
+<div class="sig" data-codeid="sig16"></div>
+<div class="sig" data-codeid="sig17"></div>
+<p><code>sleep</code> is a simple delay. <code>timeout</code> wraps a promise with a deadline -- if the promise doesn't settle within <code>ms</code> milliseconds, it rejects with a TIMEOUT error. Useful for capping slow async assertions:</p>
+<pre data-codeid="code18"></pre>
+<h2>Error handling</h2><div class="note">
+The rig doesn't catch unhandled rejections or uncaught exceptions outside of assertions. If your test code throws between assertions, wrap the whole test group in a try/catch and call <code>t.info()</code> with the error. For global error capture, pair with weld.diag.
+</div>
+  <div class="footer">Part of the <a href="https://perchance.org/weld-ui-index">weld plugin suite</a>. Stashed at <code>window.weld.testrig</code>. This page loads the plugin so you can inspect it in DevTools.</div>
+</div>
+<script>
+(function(){
+  var examples = {
+  'code1': 'output\n  weld-testrig = \{import:weld-testrig-plugin\}',
+  'code2': 'root.weldTestrig();\n\nconst t = weld.testrig.create(\{\{ container: \'#test-output\' \}\});\nt.start();\n\n// Sync assertions\nt.assertEqual(\'math\', \'addition\', 4, 2 + 2);\nt.assertTrue(\'math\', \'positive\', 42 > 0);\nt.assertThrows(\'errors\', \'null access\', () => null.foo);\n\n// Async assertions\nawait t.assertResolves(\'fetch\', \'loads ok\', fetch(\'/api/health\'));\nawait t.assertRejects(\'fetch\', \'404 rejects\', fetch(\'/nonexistent\'));\n\n// Skip / info\nt.skip(\'browser\', \'WebGPU\', \'not available in this environment\');\nt.info(\'env\', \'user agent\', navigator.userAgent);\n\nconst summary = t.finish();\nconsole.log(summary.passed ? \'ALL PASSED\' : \'FAILURES\');',
+  'sig3': 't.assertEqual(group, name, expected, actual, opts?)  ->  boolean',
+  'sig4': 't.assertTrue(group, name, actual, opts?)',
+  'sig5': 't.assertFalse(group, name, actual, opts?)',
+  'sig6': 't.assertThrows(group, name, fn, opts?)',
+  'sig7': 't.assertResolves(group, name, promise, opts?)  ->  Promise<boolean>',
+  'sig8': 't.assertRejects(group, name, promise, opts?)  ->  Promise<boolean>',
+  'sig9': 't.skip(group, name, reason?)',
+  'sig10': 't.info(group, name, message)',
+  'sig11': 't.start()  — reset counters and results, record start time',
+  'sig12': 't.finish()  ->  summary',
+  'sig13': 't.progress(current, total, label?)  — emit a progress event',
+  'sig14': 't.exportResults()  ->  JSON-safe object',
+  'sig15': 't.exportText()  ->  string',
+  'sig16': 't.sleep(ms)  ->  Promise',
+  'sig17': 't.timeout(promise, ms, label?)  ->  Promise',
+  'code18': 'await t.assertResolves(\'api\', \'responds within 5s\',\n  t.timeout(fetch(\'/slow-endpoint\'), 5000, \'slow-endpoint\')\n);'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    var nodes = document.querySelectorAll('[data-codeid]');
+    nodes.forEach(function(n){
+      var id = n.getAttribute('data-codeid');
+      var src = examples[id];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.testrig) return; // already loaded
+
+// -----------------------------------------------------------------
+// weld.testrig: Assertion framework for Perchance plugin testing.
+// PASS / FAIL / DRIFT / SKIP status levels, test groups with headers,
+// live stats, progress bar, export. The platform monitor pattern,
+// generalized.
+// -----------------------------------------------------------------
+
+function createTestRig(opts) {
+  opts = opts || {};
+  var results = [];
+  var counts = { PASS: 0, FAIL: 0, DRIFT: 0, SKIP: 0, INFO: 0 };
+  var groups = {};
+  var startTime = null;
+  var listeners = [];
+  var container = typeof opts.container === 'string'
+    ? document.querySelector(opts.container) : opts.container;
+
+  function emit(event, data) {
+    for (var i = 0; i < listeners.length; i++) {
+      try { listeners[i](event, data); } catch (e) {}
+    }
+  }
+
+  function stringify(v) {
+    if (v === undefined) return 'undefined';
+    if (v === null) return 'null';
+    if (typeof v === 'string') return v.length > 80 ? JSON.stringify(v.slice(0, 80)) + '...' : JSON.stringify(v);
+    try {
+      var s = JSON.stringify(v);
+      return s.length > 100 ? s.slice(0, 100) + '...' : s;
+    } catch (e) { return String(v); }
+  }
+
+  function record(group, name, status, expected, actual, note) {
+    var entry = {
+      group: group,
+      name: name,
+      status: status,
+      expected: expected,
+      actual: actual,
+      note: note || null,
+      timestamp: Date.now()
+    };
+    results.push(entry);
+    counts[status] = (counts[status] || 0) + 1;
+    if (!groups[group]) groups[group] = [];
+    groups[group].push(entry);
+    emit('result', entry);
+    if (container) renderResult(entry);
+    return status === 'PASS';
+  }
+
+  // -------- Assertions --------
+  function assertEqual(group, name, expected, actual, assertOpts) {
+    assertOpts = assertOpts || {};
+    var cmp = assertOpts.cmp
+      ? assertOpts.cmp(expected, actual)
+      : stringify(expected) === stringify(actual);
+    var status = cmp ? 'PASS' : (assertOpts.soft ? 'DRIFT' : 'FAIL');
+    return record(group, name, status, expected, actual, assertOpts.note);
+  }
+
+  function assertTrue(group, name, actual, assertOpts) {
+    return assertEqual(group, name, true, !!actual, assertOpts);
+  }
+
+  function assertFalse(group, name, actual, assertOpts) {
+    return assertEqual(group, name, false, !!actual, assertOpts);
+  }
+
+  function assertThrows(group, name, fn, assertOpts) {
+    assertOpts = assertOpts || {};
+    var threw = false;
+    var error = null;
+    try { fn(); } catch (e) { threw = true; error = e; }
+    var status = threw ? 'PASS' : 'FAIL';
+    return record(group, name, status, 'should throw', threw ? 'threw: ' + (error && error.message || error) : 'did not throw', assertOpts.note);
+  }
+
+  // Async version: resolves the promise and checks the result
+  function assertResolves(group, name, promise, assertOpts) {
+    assertOpts = assertOpts || {};
+    return Promise.resolve(promise).then(function(val) {
+      return record(group, name, 'PASS', 'should resolve', 'resolved: ' + stringify(val), assertOpts.note);
+    }).catch(function(err) {
+      return record(group, name, 'FAIL', 'should resolve', 'rejected: ' + (err && err.message || err), assertOpts.note);
+    });
+  }
+
+  function assertRejects(group, name, promise, assertOpts) {
+    assertOpts = assertOpts || {};
+    return Promise.resolve(promise).then(function(val) {
+      return record(group, name, 'FAIL', 'should reject', 'resolved: ' + stringify(val), assertOpts.note);
+    }).catch(function(err) {
+      return record(group, name, 'PASS', 'should reject', 'rejected: ' + (err && err.message || err), assertOpts.note);
+    });
+  }
+
+  function skip(group, name, reason) {
+    return record(group, name, 'SKIP', null, null, reason || 'skipped');
+  }
+
+  function info(group, name, message) {
+    return record(group, name, 'INFO', null, null, message);
+  }
+
+  // -------- Timing --------
+  function start() {
+    startTime = Date.now();
+    results = [];
+    counts = { PASS: 0, FAIL: 0, DRIFT: 0, SKIP: 0, INFO: 0 };
+    groups = {};
+    if (container) container.innerHTML = '';
+    emit('start', {});
+  }
+
+  function finish() {
+    var elapsed = startTime ? Date.now() - startTime : 0;
+    var summary = {
+      counts: Object.assign({}, counts),
+      total: results.length,
+      elapsed: elapsed,
+      passed: counts.FAIL === 0 && counts.DRIFT === 0,
+      groups: Object.keys(groups)
+    };
+    emit('finish', summary);
+    return summary;
+  }
+
+  // -------- Progress --------
+  function progress(current, total, label) {
+    emit('progress', { current: current, total: total, label: label || '' });
+  }
+
+  // -------- Export --------
+  function exportResults() {
+    return {
+      results: results.slice(),
+      counts: Object.assign({}, counts),
+      groups: Object.keys(groups),
+      elapsed: startTime ? Date.now() - startTime : 0,
+      exportedAt: Date.now()
+    };
+  }
+
+  function exportText() {
+    var lines = [];
+    lines.push('Test results: ' + new Date().toISOString());
+    lines.push('');
+    for (var g in groups) {
+      lines.push('== ' + g + ' ==');
+      for (var i = 0; i < groups[g].length; i++) {
+        var r = groups[g][i];
+        var line = '  ' + r.status + '  ' + r.name;
+        if (r.note) line += '  -- ' + r.note;
+        if (r.status === 'FAIL' || r.status === 'DRIFT') {
+          line += '  (expected: ' + stringify(r.expected) + ', got: ' + stringify(r.actual) + ')';
+        }
+        lines.push(line);
+      }
+      lines.push('');
+    }
+    lines.push('PASS: ' + counts.PASS + '  FAIL: ' + counts.FAIL +
+      '  DRIFT: ' + counts.DRIFT + '  SKIP: ' + counts.SKIP);
+    return lines.join('\n');
+  }
+
+  // -------- Rendering --------
+  function renderResult(entry) {
+    if (!container) return;
+    // Find or create group section
+    var groupEl = container.querySelector('[data-group="' + entry.group + '"]');
+    if (!groupEl) {
+      groupEl = document.createElement('div');
+      groupEl.dataset.group = entry.group;
+      groupEl.innerHTML =
+        '<div style="font:600 11px var(--weld-mono,monospace);color:var(--weld-muted,#7d8590);' +
+        'text-transform:uppercase;letter-spacing:1.5px;padding:10px 0 6px;' +
+        'border-bottom:1px solid var(--weld-border,rgba(255,255,255,0.10));margin-top:12px;">' +
+        escapeHtml(entry.group) + '</div>';
+      container.appendChild(groupEl);
+    }
+    var row = document.createElement('div');
+    row.style.cssText = 'display:grid;grid-template-columns:60px 240px 1fr;gap:8px;' +
+      'padding:4px 0;border-bottom:1px dotted var(--weld-border,rgba(255,255,255,0.05));' +
+      'align-items:baseline;font:12px var(--weld-mono,monospace);';
+    var statusColor = { PASS: '#3fb950', FAIL: '#f85149', DRIFT: '#d29922', SKIP: '#7d8590', INFO: '#4493f8' };
+    var detail = '';
+    if (entry.status === 'PASS') detail = '<span style="color:#3fb950;">' + escapeHtml(stringify(entry.actual)) + '</span>';
+    else if (entry.status === 'SKIP' || entry.status === 'INFO') detail = '<span style="color:#7d8590;">' + escapeHtml(entry.note || '') + '</span>';
+    else detail = '<span style="color:#7d8590;">expected: ' + escapeHtml(stringify(entry.expected)) + '</span> <span style="color:#f85149;">got: ' + escapeHtml(stringify(entry.actual)) + '</span>';
+    if (entry.note && entry.status !== 'SKIP' && entry.status !== 'INFO') {
+      detail += ' <span style="color:#7d8590;">' + escapeHtml(entry.note) + '</span>';
+    }
+    row.innerHTML =
+      '<span style="font-weight:700;color:' + (statusColor[entry.status] || '#7d8590') + ';">' + entry.status + '</span>' +
+      '<span style="color:var(--weld-ink,#e6edf3);">' + escapeHtml(entry.name) + '</span>' +
+      '<span>' + detail + '</span>';
+    groupEl.appendChild(row);
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // -------- Helpers --------
+  function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+
+  function timeout(promise, ms, label) {
+    return new Promise(function(resolve, reject) {
+      var done = false;
+      var t = setTimeout(function() { if (!done) { done = true; reject(new Error('TIMEOUT' + (label ? ' ' + label : ''))); } }, ms);
+      Promise.resolve(promise).then(
+        function(v) { if (!done) { done = true; clearTimeout(t); resolve(v); } },
+        function(e) { if (!done) { done = true; clearTimeout(t); reject(e); } }
+      );
+    });
+  }
+
+  function on(fn) {
+    listeners.push(fn);
+    return function() {
+      var idx = listeners.indexOf(fn);
+      if (idx >= 0) listeners.splice(idx, 1);
+    };
+  }
+
+  return {
+    // Assertions
+    assertEqual: assertEqual,
+    assertTrue: assertTrue,
+    assertFalse: assertFalse,
+    assertThrows: assertThrows,
+    assertResolves: assertResolves,
+    assertRejects: assertRejects,
+    skip: skip,
+    info: info,
+    // Lifecycle
+    start: start,
+    finish: finish,
+    progress: progress,
+    // Export
+    exportResults: exportResults,
+    exportText: exportText,
+    // State
+    counts: function() { return Object.assign({}, counts); },
+    results: function() { return results.slice(); },
+    groupNames: function() { return Object.keys(groups); },
+    on: on,
+    // Helpers
+    sleep: sleep,
+    timeout: timeout
+  };
+}
+
+window.weld.testrig = {
+  create: createTestRig,
+  version: '1.0.0'
+};
+
+})();
+
+</script>
+<footer class="footer-social"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
