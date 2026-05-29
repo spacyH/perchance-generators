@@ -1,0 +1,573 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.stream<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-stream-example">demo &rarr;</a></span></div>
+  <div class="hdr">
+    <div class="hdr-row">
+      <h1>weld.stream</h1>
+      <span class="ver">v1.0.0</span>
+    </div>
+    <p class="lead">The generation half of an AI chat app. Sends an instruction to <code>ai-text-plugin</code>, streams the reply, and manages the awkward parts: boxed-String results, the real stopReason vocabulary, aborting, and the broker's one-at-a-time limit.</p>
+  </div>
+
+  <h2>Overview</h2>
+<p>weld.prompt assembles the instruction string; <strong>weld.stream sends it and manages the call lifecycle.</strong> The raw <code>ai-text-plugin</code> has three edges that every consumer re-hits, and weld.stream smooths all three:</p>
+<ul>
+  <li>The resolved value is a <strong>boxed String</strong>, so <code>result === "x"</code> is always false. weld.stream hands back a plain <code>text</code> string.</li>
+  <li><code>stopReason</code> is <code>natural</code> / <code>artificial</code> / <code>error</code> / <code>user</code> &mdash; not the <code>stop_sequence</code> / <code>max_tokens</code> the official docs claim. weld.stream translates these into plain booleans.</li>
+  <li>The broker runs <strong>one generation at a time</strong>. weld.stream queues overlapping calls in a FIFO so you can fire-and-forget.</li>
+</ul>
+
+  <h2>Quick start</h2>
+<p>In your lists editor, import the plugin and its dependency:</p>
+<pre data-codeid="install"></pre>
+<p>The DSL form wires the dependency in for you on load. Then, from your HTML panel:</p>
+<pre data-codeid="quick"></pre>
+<div class="note">weld.stream calls <code>aiTextPlugin</code> for you &mdash; you never touch the boxed String, the stop sequences, or the stopReason strings directly unless you want to.</div>
+
+  <h2>run(opts)</h2>
+<div class="sig" data-codeid="sig_run"></div>
+<p>Queues a generation and returns a <strong>handle</strong> (see below). The handle is thenable, so you can <code>await</code> it directly. Resolves to a normalized result object &mdash; it never rejects.</p>
+<pre data-codeid="run_ex"></pre>
+<h4>opts</h4>
+<table>
+  <tr><th>Key</th><th>Type</th><th>Meaning</th></tr>
+  <tr><td><code>instruction</code></td><td>string</td><td><strong>required.</strong> The system prompt / task. Empty &rarr; result with <code>stopReason: 'error'</code>.</td></tr>
+  <tr><td><code>startWith</code></td><td>string</td><td>Text the model continues from. Hidden from <code>text</code> by default.</td></tr>
+  <tr><td><code>hideStartWith</code></td><td>bool</td><td>Set <code>false</code> to keep the echoed prefix. Default <code>true</code>.</td></tr>
+  <tr><td><code>stopSequences</code></td><td>string[]</td><td>Clamped to 20 (21+ makes the backend error). Empty entries dropped.</td></tr>
+  <tr><td><code>chat</code></td><td>bool</td><td>Use the double-bracketed-name wire-format stops when no <code>stopSequences</code> given.</td></tr>
+  <tr><td><code>onChunk</code></td><td>fn(delta, full)</td><td>Stream callback. Supplying it enables streaming.</td></tr>
+  <tr><td><code>onToken</code></td><td>fn(delta)</td><td>Lighter stream callback (delta only).</td></tr>
+  <tr><td><code>onDone</code></td><td>fn(result)</td><td>Fires once on completion, any outcome.</td></tr>
+  <tr><td><code>onError</code></td><td>fn(msg, result)</td><td>Fires once when <code>stopReason</code> is <code>error</code>.</td></tr>
+</table>
+
+  <h2>Streaming</h2>
+<p>Pass <code>onChunk</code> to receive the reply as it arrives. The first argument is the new delta; the second is the full text so far. Text echoed back from <code>startWith</code> is filtered out for you.</p>
+<pre data-codeid="stream_ex"></pre>
+<p>Or read <code>handle.liveText</code> at any time for the accumulated text.</p>
+
+  <h2>The handle</h2>
+<div class="sig" data-codeid="sig_handle"></div>
+<table>
+  <tr><th>Member</th><th>What it does</th></tr>
+  <tr><td><code>then / catch / finally</code></td><td>Thenable &mdash; <code>await handle</code> gives the result object.</td></tr>
+  <tr><td><code>stop()</code></td><td>Abort. If in flight, aborts the broker call (resolves <code>aborted</code>). If still queued, settles it as aborted and skips it.</td></tr>
+  <tr><td><code>liveText</code></td><td>Accumulated streamed text so far (getter).</td></tr>
+  <tr><td><code>started</code> / <code>queued</code></td><td>Lifecycle flags (getters).</td></tr>
+  <tr><td><code>id</code></td><td>Unique id for this generation.</td></tr>
+</table>
+<pre data-codeid="stop_ex"></pre>
+
+  <h2>The result object</h2>
+<p>Every run resolves to the same shape &mdash; check the booleans, not the raw string:</p>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Meaning</th></tr>
+  <tr><td><code>text</code></td><td>string</td><td>The generated text (a real primitive string).</td></tr>
+  <tr><td><code>stopReason</code></td><td>string</td><td>Raw reason: <code>natural</code> / <code>artificial</code> / <code>error</code> / <code>user</code>.</td></tr>
+  <tr><td><code>truncated</code></td><td>bool</td><td><code>true</code> when <code>artificial</code> &mdash; hit a stop sequence or the output ceiling.</td></tr>
+  <tr><td><code>aborted</code></td><td>bool</td><td><code>true</code> when <code>stop()</code> was called.</td></tr>
+  <tr><td><code>error</code></td><td>string|null</td><td>Set when the generation failed; <code>text</code> is empty.</td></tr>
+</table>
+<div class="note warn">The output ceiling is roughly 900 tokens per call. If <code>truncated</code> is true and you need more, run again with the prior <code>text</code> fed back in as context.</div>
+
+  <h2>Queue &amp; status</h2>
+<p>The broker handles one generation at a time, so weld.stream serializes calls. These let you observe and control the queue:</p>
+<div class="sig" data-codeid="sig_busy"></div>
+<div class="sig" data-codeid="sig_pending"></div>
+<div class="sig" data-codeid="sig_stopall"></div>
+<p><code>stopAll()</code> aborts whatever is running and discards everything queued behind it.</p>
+<pre data-codeid="queue_ex"></pre>
+
+  <h2>Token helpers</h2>
+<p>Surfaced from the plugin's meta object so you can pack a context window without importing anything else:</p>
+<div class="sig" data-codeid="sig_count"></div>
+<div class="sig" data-codeid="sig_budget"></div>
+<div class="sig" data-codeid="sig_meta"></div>
+<div class="sig" data-codeid="sig_preload"></div>
+<p><code>count(text)</code> returns an approximate token count (a fast bigram estimate, no network). <code>budget(slack)</code> returns <code>idealMaxContextTokens - slack</code> (default slack 800, which protects the prefix cache). <code>preload()</code> warms the broker &mdash; harmless, with no measurable speedup.</p>
+<pre data-codeid="token_ex"></pre>
+
+  <h2>attach(deps)</h2>
+<div class="sig" data-codeid="sig_attach"></div>
+<p>Inject the imported <code>ai-text-plugin</code> function. The DSL form calls this for you. You only need it if you load weld.stream in some non-standard way; otherwise the <code>window.root.aiTextPlugin</code> fallback covers you.</p>
+
+  <h2>Notes</h2>
+<div class="note">weld.stream follows the standard weld loading pattern: it creates <code>window.weld</code> if needed and attaches itself at <code>window.weld.stream</code>. Loading it twice is a no-op that just re-attaches the dependency.</div>
+<div class="note">Pairs naturally with <a href="https://perchance.org/weld-prompt-plugin">weld.prompt</a> (build the instruction) and <a href="https://perchance.org/weld-tokens-plugin">weld.tokens</a> (exact counts). The demo also uses <a href="https://perchance.org/weld-ui-plugin">weld.ui</a> for its controls.</div>
+</div>
+<script>
+(function(){
+  var examples = {
+  'install': 'output\n  weld-stream = \{import:weld-stream-plugin\}\n  aiTextPlugin = \{import:ai-text-plugin\}',
+  'quick': 'var stream = window.weld.stream;\n\nvar result = await stream.run(\{ instruction: \'Write a haiku about autumn.\' \});\nconsole.log(result.text);          // a real string\nconsole.log(result.stopReason);    // \'natural\'',
+  'sig_run': 'weld.stream.run(opts) -> handle',
+  'run_ex': 'var r = await stream.run(\{\n  instruction: systemPrompt,\n  startWith: \'\[\[Chloe]]:\',   // continue from here\n  chat: true,                  // use the chat wire-format stops\n\});\nif (r.error)        showError(r.error);\nelse if (r.truncated) appendMore(r.text);   // hit the ceiling\nelse                appendReply(r.text);',
+  'stream_ex': 'var out = document.getElementById(\'reply\');\nout.textContent = \'\';\nawait stream.run(\{\n  instruction: prompt,\n  onChunk: function(delta, full) \{ out.textContent = full; \},\n  onDone:  function(res)        \{ markComplete(res.aborted); \},\n\});',
+  'sig_handle': 'handle = \{ then, catch, finally, stop(), liveText, started, queued, id \}',
+  'stop_ex': 'var h = stream.run(\{ instruction: prompt, onChunk: render \});\nstopButton.onclick = function() \{ h.stop(); \};\nvar res = await h;\nif (res.aborted) toast.info(\'Stopped.\');',
+  'sig_busy': 'weld.stream.isBusy() -> bool',
+  'sig_pending': 'weld.stream.pending() -> number',
+  'sig_stopall': 'weld.stream.stopAll()',
+  'queue_ex': 'stream.run(\{ instruction: a \});   // runs now\nstream.run(\{ instruction: b \});   // waits its turn\nstream.run(\{ instruction: c \});   // waits behind b\n\nstream.isBusy();    // true\nstream.pending();   // 2\nstream.stopAll();   // abort a, drop b and c',
+  'sig_count': 'weld.stream.count(text) -> number | null',
+  'sig_budget': 'weld.stream.budget(slack?) -> number | null',
+  'sig_meta': 'weld.stream.meta() -> \{ countTokens, idealMaxContextTokens \} | null',
+  'sig_preload': 'weld.stream.preload()',
+  'token_ex': 'var budget = stream.budget();        // e.g. 5200  (6000 - 800)\nvar used   = stream.count(history);  // approx tokens in the history\nwhile (used > budget) \{\n  history = dropOldest(history);\n  used = stream.count(history);\n\}',
+  'sig_attach': 'weld.stream.attach(\{ aiTextPlugin \})'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    document.querySelectorAll('[data-codeid]').forEach(function(n){
+      var src = examples[n.getAttribute('data-codeid')];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+var aiTextPlugin = (window.root && window.root.aiTextPlugin) || null;
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.stream) {
+  return window.weld.stream;
+}
+
+// -----------------------------------------------------------------
+// weld.stream: the generation half of an AI chat app.
+//
+// weld.prompt assembles the instruction string; weld.stream sends it
+// to ai-text-plugin and manages the call lifecycle. It exists because
+// the raw plugin has three sharp edges that every consumer re-hits:
+//
+//   1. The resolved value is a BOXED String, not a primitive, so
+//      `result === "x"` is always false. We hand back a plain string.
+//   2. stopReason is "natural" | "artificial" | "error" | "user" --
+//      NOT the "stop_sequence"/"max_tokens" the official docs claim.
+//      We translate to plain booleans: truncated / aborted / error.
+//   3. The broker accepts exactly one generation at a time. Overlapping
+//      calls don't error -- they just contend. We serialize them in an
+//      internal FIFO queue so callers can fire-and-forget.
+//
+// The plugin must be imported in the lists editor (see the import
+// directive at the top of this generator) and handed to us via
+// weld.stream.attach({ aiTextPlugin: aiTextPlugin }) -- the DSL form
+// below does this automatically. If you skip it we also try
+// window.root.aiTextPlugin as a fallback.
+// -----------------------------------------------------------------
+
+var deps = { aiTextPlugin: null };
+
+function attach(d) {
+  if (d && typeof d.aiTextPlugin === 'function') deps.aiTextPlugin = d.aiTextPlugin;
+}
+
+function grabPlugin() {
+  if (typeof deps.aiTextPlugin === 'function') return deps.aiTextPlugin;
+  try {
+    if (window.root && typeof window.root.aiTextPlugin === 'function') return window.root.aiTextPlugin;
+  } catch (e) { /* proxy miss */ }
+  return null;
+}
+
+// -----------------------------------------------------------------
+// Constants. A literal double-open-bracket sequence would be read as a
+// Perchance template by the source scanner, so we assemble it from char
+// codes instead.
+// -----------------------------------------------------------------
+var LBR = String.fromCharCode(91);            // "["
+var DOUBLE = LBR + LBR;                        // a double open bracket
+var DEFAULT_CHAT_STOPS = ['\n\n' + DOUBLE, '\n' + DOUBLE]; // the two standard chat stop sequences
+var MAX_STOP_SEQUENCES = 20;                   // hard backend limit (21+ => stopReason "error")
+
+var idSeq = 0;
+function nextId() {
+  idSeq += 1;
+  return 'weldStream' + Date.now() + '_' + idSeq;
+}
+
+// -----------------------------------------------------------------
+// Normalize the boxed-String result into a plain, predictable object.
+// -----------------------------------------------------------------
+function normalize(result) {
+  var out = {
+    text: '',
+    stopReason: 'natural',
+    truncated: false,   // "artificial": hit a stop sequence or the output ceiling
+    aborted: false,     // "user": stop() was called
+    error: null
+  };
+  if (result == null) {
+    out.stopReason = 'error';
+    out.error = 'no result returned from ai-text-plugin';
+    return out;
+  }
+  var reason = result.stopReason || 'natural';
+  out.stopReason = reason;
+  // generatedText is the full output; String(result) also works on the box.
+  out.text = (result.generatedText != null) ? String(result.generatedText) : String(result);
+  if (reason === 'artificial') out.truncated = true;
+  if (reason === 'user') out.aborted = true;
+  if (reason === 'error') {
+    out.error = 'ai-text-plugin reported a generation error';
+    out.text = '';
+  }
+  return out;
+}
+
+function clampStops(stops) {
+  if (stops == null) return null;
+  if (!Array.isArray(stops)) stops = [stops];
+  stops = stops.filter(function (s) { return s != null && String(s).length > 0; });
+  if (stops.length === 0) return null;
+  if (stops.length > MAX_STOP_SEQUENCES) stops = stops.slice(0, MAX_STOP_SEQUENCES);
+  return stops;
+}
+
+// -----------------------------------------------------------------
+// Serial queue. activeEntry is the in-flight generation; the broker
+// handles exactly one at a time, so everything else waits behind it.
+// -----------------------------------------------------------------
+var queue = [];
+var activeEntry = null;
+var pumping = false;
+
+function buildCallOpts(entry) {
+  var o = entry.opts;
+  var callOpts = { instruction: String(o.instruction) };
+
+  if (o.startWith != null) {
+    callOpts.startWith = String(o.startWith);
+    // Default to hiding the echoed prefix unless the caller opts out.
+    callOpts.hideStartWith = (o.hideStartWith !== false);
+  }
+
+  var stops = (o.stopSequences != null)
+    ? o.stopSequences
+    : (o.chat ? DEFAULT_CHAT_STOPS : null);
+  stops = clampStops(stops);
+  if (stops) callOpts.stopSequences = stops;
+
+  // Stream only when a chunk/token handler is supplied. A bare await
+  // path still resolves with the complete text either way.
+  if (typeof o.onChunk === 'function' || typeof o.onToken === 'function') {
+    callOpts.onChunk = function (c) {
+      if (!c) return;
+      if (c.isFromStartWith) return;           // skip the echoed startWith
+      var delta = c.textChunk || '';
+      entry.liveText += delta;
+      if (typeof o.onChunk === 'function') {
+        try { o.onChunk(delta, entry.liveText); } catch (e) { /* consumer error */ }
+      }
+      if (typeof o.onToken === 'function') {
+        try { o.onToken(delta); } catch (e) { /* consumer error */ }
+      }
+    };
+  }
+  return callOpts;
+}
+
+function settle(entry, norm) {
+  if (entry._settled) return;
+  entry._settled = true;
+  var o = entry.opts;
+  if (norm.error && typeof o.onError === 'function') {
+    try { o.onError(norm.error, norm); } catch (e) { /* consumer error */ }
+  }
+  if (typeof o.onDone === 'function') {
+    try { o.onDone(norm); } catch (e) { /* consumer error */ }
+  }
+  entry._resolve(norm);
+}
+
+function pump() {
+  if (pumping || activeEntry) return;
+  // Drop any entries cancelled while queued (already settled by stop()).
+  while (queue.length && queue[0]._settled) queue.shift();
+  if (queue.length === 0) return;
+
+  pumping = true;
+  var entry = queue.shift();
+  activeEntry = entry;
+  entry.started = true;
+
+  var plugin = grabPlugin();
+  if (!plugin) {
+    activeEntry = null;
+    pumping = false;
+    settle(entry, {
+      text: '', stopReason: 'error', truncated: false, aborted: false,
+      error: 'weld.stream: ai-text-plugin is not attached. Add '
+        + 'aiTextPlugin = ' + '{' + 'import:ai-text-plugin' + '}'
+        + ' to your lists and call weld.stream.attach({ aiTextPlugin }).'
+    });
+    pump();
+    return;
+  }
+
+  var instr = entry.opts.instruction;
+  if (instr == null || String(instr).trim() === '') {
+    activeEntry = null;
+    pumping = false;
+    settle(entry, {
+      text: '', stopReason: 'error', truncated: false, aborted: false,
+      error: 'weld.stream: instruction is empty.'
+    });
+    pump();
+    return;
+  }
+
+  var done = function (norm) {
+    activeEntry = null;
+    entry.inner = null;
+    pumping = false;
+    settle(entry, norm);
+    pump();
+  };
+
+  try {
+    var inner = plugin(buildCallOpts(entry));   // synchronous extended-Promise handle
+    entry.inner = inner;
+    // If stop() arrived between dequeue and here, honor it now.
+    if (entry._stopRequested && inner && typeof inner.stop === 'function') {
+      try { inner.stop(); } catch (e) { /* ignore */ }
+    }
+    Promise.resolve(inner).then(function (raw) {
+      done(normalize(raw));
+    }, function (err) {
+      done({
+        text: '', stopReason: 'error', truncated: false, aborted: false,
+        error: String((err && err.message) || err)
+      });
+    });
+  } catch (err) {
+    done({
+      text: '', stopReason: 'error', truncated: false, aborted: false,
+      error: String((err && err.message) || err)
+    });
+  }
+}
+
+// -----------------------------------------------------------------
+// Public: run(opts) -> handle. The handle is thenable and abortable.
+//
+// opts:
+//   instruction    (string, required)
+//   startWith      (string)  text the model continues from
+//   hideStartWith  (bool)    default true when startWith is set
+//   stopSequences  (string[]) clamped to 20; falls back to chat stops if chat:true
+//   chat           (bool)    use the double-bracketed Name wire-format stops
+//   onChunk(delta, fullText) stream callback (enables streaming)
+//   onToken(delta)           lighter stream callback
+//   onDone(result)           fires once on completion (any outcome)
+//   onError(message, result) fires once on error
+//
+// resolves to: { text, stopReason, truncated, aborted, error }
+// -----------------------------------------------------------------
+function run(opts) {
+  opts = opts || {};
+  var entry = {
+    id: nextId(),
+    opts: opts,
+    liveText: '',
+    started: false,
+    inner: null,
+    _settled: false,
+    _stopRequested: false,
+    _resolve: null
+  };
+  entry.promise = new Promise(function (resolve) { entry._resolve = resolve; });
+
+  function stop() {
+    entry._stopRequested = true;
+    if (entry._settled) return;
+    if (activeEntry === entry && entry.inner && typeof entry.inner.stop === 'function') {
+      // In flight: abort the broker call. It resolves with stopReason "user".
+      try { entry.inner.stop(); } catch (e) { /* ignore */ }
+    } else if (!entry.started) {
+      // Still queued: settle immediately as aborted; pump() will skip it.
+      settle(entry, {
+        text: entry.liveText, stopReason: 'user',
+        truncated: false, aborted: true, error: null
+      });
+    }
+  }
+
+  var handle = {
+    id: entry.id,
+    stop: stop,
+    promise: entry.promise,
+    then: function (a, b) { return entry.promise.then(a, b); },
+    catch: function (b) { return entry.promise.catch(b); },
+    finally: function (f) { return entry.promise.finally(f); }
+  };
+  Object.defineProperty(handle, 'liveText', { get: function () { return entry.liveText; } });
+  Object.defineProperty(handle, 'started', { get: function () { return entry.started; } });
+  Object.defineProperty(handle, 'queued', { get: function () { return !entry.started && !entry._settled; } });
+
+  queue.push(entry);
+  pump();
+  return handle;
+}
+
+// Abort the active generation and discard everything queued behind it.
+function stopAll() {
+  var pending = queue.slice();
+  if (activeEntry && activeEntry.inner && typeof activeEntry.inner.stop === 'function') {
+    try { activeEntry.inner.stop(); } catch (e) { /* ignore */ }
+  }
+  pending.forEach(function (entry) {
+    if (entry._settled || entry === activeEntry) return;
+    settle(entry, {
+      text: entry.liveText, stopReason: 'user',
+      truncated: false, aborted: true, error: null
+    });
+  });
+}
+
+function isBusy() { return !!activeEntry; }
+function pending() {
+  return queue.filter(function (e) { return !e._settled && !e.started; }).length;
+}
+
+// -----------------------------------------------------------------
+// Token helpers, surfaced from the plugin's meta object.
+//   meta()        -> { countTokens, idealMaxContextTokens } | null
+//   count(text)   -> approximate token count (bigram estimate) | null
+//   budget(slack) -> idealMaxContextTokens - slack (default 800)
+//   preload()     -> warm the broker (harmless; no measurable speedup)
+// -----------------------------------------------------------------
+function meta() {
+  var plugin = grabPlugin();
+  if (!plugin) return null;
+  try { return plugin({ getMetaObject: true }) || null; } catch (e) { return null; }
+}
+
+function count(text) {
+  var m = meta();
+  if (!m || typeof m.countTokens !== 'function') return null;
+  try { return m.countTokens(String(text || '')); } catch (e) { return null; }
+}
+
+function budget(slack) {
+  var m = meta();
+  if (!m || typeof m.idealMaxContextTokens !== 'number') return null;
+  var s = (slack == null) ? 800 : slack;
+  return m.idealMaxContextTokens - s;
+}
+
+function preload() {
+  var plugin = grabPlugin();
+  if (!plugin) return;
+  try { plugin({ preload: true }); } catch (e) { /* ignore */ }
+}
+
+window.weld.stream = {
+  attach: attach,
+  run: run,
+  stopAll: stopAll,
+  isBusy: isBusy,
+  pending: pending,
+  meta: meta,
+  count: count,
+  budget: budget,
+  preload: preload,
+  DEFAULT_CHAT_STOPS: DEFAULT_CHAT_STOPS,
+  version: '1.0.0'
+};
+
+
+return window.weld.stream;
+
+})();
+</script>
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>

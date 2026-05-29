@@ -1,0 +1,362 @@
+$meta
+  title       = weld.stream
+  description = AI text generation lifecycle: streaming with onChunk/onToken, abort via stop(), normalized stopReason, a single-broker serial queue, and token-budget helpers. Wraps ai-text-plugin. Stash on window.weld.stream.
+  tags        = weld, stream, ai, generation, aitext, plugin
+
+aiTextPlugin = {import:ai-text-plugin}
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.stream) {
+    window.weld.stream.attach({ aiTextPlugin: aiTextPlugin });
+    return window.weld.stream;
+  }
+
+  // -----------------------------------------------------------------
+  // weld.stream: the generation half of an AI chat app.
+  //
+  // weld.prompt assembles the instruction string; weld.stream sends it
+  // to ai-text-plugin and manages the call lifecycle. It exists because
+  // the raw plugin has three sharp edges that every consumer re-hits:
+  //
+  //   1. The resolved value is a BOXED String, not a primitive, so
+  //      `result === "x"` is always false. We hand back a plain string.
+  //   2. stopReason is "natural" | "artificial" | "error" | "user" --
+  //      NOT the "stop_sequence"/"max_tokens" the official docs claim.
+  //      We translate to plain booleans: truncated / aborted / error.
+  //   3. The broker accepts exactly one generation at a time. Overlapping
+  //      calls don't error -- they just contend. We serialize them in an
+  //      internal FIFO queue so callers can fire-and-forget.
+  //
+  // The plugin must be imported in the lists editor (see the import
+  // directive at the top of this generator) and handed to us via
+  // weld.stream.attach({ aiTextPlugin: aiTextPlugin }) -- the DSL form
+  // below does this automatically. If you skip it we also try
+  // window.root.aiTextPlugin as a fallback.
+  // -----------------------------------------------------------------
+
+  var deps = { aiTextPlugin: null };
+
+  function attach(d) {
+    if (d && typeof d.aiTextPlugin === 'function') deps.aiTextPlugin = d.aiTextPlugin;
+  }
+
+  function grabPlugin() {
+    if (typeof deps.aiTextPlugin === 'function') return deps.aiTextPlugin;
+    try {
+      if (window.root && typeof window.root.aiTextPlugin === 'function') return window.root.aiTextPlugin;
+    } catch (e) { /* proxy miss */ }
+    return null;
+  }
+
+  // -----------------------------------------------------------------
+  // Constants. A literal double-open-bracket sequence would be read as a
+  // Perchance template by the source scanner, so we assemble it from char
+  // codes instead.
+  // -----------------------------------------------------------------
+  var LBR = String.fromCharCode(91);            // "["
+  var DOUBLE = LBR + LBR;                        // a double open bracket
+  var DEFAULT_CHAT_STOPS = ['\n\n' + DOUBLE, '\n' + DOUBLE]; // the two standard chat stop sequences
+  var MAX_STOP_SEQUENCES = 20;                   // hard backend limit (21+ => stopReason "error")
+
+  var idSeq = 0;
+  function nextId() {
+    idSeq += 1;
+    return 'weldStream' + Date.now() + '_' + idSeq;
+  }
+
+  // -----------------------------------------------------------------
+  // Normalize the boxed-String result into a plain, predictable object.
+  // -----------------------------------------------------------------
+  function normalize(result) {
+    var out = {
+      text: '',
+      stopReason: 'natural',
+      truncated: false,   // "artificial": hit a stop sequence or the output ceiling
+      aborted: false,     // "user": stop() was called
+      error: null
+    };
+    if (result == null) {
+      out.stopReason = 'error';
+      out.error = 'no result returned from ai-text-plugin';
+      return out;
+    }
+    var reason = result.stopReason || 'natural';
+    out.stopReason = reason;
+    // generatedText is the full output; String(result) also works on the box.
+    out.text = (result.generatedText != null) ? String(result.generatedText) : String(result);
+    if (reason === 'artificial') out.truncated = true;
+    if (reason === 'user') out.aborted = true;
+    if (reason === 'error') {
+      out.error = 'ai-text-plugin reported a generation error';
+      out.text = '';
+    }
+    return out;
+  }
+
+  function clampStops(stops) {
+    if (stops == null) return null;
+    if (!Array.isArray(stops)) stops = [stops];
+    stops = stops.filter(function (s) { return s != null && String(s).length > 0; });
+    if (stops.length === 0) return null;
+    if (stops.length > MAX_STOP_SEQUENCES) stops = stops.slice(0, MAX_STOP_SEQUENCES);
+    return stops;
+  }
+
+  // -----------------------------------------------------------------
+  // Serial queue. activeEntry is the in-flight generation; the broker
+  // handles exactly one at a time, so everything else waits behind it.
+  // -----------------------------------------------------------------
+  var queue = [];
+  var activeEntry = null;
+  var pumping = false;
+
+  function buildCallOpts(entry) {
+    var o = entry.opts;
+    var callOpts = { instruction: String(o.instruction) };
+
+    if (o.startWith != null) {
+      callOpts.startWith = String(o.startWith);
+      // Default to hiding the echoed prefix unless the caller opts out.
+      callOpts.hideStartWith = (o.hideStartWith !== false);
+    }
+
+    var stops = (o.stopSequences != null)
+      ? o.stopSequences
+      : (o.chat ? DEFAULT_CHAT_STOPS : null);
+    stops = clampStops(stops);
+    if (stops) callOpts.stopSequences = stops;
+
+    // Stream only when a chunk/token handler is supplied. A bare await
+    // path still resolves with the complete text either way.
+    if (typeof o.onChunk === 'function' || typeof o.onToken === 'function') {
+      callOpts.onChunk = function (c) {
+        if (!c) return;
+        if (c.isFromStartWith) return;           // skip the echoed startWith
+        var delta = c.textChunk || '';
+        entry.liveText += delta;
+        if (typeof o.onChunk === 'function') {
+          try { o.onChunk(delta, entry.liveText); } catch (e) { /* consumer error */ }
+        }
+        if (typeof o.onToken === 'function') {
+          try { o.onToken(delta); } catch (e) { /* consumer error */ }
+        }
+      };
+    }
+    return callOpts;
+  }
+
+  function settle(entry, norm) {
+    if (entry._settled) return;
+    entry._settled = true;
+    var o = entry.opts;
+    if (norm.error && typeof o.onError === 'function') {
+      try { o.onError(norm.error, norm); } catch (e) { /* consumer error */ }
+    }
+    if (typeof o.onDone === 'function') {
+      try { o.onDone(norm); } catch (e) { /* consumer error */ }
+    }
+    entry._resolve(norm);
+  }
+
+  function pump() {
+    if (pumping || activeEntry) return;
+    // Drop any entries cancelled while queued (already settled by stop()).
+    while (queue.length && queue[0]._settled) queue.shift();
+    if (queue.length === 0) return;
+
+    pumping = true;
+    var entry = queue.shift();
+    activeEntry = entry;
+    entry.started = true;
+
+    var plugin = grabPlugin();
+    if (!plugin) {
+      activeEntry = null;
+      pumping = false;
+      settle(entry, {
+        text: '', stopReason: 'error', truncated: false, aborted: false,
+        error: 'weld.stream: ai-text-plugin is not attached. Add '
+          + 'aiTextPlugin = ' + '{' + 'import:ai-text-plugin' + '}'
+          + ' to your lists and call weld.stream.attach({ aiTextPlugin }).'
+      });
+      pump();
+      return;
+    }
+
+    var instr = entry.opts.instruction;
+    if (instr == null || String(instr).trim() === '') {
+      activeEntry = null;
+      pumping = false;
+      settle(entry, {
+        text: '', stopReason: 'error', truncated: false, aborted: false,
+        error: 'weld.stream: instruction is empty.'
+      });
+      pump();
+      return;
+    }
+
+    var done = function (norm) {
+      activeEntry = null;
+      entry.inner = null;
+      pumping = false;
+      settle(entry, norm);
+      pump();
+    };
+
+    try {
+      var inner = plugin(buildCallOpts(entry));   // synchronous extended-Promise handle
+      entry.inner = inner;
+      // If stop() arrived between dequeue and here, honor it now.
+      if (entry._stopRequested && inner && typeof inner.stop === 'function') {
+        try { inner.stop(); } catch (e) { /* ignore */ }
+      }
+      Promise.resolve(inner).then(function (raw) {
+        done(normalize(raw));
+      }, function (err) {
+        done({
+          text: '', stopReason: 'error', truncated: false, aborted: false,
+          error: String((err && err.message) || err)
+        });
+      });
+    } catch (err) {
+      done({
+        text: '', stopReason: 'error', truncated: false, aborted: false,
+        error: String((err && err.message) || err)
+      });
+    }
+  }
+
+  // -----------------------------------------------------------------
+  // Public: run(opts) -> handle. The handle is thenable and abortable.
+  //
+  // opts:
+  //   instruction    (string, required)
+  //   startWith      (string)  text the model continues from
+  //   hideStartWith  (bool)    default true when startWith is set
+  //   stopSequences  (string[]) clamped to 20; falls back to chat stops if chat:true
+  //   chat           (bool)    use the double-bracketed Name wire-format stops
+  //   onChunk(delta, fullText) stream callback (enables streaming)
+  //   onToken(delta)           lighter stream callback
+  //   onDone(result)           fires once on completion (any outcome)
+  //   onError(message, result) fires once on error
+  //
+  // resolves to: { text, stopReason, truncated, aborted, error }
+  // -----------------------------------------------------------------
+  function run(opts) {
+    opts = opts || {};
+    var entry = {
+      id: nextId(),
+      opts: opts,
+      liveText: '',
+      started: false,
+      inner: null,
+      _settled: false,
+      _stopRequested: false,
+      _resolve: null
+    };
+    entry.promise = new Promise(function (resolve) { entry._resolve = resolve; });
+
+    function stop() {
+      entry._stopRequested = true;
+      if (entry._settled) return;
+      if (activeEntry === entry && entry.inner && typeof entry.inner.stop === 'function') {
+        // In flight: abort the broker call. It resolves with stopReason "user".
+        try { entry.inner.stop(); } catch (e) { /* ignore */ }
+      } else if (!entry.started) {
+        // Still queued: settle immediately as aborted; pump() will skip it.
+        settle(entry, {
+          text: entry.liveText, stopReason: 'user',
+          truncated: false, aborted: true, error: null
+        });
+      }
+    }
+
+    var handle = {
+      id: entry.id,
+      stop: stop,
+      promise: entry.promise,
+      then: function (a, b) { return entry.promise.then(a, b); },
+      catch: function (b) { return entry.promise.catch(b); },
+      finally: function (f) { return entry.promise.finally(f); }
+    };
+    Object.defineProperty(handle, 'liveText', { get: function () { return entry.liveText; } });
+    Object.defineProperty(handle, 'started', { get: function () { return entry.started; } });
+    Object.defineProperty(handle, 'queued', { get: function () { return !entry.started && !entry._settled; } });
+
+    queue.push(entry);
+    pump();
+    return handle;
+  }
+
+  // Abort the active generation and discard everything queued behind it.
+  function stopAll() {
+    var pending = queue.slice();
+    if (activeEntry && activeEntry.inner && typeof activeEntry.inner.stop === 'function') {
+      try { activeEntry.inner.stop(); } catch (e) { /* ignore */ }
+    }
+    pending.forEach(function (entry) {
+      if (entry._settled || entry === activeEntry) return;
+      settle(entry, {
+        text: entry.liveText, stopReason: 'user',
+        truncated: false, aborted: true, error: null
+      });
+    });
+  }
+
+  function isBusy() { return !!activeEntry; }
+  function pending() {
+    return queue.filter(function (e) { return !e._settled && !e.started; }).length;
+  }
+
+  // -----------------------------------------------------------------
+  // Token helpers, surfaced from the plugin's meta object.
+  //   meta()        -> { countTokens, idealMaxContextTokens } | null
+  //   count(text)   -> approximate token count (bigram estimate) | null
+  //   budget(slack) -> idealMaxContextTokens - slack (default 800)
+  //   preload()     -> warm the broker (harmless; no measurable speedup)
+  // -----------------------------------------------------------------
+  function meta() {
+    var plugin = grabPlugin();
+    if (!plugin) return null;
+    try { return plugin({ getMetaObject: true }) || null; } catch (e) { return null; }
+  }
+
+  function count(text) {
+    var m = meta();
+    if (!m || typeof m.countTokens !== 'function') return null;
+    try { return m.countTokens(String(text || '')); } catch (e) { return null; }
+  }
+
+  function budget(slack) {
+    var m = meta();
+    if (!m || typeof m.idealMaxContextTokens !== 'number') return null;
+    var s = (slack == null) ? 800 : slack;
+    return m.idealMaxContextTokens - s;
+  }
+
+  function preload() {
+    var plugin = grabPlugin();
+    if (!plugin) return;
+    try { plugin({ preload: true }); } catch (e) { /* ignore */ }
+  }
+
+  window.weld.stream = {
+    attach: attach,
+    run: run,
+    stopAll: stopAll,
+    isBusy: isBusy,
+    pending: pending,
+    meta: meta,
+    count: count,
+    budget: budget,
+    preload: preload,
+    DEFAULT_CHAT_STOPS: DEFAULT_CHAT_STOPS,
+    version: '1.0.0'
+  };
+
+  window.weld.stream.attach({ aiTextPlugin: aiTextPlugin });
+
+  return window.weld.stream;
