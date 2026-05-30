@@ -1,0 +1,1369 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:820px;margin:0 auto;padding:36px 18px 96px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 0 16px;margin-bottom:22px;border-bottom:1px solid var(--border);}
+.breadcrumb a{color:var(--muted);}.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}.breadcrumb .crumb-cur{color:var(--ink);}.breadcrumb .crumb-action a{color:var(--accent);}
+.hdr{margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:12px;}.hdr h1{font:700 25px var(--mono);letter-spacing:-0.5px;}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;}
+.hdr .lead{color:var(--muted);margin-top:8px;}
+.drop{border:2px dashed var(--border);border-radius:12px;padding:30px 18px;text-align:center;cursor:pointer;transition:.15s;background:var(--surface);}
+.drop:hover,.drop.over{border-color:var(--accent);background:rgba(68,147,248,0.06);}
+.drop .big{font-size:15px;font-weight:600;}.drop .sub{color:var(--muted);font-size:12px;margin-top:4px;}
+.hide{display:none!important;}
+.controls{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin:14px 0;}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0;}
+.row .lbl{font:600 12px var(--mono);color:var(--muted);min-width:84px;}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+.seg button{background:transparent;color:var(--muted);border:0;padding:6px 11px;font:600 12px var(--font);cursor:pointer;}
+.seg button.on{background:var(--accent);color:#fff;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 15px;font:600 13px var(--font);cursor:pointer;}
+.btn.ghost{background:var(--faint);color:var(--ink);}.btn:disabled{opacity:.4;cursor:not-allowed;}
+input[type=text]{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:8px 10px;font:13px var(--font);flex:1;min-width:140px;}
+.thumb{width:54px;height:54px;border-radius:8px;border:1px solid var(--border);object-fit:contain;background-image:linear-gradient(45deg,#222 25%,transparent 25%),linear-gradient(-45deg,#222 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#222 75%),linear-gradient(-45deg,transparent 75%,#222 75%);background-size:12px 12px;background-position:0 0,0 6px,6px -6px,-6px 0;background-color:#2b2b2b;}
+.warn{color:var(--red);font:12px var(--mono);min-height:16px;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:10px 14px;border-radius:0 4px 4px 0;margin:16px 0;font-size:13px;color:#c9d1d9;}
+#stage{margin:14px 0;}
+.footer{margin-top:42px;padding-top:18px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);}.footer a{color:var(--muted);}
+</style>
+<div id="page">
+  <div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.vn<span class="crumb-sep">/</span><span class="crumb-cur">demo</span></span><span class="crumb-action"><a href="https://perchance.org/weld-vn-plugin">docs &rarr;</a></span></div>
+  <div class="hdr">
+    <div class="hdr-row"><h1>weld.vn &mdash; mini visual novel</h1><span class="ver">composes 4 plugins</span></div>
+    <p class="lead">A tiny visual-novel scene built from weld plugins: <b>weld.background</b> cuts your character out, <b>weld.vn</b> stages the dialogue and choices, <b>weld.banlist</b> screens the text, and <b>weld.comments</b> opens a discussion. Everything runs in your browser.</p>
+  </div>
+
+  <div id="drop" class="drop">
+    <div class="big">Choose a character image</div>
+    <div class="sub">drag &amp; drop / paste / camera roll &middot; it gets cut out to a transparent sprite</div>
+    <input id="file" class="hide" type="file" accept="image/*">
+  </div>
+
+  <div id="setup" class="controls hide">
+    <div class="row"><span class="lbl">character</span><img id="thumb" class="thumb" alt=""><span id="cutInfo" class="hoverchip" style="font:12px var(--mono);color:var(--muted);"></span></div>
+    <div class="row"><span class="lbl">name</span><input id="nameInput" type="text" value="Aria" maxlength="24"></div>
+    <div class="row"><span class="lbl">opening line</span><input id="lineInput" type="text" value="So... this is where our story begins." maxlength="160"></div>
+    <div class="row"><span class="lbl">backdrop</span>
+      <span class="seg" id="sceneSeg">
+        <button data-scene="dusk" class="on">Dusk</button><button data-scene="sky">Sky</button><button data-scene="room">Room</button>
+      </span>
+      <button id="sceneBtn" class="btn ghost">Upload backdrop</button>
+      <input id="sceneFile" class="hide" type="file" accept="image/*">
+    </div>
+    <div class="row"><span class="lbl">position</span>
+      <span class="seg" id="posSeg"><button data-pos="left">Left</button><button data-pos="center" class="on">Center</button><button data-pos="right">Right</button></span>
+    </div>
+    <div class="row"><span id="warn" class="warn"></span></div>
+    <div class="row" style="margin-top:8px;">
+      <button id="playBtn" class="btn">Play scene</button>
+      <button id="snapBtn" class="btn ghost" disabled>Snapshot PNG</button>
+      <button id="discussBtn" class="btn ghost">Discuss this scene</button>
+      <button id="reset" class="btn ghost">New character</button>
+    </div>
+  </div>
+
+  <div id="stage"></div>
+
+  <div class="note">This is a generic reference app, not a clone of any specific generator. Swap the scripted lines for <code>weld.stream</code> output, the backdrop for <code>weld.image</code>, and persist scenes with <code>weld.persist</code> to grow it into a full story engine &mdash; the staging, cut-out, moderation, and discussion are already reusable plugins.</div>
+
+  <footer class="footer"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
+</div>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.background) return window.weld.background;
+
+// -----------------------------------------------------------------
+// weld.background: take an image, drop its background, put a new one
+// behind the subject. Built to run on a photo the user uploads from
+// their phone or PC, entirely in the browser -- so the default engine
+// is pure canvas (no model, no network) and works inside the Perchance
+// sandbox where loading a big ML model is not guaranteed.
+//
+//   remove(src, opts)            -> canvas with the background erased
+//   replace(src, background, o)  -> canvas with a new background behind
+//   mask(src, opts)              -> the raw alpha mask
+//   maskFromData(rgba, w, h, o)  -> pure mask math (testable, no canvas)
+//   useSegmenter(fn)             -> swap in an AI cutout when you have one
+//   fromFile / fromUrl / toDataUrl / toBlob / download  -> I/O helpers
+//
+// The default keying works best on a reasonably uniform background
+// (a wall, sky, product backdrop, green/blue screen). For arbitrary
+// scenes, register an AI segmenter via useSegmenter().
+// -----------------------------------------------------------------
+
+var MAX_DIM_DEFAULT = 1600; // cap working size so big phone photos stay fast
+var segmenter = null;       // optional async (canvas) -> alpha mask
+
+// ---- pure colour helpers (no DOM) ----
+function dist(d, i, r, g, b) {
+  var dr = (d[i] - r) / 255, dg = (d[i + 1] - g) / 255, db = (d[i + 2] - b) / 255;
+  return Math.sqrt((dr * dr + dg * dg + db * db) / 3); // 0..1
+}
+
+// Estimate the background colour from the border pixels (trimmed mean).
+function estimateBgColor(data, w, h) {
+  var rs = [], gs = [], bs = [];
+  function add(x, y) {
+    var i = (y * w + x) * 4;
+    rs.push(data[i]); gs.push(data[i + 1]); bs.push(data[i + 2]);
+  }
+  var step = Math.max(1, Math.floor(Math.max(w, h) / 200));
+  for (var x = 0; x < w; x += step) { add(x, 0); add(x, h - 1); }
+  for (var y = 0; y < h; y += step) { add(0, y); add(w - 1, y); }
+  function trimmedMean(arr) {
+    arr.sort(function (a, b) { return a - b; });
+    var lo = Math.floor(arr.length * 0.1), hi = Math.ceil(arr.length * 0.9);
+    var sum = 0, n = 0;
+    for (var k = lo; k < hi; k++) { sum += arr[k]; n++; }
+    return n ? Math.round(sum / n) : (arr.length ? arr[arr.length >> 1] : 255);
+  }
+  return [trimmedMean(rs), trimmedMean(gs), trimmedMean(bs)];
+}
+
+// Feathered alpha for a colour distance: 255 (keep) far from the key,
+// 0 (drop) within tol, a smooth ramp across the softness band.
+function alphaFor(d, tol, soft) {
+  if (d <= tol) return 0;
+  if (soft <= 0) return 255;
+  if (d >= tol + soft) return 255;
+  return Math.round(255 * (d - tol) / soft);
+}
+
+// Distance to the NEAREST of a list of key colours (for multi-pick).
+function minDist(d, i, keys) {
+  var m = 1;
+  for (var k = 0; k < keys.length; k++) {
+    var dd = dist(d, i, keys[k][0], keys[k][1], keys[k][2]);
+    if (dd < m) m = dd;
+  }
+  return m;
+}
+
+// The core mask. Pure: operates on a raw RGBA array, returns a
+// Uint8ClampedArray of per-pixel alpha (255 = foreground/keep).
+// opts: { mode:'auto'|'chroma', keyColor:[r,g,b], keyColors (array of [r,g,b]),
+//         tolerance, softness, contiguous (auto only), smooth }
+// keyColors lets an eyedropper remove several background colours at once:
+// a pixel is background if it is within tolerance of ANY key colour.
+function maskFromData(data, w, h, opts) {
+  opts = opts || {};
+  var tol = opts.tolerance != null ? opts.tolerance : 0.18;
+  var soft = opts.softness != null ? opts.softness : 0.10;
+  var keys = (opts.keyColors && opts.keyColors.length)
+    ? opts.keyColors
+    : [opts.keyColor || estimateBgColor(data, w, h)];
+  var n = w * h;
+  var alpha = new Uint8ClampedArray(n);
+  for (var p = 0; p < n; p++) alpha[p] = 255;
+
+  var contiguous = (opts.mode === 'chroma') ? false
+    : (opts.contiguous !== false); // auto defaults to contiguous
+
+  if (!contiguous) {
+    // Global colour key: erase any of the key colours everywhere.
+    for (var q = 0; q < n; q++) {
+      alpha[q] = alphaFor(minDist(data, q * 4, keys), tol, soft);
+    }
+  } else {
+    // Flood fill from the borders: only erase background connected to
+    // an edge, so a subject the same colour as the wall is kept.
+    var visited = new Uint8Array(n);
+    var stack = [];
+    function consider(idx) {
+      if (visited[idx]) return;
+      visited[idx] = 1;
+      var d = minDist(data, idx * 4, keys);
+      if (d <= tol + soft) {
+        alpha[idx] = alphaFor(d, tol, soft);
+        stack.push(idx);
+      }
+      // else: a foreground edge -- leave alpha 255, do not spread through it
+    }
+    for (var bx = 0; bx < w; bx++) { consider(bx); consider((h - 1) * w + bx); }
+    for (var by = 0; by < h; by++) { consider(by * w); consider(by * w + (w - 1)); }
+    while (stack.length) {
+      var idx2 = stack.pop();
+      var px = idx2 % w, py = (idx2 - px) / w;
+      if (px > 0) consider(idx2 - 1);
+      if (px < w - 1) consider(idx2 + 1);
+      if (py > 0) consider(idx2 - w);
+      if (py < h - 1) consider(idx2 + w);
+    }
+  }
+
+  if (opts.smooth !== false && soft > 0) smoothAlpha(alpha, w, h);
+  return alpha;
+}
+
+// A light 3x3 average pass on the alpha to soften jagged edges.
+function smoothAlpha(alpha, w, h) {
+  var src = alpha.slice();
+  for (var y = 1; y < h - 1; y++) {
+    for (var x = 1; x < w - 1; x++) {
+      var i = y * w + x;
+      // only touch boundary pixels (where neighbours disagree)
+      var a = src[i];
+      if (a === 0 || a === 255) {
+        var diff = false;
+        if (src[i - 1] !== a || src[i + 1] !== a || src[i - w] !== a || src[i + w] !== a) diff = true;
+        if (!diff) continue;
+      }
+      var sum = src[i] + src[i - 1] + src[i + 1] + src[i - w] + src[i + w]
+        + src[i - w - 1] + src[i - w + 1] + src[i + w - 1] + src[i + w + 1];
+      alpha[i] = Math.round(sum / 9);
+    }
+  }
+}
+
+// ---- canvas I/O ----
+function makeCanvas(w, h) {
+  var c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  return c;
+}
+
+// Draw any source (canvas/image/ImageBitmap) onto a new canvas,
+// optionally downscaled so the long side <= maxDim.
+function toWorkingCanvas(srcImg, maxDim) {
+  var sw = srcImg.naturalWidth || srcImg.width;
+  var sh = srcImg.naturalHeight || srcImg.height;
+  var scale = 1;
+  if (maxDim && Math.max(sw, sh) > maxDim) scale = maxDim / Math.max(sw, sh);
+  var w = Math.max(1, Math.round(sw * scale));
+  var h = Math.max(1, Math.round(sh * scale));
+  var c = makeCanvas(w, h);
+  c.getContext('2d').drawImage(srcImg, 0, 0, w, h);
+  return c;
+}
+
+function getData(canvas) {
+  return canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+}
+
+// Resolve a source (canvas | image element | File/Blob | url string) to
+// a working canvas (Promise).
+function resolveSource(src, opts) {
+  opts = opts || {};
+  var maxDim = opts.maxDim != null ? opts.maxDim : MAX_DIM_DEFAULT;
+  if (src && src.getContext) return Promise.resolve(toWorkingCanvas(src, maxDim));
+  if (typeof Blob !== 'undefined' && src instanceof Blob) {
+    return fromFile(src).then(function (c) { return toWorkingCanvas(c, maxDim); });
+  }
+  if (typeof src === 'string') {
+    return fromUrl(src).then(function (c) { return toWorkingCanvas(c, maxDim); });
+  }
+  if (src && (src.naturalWidth || src.width)) return Promise.resolve(toWorkingCanvas(src, maxDim));
+  return Promise.reject(new Error('weld.background: unsupported image source'));
+}
+
+function fromFile(file) {
+  return new Promise(function (resolve, reject) {
+    if (typeof FileReader === 'undefined') { reject(new Error('weld.background: FileReader unavailable')); return; }
+    var fr = new FileReader();
+    fr.onload = function () { resolve(fromUrl(fr.result)); };
+    fr.onerror = function () { reject(fr.error); };
+    fr.readAsDataURL(file);
+  }).then(function (c) { return c; });
+}
+
+function fromUrl(url) {
+  return new Promise(function (resolve, reject) {
+    var img = new Image();
+    // data: URLs are same-origin; remote URLs need CORS to read pixels.
+    if (!/^data:/.test(String(url))) img.crossOrigin = 'anonymous';
+    img.onload = function () {
+      var c = makeCanvas(img.naturalWidth, img.naturalHeight);
+      c.getContext('2d').drawImage(img, 0, 0);
+      resolve(c);
+    };
+    img.onerror = function () { reject(new Error('weld.background: could not load image')); };
+    img.src = url;
+  });
+}
+
+// ---- public mask / remove ----
+function mask(src, opts) {
+  return resolveSource(src, opts).then(function (canvas) {
+    if (segmenter) {
+      return Promise.resolve(segmenter(canvas, opts)).then(function (m) {
+        return { width: canvas.width, height: canvas.height, alpha: normalizeMask(m, canvas.width, canvas.height), canvas: canvas };
+      });
+    }
+    var img = getData(canvas);
+    var alpha = maskFromData(img.data, canvas.width, canvas.height, opts);
+    return { width: canvas.width, height: canvas.height, alpha: alpha, canvas: canvas };
+  });
+}
+
+// Accept several segmenter return shapes -> Uint8ClampedArray alpha.
+function normalizeMask(m, w, h) {
+  var n = w * h;
+  if (m instanceof Uint8ClampedArray && m.length === n) return m;
+  if (m && m.data && m.data.length === n * 4) { // ImageData: take alpha channel
+    var a = new Uint8ClampedArray(n);
+    for (var i = 0; i < n; i++) a[i] = m.data[i * 4 + 3];
+    return a;
+  }
+  if (m && m.length === n) { // Float32 0..1 or Uint8 0..255
+    var out = new Uint8ClampedArray(n), float = m[0] <= 1 && m[0] >= 0;
+    // crude detection: assume 0..1 if max small; safer to scan
+    var max = 0; for (var k = 0; k < n; k++) if (m[k] > max) max = m[k];
+    var mul = max <= 1 ? 255 : 1;
+    for (var j = 0; j < n; j++) out[j] = m[j] * mul;
+    return out;
+  }
+  // Unknown: keep everything.
+  var keep = new Uint8ClampedArray(n);
+  for (var z = 0; z < n; z++) keep[z] = 255;
+  return keep;
+}
+
+// remove(src, opts) -> canvas with the background made transparent.
+function remove(src, opts) {
+  return mask(src, opts).then(function (res) {
+    var canvas = res.canvas;
+    var ctx = canvas.getContext('2d');
+    var img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    var d = img.data, a = res.alpha;
+    for (var p = 0; p < a.length; p++) {
+      var cur = d[p * 4 + 3];
+      d[p * 4 + 3] = Math.min(cur, a[p]);
+    }
+    if (opts && opts.despill) despillEdges(d, a, canvas.width, canvas.height, opts);
+    var out = makeCanvas(canvas.width, canvas.height);
+    out.getContext('2d').putImageData(img, 0, 0);
+    return out;
+  });
+}
+
+// Reduce key-colour fringe on partially transparent edge pixels.
+function despillEdges(d, alpha, w, h, opts) {
+  for (var p = 0; p < alpha.length; p++) {
+    if (alpha[p] > 0 && alpha[p] < 255) {
+      var i = p * 4;
+      var avg = (d[i] + d[i + 1] + d[i + 2]) / 3;
+      // pull each channel toward the local average to kill the spill tint
+      d[i] = Math.round((d[i] + avg) / 2);
+      d[i + 1] = Math.round((d[i + 1] + avg) / 2);
+      d[i + 2] = Math.round((d[i + 2] + avg) / 2);
+    }
+  }
+}
+
+// ---- background painting + compositing ----
+function paintBackground(ctx, w, h, background, original) {
+  if (background == null || background === 'transparent') return Promise.resolve();
+  if (typeof background === 'string') { ctx.fillStyle = background; ctx.fillRect(0, 0, w, h); return Promise.resolve(); }
+  if (background && background.gradient) {
+    var ang = (background.angle || 0) * Math.PI / 180;
+    var x = Math.cos(ang), y = Math.sin(ang);
+    var g = ctx.createLinearGradient(w / 2 - x * w / 2, h / 2 - y * h / 2, w / 2 + x * w / 2, h / 2 + y * h / 2);
+    var stops = background.gradient;
+    for (var s = 0; s < stops.length; s++) {
+      var pos = stops.length === 1 ? 0 : s / (stops.length - 1);
+      g.addColorStop(pos, stops[s]);
+    }
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); return Promise.resolve();
+  }
+  if (background && background.blur != null && original) {
+    var prev = ctx.filter;
+    ctx.filter = 'blur(' + background.blur + 'px)';
+    drawCover(ctx, original, w, h);
+    ctx.filter = prev || 'none';
+    return Promise.resolve();
+  }
+  // Otherwise treat as an image source.
+  var fit = (background && background.fit) || 'cover';
+  var imgSrc = (background && background.image) ? background.image : background;
+  return resolveSource(imgSrc, { maxDim: Math.max(w, h) }).then(function (bgCanvas) {
+    if (fit === 'stretch') ctx.drawImage(bgCanvas, 0, 0, w, h);
+    else if (fit === 'tile') tile(ctx, bgCanvas, w, h);
+    else if (fit === 'contain') drawContain(ctx, bgCanvas, w, h);
+    else drawCover(ctx, bgCanvas, w, h);
+  });
+}
+
+function drawCover(ctx, img, w, h) {
+  var iw = img.width, ih = img.height;
+  var scale = Math.max(w / iw, h / ih);
+  var dw = iw * scale, dh = ih * scale;
+  ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+}
+function drawContain(ctx, img, w, h) {
+  var iw = img.width, ih = img.height;
+  var scale = Math.min(w / iw, h / ih);
+  var dw = iw * scale, dh = ih * scale;
+  ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+}
+function tile(ctx, img, w, h) {
+  for (var y = 0; y < h; y += img.height) for (var x = 0; x < w; x += img.width) ctx.drawImage(img, x, y);
+}
+
+// replace(src, background, opts) -> canvas: foreground over a new bg.
+function replace(src, background, opts) {
+  opts = opts || {};
+  return resolveSource(src, opts).then(function (working) {
+    return remove(working, opts).then(function (fg) {
+      var w = fg.width, h = fg.height;
+      var out = makeCanvas(w, h);
+      var ctx = out.getContext('2d');
+      return Promise.resolve(paintBackground(ctx, w, h, background, working)).then(function () {
+        ctx.drawImage(fg, 0, 0);
+        return out;
+      });
+    });
+  });
+}
+
+// ---- output helpers ----
+function toDataUrl(canvas, type, quality) { return canvas.toDataURL(type || 'image/png', quality); }
+function toBlob(canvas, type, quality) {
+  return new Promise(function (resolve) {
+    if (canvas.toBlob) canvas.toBlob(function (b) { resolve(b); }, type || 'image/png', quality);
+    else resolve(dataUrlToBlob(canvas.toDataURL(type || 'image/png', quality)));
+  });
+}
+function dataUrlToBlob(url) {
+  var parts = url.split(','), mime = parts[0].match(/:(.*?);/)[1], bin = atob(parts[1]);
+  var arr = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+function download(canvas, filename, type, quality) {
+  var a = document.createElement('a');
+  a.href = toDataUrl(canvas, type, quality);
+  a.download = filename || 'cutout.png';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+// ---- AI hook ----
+function useSegmenter(fn) { segmenter = (typeof fn === 'function') ? fn : null; }
+function hasSegmenter() { return !!segmenter; }
+
+// ---- portrait helpers (v1.1.0) ----
+
+// Bounding box of non-transparent pixels. Pure. null if fully transparent.
+function alphaBounds(alpha, w, h, threshold) {
+  threshold = threshold || 0;
+  var minX = w, minY = h, maxX = -1, maxY = -1;
+  for (var y = 0; y < h; y++) {
+    for (var x = 0; x < w; x++) {
+      if (alpha[y * w + x] > threshold) {
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (maxX < 0) return null;
+  return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+}
+
+// Crop a canvas to its non-transparent subject (with optional padding).
+// Perfect for turning a cutout into a tidy character portrait.
+function trim(canvas, opts) {
+  opts = opts || {};
+  var ctx = canvas.getContext('2d');
+  var img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  var n = canvas.width * canvas.height;
+  var alpha = new Uint8ClampedArray(n);
+  for (var i = 0; i < n; i++) alpha[i] = img.data[i * 4 + 3];
+  var b = alphaBounds(alpha, canvas.width, canvas.height, opts.threshold || 0);
+  if (!b) return canvas;
+  var pad = opts.padding || 0;
+  var x = Math.max(0, b.x - pad), y = Math.max(0, b.y - pad);
+  var ww = Math.min(canvas.width - x, b.w + pad * 2);
+  var hh = Math.min(canvas.height - y, b.h + pad * 2);
+  var out = makeCanvas(ww, hh);
+  out.getContext('2d').drawImage(canvas, x, y, ww, hh, 0, 0, ww, hh);
+  return out;
+}
+
+// Label connected opaque regions (4-connectivity). Pure over an alpha
+// array. Returns { labels:Int32Array, comps:[{label,area,x,y,w,h}] }.
+function labelComponents(alpha, w, h) {
+  var n = w * h;
+  var labels = new Int32Array(n);
+  var comps = [];
+  var next = 1, stack = [];
+  for (var p = 0; p < n; p++) {
+    if (alpha[p] === 0 || labels[p] !== 0) continue;
+    var label = next++, area = 0;
+    var minX = w, minY = h, maxX = 0, maxY = 0;
+    stack.push(p); labels[p] = label;
+    while (stack.length) {
+      var idx = stack.pop();
+      var x = idx % w, y = (idx - x) / w;
+      area++;
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+      if (x > 0 && alpha[idx - 1] > 0 && labels[idx - 1] === 0) { labels[idx - 1] = label; stack.push(idx - 1); }
+      if (x < w - 1 && alpha[idx + 1] > 0 && labels[idx + 1] === 0) { labels[idx + 1] = label; stack.push(idx + 1); }
+      if (y > 0 && alpha[idx - w] > 0 && labels[idx - w] === 0) { labels[idx - w] = label; stack.push(idx - w); }
+      if (y < h - 1 && alpha[idx + w] > 0 && labels[idx + w] === 0) { labels[idx + w] = label; stack.push(idx + w); }
+    }
+    comps.push({ label: label, area: area, x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 });
+  }
+  return { labels: labels, comps: comps };
+}
+
+// Keep only the largest opaque blob (default), or, with opts.minArea,
+// every blob at least that big -- a despeckle that drops stray pixels
+// left over from keying. Returns a new canvas.
+function keepLargest(canvas, opts) {
+  opts = opts || {};
+  var w = canvas.width, h = canvas.height, n = w * h;
+  var ctx = canvas.getContext('2d');
+  var img = ctx.getImageData(0, 0, w, h);
+  var alpha = new Uint8ClampedArray(n);
+  for (var i = 0; i < n; i++) alpha[i] = img.data[i * 4 + 3];
+  var res = labelComponents(alpha, w, h);
+  if (!res.comps.length) return canvas;
+  var keep = {};
+  if (opts.minArea) {
+    for (var c = 0; c < res.comps.length; c++) if (res.comps[c].area >= opts.minArea) keep[res.comps[c].label] = 1;
+  } else {
+    var best = res.comps[0];
+    for (var c2 = 1; c2 < res.comps.length; c2++) if (res.comps[c2].area > best.area) best = res.comps[c2];
+    keep[best.label] = 1;
+  }
+  for (var q = 0; q < n; q++) if (!keep[res.labels[q]]) img.data[q * 4 + 3] = 0;
+  var out = makeCanvas(w, h);
+  out.getContext('2d').putImageData(img, 0, 0);
+  return out;
+}
+
+// Split a (background-removed) image into separate cropped object PNGs,
+// one per connected region above opts.minArea. Returns Promise of
+// [{ canvas, x, y, w, h, area }] sorted largest-first. Set opts.remove
+// to false if the source is already transparent.
+function extractObjects(src, opts) {
+  opts = opts || {};
+  var minArea = opts.minArea || 100;
+  var prep = (opts.remove === false) ? resolveSource(src, opts) : remove(src, opts);
+  return Promise.resolve(prep).then(function (canvas) {
+    var w = canvas.width, h = canvas.height, n = w * h;
+    var img = canvas.getContext('2d').getImageData(0, 0, w, h);
+    var alpha = new Uint8ClampedArray(n);
+    for (var i = 0; i < n; i++) alpha[i] = img.data[i * 4 + 3];
+    var res = labelComponents(alpha, w, h);
+    var out = [];
+    for (var c = 0; c < res.comps.length; c++) {
+      var comp = res.comps[c];
+      if (comp.area < minArea) continue;
+      var oc = makeCanvas(comp.w, comp.h);
+      var od = oc.getContext('2d').createImageData(comp.w, comp.h);
+      for (var yy = 0; yy < comp.h; yy++) {
+        for (var xx = 0; xx < comp.w; xx++) {
+          var si = ((comp.y + yy) * w + (comp.x + xx));
+          if (res.labels[si] !== comp.label) continue;
+          var di = (yy * comp.w + xx) * 4;
+          od.data[di] = img.data[si * 4];
+          od.data[di + 1] = img.data[si * 4 + 1];
+          od.data[di + 2] = img.data[si * 4 + 2];
+          od.data[di + 3] = img.data[si * 4 + 3];
+        }
+      }
+      oc.getContext('2d').putImageData(od, 0, 0);
+      out.push({ canvas: oc, x: comp.x, y: comp.y, w: comp.w, h: comp.h, area: comp.area });
+    }
+    out.sort(function (a, b) { return b.area - a.area; });
+    return out;
+  });
+}
+
+window.weld.background = {
+  remove: remove,
+  replace: replace,
+  mask: mask,
+  maskFromData: maskFromData,
+  estimateBgColor: estimateBgColor,
+  trim: trim,
+  keepLargest: keepLargest,
+  despeckle: keepLargest,
+  extractObjects: extractObjects,
+  alphaBounds: alphaBounds,
+  labelComponents: labelComponents,
+  fromFile: fromFile,
+  fromUrl: fromUrl,
+  toDataUrl: toDataUrl,
+  toBlob: toBlob,
+  download: download,
+  useSegmenter: useSegmenter,
+  hasSegmenter: hasSegmenter,
+  version: '1.1.0'
+};
+
+return window.weld.background;
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.vn) return window.weld.vn;
+
+// -----------------------------------------------------------------
+// weld.vn: the presentation layer of a visual novel / story game.
+//
+//   var stage = weld.vn.create(container, { typeSpeed: 18 });
+//   stage.background(skyUrl);
+//   stage.show('hero', { image: portraitCanvas, position: 'left' });
+//   await stage.say('Aria', 'So this is where it begins...');
+//   var pick = await stage.choices(['Follow her', 'Stay put']);
+//
+// The sprite images can be cut-out portraits from weld.background, the
+// backdrop can come from weld.image, and the lines can stream from
+// weld.stream -- weld.vn just stages them. A run(script) helper plays a
+// sequence of steps, and snapshot() composites the current frame to a
+// canvas for export. DOM-based; one stylesheet, injected once.
+// -----------------------------------------------------------------
+
+var STYLE_ID = 'weld-vn-style';
+
+function ensureStyle() {
+  if (typeof document === 'undefined' || document.getElementById(STYLE_ID)) return;
+  var st = document.createElement('style');
+  st.id = STYLE_ID;
+  st.textContent =
+    '.weld-vn{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:10px;background:#000;font-family:var(--vn-font,"DM Sans",system-ui,sans-serif);user-select:none;}'
+    + '.weld-vn-bg,.weld-vn-bg2{position:absolute;inset:0;background-size:cover;background-position:center;transition:opacity .5s ease;}'
+    + '.weld-vn-chars{position:absolute;inset:0;}'
+    + '.weld-vn-sprite{position:absolute;bottom:0;height:90%;transition:opacity .35s ease, transform .35s ease, filter .35s ease;will-change:opacity,transform;}'
+    + '.weld-vn-sprite.dim{filter:brightness(.55) saturate(.8);}'
+    + '.weld-vn-dialogue{position:absolute;left:3%;right:3%;bottom:3.5%;min-height:22%;background:rgba(8,12,22,.82);border:1.5px solid var(--accent,#4493f8);border-radius:12px;padding:18px 20px 16px;color:#e6edf3;cursor:pointer;opacity:0;transition:opacity .2s ease;box-shadow:0 8px 30px rgba(0,0,0,.4);}'
+    + '.weld-vn-dialogue.show{opacity:1;}'
+    + '.weld-vn-name{position:absolute;top:-14px;left:14px;background:var(--accent,#4493f8);color:#fff;font-weight:600;font-size:13px;padding:3px 12px;border-radius:8px;}'
+    + '.weld-vn-text{font-size:clamp(13px,2.1vw,17px);line-height:1.5;min-height:2.4em;}'
+    + '.weld-vn-next{position:absolute;right:14px;bottom:10px;color:var(--accent,#4493f8);font-size:14px;opacity:0;transition:opacity .2s;animation:weldVnBob 1s ease-in-out infinite;}'
+    + '.weld-vn-next.show{opacity:1;}'
+    + '@keyframes weldVnBob{0%,100%{transform:translateY(0);}50%{transform:translateY(3px);}}'
+    + '.weld-vn-choices{position:absolute;left:0;right:0;bottom:0;top:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(0,0,0,.35);padding:20px;}'
+    + '.weld-vn-choice{min-width:min(60%,360px);background:rgba(13,17,23,.92);border:1.5px solid var(--accent,#4493f8);color:#e6edf3;border-radius:10px;padding:12px 18px;font-size:15px;cursor:pointer;transition:background .15s,transform .1s;}'
+    + '.weld-vn-choice:hover{background:var(--accent,#4493f8);color:#fff;transform:translateY(-1px);}';
+  document.head.appendChild(st);
+}
+
+// Normalize an image source (url | canvas | Image) for display + snapshot.
+function normalizeImage(image) {
+  if (!image) return null;
+  if (image.getContext) return { url: image.toDataURL('image/png'), drawable: image, aspect: image.width / image.height };
+  if (image.tagName === 'IMG' || image.naturalWidth) {
+    var a = (image.naturalWidth && image.naturalHeight) ? image.naturalWidth / image.naturalHeight : null;
+    return { url: image.src, drawable: image, aspect: a };
+  }
+  return { url: String(image), drawable: null, aspect: null }; // a URL; aspect resolved on load
+}
+
+function loadImage(url) {
+  return new Promise(function (resolve, reject) {
+    var img = new Image();
+    if (!/^data:/.test(String(url))) img.crossOrigin = 'anonymous';
+    img.onload = function () { resolve(img); };
+    img.onerror = function () { reject(new Error('weld.vn: image load failed')); };
+    img.src = url;
+  });
+}
+
+function posToFrac(position) {
+  if (typeof position === 'number') return Math.max(0, Math.min(1, position));
+  if (position === 'left') return 0.04;
+  if (position === 'right') return 0.96;
+  return 0.5; // center
+}
+
+function create(container, opts) {
+  opts = opts || {};
+  if (typeof container === 'string') container = document.querySelector(container);
+  if (!container) throw new Error('weld.vn: container not found');
+  ensureStyle();
+
+  var typeSpeed = opts.typeSpeed != null ? opts.typeSpeed : 18; // ms per char
+  if (opts.font) container.style.setProperty('--vn-font', opts.font);
+
+  var root = document.createElement('div');
+  root.className = 'weld-vn';
+  root.innerHTML =
+    '<div class="weld-vn-bg" data-bg></div>'
+    + '<div class="weld-vn-bg2" data-bg2 style="opacity:0;"></div>'
+    + '<div class="weld-vn-chars" data-chars></div>'
+    + '<div class="weld-vn-dialogue" data-dialogue><div class="weld-vn-name" data-name></div><div class="weld-vn-text" data-text></div><div class="weld-vn-next" data-next>&#9660;</div></div>'
+    + '<div class="weld-vn-choices" data-choices style="display:none;"></div>';
+  container.appendChild(root);
+
+  var bgEl = root.querySelector('[data-bg]');
+  var charsEl = root.querySelector('[data-chars]');
+  var dialogueEl = root.querySelector('[data-dialogue]');
+  var nameEl = root.querySelector('[data-name]');
+  var textEl = root.querySelector('[data-text]');
+  var nextEl = root.querySelector('[data-next]');
+  var choicesEl = root.querySelector('[data-choices]');
+
+  // model (for snapshot)
+  var model = { bg: null, chars: {}, dialogue: null };
+  var advanceListeners = [];
+  var typing = null; // active typewriter controller
+
+  // ---- background ----
+  function bgCss(spec) {
+    if (spec == null) return '';
+    if (spec.gradient) {
+      var ang = (spec.angle != null ? spec.angle : 180);
+      return 'linear-gradient(' + ang + 'deg,' + spec.gradient.join(',') + ')';
+    }
+    if (spec.color) return spec.color;
+    if (typeof spec === 'string' && spec.charAt(0) === '#') return spec;
+    return '';
+  }
+  function background(src, o) {
+    o = o || {};
+    var spec;
+    if (src && src.getContext) spec = { image: src.toDataURL('image/png') };
+    else if (typeof src === 'string' && src.charAt(0) !== '#') spec = { image: src };
+    else if (typeof src === 'string') spec = { color: src };
+    else spec = src || {};
+    model.bg = spec;
+    if (spec.image) { bgEl.style.background = ''; bgEl.style.backgroundImage = 'url("' + spec.image + '")'; }
+    else { bgEl.style.backgroundImage = ''; bgEl.style.background = bgCss(spec); }
+    return api;
+  }
+
+  // ---- characters ----
+  function show(id, o) {
+    o = o || {};
+    var norm = normalizeImage(o.image);
+    var rec = model.chars[id] || {};
+    rec.norm = norm || rec.norm;
+    rec.position = o.position != null ? o.position : (rec.position != null ? rec.position : 'center');
+    rec.scale = o.scale != null ? o.scale : (rec.scale != null ? rec.scale : 0.9);
+    rec.flip = o.flip != null ? o.flip : !!rec.flip;
+    rec.dim = o.dim != null ? o.dim : !!rec.dim;
+    model.chars[id] = rec;
+
+    var el = rec.el;
+    if (!el) {
+      el = document.createElement('img');
+      el.className = 'weld-vn-sprite';
+      el.style.opacity = '0';
+      charsEl.appendChild(el);
+      rec.el = el;
+    }
+    if (rec.norm) el.src = rec.norm.url;
+    el.style.height = (rec.scale * 100) + '%';
+    var frac = posToFrac(rec.position);
+    el.style.left = (frac * 100) + '%';
+    el.style.transform = 'translateX(-50%)' + (rec.flip ? ' scaleX(-1)' : '');
+    el.classList.toggle('dim', !!rec.dim);
+    requestAnimationFrame(function () { el.style.opacity = '1'; });
+    return api;
+  }
+  function hide(id) {
+    var rec = model.chars[id];
+    if (rec && rec.el) { var el = rec.el; el.style.opacity = '0'; setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 360); }
+    delete model.chars[id];
+    return api;
+  }
+  function clearCharacters() { Object.keys(model.chars).forEach(hide); return api; }
+
+  // ---- dialogue (typewriter) ----
+  function say(name, text, o) {
+    o = o || {};
+    choicesEl.style.display = 'none';
+    model.dialogue = { name: name || '', text: String(text == null ? '' : text) };
+    nameEl.textContent = name || '';
+    nameEl.style.display = name ? '' : 'none';
+    dialogueEl.classList.add('show');
+    nextEl.classList.remove('show');
+    var full = model.dialogue.text;
+    textEl.textContent = '';
+
+    return new Promise(function (resolve) {
+      var i = 0, done = false, resolved = false;
+      function finish() { textEl.textContent = full; done = true; nextEl.classList.add('show'); if (typing) { clearInterval(typing.timer); typing = null; } }
+      function advance() {
+        if (!done) { finish(); return; }
+        if (resolved) return; resolved = true;
+        dialogueEl.removeEventListener('click', onClick);
+        root.removeEventListener('click', onClick);
+        advanceListeners.forEach(function (fn) { try { fn(); } catch (e) {} });
+        resolve();
+      }
+      function onClick() { advance(); }
+      if (o.instant || typeSpeed <= 0) { finish(); }
+      else {
+        typing = { timer: setInterval(function () {
+          i++; textEl.textContent = full.slice(0, i);
+          if (i >= full.length) finish();
+        }, typeSpeed) };
+      }
+      dialogueEl.addEventListener('click', onClick);
+    });
+  }
+
+  // ---- choices ----
+  function choices(list, o) {
+    o = o || {};
+    choicesEl.innerHTML = '';
+    choicesEl.style.display = 'flex';
+    return new Promise(function (resolve) {
+      (list || []).forEach(function (item, idx) {
+        var label = (item && item.label != null) ? item.label : item;
+        var value = (item && item.value != null) ? item.value : idx;
+        var b = document.createElement('button');
+        b.className = 'weld-vn-choice';
+        b.textContent = label;
+        b.addEventListener('click', function () {
+          choicesEl.style.display = 'none';
+          resolve(value);
+        });
+        choicesEl.appendChild(b);
+      });
+    });
+  }
+
+  // ---- script runner ----
+  // steps: { bg }, { background, fit }, { show, image, position, scale, flip },
+  //        { hide }, { name, text } or { say, name }, { choices, onChoose },
+  //        { wait }, { clear:'characters'|'all' }
+  function run(script) {
+    var steps = script || [];
+    var idx = 0;
+    function step() {
+      if (idx >= steps.length) return Promise.resolve();
+      var s = steps[idx++];
+      var p = Promise.resolve();
+      if (s.bg != null || s.background != null) background(s.bg != null ? s.bg : s.background, { fit: s.fit });
+      if (s.clear === 'all') { clearCharacters(); clearDialogue(); }
+      else if (s.clear === 'characters') clearCharacters();
+      if (s.hide != null) hide(s.hide);
+      if (s.show != null) show(s.show, s);
+      if (s.wait != null) p = p.then(function () { return new Promise(function (r) { setTimeout(r, s.wait); }); });
+      if (s.say != null || s.text != null) p = p.then(function () { return say(s.name || '', s.say != null ? s.say : s.text, s); });
+      if (s.choices != null) p = p.then(function () { return choices(s.choices, s).then(function (v) { if (s.onChoose) s.onChoose(v); }); });
+      return p.then(step);
+    }
+    return step();
+  }
+
+  function clearDialogue() { dialogueEl.classList.remove('show'); model.dialogue = null; }
+  function clear() { clearCharacters(); clearDialogue(); choicesEl.style.display = 'none'; background({}); return api; }
+  function destroy() { if (root.parentNode) root.parentNode.removeChild(root); advanceListeners = []; }
+  function onAdvance(fn) { advanceListeners.push(fn); return function () { var i = advanceListeners.indexOf(fn); if (i !== -1) advanceListeners.splice(i, 1); }; }
+
+  // ---- snapshot to canvas (for sharing/export) ----
+  function snapshot(o) {
+    o = o || {};
+    var W = o.width || 1280, H = o.height || 720;
+    var canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    var ctx = canvas.getContext('2d');
+
+    // background
+    var bgP = Promise.resolve();
+    var bg = model.bg || {};
+    if (bg.image) bgP = loadImage(bg.image).then(function (img) {
+      var sc = Math.max(W / img.width, H / img.height);
+      ctx.drawImage(img, (W - img.width * sc) / 2, (H - img.height * sc) / 2, img.width * sc, img.height * sc);
+    });
+    else { ctx.fillStyle = (bg.color || (typeof bg === 'string' ? bg : '#000')); if (bg.gradient) { var g = ctx.createLinearGradient(0, 0, 0, H); bg.gradient.forEach(function (c, i) { g.addColorStop(bg.gradient.length === 1 ? 0 : i / (bg.gradient.length - 1), c); }); ctx.fillStyle = g; } ctx.fillRect(0, 0, W, H); }
+
+    return bgP.then(function () {
+      // characters (ensure drawables loaded)
+      var ids = Object.keys(model.chars);
+      return ids.reduce(function (chain, id) {
+        var rec = model.chars[id];
+        if (!rec.norm) return chain;
+        return chain.then(function () {
+          var dp = rec.norm.drawable ? Promise.resolve(rec.norm.drawable) : loadImage(rec.norm.url);
+          return dp.then(function (drawable) {
+            var aspect = rec.norm.aspect || (drawable.width / drawable.height) || 0.6;
+            var dh = rec.scale * H, dw = dh * aspect;
+            var cx = posToFrac(rec.position) * W;
+            var x = cx - dw / 2, y = H - dh;
+            ctx.save();
+            if (rec.dim) ctx.filter = 'brightness(0.55)';
+            if (rec.flip) { ctx.translate(x + dw, y); ctx.scale(-1, 1); ctx.drawImage(drawable, 0, 0, dw, dh); }
+            else ctx.drawImage(drawable, x, y, dw, dh);
+            ctx.restore();
+          });
+        });
+      }, Promise.resolve());
+    }).then(function () {
+      // dialogue
+      if (model.dialogue && o.dialogue !== false) {
+        var bx = W * 0.03, bw = W * 0.94, bh = H * 0.24, by = H - bh - H * 0.035;
+        roundRect(ctx, bx, by, bw, bh, 14); ctx.fillStyle = 'rgba(8,12,22,0.82)'; ctx.fill();
+        ctx.strokeStyle = 'rgba(68,147,248,0.85)'; ctx.lineWidth = 2; roundRect(ctx, bx, by, bw, bh, 14); ctx.stroke();
+        if (model.dialogue.name) {
+          ctx.font = '600 ' + Math.round(H * 0.026) + 'px DM Sans, sans-serif';
+          var nw = ctx.measureText(model.dialogue.name).width + 30;
+          roundRect(ctx, bx + 16, by - H * 0.022, nw, H * 0.045, 8); ctx.fillStyle = '#4493f8'; ctx.fill();
+          ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; ctx.fillText(model.dialogue.name, bx + 31, by + 1);
+        }
+        ctx.fillStyle = '#e6edf3'; ctx.textBaseline = 'top'; ctx.font = Math.round(H * 0.03) + 'px DM Sans, sans-serif';
+        wrapText(ctx, model.dialogue.text, bx + 22, by + 24, bw - 44, H * 0.04);
+      }
+      return canvas;
+    });
+  }
+
+  function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+  function wrapText(ctx, text, x, y, maxW, lh) { var words = String(text).split(' '), line = '', yy = y; for (var i = 0; i < words.length; i++) { var t = line + words[i] + ' '; if (ctx.measureText(t).width > maxW && i > 0) { ctx.fillText(line, x, yy); line = words[i] + ' '; yy += lh; } else line = t; } ctx.fillText(line, x, yy); }
+
+  var api = {
+    background: background, show: show, hide: hide, clearCharacters: clearCharacters,
+    say: say, choices: choices, run: run, clear: clear, destroy: destroy,
+    onAdvance: onAdvance, snapshot: snapshot, el: root
+  };
+  return api;
+}
+
+window.weld.vn = {
+  create: create,
+  version: '1.0.0'
+};
+
+return window.weld.vn;
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.comments) return window.weld.comments;
+
+// -----------------------------------------------------------------
+// weld.comments: per-item discussion threads.
+//
+// Perchance hosts a comments-plugin embed. The reusable trick is to
+// give every item (image, post, scene...) its own channel by hashing a
+// stable key, theme the embed to match your app, and present it either
+// as an overlay modal or inline. weld.comments wraps all of that:
+//
+//   channel(key)            -> a stable channel id for that key
+//   open({ key, title, ... })  themed overlay with the thread
+//   inline(target, opts)       embed into an element
+//   close()
+//
+// No app identity is baked in -- you pass your app slug and (optional)
+// admin hash. Defaults are sensible and generic.
+// -----------------------------------------------------------------
+
+var EMBED_BASE = 'https://comments-plugin.perchance.org/embed/';
+var STYLE_ID = 'weld-comments-style';
+var overlay = null;
+
+// Stable short hash (djb2 -> base36) for deriving a channel from any key.
+function hash(text) {
+  text = String(text == null ? '' : text);
+  var h = 5381;
+  for (var i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) | 0;
+  return Math.abs(h).toString(36);
+}
+
+// A channel id for an item. prefix groups channels under your app.
+function channel(key, prefix) {
+  prefix = prefix || defaultApp();
+  return prefix + '-' + hash(key);
+}
+
+function defaultApp() {
+  try { if (window.generatorName) return String(window.generatorName); } catch (e) {}
+  return 'weld';
+}
+
+function resolveTheme(theme) {
+  if (theme === 'light' || theme === 'dark') return theme;
+  try { if (document.body && document.body.classList.contains('light-theme')) return 'light'; } catch (e) {}
+  return 'dark';
+}
+
+function defaultConfig() {
+  return {
+    loadFonts: 'Open Sans, Inter',
+    containerStyle: 'width:100%;height:100%;',
+    inputAreaStyle: 'height:68px;',
+    commentPlaceholderText: 'Add a comment...',
+    submitButtonText: 'comment',
+    allowBots: false
+  };
+}
+
+// Build the embed src. app = generator slug the thread lives under.
+function buildSrc(app, chan, config) {
+  config = config || {};
+  var merged = {};
+  var d = defaultConfig();
+  for (var k in d) merged[k] = d[k];
+  for (var k2 in config) merged[k2] = config[k2];
+  merged.channel = chan;
+  var adminHash = merged.adminPasswordHash || '';
+  var encoded = encodeURIComponent(JSON.stringify(merged));
+  var src = EMBED_BASE + app + '+' + chan + '?';
+  if (adminHash) src += 'adminPasswordHash=' + adminHash;
+  return src + '#' + encoded;
+}
+
+function ensureStyle() {
+  if (typeof document === 'undefined' || document.getElementById(STYLE_ID)) return;
+  var st = document.createElement('style');
+  st.id = STYLE_ID;
+  st.textContent =
+    '.weld-comments-ov{z-index:99999;position:fixed;inset:0;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;padding:14px;box-sizing:border-box;}'
+    + '.weld-comments-card{width:min(980px,100%);height:min(760px,92dvh);background:var(--background-color,var(--bg-color,#111));color:var(--text-color,#eee);border:1px solid var(--border-color,#444);border-radius:12px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.35);}'
+    + '.weld-comments-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;border-bottom:1px solid var(--border-color,#444);}'
+    + '.weld-comments-title{font-weight:700;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}'
+    + '.weld-comments-x{border:1px solid var(--border-color,#444);background:var(--input-bg,#222);color:var(--text-color,#eee);border-radius:8px;width:30px;height:30px;cursor:pointer;}'
+    + '.weld-comments-layout{display:grid;grid-template-columns:minmax(180px,34%) 1fr;min-height:0;flex:1;}'
+    + '.weld-comments-preview{border-right:1px solid var(--border-color,#444);background:var(--input-bg,#151515);display:flex;align-items:center;justify-content:center;min-height:0;padding:10px;}'
+    + '.weld-comments-preview img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;}'
+    + '.weld-comments-wrap{position:relative;min-width:0;min-height:0;}'
+    + '.weld-comments-frame{width:100%;height:100%;border:none;background:transparent;}'
+    + '.weld-comments-loading{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;background:var(--background-color,var(--bg-color,#111));color:var(--text-color,#eee);font:13px/1.4 Open Sans,sans-serif;transition:opacity .18s ease;pointer-events:none;}'
+    + '.weld-comments-spin{width:22px;height:22px;border-radius:999px;border:2px solid rgba(128,128,128,.35);border-top-color:currentColor;animation:weldCommentsSpin .8s linear infinite;}'
+    + '@keyframes weldCommentsSpin{to{transform:rotate(360deg);}}'
+    + '@media (max-width:700px){.weld-comments-card{width:calc(100vw - 24px);max-width:calc(100vw - 24px);height:min(720px,calc(100dvh - 32px));}.weld-comments-layout{grid-template-columns:1fr;}.weld-comments-preview{display:none;}}';
+  document.head.appendChild(st);
+}
+
+function ensureOverlay() {
+  if (overlay) return overlay;
+  ensureStyle();
+  overlay = document.createElement('div');
+  overlay.className = 'weld-comments-ov';
+  overlay.innerHTML =
+    '<div class="weld-comments-card">'
+    + '<div class="weld-comments-head"><div class="weld-comments-title" data-title>Comments</div>'
+    + '<button class="weld-comments-x" data-close>x</button></div>'
+    + '<div class="weld-comments-layout">'
+    + '<div class="weld-comments-preview" data-preview><img data-img></div>'
+    + '<div class="weld-comments-wrap">'
+    + '<div class="weld-comments-loading" data-loading><div class="weld-comments-spin"></div><div>Loading comments...</div></div>'
+    + '<iframe class="weld-comments-frame" data-frame allow="clipboard-read *; clipboard-write *"></iframe>'
+    + '</div></div></div>';
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+  overlay.querySelector('[data-close]').addEventListener('click', close);
+  var frame = overlay.querySelector('[data-frame]');
+  var loading = overlay.querySelector('[data-loading]');
+  frame.addEventListener('load', function () {
+    loading.style.opacity = '0';
+    setTimeout(function () { if (loading.style.opacity === '0') loading.style.display = 'none'; }, 200);
+  });
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+// open(opts):
+//   key       (required) anything stable -> derives the channel
+//   title     header text
+//   image     optional preview image url
+//   app       generator slug the thread lives under (default generatorName)
+//   theme     'auto' | 'light' | 'dark'
+//   prefix    channel prefix (default app)
+//   disabled  if true, show a "comments disabled" notice instead
+//   config    passthrough to the comments embed (placeholder, submitButtonText,
+//             allowBots, adminPasswordHash, ...)
+function open(opts) {
+  opts = opts || {};
+  if (opts.disabled) { notifyDisabled(); return; }
+  if (typeof document === 'undefined') return;
+  var app = opts.app || defaultApp();
+  var chan = channel(opts.key, opts.prefix || app);
+  var cfg = {};
+  var base = opts.config || {};
+  for (var k in base) cfg[k] = base[k];
+  cfg.forceColorScheme = resolveTheme(opts.theme);
+  var src = buildSrc(app, chan, cfg);
+
+  var ov = ensureOverlay();
+  ov.querySelector('[data-title]').textContent = opts.title || 'Comments';
+  var preview = ov.querySelector('[data-preview]');
+  var img = ov.querySelector('[data-img]');
+  if (opts.image) { preview.style.display = ''; img.src = opts.image; }
+  else { preview.style.display = 'none'; }
+
+  var frame = ov.querySelector('[data-frame]');
+  var loading = ov.querySelector('[data-loading]');
+  ov.style.display = 'flex';
+  if (frame.getAttribute('data-src') !== src) {
+    loading.style.display = 'flex'; loading.style.opacity = '1';
+    frame.setAttribute('data-src', src);
+    frame.src = src;
+  }
+  return chan;
+}
+
+function close() { if (overlay) overlay.style.display = 'none'; }
+
+// inline(target, opts): embed the thread into an element instead of a modal.
+function inline(target, opts) {
+  opts = opts || {};
+  var el = (typeof target === 'string') ? document.querySelector(target) : target;
+  if (!el) return null;
+  var app = opts.app || defaultApp();
+  var chan = channel(opts.key, opts.prefix || app);
+  var cfg = {};
+  var base = opts.config || {};
+  for (var k in base) cfg[k] = base[k];
+  cfg.forceColorScheme = resolveTheme(opts.theme);
+  var frame = document.createElement('iframe');
+  frame.style.cssText = opts.style || 'width:100%;height:100%;border:none;background:transparent;';
+  frame.setAttribute('allow', 'clipboard-read *; clipboard-write *');
+  frame.src = buildSrc(app, chan, cfg);
+  el.appendChild(frame);
+  return frame;
+}
+
+function notifyDisabled() {
+  if (window.weld && window.weld.toast) { window.weld.toast.show('Comments are disabled for this item.', 'info'); return; }
+  if (typeof document === 'undefined') return;
+  var p = document.createElement('div');
+  p.style.cssText = 'z-index:100000;position:fixed;left:50%;bottom:18px;transform:translateX(-50%);max-width:min(360px,calc(100vw - 28px));padding:10px 13px;border-radius:10px;border:1px solid var(--border-color,#444);background:var(--input-bg,#222);color:var(--text-color,#eee);box-shadow:0 8px 28px rgba(0,0,0,.35);font:13px/1.45 Open Sans,sans-serif;opacity:0;transition:opacity .18s ease;pointer-events:none;';
+  p.textContent = 'Comments disabled for this item.';
+  document.body.appendChild(p);
+  requestAnimationFrame(function () { p.style.opacity = '1'; });
+  setTimeout(function () { p.style.opacity = '0'; setTimeout(function () { p.remove(); }, 250); }, 2400);
+}
+
+window.weld.comments = {
+  channel: channel,
+  hash: hash,
+  buildSrc: buildSrc,
+  open: open,
+  inline: inline,
+  close: close,
+  version: '1.0.0'
+};
+
+return window.weld.comments;
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.banlist) return window.weld.banlist;
+
+// -----------------------------------------------------------------
+// weld.banlist: the explicit deny-lists every community gallery/chat
+// ends up needing -- banned users, banned phrases (in prompts and in
+// negative prompts), and a content-rating ceiling. weld.spamguard
+// handles "this looks like copy-paste spam"; weld.banlist handles
+// "this exact thing is not allowed here".
+//
+//   var list = weld.banlist.create({ users, phrases, negativePhrases, rating });
+//   list.checkUser(name)               -> { ok, reason }
+//   list.check(text)                   -> { ok, matched, reason }
+//   list.checkPrompt(prompt, negative) -> { ok, reasons }
+//   list.allowedRating(itemRating)     -> bool   (item <= configured ceiling)
+//   list.filter(items, getText)        -> items that pass
+//
+// Phrases support plain substring and "*" wildcards, case-insensitive.
+// -----------------------------------------------------------------
+
+var RATINGS = ['g', 'pg', 'pg13', 'r', 'x'];
+
+function normalize(s) { return String(s == null ? '' : s).toLowerCase(); }
+
+// Compile a phrase (with optional "*" wildcards) into a tester.
+function compile(phrase) {
+  var p = normalize(phrase).trim();
+  if (!p) return null;
+  if (p.indexOf('*') === -1) {
+    return { raw: p, test: function (text) { return text.indexOf(p) !== -1; } };
+  }
+  // Wildcard: escape regex, turn * into .*
+  var esc = p.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+  var re = new RegExp(esc);
+  return { raw: p, test: function (text) { return re.test(text); } };
+}
+
+function compileList(arr) {
+  var out = [];
+  (arr || []).forEach(function (p) { var c = compile(p); if (c) out.push(c); });
+  return out;
+}
+
+function ratingRank(r) {
+  var i = RATINGS.indexOf(normalize(r));
+  return i === -1 ? RATINGS.length : i; // unknown = most restrictive (treated as above x)
+}
+
+function create(config) {
+  config = config || {};
+  var users = {};
+  (config.users || []).forEach(function (u) { users[normalize(u)] = true; });
+  var phrases = compileList(config.phrases);
+  var negPhrases = compileList(config.negativePhrases);
+  var ceiling = config.rating != null ? normalize(config.rating) : 'x'; // default: allow all
+
+  function checkUser(name) {
+    var ok = !users[normalize(name)];
+    return { ok: ok, reason: ok ? null : 'banned user' };
+  }
+
+  function matchIn(text, list) {
+    var t = normalize(text);
+    for (var i = 0; i < list.length; i++) if (list[i].test(t)) return list[i].raw;
+    return null;
+  }
+
+  function check(text) {
+    var m = matchIn(text, phrases);
+    return { ok: !m, matched: m, reason: m ? ('banned phrase: ' + m) : null };
+  }
+
+  function checkPrompt(prompt, negative) {
+    var reasons = [];
+    var m1 = matchIn(prompt, phrases);
+    if (m1) reasons.push('banned phrase: ' + m1);
+    if (negative != null) {
+      var m2 = matchIn(negative, negPhrases);
+      if (m2) reasons.push('banned negative phrase: ' + m2);
+    }
+    return { ok: reasons.length === 0, reasons: reasons };
+  }
+
+  function allowedRating(itemRating) {
+    return ratingRank(itemRating) <= ratingRank(ceiling);
+  }
+
+  // Filter a list of items. getText(item) -> the text to check; items may
+  // also carry { user, rating } which are checked when present.
+  function filter(items, getText) {
+    getText = getText || function (x) { return x && (x.text || x.prompt || x); };
+    return (items || []).filter(function (it) {
+      if (it && it.user != null && !checkUser(it.user).ok) return false;
+      if (it && it.rating != null && !allowedRating(it.rating)) return false;
+      return check(getText(it)).ok;
+    });
+  }
+
+  return {
+    checkUser: checkUser,
+    check: check,
+    checkPrompt: checkPrompt,
+    allowedRating: allowedRating,
+    filter: filter,
+    banUser: function (u) { users[normalize(u)] = true; },
+    unbanUser: function (u) { delete users[normalize(u)]; },
+    addPhrase: function (p) { var c = compile(p); if (c) phrases.push(c); },
+    addNegativePhrase: function (p) { var c = compile(p); if (c) negPhrases.push(c); },
+    setRating: function (r) { ceiling = normalize(r); },
+    rating: function () { return ceiling; },
+    users: function () { return Object.keys(users); }
+  };
+}
+
+window.weld.banlist = {
+  create: create,
+  ratings: RATINGS.slice(),
+  version: '1.0.0'
+};
+
+return window.weld.banlist;
+})();
+</script>
+<script>
+(function(){
+  function start(){ if(!window.weld||!window.weld.background||!window.weld.vn||!window.weld.banlist){ setTimeout(start,120); return; } build(); }
+  function build(){
+    var bg=window.weld.background, vn=window.weld.vn, comments=window.weld.comments, banlist=window.weld.banlist;
+    var $=function(id){return document.getElementById(id);};
+
+    // a tiny demo moderation list (generic placeholders)
+    var mod = banlist.create({ phrases:['badword','slur-placeholder'], rating:'pg13' });
+
+    var SCENES = {
+      dusk: { gradient:['#ff9966','#ff5e7e','#5b3a8c'], angle:180 },
+      sky:  { gradient:['#7ec8ff','#cfeaff','#eef7ff'], angle:180 },
+      room: { gradient:['#3a2f4a','#5a4663','#6b4a3a','#42291f'], angle:180 }
+    };
+
+    var S={ sprite:null, scene:'dusk', sceneImg:null, pos:'center', name:'Aria', line:'So... this is where our story begins.' };
+    var stage=null;
+
+    var drop=$('drop'), file=$('file'), setup=$('setup');
+    drop.addEventListener('click',function(){file.click();});
+    file.addEventListener('change',function(e){ if(e.target.files&&e.target.files[0]) loadChar(e.target.files[0]); });
+    drop.addEventListener('dragover',function(e){e.preventDefault();drop.classList.add('over');});
+    drop.addEventListener('dragleave',function(){drop.classList.remove('over');});
+    drop.addEventListener('drop',function(e){e.preventDefault();drop.classList.remove('over'); if(e.dataTransfer.files&&e.dataTransfer.files[0]) loadChar(e.dataTransfer.files[0]);});
+    window.addEventListener('paste',function(e){ var it=(e.clipboardData&&e.clipboardData.items)||[]; for(var i=0;i<it.length;i++) if(it[i].type&&it[i].type.indexOf('image')===0){ loadChar(it[i].getAsFile()); break; } });
+
+    function loadChar(f){
+      $('cutInfo').textContent='cutting out...';
+      bg.replace(f,'transparent',{}).then(function(cut){
+        cut=bg.despeckle(cut,{minArea:Math.max(20,Math.round(cut.width*cut.height*0.0008))});
+        cut=bg.trim(cut,{padding:4});
+        S.sprite=cut;
+        $('thumb').src=bg.toDataUrl(cut);
+        $('cutInfo').textContent=cut.width+' x '+cut.height+' transparent';
+        drop.classList.add('hide'); setup.classList.remove('hide');
+        ensureStage(); previewFrame();
+      }).catch(function(err){ alert('Could not process image: '+err.message); });
+    }
+
+    function ensureStage(){ if(stage) return; stage=vn.create($('stage'),{typeSpeed:18}); }
+    function backdrop(){ return S.scene==='upload'&&S.sceneImg ? S.sceneImg : SCENES[S.scene]; }
+
+    // show a static preview frame (no dialogue yet)
+    function previewFrame(){
+      ensureStage();
+      stage.background(backdrop());
+      if(S.sprite) stage.show('hero',{image:S.sprite,position:S.pos,scale:0.9});
+    }
+
+    $('sceneSeg').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b)return; S.scene=b.getAttribute('data-scene'); S.sceneImg=null; [].forEach.call(this.children,function(c){c.classList.toggle('on',c===b);}); previewFrame(); });
+    $('sceneBtn').addEventListener('click',function(){$('sceneFile').click();});
+    $('sceneFile').addEventListener('change',function(e){ if(!e.target.files||!e.target.files[0])return; bg.fromFile(e.target.files[0]).then(function(c){ S.sceneImg=c; S.scene='upload'; [].forEach.call($('sceneSeg').children,function(x){x.classList.remove('on');}); previewFrame(); }); });
+    $('posSeg').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b)return; S.pos=b.getAttribute('data-pos'); [].forEach.call(this.children,function(c){c.classList.toggle('on',c===b);}); previewFrame(); });
+    $('nameInput').addEventListener('input',function(e){ S.name=e.target.value; });
+    $('lineInput').addEventListener('input',function(e){ S.line=e.target.value; });
+
+    function moderate(){
+      var u=mod.check(S.name), l=mod.check(S.line);
+      if(!u.ok){ $('warn').textContent='Name blocked: '+u.reason; return false; }
+      if(!l.ok){ $('warn').textContent='Line blocked: '+l.reason; return false; }
+      $('warn').textContent=''; return true;
+    }
+
+    $('playBtn').addEventListener('click',function(){
+      if(!moderate()) return;
+      ensureStage();
+      var name=S.name||'???';
+      stage.run([
+        { background: backdrop() },
+        { show:'hero', image:S.sprite, position:S.pos, scale:0.9 },
+        { name:name, say:S.line },
+        { name:name, say:'Tell me -- are you the one the letters spoke of?' },
+        { choices:['"I might be."','"Who is asking?"'], onChoose:function(v){ S._choice=v; } },
+        { name:name, say:'...then we should not be seen talking here. Walk with me.' }
+      ]).then(function(){
+        // a tiny branch echo based on the choice
+        var follow = S._choice===0 ? 'She gives a small, knowing smile.' : 'Her eyes narrow, but she nods.';
+        return stage.say(name, follow);
+      }).then(function(){ $('snapBtn').disabled=false; });
+    });
+
+    $('snapBtn').addEventListener('click',function(){ stage.snapshot({width:1280,height:720}).then(function(canvas){ var a=document.createElement('a'); a.href=canvas.toDataURL('image/png'); a.download='vn-scene.png'; a.click(); }); });
+
+    $('discussBtn').addEventListener('click',function(){
+      if(comments) comments.open({ key:'weld-vn-demo', title:'Discuss this scene', app:'weld-vn-example', theme:'dark', config:{ commentPlaceholderText:'Share your scene...' } });
+      else alert('weld.comments not loaded');
+    });
+
+    $('reset').addEventListener('click',function(){ S.sprite=null; if(stage){stage.clear();} setup.classList.add('hide'); drop.classList.remove('hide'); file.value=''; $('snapBtn').disabled=true; });
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start); else start();
+})();
+</script>

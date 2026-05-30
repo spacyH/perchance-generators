@@ -1,0 +1,192 @@
+$meta
+  title       = weld.clean
+  description = Output post-processing for AI text: trim a dangling sentence after truncation, strip role-name bleed, collapse repetition loops, balance code fences, drop hidden-from-AI blocks, and apply custom regex rules. Stash on window.weld.clean.
+  tags        = weld, clean, postprocess, regex, sanitize, ai, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.clean) return window.weld.clean;
+
+  // -----------------------------------------------------------------
+  // weld.clean: the "scrub the raw model text" step every chat app
+  // re-implements. A text model returns prose that often needs fixing
+  // before you store or render it:
+  //   - a half-finished trailing sentence when the output was truncated
+  //   - the model echoing "Name:" or hallucinating the next speaker turn
+  //   - repetition loops (the same line/word over and over)
+  //   - an unclosed ``` code fence that breaks the markdown renderer
+  //   - leftover hidden-from-AI marker blocks
+  // Each fixer is exposed on its own; clean() runs a configurable pipe.
+  // Everything here is pure string -> string, no dependencies.
+  // -----------------------------------------------------------------
+
+  var HIDDEN_START = '<!--hidden-from-ai-start-->';
+  var HIDDEN_END   = '<!--hidden-from-ai-end-->';
+  var FENCE = String.fromCharCode(96, 96, 96); // three backticks
+
+  // Remove an incomplete final sentence. Use when a result was truncated
+  // (stopReason "artificial") so you don't show a chopped-off fragment.
+  function trimPartial(text) {
+    var s = String(text == null ? '' : text);
+    if (!s) return s;
+    var trimmed = s.replace(/\s+$/, '');
+    // Already ends cleanly on terminal punctuation or a closing quote/bracket.
+    if (/[.!?\u2026\u3002\uff01\uff1f]["'\u201d\u2019)\]]?$/.test(trimmed)) return trimmed;
+    // Otherwise cut back to the last sentence terminator we can find.
+    var m = trimmed.match(/[\s\S]*[.!?\u2026\u3002\uff01\uff1f]["'\u201d\u2019)\]]?/);
+    if (m && m[0].trim().length > 0) return m[0].replace(/\s+$/, '');
+    return trimmed; // no terminator at all: leave it as-is rather than blank it
+  }
+
+  // Strip a leading "Name:" the model echoed, and cut the reply at the
+  // point where it starts speaking AS another turn (role bleed).
+  // names: optional array of speaker names to police; if omitted, any
+  // capitalized "Word:" or "Word :" at the start of a line is treated
+  // as a turn boundary.
+  function stripRolePrefix(text, names) {
+    var s = String(text == null ? '' : text);
+    if (!s) return s;
+
+    function speakerAlt() {
+      if (names && names.length) {
+        var esc = names.map(function (n) {
+          return String(n).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        });
+        return '(?:' + esc.join('|') + ')';
+      }
+      return '[A-Z][\\w .\u2019\'-]{0,30}';
+    }
+    var alt = speakerAlt();
+
+    // 1. Drop a single leading "Name:" prefix on the whole reply.
+    s = s.replace(new RegExp('^\\s*' + alt + '\\s*:\\s*'), '');
+
+    // 2. Cut at the first mid-reply line that starts a new speaker turn.
+    var boundary = new RegExp('\\n\\s*' + alt + '\\s*:\\s');
+    var hit = s.search(boundary);
+    if (hit !== -1) s = s.slice(0, hit);
+
+    return s.replace(/\s+$/, '');
+  }
+
+  // Collapse runaway repetition: identical adjacent lines, identical
+  // adjacent sentences, and long single-character runs.
+  function collapseRepeats(text, opts) {
+    opts = opts || {};
+    var maxLineRepeat = opts.maxLineRepeat || 2;
+    var maxCharRun = opts.maxCharRun || 8;
+    var s = String(text == null ? '' : text);
+    if (!s) return s;
+
+    // Long single-character runs (e.g. "okayyyyyyyy", "!!!!!!!!").
+    s = s.replace(/(.)\1{7,}/g, function (m, ch) {
+      return new Array(maxCharRun + 1).join(ch);
+    });
+
+    // Identical adjacent lines beyond the allowed repeat count.
+    var lines = s.split('\n');
+    var out = [];
+    var run = 0, prev = null;
+    for (var i = 0; i < lines.length; i++) {
+      var key = lines[i].trim();
+      if (key !== '' && key === prev) {
+        run += 1;
+        if (run >= maxLineRepeat) continue;
+      } else {
+        run = 0; prev = key;
+      }
+      out.push(lines[i]);
+    }
+    return out.join('\n');
+  }
+
+  // Ensure triple-backtick code fences are balanced. If an odd fence is
+  // left open, append a closing one so the markdown renderer recovers.
+  function balanceFences(text) {
+    var s = String(text == null ? '' : text);
+    var count = 0, idx = s.indexOf(FENCE);
+    while (idx !== -1) { count += 1; idx = s.indexOf(FENCE, idx + 3); }
+    if (count % 2 === 1) {
+      if (!/\n$/.test(s)) s += '\n';
+      s += FENCE;
+    }
+    return s;
+  }
+
+  // Remove hidden-from-AI marker blocks and their contents.
+  function stripHidden(text) {
+    var s = String(text == null ? '' : text);
+    var start = s.indexOf(HIDDEN_START);
+    while (start !== -1) {
+      var end = s.indexOf(HIDDEN_END, start);
+      if (end === -1) { s = s.slice(0, start); break; }
+      s = s.slice(0, start) + s.slice(end + HIDDEN_END.length);
+      start = s.indexOf(HIDDEN_START);
+    }
+    return s;
+  }
+
+  // Apply an ordered list of find/replace rules.
+  // rule = { find: string|RegExp, replace: string, flags?: string }
+  function applyRules(text, ruleList) {
+    var s = String(text == null ? '' : text);
+    if (!ruleList || !ruleList.length) return s;
+    for (var i = 0; i < ruleList.length; i++) {
+      var r = ruleList[i];
+      if (!r || r.find == null) continue;
+      var re;
+      if (r.find instanceof RegExp) re = r.find;
+      else re = new RegExp(String(r.find), r.flags == null ? 'g' : r.flags);
+      s = s.replace(re, r.replace == null ? '' : String(r.replace));
+    }
+    return s;
+  }
+
+  // The pipeline. Each stage is opt-in; pass a result object straight
+  // from weld.stream and clean() will trimPartial only when truncated.
+  // opts:
+  //   truncated     (bool)    run trimPartial (auto-true if you pass result)
+  //   roleNames     (array)   names for stripRolePrefix; [] enables generic mode
+  //   roles         (bool)    enable stripRolePrefix even without names
+  //   collapse      (bool)    collapseRepeats (default true)
+  //   fences        (bool)    balanceFences (default true)
+  //   hidden        (bool)    stripHidden (default true)
+  //   rules         (array)   custom find/replace rules
+  //   trim          (bool)    trim outer whitespace (default true)
+  function clean(input, opts) {
+    opts = opts || {};
+    var text, truncated;
+    if (input && typeof input === 'object' && 'text' in input) {
+      // A weld.stream result object.
+      text = input.text;
+      truncated = (opts.truncated != null) ? opts.truncated : !!input.truncated;
+    } else {
+      text = input;
+      truncated = !!opts.truncated;
+    }
+    var s = String(text == null ? '' : text);
+
+    if (opts.hidden !== false) s = stripHidden(s);
+    if (opts.roles || (opts.roleNames != null)) s = stripRolePrefix(s, opts.roleNames);
+    if (opts.collapse !== false) s = collapseRepeats(s, opts);
+    if (truncated) s = trimPartial(s);
+    if (opts.rules) s = applyRules(s, opts.rules);
+    if (opts.fences !== false) s = balanceFences(s);
+    if (opts.trim !== false) s = s.replace(/^\s+|\s+$/g, '');
+    return s;
+  }
+
+  window.weld.clean = {
+    clean: clean,
+    trimPartial: trimPartial,
+    stripRolePrefix: stripRolePrefix,
+    collapseRepeats: collapseRepeats,
+    balanceFences: balanceFences,
+    stripHidden: stripHidden,
+    rules: applyRules,
+    version: '1.0.0'
+  };
+
+  return window.weld.clean;

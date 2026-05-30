@@ -1,0 +1,213 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--amber:#d29922;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:780px;margin:0 auto;padding:34px 18px 90px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 0 16px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+.breadcrumb a{color:var(--muted);}.breadcrumb .sep{color:var(--faint);margin:0 8px;}.breadcrumb .cur{color:var(--ink);}.breadcrumb .act a{color:var(--accent);}
+.hdr{margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}.hdr h1{font:700 24px var(--mono);letter-spacing:-0.5px;}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;}
+.hdr .lead{color:var(--muted);margin-top:8px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;}
+.panel h2{font:600 13px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:8px 0;}
+.lbl{font:600 12px var(--mono);color:var(--muted);min-width:74px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 15px;font:600 13px var(--font);cursor:pointer;transition:.12s;}
+.btn:hover{filter:brightness(1.08);}.btn.ghost{background:var(--faint);color:var(--ink);}.btn.sm{padding:6px 11px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+input[type=text],textarea{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:8px 10px;font:13px var(--font);}
+input[type=text]{flex:1;min-width:120px;}textarea{width:100%;font:12.5px/1.5 var(--mono);resize:vertical;}
+.mono{font:13px var(--mono);}
+.out{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font:12.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;min-height:20px;color:#c9d1d9;}
+.chip{display:inline-block;background:var(--faint);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font:600 12px var(--mono);margin:2px;}
+.chip.k{background:rgba(63,185,80,.14);border-color:rgba(63,185,80,.4);color:#7ee787;}
+.chip.d{opacity:.4;text-decoration:line-through;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:9px 13px;border-radius:0 4px 4px 0;margin:12px 0 0;font-size:12.5px;color:#c9d1d9;}
+.note.warn{background:rgba(210,153,34,.08);border-color:var(--amber);}
+.tag{font:600 10px var(--mono);padding:2px 7px;border-radius:4px;background:rgba(63,185,80,.14);color:#7ee787;border:1px solid rgba(63,185,80,.4);}
+.tag.ai{background:rgba(210,153,34,.12);color:#e3b341;border-color:rgba(210,153,34,.4);}
+.bar{height:14px;background:var(--accent);border-radius:3px;transition:width .3s;}
+.footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);}.footer a{color:var(--muted);}
+.flex{display:flex;gap:10px;align-items:center;}.wrap{flex-wrap:wrap;}.grow{flex:1;}.mt{margin-top:10px;}
+</style>
+<div id="page">
+  <div class="breadcrumb"><span><a href="https://perchance.org/weld-ui-index">weld</a><span class="sep">/</span>weld.banlist<span class="sep">/</span><span class="cur">demo</span></span><span class="act"><a href="https://perchance.org/weld-banlist-plugin">docs &rarr;</a></span></div>
+  <div class="hdr"><div class="hdr-row"><h1>weld.banlist &mdash; demo</h1><span class="ver">v1.0.0</span></div><p class="lead">List-based moderation: banned users, banned phrases (substring or wildcard), and a content-rating gate. Set up a list and watch it accept, reject, and filter submissions live.</p></div>
+
+  <div class="panel"><h2>The list <span class="tag">pure</span></h2>
+    <div class="row"><span class="lbl">rating</span>
+      <span class="seg" id="brate"><button data-r="g">G</button><button data-r="pg">PG</button><button data-r="pg13" class="on">PG-13</button><button data-r="r">R</button><button data-r="x">X</button></span></div>
+    <div class="row"><span class="lbl">phrases</span><input id="bphrases" type="text" value="spoiler, leak*"></div>
+    <div class="row"><span class="lbl">users</span><input id="busers" type="text" value="spammer42"></div></div>
+  <div class="panel"><h2>Check a submission</h2>
+    <div class="row"><span class="lbl">from user</span><input id="buser" type="text" value="guest"></div>
+    <div class="row"><span class="lbl">text</span><input id="btext" type="text" value="here is a leaked screenshot"></div>
+    <div class="row"><span class="lbl">rating</span>
+      <span class="seg" id="bitemrate"><button data-r="g" class="on">G</button><button data-r="pg">PG</button><button data-r="pg13">PG-13</button><button data-r="r">R</button><button data-r="x">X</button></span></div>
+    <div class="row"><button id="bcheck" class="btn">Check</button></div>
+    <div id="bout" class="out mt"></div></div>
+  <div class="panel"><h2>Filter a feed</h2>
+    <div class="row"><button id="bfilter" class="btn ghost">Filter sample feed</button></div>
+    <div id="bfeed" class="mt"></div>
+    <div class="note">create() builds the list; check()/checkUser()/allowedRating() each return a reason, and filter() drops everything that fails. Phrases match case-insensitively with <code>*</code> as a wildcard.</div></div>
+  <footer class="footer"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
+</div>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.banlist) return window.weld.banlist;
+
+// -----------------------------------------------------------------
+// weld.banlist: the explicit deny-lists every community gallery/chat
+// ends up needing -- banned users, banned phrases (in prompts and in
+// negative prompts), and a content-rating ceiling. weld.spamguard
+// handles "this looks like copy-paste spam"; weld.banlist handles
+// "this exact thing is not allowed here".
+//
+//   var list = weld.banlist.create({ users, phrases, negativePhrases, rating });
+//   list.checkUser(name)               -> { ok, reason }
+//   list.check(text)                   -> { ok, matched, reason }
+//   list.checkPrompt(prompt, negative) -> { ok, reasons }
+//   list.allowedRating(itemRating)     -> bool   (item <= configured ceiling)
+//   list.filter(items, getText)        -> items that pass
+//
+// Phrases support plain substring and "*" wildcards, case-insensitive.
+// -----------------------------------------------------------------
+
+var RATINGS = ['g', 'pg', 'pg13', 'r', 'x'];
+
+function normalize(s) { return String(s == null ? '' : s).toLowerCase(); }
+
+// Compile a phrase (with optional "*" wildcards) into a tester.
+function compile(phrase) {
+  var p = normalize(phrase).trim();
+  if (!p) return null;
+  if (p.indexOf('*') === -1) {
+    return { raw: p, test: function (text) { return text.indexOf(p) !== -1; } };
+  }
+  // Wildcard: escape regex, turn * into .*
+  var esc = p.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+  var re = new RegExp(esc);
+  return { raw: p, test: function (text) { return re.test(text); } };
+}
+
+function compileList(arr) {
+  var out = [];
+  (arr || []).forEach(function (p) { var c = compile(p); if (c) out.push(c); });
+  return out;
+}
+
+function ratingRank(r) {
+  var i = RATINGS.indexOf(normalize(r));
+  return i === -1 ? RATINGS.length : i; // unknown = most restrictive (treated as above x)
+}
+
+function create(config) {
+  config = config || {};
+  var users = {};
+  (config.users || []).forEach(function (u) { users[normalize(u)] = true; });
+  var phrases = compileList(config.phrases);
+  var negPhrases = compileList(config.negativePhrases);
+  var ceiling = config.rating != null ? normalize(config.rating) : 'x'; // default: allow all
+
+  function checkUser(name) {
+    var ok = !users[normalize(name)];
+    return { ok: ok, reason: ok ? null : 'banned user' };
+  }
+
+  function matchIn(text, list) {
+    var t = normalize(text);
+    for (var i = 0; i < list.length; i++) if (list[i].test(t)) return list[i].raw;
+    return null;
+  }
+
+  function check(text) {
+    var m = matchIn(text, phrases);
+    return { ok: !m, matched: m, reason: m ? ('banned phrase: ' + m) : null };
+  }
+
+  function checkPrompt(prompt, negative) {
+    var reasons = [];
+    var m1 = matchIn(prompt, phrases);
+    if (m1) reasons.push('banned phrase: ' + m1);
+    if (negative != null) {
+      var m2 = matchIn(negative, negPhrases);
+      if (m2) reasons.push('banned negative phrase: ' + m2);
+    }
+    return { ok: reasons.length === 0, reasons: reasons };
+  }
+
+  function allowedRating(itemRating) {
+    return ratingRank(itemRating) <= ratingRank(ceiling);
+  }
+
+  // Filter a list of items. getText(item) -> the text to check; items may
+  // also carry { user, rating } which are checked when present.
+  function filter(items, getText) {
+    getText = getText || function (x) { return x && (x.text || x.prompt || x); };
+    return (items || []).filter(function (it) {
+      if (it && it.user != null && !checkUser(it.user).ok) return false;
+      if (it && it.rating != null && !allowedRating(it.rating)) return false;
+      return check(getText(it)).ok;
+    });
+  }
+
+  return {
+    checkUser: checkUser,
+    check: check,
+    checkPrompt: checkPrompt,
+    allowedRating: allowedRating,
+    filter: filter,
+    banUser: function (u) { users[normalize(u)] = true; },
+    unbanUser: function (u) { delete users[normalize(u)]; },
+    addPhrase: function (p) { var c = compile(p); if (c) phrases.push(c); },
+    addNegativePhrase: function (p) { var c = compile(p); if (c) negPhrases.push(c); },
+    setRating: function (r) { ceiling = normalize(r); },
+    rating: function () { return ceiling; },
+    users: function () { return Object.keys(users); }
+  };
+}
+
+window.weld.banlist = {
+  create: create,
+  ratings: RATINGS.slice(),
+  version: '1.0.0'
+};
+
+return window.weld.banlist;
+})();
+</script>
+<script>
+(function(){
+  function $(id){return document.getElementById(id);}
+  function boot(){ if(!window.weld||!window.weld.banlist){return setTimeout(boot,100);} init(); }
+  function init(){
+    var BL=window.weld.banlist, ceiling='pg13', itemRate='g';
+    function seg(id,set){ var el=$(id); el.onclick=function(e){ var b=e.target.closest('button'); if(!b)return; [].forEach.call(el.children,function(c){c.classList.toggle('on',c===b);}); set(b.getAttribute('data-r')); }; }
+    seg('brate',function(r){ ceiling=r; }); seg('bitemrate',function(r){ itemRate=r; });
+    function build(){ return BL.create({ users:$('busers').value.split(',').map(function(s){return s.trim();}).filter(Boolean), phrases:$('bphrases').value.split(',').map(function(s){return s.trim();}).filter(Boolean), rating:ceiling }); }
+    $('bcheck').onclick=function(){ var L=build(),lines=[];
+      var u=L.checkUser($('buser').value); lines.push('user: '+(u.ok?'OK':'BLOCKED \u2014 '+u.reason));
+      var c=L.check($('btext').value); lines.push('text: '+(c.ok?'OK':'BLOCKED \u2014 '+c.reason));
+      var ar=L.allowedRating(itemRate); lines.push('rating '+itemRate+' under '+ceiling+': '+(ar?'OK':'BLOCKED'));
+      var pass=u.ok&&c.ok&&ar; lines.unshift(pass?'\u2705 ACCEPTED':'\u26d4 REJECTED'); lines.unshift('');
+      $('bout').textContent=lines.join('\n').trim(); $('bout').style.color=pass?'#7ee787':'#ff7b72'; };
+    $('bfilter').onclick=function(){ var L=build(); var feed=[
+      {user:'guest', text:'lovely sunset', rating:'g'},
+      {user:'spammer42', text:'hi', rating:'g'},
+      {user:'guest', text:'big spoiler ahead', rating:'g'},
+      {user:'guest', text:'a leaked build', rating:'g'},
+      {user:'guest', text:'mature content', rating:'r'},
+      {user:'fan', text:'great work!', rating:'pg'}];
+      var kept=L.filter(feed,function(it){return it.text;});
+      $('bfeed').innerHTML=feed.map(function(it){ var ok=kept.indexOf(it)>=0; return '<div class="row" style="margin:3px 0"><span class="chip '+(ok?'k':'d')+'">'+it.user+'</span><span class="grow mono" style="opacity:'+(ok?1:.5)+'">'+it.text+' <span style="color:var(--muted)">['+it.rating+']</span></span></div>'; }).join('')+'<div class="mono mt" style="color:var(--muted)">kept '+kept.length+' of '+feed.length+'</div>'; };
+    $('bcheck').click(); $('bfilter').click();
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+})();
+</script>

@@ -1,0 +1,731 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.background<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-background-example">demo &rarr;</a></span></div>
+<div class="hdr">
+  <div class="hdr-row">
+      <h1>weld.background</h1>
+      <span class="ver">v1.1.0</span>
+  </div>
+  <p class="lead">Remove and replace an image background entirely in the browser &mdash; built for photos a user uploads from their phone or PC. A pure-canvas engine (edge flood-fill + chroma key, feathered) that needs no model, with a multi-colour eyedropper, trim, and despeckle for clean portraits, plus a hook to plug in an AI segmenter for hard cutouts.</p>
+</div>
+<h2>Install</h2>
+<p>Import the plugin once. It stashes its API on <code>window.weld.background</code>. No other plugins are required &mdash; the default engine is pure canvas and runs entirely in the browser, which is what lets it work on a photo the user uploads from their device inside the Perchance sandbox.</p>
+<pre data-codeid="install"></pre>
+
+<h2>Quick start</h2>
+<p>Take a <code>File</code> from a file input (on a phone this offers the camera and photo library), replace its background, and show the result.</p>
+<pre data-codeid="quick"></pre>
+
+<h2>Bringing in an image</h2>
+<div class="sig" data-codeid="sig_fromfile"></div>
+<div class="sig" data-codeid="sig_fromurl"></div>
+<p><code>fromFile</code> reads a <code>File</code>/<code>Blob</code> via <code>FileReader</code> (a data URL, so the canvas is never tainted and pixels stay readable). <code>fromUrl</code> loads a data URL or a same-origin/CORS image. Every operation also accepts a raw <code>File</code>, URL string, image element, or canvas directly, so you rarely need these explicitly.</p>
+
+<h2>remove(src, opts)</h2>
+<div class="sig" data-codeid="sig_remove"></div>
+<p>Returns a promise for a new canvas with the background erased to transparency. Large images are downscaled to <code>opts.maxDim</code> (default 1600) first, for speed and memory.</p>
+<h4>opts</h4>
+<table>
+<tr><th>field</th><th>default</th><th>meaning</th></tr>
+<tr><td><code>mode</code></td><td>'auto'</td><td>'auto' (flood-fill from the edges) or 'chroma' (key one colour everywhere)</td></tr>
+<tr><td><code>keyColor</code></td><td>auto-estimated</td><td>[r,g,b] of the background; required for chroma</td></tr>
+<tr><td><code>keyColors</code></td><td>&mdash;</td><td>an array of [r,g,b] colours; a pixel is background if near ANY of them (eyedropper multi-pick)</td></tr>
+<tr><td><code>tolerance</code></td><td>0.18</td><td>0..1 colour-distance threshold for "background"</td></tr>
+<tr><td><code>softness</code></td><td>0.10</td><td>0..1 feather band for soft edges</td></tr>
+<tr><td><code>contiguous</code></td><td>true</td><td>auto only: erase only background connected to an edge</td></tr>
+<tr><td><code>despill</code></td><td>false</td><td>reduce key-colour fringe on edge pixels (good for green/blue screen)</td></tr>
+</table>
+<div class="note">Auto mode flood-fills inward from the borders, so a subject that happens to share the wall's colour is kept &mdash; only background actually touching an edge is removed. That is the difference between <code>contiguous</code> and a plain global colour key.</div>
+
+<h2>replace(src, background, opts)</h2>
+<div class="sig" data-codeid="sig_replace"></div>
+<p>Removes the background, then composites the subject over a new one. The <code>background</code> argument is flexible:</p>
+<pre data-codeid="bg_kinds"></pre>
+<p>Image backgrounds accept <code>opts.fit</code> of <code>cover</code> (default), <code>contain</code>, <code>stretch</code>, or <code>tile</code>. All removal opts apply here too.</p>
+
+<h2>Plugging in an AI cutout</h2>
+<div class="sig" data-codeid="sig_seg"></div>
+<p>The canvas engine is great for uniform backgrounds. For arbitrary scenes &mdash; a person in a cluttered room &mdash; register a segmenter and weld.background will use it instead of colour keying, while still handling all the compositing, feathering, and output. Your function receives the working canvas and returns a mask (a per-pixel alpha array, a Float32 0..1 array, or an ImageData whose alpha channel is the mask).</p>
+<pre data-codeid="seg_ex"></pre>
+<div class="note warn">Perchance's own <code>removeBackground</code> (the RMBG-1.4 model) only runs as a post-process on images the <code>text-to-image-plugin</code> generates. To cut out an uploaded photo you supply the segmenter &mdash; or rely on the built-in canvas keying, which needs nothing.</div>
+
+<h2>Output</h2>
+<div class="sig" data-codeid="sig_todata"></div>
+<div class="sig" data-codeid="sig_toblob"></div>
+<div class="sig" data-codeid="sig_download"></div>
+<p>PNG preserves the transparency from a removed background; pass <code>'image/jpeg'</code> with a quality for a smaller flattened file.</p>
+
+<h2>Trimming &amp; cleanup for portraits</h2>
+<div class="sig" data-codeid="sig_trim"></div>
+<div class="sig" data-codeid="sig_keeplargest"></div>
+<div class="sig" data-codeid="sig_despeckle"></div>
+<p>After a cut-out you usually want a tidy portrait: crop away the transparent margins, drop stray specks the key left behind, or isolate just the subject. These run on the canvas <code>remove</code> returns.</p>
+<pre data-codeid="cleanup_ex"></pre>
+<table>
+<tr><th>helper</th><th>does</th></tr>
+<tr><td><code>trim</code></td><td>crop to the non-transparent subject (opts.padding, opts.threshold)</td></tr>
+<tr><td><code>despeckle</code></td><td>keep every blob at least opts.minArea pixels; removes keying noise</td></tr>
+<tr><td><code>keepLargest</code></td><td>keep only the single biggest opaque region</td></tr>
+</table>
+
+<h2>Extracting separate objects</h2>
+<div class="sig" data-codeid="sig_extract"></div>
+<p>Split a scene into one cropped PNG per connected region &mdash; handy for pulling individual sprites out of a flat illustration. Returns the pieces largest-first; pass <code>opts.remove: false</code> if the source already has a transparent background.</p>
+<pre data-codeid="extract_ex"></pre>
+
+<h2>Lower-level mask</h2>
+<div class="sig" data-codeid="sig_mask"></div>
+<div class="sig" data-codeid="sig_maskdata"></div>
+<p><code>mask</code> returns <code>{ width, height, alpha }</code> for custom compositing. <code>maskFromData</code> is the pure math over a raw RGBA array &mdash; no canvas &mdash; handy for testing or running off the main thread.</p>
+<script>
+(function(){
+  var examples = {
+  'install': 'output\n  weld-background = \{import:weld-background-plugin\}',
+  'quick': 'var input = document.querySelector(\'input\[type=file]\');\ninput.onchange = async function() \{\n  var out = await weld.background.replace(input.files\[0], \'#1e293b\');\n  document.body.appendChild(out);          // canvas with a new background\n  weld.background.download(out, \'cutout.png\');\n\};',
+  'sig_fromfile': 'weld.background.fromFile(file) -> Promise<canvas>',
+  'sig_fromurl': 'weld.background.fromUrl(url) -> Promise<canvas>',
+  'sig_remove': 'weld.background.remove(src, opts) -> Promise<canvas>',
+  'sig_replace': 'weld.background.replace(src, background, opts) -> Promise<canvas>',
+  'bg_kinds': 'await weld.background.replace(src, \'transparent\');          // erase only\nawait weld.background.replace(src, \'#0d1117\');              // solid colour\nawait weld.background.replace(src, \{ gradient: \[\'#4493f8\',\'#a371f7\'], angle: 45 \});\nawait weld.background.replace(src, \{ blur: 16 \});           // frosted original\nawait weld.background.replace(src, beachFile, \{ fit: \'cover\' \}); // another image',
+  'sig_seg': 'weld.background.useSegmenter(fn)   //  fn(canvas) -> mask',
+  'seg_ex': '// example shape -- wire any model you can load:\nweld.background.useSegmenter(async function(canvas) \{\n  var result = await myModel.segment(canvas);   // your model\n  return result.alpha;   // Uint8 0..255, Float32 0..1, or an ImageData\n\});\n// now remove()/replace() use the model automatically:\nvar out = await weld.background.replace(photo, \'#fff\');',
+  'sig_todata': 'weld.background.toDataUrl(canvas, type?, quality?) -> string',
+  'sig_toblob': 'weld.background.toBlob(canvas, type?, quality?) -> Promise<Blob>',
+  'sig_download': 'weld.background.download(canvas, filename, type?, quality?)',
+  'sig_mask': 'weld.background.mask(src, opts) -> Promise<\{ width, height, alpha \}>',
+  'sig_maskdata': 'weld.background.maskFromData(rgba, w, h, opts) -> Uint8ClampedArray',
+  'sig_trim': 'weld.background.trim(canvas, opts) -> canvas',
+  'sig_keeplargest': 'weld.background.keepLargest(canvas) -> canvas',
+  'sig_despeckle': 'weld.background.despeckle(canvas, \{ minArea \}) -> canvas',
+  'cleanup_ex': 'var cut = await weld.background.remove(photo, \{ keyColors: picks \});\ncut = weld.background.despeckle(cut, \{ minArea: 40 \});  // drop stray pixels\nvar portrait = weld.background.trim(cut, \{ padding: 8 \}); // crop to the subject',
+  'sig_extract': 'weld.background.extractObjects(src, opts) -> Promise<\[\{ canvas, x, y, w, h, area \}]>',
+  'extract_ex': 'var parts = await weld.background.extractObjects(sheet, \{ minArea: 200 \});\nparts.forEach(function(p, i)\{ weld.background.download(p.canvas, \'sprite_\' + i + \'.png\'); \});'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    document.querySelectorAll('[data-codeid]').forEach(function(n){
+      var src = examples[n.getAttribute('data-codeid')];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.background) return window.weld.background;
+
+// -----------------------------------------------------------------
+// weld.background: take an image, drop its background, put a new one
+// behind the subject. Built to run on a photo the user uploads from
+// their phone or PC, entirely in the browser -- so the default engine
+// is pure canvas (no model, no network) and works inside the Perchance
+// sandbox where loading a big ML model is not guaranteed.
+//
+//   remove(src, opts)            -> canvas with the background erased
+//   replace(src, background, o)  -> canvas with a new background behind
+//   mask(src, opts)              -> the raw alpha mask
+//   maskFromData(rgba, w, h, o)  -> pure mask math (testable, no canvas)
+//   useSegmenter(fn)             -> swap in an AI cutout when you have one
+//   fromFile / fromUrl / toDataUrl / toBlob / download  -> I/O helpers
+//
+// The default keying works best on a reasonably uniform background
+// (a wall, sky, product backdrop, green/blue screen). For arbitrary
+// scenes, register an AI segmenter via useSegmenter().
+// -----------------------------------------------------------------
+
+var MAX_DIM_DEFAULT = 1600; // cap working size so big phone photos stay fast
+var segmenter = null;       // optional async (canvas) -> alpha mask
+
+// ---- pure colour helpers (no DOM) ----
+function dist(d, i, r, g, b) {
+  var dr = (d[i] - r) / 255, dg = (d[i + 1] - g) / 255, db = (d[i + 2] - b) / 255;
+  return Math.sqrt((dr * dr + dg * dg + db * db) / 3); // 0..1
+}
+
+// Estimate the background colour from the border pixels (trimmed mean).
+function estimateBgColor(data, w, h) {
+  var rs = [], gs = [], bs = [];
+  function add(x, y) {
+    var i = (y * w + x) * 4;
+    rs.push(data[i]); gs.push(data[i + 1]); bs.push(data[i + 2]);
+  }
+  var step = Math.max(1, Math.floor(Math.max(w, h) / 200));
+  for (var x = 0; x < w; x += step) { add(x, 0); add(x, h - 1); }
+  for (var y = 0; y < h; y += step) { add(0, y); add(w - 1, y); }
+  function trimmedMean(arr) {
+    arr.sort(function (a, b) { return a - b; });
+    var lo = Math.floor(arr.length * 0.1), hi = Math.ceil(arr.length * 0.9);
+    var sum = 0, n = 0;
+    for (var k = lo; k < hi; k++) { sum += arr[k]; n++; }
+    return n ? Math.round(sum / n) : (arr.length ? arr[arr.length >> 1] : 255);
+  }
+  return [trimmedMean(rs), trimmedMean(gs), trimmedMean(bs)];
+}
+
+// Feathered alpha for a colour distance: 255 (keep) far from the key,
+// 0 (drop) within tol, a smooth ramp across the softness band.
+function alphaFor(d, tol, soft) {
+  if (d <= tol) return 0;
+  if (soft <= 0) return 255;
+  if (d >= tol + soft) return 255;
+  return Math.round(255 * (d - tol) / soft);
+}
+
+// Distance to the NEAREST of a list of key colours (for multi-pick).
+function minDist(d, i, keys) {
+  var m = 1;
+  for (var k = 0; k < keys.length; k++) {
+    var dd = dist(d, i, keys[k][0], keys[k][1], keys[k][2]);
+    if (dd < m) m = dd;
+  }
+  return m;
+}
+
+// The core mask. Pure: operates on a raw RGBA array, returns a
+// Uint8ClampedArray of per-pixel alpha (255 = foreground/keep).
+// opts: { mode:'auto'|'chroma', keyColor:[r,g,b], keyColors (array of [r,g,b]),
+//         tolerance, softness, contiguous (auto only), smooth }
+// keyColors lets an eyedropper remove several background colours at once:
+// a pixel is background if it is within tolerance of ANY key colour.
+function maskFromData(data, w, h, opts) {
+  opts = opts || {};
+  var tol = opts.tolerance != null ? opts.tolerance : 0.18;
+  var soft = opts.softness != null ? opts.softness : 0.10;
+  var keys = (opts.keyColors && opts.keyColors.length)
+    ? opts.keyColors
+    : [opts.keyColor || estimateBgColor(data, w, h)];
+  var n = w * h;
+  var alpha = new Uint8ClampedArray(n);
+  for (var p = 0; p < n; p++) alpha[p] = 255;
+
+  var contiguous = (opts.mode === 'chroma') ? false
+    : (opts.contiguous !== false); // auto defaults to contiguous
+
+  if (!contiguous) {
+    // Global colour key: erase any of the key colours everywhere.
+    for (var q = 0; q < n; q++) {
+      alpha[q] = alphaFor(minDist(data, q * 4, keys), tol, soft);
+    }
+  } else {
+    // Flood fill from the borders: only erase background connected to
+    // an edge, so a subject the same colour as the wall is kept.
+    var visited = new Uint8Array(n);
+    var stack = [];
+    function consider(idx) {
+      if (visited[idx]) return;
+      visited[idx] = 1;
+      var d = minDist(data, idx * 4, keys);
+      if (d <= tol + soft) {
+        alpha[idx] = alphaFor(d, tol, soft);
+        stack.push(idx);
+      }
+      // else: a foreground edge -- leave alpha 255, do not spread through it
+    }
+    for (var bx = 0; bx < w; bx++) { consider(bx); consider((h - 1) * w + bx); }
+    for (var by = 0; by < h; by++) { consider(by * w); consider(by * w + (w - 1)); }
+    while (stack.length) {
+      var idx2 = stack.pop();
+      var px = idx2 % w, py = (idx2 - px) / w;
+      if (px > 0) consider(idx2 - 1);
+      if (px < w - 1) consider(idx2 + 1);
+      if (py > 0) consider(idx2 - w);
+      if (py < h - 1) consider(idx2 + w);
+    }
+  }
+
+  if (opts.smooth !== false && soft > 0) smoothAlpha(alpha, w, h);
+  return alpha;
+}
+
+// A light 3x3 average pass on the alpha to soften jagged edges.
+function smoothAlpha(alpha, w, h) {
+  var src = alpha.slice();
+  for (var y = 1; y < h - 1; y++) {
+    for (var x = 1; x < w - 1; x++) {
+      var i = y * w + x;
+      // only touch boundary pixels (where neighbours disagree)
+      var a = src[i];
+      if (a === 0 || a === 255) {
+        var diff = false;
+        if (src[i - 1] !== a || src[i + 1] !== a || src[i - w] !== a || src[i + w] !== a) diff = true;
+        if (!diff) continue;
+      }
+      var sum = src[i] + src[i - 1] + src[i + 1] + src[i - w] + src[i + w]
+        + src[i - w - 1] + src[i - w + 1] + src[i + w - 1] + src[i + w + 1];
+      alpha[i] = Math.round(sum / 9);
+    }
+  }
+}
+
+// ---- canvas I/O ----
+function makeCanvas(w, h) {
+  var c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  return c;
+}
+
+// Draw any source (canvas/image/ImageBitmap) onto a new canvas,
+// optionally downscaled so the long side <= maxDim.
+function toWorkingCanvas(srcImg, maxDim) {
+  var sw = srcImg.naturalWidth || srcImg.width;
+  var sh = srcImg.naturalHeight || srcImg.height;
+  var scale = 1;
+  if (maxDim && Math.max(sw, sh) > maxDim) scale = maxDim / Math.max(sw, sh);
+  var w = Math.max(1, Math.round(sw * scale));
+  var h = Math.max(1, Math.round(sh * scale));
+  var c = makeCanvas(w, h);
+  c.getContext('2d').drawImage(srcImg, 0, 0, w, h);
+  return c;
+}
+
+function getData(canvas) {
+  return canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+}
+
+// Resolve a source (canvas | image element | File/Blob | url string) to
+// a working canvas (Promise).
+function resolveSource(src, opts) {
+  opts = opts || {};
+  var maxDim = opts.maxDim != null ? opts.maxDim : MAX_DIM_DEFAULT;
+  if (src && src.getContext) return Promise.resolve(toWorkingCanvas(src, maxDim));
+  if (typeof Blob !== 'undefined' && src instanceof Blob) {
+    return fromFile(src).then(function (c) { return toWorkingCanvas(c, maxDim); });
+  }
+  if (typeof src === 'string') {
+    return fromUrl(src).then(function (c) { return toWorkingCanvas(c, maxDim); });
+  }
+  if (src && (src.naturalWidth || src.width)) return Promise.resolve(toWorkingCanvas(src, maxDim));
+  return Promise.reject(new Error('weld.background: unsupported image source'));
+}
+
+function fromFile(file) {
+  return new Promise(function (resolve, reject) {
+    if (typeof FileReader === 'undefined') { reject(new Error('weld.background: FileReader unavailable')); return; }
+    var fr = new FileReader();
+    fr.onload = function () { resolve(fromUrl(fr.result)); };
+    fr.onerror = function () { reject(fr.error); };
+    fr.readAsDataURL(file);
+  }).then(function (c) { return c; });
+}
+
+function fromUrl(url) {
+  return new Promise(function (resolve, reject) {
+    var img = new Image();
+    // data: URLs are same-origin; remote URLs need CORS to read pixels.
+    if (!/^data:/.test(String(url))) img.crossOrigin = 'anonymous';
+    img.onload = function () {
+      var c = makeCanvas(img.naturalWidth, img.naturalHeight);
+      c.getContext('2d').drawImage(img, 0, 0);
+      resolve(c);
+    };
+    img.onerror = function () { reject(new Error('weld.background: could not load image')); };
+    img.src = url;
+  });
+}
+
+// ---- public mask / remove ----
+function mask(src, opts) {
+  return resolveSource(src, opts).then(function (canvas) {
+    if (segmenter) {
+      return Promise.resolve(segmenter(canvas, opts)).then(function (m) {
+        return { width: canvas.width, height: canvas.height, alpha: normalizeMask(m, canvas.width, canvas.height), canvas: canvas };
+      });
+    }
+    var img = getData(canvas);
+    var alpha = maskFromData(img.data, canvas.width, canvas.height, opts);
+    return { width: canvas.width, height: canvas.height, alpha: alpha, canvas: canvas };
+  });
+}
+
+// Accept several segmenter return shapes -> Uint8ClampedArray alpha.
+function normalizeMask(m, w, h) {
+  var n = w * h;
+  if (m instanceof Uint8ClampedArray && m.length === n) return m;
+  if (m && m.data && m.data.length === n * 4) { // ImageData: take alpha channel
+    var a = new Uint8ClampedArray(n);
+    for (var i = 0; i < n; i++) a[i] = m.data[i * 4 + 3];
+    return a;
+  }
+  if (m && m.length === n) { // Float32 0..1 or Uint8 0..255
+    var out = new Uint8ClampedArray(n), float = m[0] <= 1 && m[0] >= 0;
+    // crude detection: assume 0..1 if max small; safer to scan
+    var max = 0; for (var k = 0; k < n; k++) if (m[k] > max) max = m[k];
+    var mul = max <= 1 ? 255 : 1;
+    for (var j = 0; j < n; j++) out[j] = m[j] * mul;
+    return out;
+  }
+  // Unknown: keep everything.
+  var keep = new Uint8ClampedArray(n);
+  for (var z = 0; z < n; z++) keep[z] = 255;
+  return keep;
+}
+
+// remove(src, opts) -> canvas with the background made transparent.
+function remove(src, opts) {
+  return mask(src, opts).then(function (res) {
+    var canvas = res.canvas;
+    var ctx = canvas.getContext('2d');
+    var img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    var d = img.data, a = res.alpha;
+    for (var p = 0; p < a.length; p++) {
+      var cur = d[p * 4 + 3];
+      d[p * 4 + 3] = Math.min(cur, a[p]);
+    }
+    if (opts && opts.despill) despillEdges(d, a, canvas.width, canvas.height, opts);
+    var out = makeCanvas(canvas.width, canvas.height);
+    out.getContext('2d').putImageData(img, 0, 0);
+    return out;
+  });
+}
+
+// Reduce key-colour fringe on partially transparent edge pixels.
+function despillEdges(d, alpha, w, h, opts) {
+  for (var p = 0; p < alpha.length; p++) {
+    if (alpha[p] > 0 && alpha[p] < 255) {
+      var i = p * 4;
+      var avg = (d[i] + d[i + 1] + d[i + 2]) / 3;
+      // pull each channel toward the local average to kill the spill tint
+      d[i] = Math.round((d[i] + avg) / 2);
+      d[i + 1] = Math.round((d[i + 1] + avg) / 2);
+      d[i + 2] = Math.round((d[i + 2] + avg) / 2);
+    }
+  }
+}
+
+// ---- background painting + compositing ----
+function paintBackground(ctx, w, h, background, original) {
+  if (background == null || background === 'transparent') return Promise.resolve();
+  if (typeof background === 'string') { ctx.fillStyle = background; ctx.fillRect(0, 0, w, h); return Promise.resolve(); }
+  if (background && background.gradient) {
+    var ang = (background.angle || 0) * Math.PI / 180;
+    var x = Math.cos(ang), y = Math.sin(ang);
+    var g = ctx.createLinearGradient(w / 2 - x * w / 2, h / 2 - y * h / 2, w / 2 + x * w / 2, h / 2 + y * h / 2);
+    var stops = background.gradient;
+    for (var s = 0; s < stops.length; s++) {
+      var pos = stops.length === 1 ? 0 : s / (stops.length - 1);
+      g.addColorStop(pos, stops[s]);
+    }
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); return Promise.resolve();
+  }
+  if (background && background.blur != null && original) {
+    var prev = ctx.filter;
+    ctx.filter = 'blur(' + background.blur + 'px)';
+    drawCover(ctx, original, w, h);
+    ctx.filter = prev || 'none';
+    return Promise.resolve();
+  }
+  // Otherwise treat as an image source.
+  var fit = (background && background.fit) || 'cover';
+  var imgSrc = (background && background.image) ? background.image : background;
+  return resolveSource(imgSrc, { maxDim: Math.max(w, h) }).then(function (bgCanvas) {
+    if (fit === 'stretch') ctx.drawImage(bgCanvas, 0, 0, w, h);
+    else if (fit === 'tile') tile(ctx, bgCanvas, w, h);
+    else if (fit === 'contain') drawContain(ctx, bgCanvas, w, h);
+    else drawCover(ctx, bgCanvas, w, h);
+  });
+}
+
+function drawCover(ctx, img, w, h) {
+  var iw = img.width, ih = img.height;
+  var scale = Math.max(w / iw, h / ih);
+  var dw = iw * scale, dh = ih * scale;
+  ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+}
+function drawContain(ctx, img, w, h) {
+  var iw = img.width, ih = img.height;
+  var scale = Math.min(w / iw, h / ih);
+  var dw = iw * scale, dh = ih * scale;
+  ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+}
+function tile(ctx, img, w, h) {
+  for (var y = 0; y < h; y += img.height) for (var x = 0; x < w; x += img.width) ctx.drawImage(img, x, y);
+}
+
+// replace(src, background, opts) -> canvas: foreground over a new bg.
+function replace(src, background, opts) {
+  opts = opts || {};
+  return resolveSource(src, opts).then(function (working) {
+    return remove(working, opts).then(function (fg) {
+      var w = fg.width, h = fg.height;
+      var out = makeCanvas(w, h);
+      var ctx = out.getContext('2d');
+      return Promise.resolve(paintBackground(ctx, w, h, background, working)).then(function () {
+        ctx.drawImage(fg, 0, 0);
+        return out;
+      });
+    });
+  });
+}
+
+// ---- output helpers ----
+function toDataUrl(canvas, type, quality) { return canvas.toDataURL(type || 'image/png', quality); }
+function toBlob(canvas, type, quality) {
+  return new Promise(function (resolve) {
+    if (canvas.toBlob) canvas.toBlob(function (b) { resolve(b); }, type || 'image/png', quality);
+    else resolve(dataUrlToBlob(canvas.toDataURL(type || 'image/png', quality)));
+  });
+}
+function dataUrlToBlob(url) {
+  var parts = url.split(','), mime = parts[0].match(/:(.*?);/)[1], bin = atob(parts[1]);
+  var arr = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+function download(canvas, filename, type, quality) {
+  var a = document.createElement('a');
+  a.href = toDataUrl(canvas, type, quality);
+  a.download = filename || 'cutout.png';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+// ---- AI hook ----
+function useSegmenter(fn) { segmenter = (typeof fn === 'function') ? fn : null; }
+function hasSegmenter() { return !!segmenter; }
+
+// ---- portrait helpers (v1.1.0) ----
+
+// Bounding box of non-transparent pixels. Pure. null if fully transparent.
+function alphaBounds(alpha, w, h, threshold) {
+  threshold = threshold || 0;
+  var minX = w, minY = h, maxX = -1, maxY = -1;
+  for (var y = 0; y < h; y++) {
+    for (var x = 0; x < w; x++) {
+      if (alpha[y * w + x] > threshold) {
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (maxX < 0) return null;
+  return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+}
+
+// Crop a canvas to its non-transparent subject (with optional padding).
+// Perfect for turning a cutout into a tidy character portrait.
+function trim(canvas, opts) {
+  opts = opts || {};
+  var ctx = canvas.getContext('2d');
+  var img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  var n = canvas.width * canvas.height;
+  var alpha = new Uint8ClampedArray(n);
+  for (var i = 0; i < n; i++) alpha[i] = img.data[i * 4 + 3];
+  var b = alphaBounds(alpha, canvas.width, canvas.height, opts.threshold || 0);
+  if (!b) return canvas;
+  var pad = opts.padding || 0;
+  var x = Math.max(0, b.x - pad), y = Math.max(0, b.y - pad);
+  var ww = Math.min(canvas.width - x, b.w + pad * 2);
+  var hh = Math.min(canvas.height - y, b.h + pad * 2);
+  var out = makeCanvas(ww, hh);
+  out.getContext('2d').drawImage(canvas, x, y, ww, hh, 0, 0, ww, hh);
+  return out;
+}
+
+// Label connected opaque regions (4-connectivity). Pure over an alpha
+// array. Returns { labels:Int32Array, comps:[{label,area,x,y,w,h}] }.
+function labelComponents(alpha, w, h) {
+  var n = w * h;
+  var labels = new Int32Array(n);
+  var comps = [];
+  var next = 1, stack = [];
+  for (var p = 0; p < n; p++) {
+    if (alpha[p] === 0 || labels[p] !== 0) continue;
+    var label = next++, area = 0;
+    var minX = w, minY = h, maxX = 0, maxY = 0;
+    stack.push(p); labels[p] = label;
+    while (stack.length) {
+      var idx = stack.pop();
+      var x = idx % w, y = (idx - x) / w;
+      area++;
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+      if (x > 0 && alpha[idx - 1] > 0 && labels[idx - 1] === 0) { labels[idx - 1] = label; stack.push(idx - 1); }
+      if (x < w - 1 && alpha[idx + 1] > 0 && labels[idx + 1] === 0) { labels[idx + 1] = label; stack.push(idx + 1); }
+      if (y > 0 && alpha[idx - w] > 0 && labels[idx - w] === 0) { labels[idx - w] = label; stack.push(idx - w); }
+      if (y < h - 1 && alpha[idx + w] > 0 && labels[idx + w] === 0) { labels[idx + w] = label; stack.push(idx + w); }
+    }
+    comps.push({ label: label, area: area, x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 });
+  }
+  return { labels: labels, comps: comps };
+}
+
+// Keep only the largest opaque blob (default), or, with opts.minArea,
+// every blob at least that big -- a despeckle that drops stray pixels
+// left over from keying. Returns a new canvas.
+function keepLargest(canvas, opts) {
+  opts = opts || {};
+  var w = canvas.width, h = canvas.height, n = w * h;
+  var ctx = canvas.getContext('2d');
+  var img = ctx.getImageData(0, 0, w, h);
+  var alpha = new Uint8ClampedArray(n);
+  for (var i = 0; i < n; i++) alpha[i] = img.data[i * 4 + 3];
+  var res = labelComponents(alpha, w, h);
+  if (!res.comps.length) return canvas;
+  var keep = {};
+  if (opts.minArea) {
+    for (var c = 0; c < res.comps.length; c++) if (res.comps[c].area >= opts.minArea) keep[res.comps[c].label] = 1;
+  } else {
+    var best = res.comps[0];
+    for (var c2 = 1; c2 < res.comps.length; c2++) if (res.comps[c2].area > best.area) best = res.comps[c2];
+    keep[best.label] = 1;
+  }
+  for (var q = 0; q < n; q++) if (!keep[res.labels[q]]) img.data[q * 4 + 3] = 0;
+  var out = makeCanvas(w, h);
+  out.getContext('2d').putImageData(img, 0, 0);
+  return out;
+}
+
+// Split a (background-removed) image into separate cropped object PNGs,
+// one per connected region above opts.minArea. Returns Promise of
+// [{ canvas, x, y, w, h, area }] sorted largest-first. Set opts.remove
+// to false if the source is already transparent.
+function extractObjects(src, opts) {
+  opts = opts || {};
+  var minArea = opts.minArea || 100;
+  var prep = (opts.remove === false) ? resolveSource(src, opts) : remove(src, opts);
+  return Promise.resolve(prep).then(function (canvas) {
+    var w = canvas.width, h = canvas.height, n = w * h;
+    var img = canvas.getContext('2d').getImageData(0, 0, w, h);
+    var alpha = new Uint8ClampedArray(n);
+    for (var i = 0; i < n; i++) alpha[i] = img.data[i * 4 + 3];
+    var res = labelComponents(alpha, w, h);
+    var out = [];
+    for (var c = 0; c < res.comps.length; c++) {
+      var comp = res.comps[c];
+      if (comp.area < minArea) continue;
+      var oc = makeCanvas(comp.w, comp.h);
+      var od = oc.getContext('2d').createImageData(comp.w, comp.h);
+      for (var yy = 0; yy < comp.h; yy++) {
+        for (var xx = 0; xx < comp.w; xx++) {
+          var si = ((comp.y + yy) * w + (comp.x + xx));
+          if (res.labels[si] !== comp.label) continue;
+          var di = (yy * comp.w + xx) * 4;
+          od.data[di] = img.data[si * 4];
+          od.data[di + 1] = img.data[si * 4 + 1];
+          od.data[di + 2] = img.data[si * 4 + 2];
+          od.data[di + 3] = img.data[si * 4 + 3];
+        }
+      }
+      oc.getContext('2d').putImageData(od, 0, 0);
+      out.push({ canvas: oc, x: comp.x, y: comp.y, w: comp.w, h: comp.h, area: comp.area });
+    }
+    out.sort(function (a, b) { return b.area - a.area; });
+    return out;
+  });
+}
+
+window.weld.background = {
+  remove: remove,
+  replace: replace,
+  mask: mask,
+  maskFromData: maskFromData,
+  estimateBgColor: estimateBgColor,
+  trim: trim,
+  keepLargest: keepLargest,
+  despeckle: keepLargest,
+  extractObjects: extractObjects,
+  alphaBounds: alphaBounds,
+  labelComponents: labelComponents,
+  fromFile: fromFile,
+  fromUrl: fromUrl,
+  toDataUrl: toDataUrl,
+  toBlob: toBlob,
+  download: download,
+  useSegmenter: useSegmenter,
+  hasSegmenter: hasSegmenter,
+  version: '1.1.0'
+};
+
+return window.weld.background;
+})();
+</script>
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>
+</div>

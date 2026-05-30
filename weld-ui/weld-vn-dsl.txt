@@ -1,0 +1,332 @@
+$meta
+  title       = weld.vn
+  description = A visual-novel stage for the browser. Layered background, character sprites (position, scale, flip, dim), a typewriter dialogue box with name tag, clickable choices, and a tiny scene-script runner. Snapshot the frame to a canvas for sharing. Pairs with weld.background (cut-out portraits as sprites), weld.image (generated backdrops), and weld.stream (generated dialogue). Stash on window.weld.vn.
+  tags        = weld, vn, visual-novel, stage, dialogue, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.vn) return window.weld.vn;
+
+  // -----------------------------------------------------------------
+  // weld.vn: the presentation layer of a visual novel / story game.
+  //
+  //   var stage = weld.vn.create(container, { typeSpeed: 18 });
+  //   stage.background(skyUrl);
+  //   stage.show('hero', { image: portraitCanvas, position: 'left' });
+  //   await stage.say('Aria', 'So this is where it begins...');
+  //   var pick = await stage.choices(['Follow her', 'Stay put']);
+  //
+  // The sprite images can be cut-out portraits from weld.background, the
+  // backdrop can come from weld.image, and the lines can stream from
+  // weld.stream -- weld.vn just stages them. A run(script) helper plays a
+  // sequence of steps, and snapshot() composites the current frame to a
+  // canvas for export. DOM-based; one stylesheet, injected once.
+  // -----------------------------------------------------------------
+
+  var STYLE_ID = 'weld-vn-style';
+
+  function ensureStyle() {
+    if (typeof document === 'undefined' || document.getElementById(STYLE_ID)) return;
+    var st = document.createElement('style');
+    st.id = STYLE_ID;
+    st.textContent =
+      '.weld-vn{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:10px;background:#000;font-family:var(--vn-font,"DM Sans",system-ui,sans-serif);user-select:none;}'
+      + '.weld-vn-bg,.weld-vn-bg2{position:absolute;inset:0;background-size:cover;background-position:center;transition:opacity .5s ease;}'
+      + '.weld-vn-chars{position:absolute;inset:0;}'
+      + '.weld-vn-sprite{position:absolute;bottom:0;height:90%;transition:opacity .35s ease, transform .35s ease, filter .35s ease;will-change:opacity,transform;}'
+      + '.weld-vn-sprite.dim{filter:brightness(.55) saturate(.8);}'
+      + '.weld-vn-dialogue{position:absolute;left:3%;right:3%;bottom:3.5%;min-height:22%;background:rgba(8,12,22,.82);border:1.5px solid var(--accent,#4493f8);border-radius:12px;padding:18px 20px 16px;color:#e6edf3;cursor:pointer;opacity:0;transition:opacity .2s ease;box-shadow:0 8px 30px rgba(0,0,0,.4);}'
+      + '.weld-vn-dialogue.show{opacity:1;}'
+      + '.weld-vn-name{position:absolute;top:-14px;left:14px;background:var(--accent,#4493f8);color:#fff;font-weight:600;font-size:13px;padding:3px 12px;border-radius:8px;}'
+      + '.weld-vn-text{font-size:clamp(13px,2.1vw,17px);line-height:1.5;min-height:2.4em;}'
+      + '.weld-vn-next{position:absolute;right:14px;bottom:10px;color:var(--accent,#4493f8);font-size:14px;opacity:0;transition:opacity .2s;animation:weldVnBob 1s ease-in-out infinite;}'
+      + '.weld-vn-next.show{opacity:1;}'
+      + '@keyframes weldVnBob{0%,100%{transform:translateY(0);}50%{transform:translateY(3px);}}'
+      + '.weld-vn-choices{position:absolute;left:0;right:0;bottom:0;top:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(0,0,0,.35);padding:20px;}'
+      + '.weld-vn-choice{min-width:min(60%,360px);background:rgba(13,17,23,.92);border:1.5px solid var(--accent,#4493f8);color:#e6edf3;border-radius:10px;padding:12px 18px;font-size:15px;cursor:pointer;transition:background .15s,transform .1s;}'
+      + '.weld-vn-choice:hover{background:var(--accent,#4493f8);color:#fff;transform:translateY(-1px);}';
+    document.head.appendChild(st);
+  }
+
+  // Normalize an image source (url | canvas | Image) for display + snapshot.
+  function normalizeImage(image) {
+    if (!image) return null;
+    if (image.getContext) return { url: image.toDataURL('image/png'), drawable: image, aspect: image.width / image.height };
+    if (image.tagName === 'IMG' || image.naturalWidth) {
+      var a = (image.naturalWidth && image.naturalHeight) ? image.naturalWidth / image.naturalHeight : null;
+      return { url: image.src, drawable: image, aspect: a };
+    }
+    return { url: String(image), drawable: null, aspect: null }; // a URL; aspect resolved on load
+  }
+
+  function loadImage(url) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      if (!/^data:/.test(String(url))) img.crossOrigin = 'anonymous';
+      img.onload = function () { resolve(img); };
+      img.onerror = function () { reject(new Error('weld.vn: image load failed')); };
+      img.src = url;
+    });
+  }
+
+  function posToFrac(position) {
+    if (typeof position === 'number') return Math.max(0, Math.min(1, position));
+    if (position === 'left') return 0.04;
+    if (position === 'right') return 0.96;
+    return 0.5; // center
+  }
+
+  function create(container, opts) {
+    opts = opts || {};
+    if (typeof container === 'string') container = document.querySelector(container);
+    if (!container) throw new Error('weld.vn: container not found');
+    ensureStyle();
+
+    var typeSpeed = opts.typeSpeed != null ? opts.typeSpeed : 18; // ms per char
+    if (opts.font) container.style.setProperty('--vn-font', opts.font);
+
+    var root = document.createElement('div');
+    root.className = 'weld-vn';
+    root.innerHTML =
+      '<div class="weld-vn-bg" data-bg></div>'
+      + '<div class="weld-vn-bg2" data-bg2 style="opacity:0;"></div>'
+      + '<div class="weld-vn-chars" data-chars></div>'
+      + '<div class="weld-vn-dialogue" data-dialogue><div class="weld-vn-name" data-name></div><div class="weld-vn-text" data-text></div><div class="weld-vn-next" data-next>&#9660;</div></div>'
+      + '<div class="weld-vn-choices" data-choices style="display:none;"></div>';
+    container.appendChild(root);
+
+    var bgEl = root.querySelector('[data-bg]');
+    var charsEl = root.querySelector('[data-chars]');
+    var dialogueEl = root.querySelector('[data-dialogue]');
+    var nameEl = root.querySelector('[data-name]');
+    var textEl = root.querySelector('[data-text]');
+    var nextEl = root.querySelector('[data-next]');
+    var choicesEl = root.querySelector('[data-choices]');
+
+    // model (for snapshot)
+    var model = { bg: null, chars: {}, dialogue: null };
+    var advanceListeners = [];
+    var typing = null; // active typewriter controller
+
+    // ---- background ----
+    function bgCss(spec) {
+      if (spec == null) return '';
+      if (spec.gradient) {
+        var ang = (spec.angle != null ? spec.angle : 180);
+        return 'linear-gradient(' + ang + 'deg,' + spec.gradient.join(',') + ')';
+      }
+      if (spec.color) return spec.color;
+      if (typeof spec === 'string' && spec.charAt(0) === '#') return spec;
+      return '';
+    }
+    function background(src, o) {
+      o = o || {};
+      var spec;
+      if (src && src.getContext) spec = { image: src.toDataURL('image/png') };
+      else if (typeof src === 'string' && src.charAt(0) !== '#') spec = { image: src };
+      else if (typeof src === 'string') spec = { color: src };
+      else spec = src || {};
+      model.bg = spec;
+      if (spec.image) { bgEl.style.background = ''; bgEl.style.backgroundImage = 'url("' + spec.image + '")'; }
+      else { bgEl.style.backgroundImage = ''; bgEl.style.background = bgCss(spec); }
+      return api;
+    }
+
+    // ---- characters ----
+    function show(id, o) {
+      o = o || {};
+      var norm = normalizeImage(o.image);
+      var rec = model.chars[id] || {};
+      rec.norm = norm || rec.norm;
+      rec.position = o.position != null ? o.position : (rec.position != null ? rec.position : 'center');
+      rec.scale = o.scale != null ? o.scale : (rec.scale != null ? rec.scale : 0.9);
+      rec.flip = o.flip != null ? o.flip : !!rec.flip;
+      rec.dim = o.dim != null ? o.dim : !!rec.dim;
+      model.chars[id] = rec;
+
+      var el = rec.el;
+      if (!el) {
+        el = document.createElement('img');
+        el.className = 'weld-vn-sprite';
+        el.style.opacity = '0';
+        charsEl.appendChild(el);
+        rec.el = el;
+      }
+      if (rec.norm) el.src = rec.norm.url;
+      el.style.height = (rec.scale * 100) + '%';
+      var frac = posToFrac(rec.position);
+      el.style.left = (frac * 100) + '%';
+      el.style.transform = 'translateX(-50%)' + (rec.flip ? ' scaleX(-1)' : '');
+      el.classList.toggle('dim', !!rec.dim);
+      requestAnimationFrame(function () { el.style.opacity = '1'; });
+      return api;
+    }
+    function hide(id) {
+      var rec = model.chars[id];
+      if (rec && rec.el) { var el = rec.el; el.style.opacity = '0'; setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 360); }
+      delete model.chars[id];
+      return api;
+    }
+    function clearCharacters() { Object.keys(model.chars).forEach(hide); return api; }
+
+    // ---- dialogue (typewriter) ----
+    function say(name, text, o) {
+      o = o || {};
+      choicesEl.style.display = 'none';
+      model.dialogue = { name: name || '', text: String(text == null ? '' : text) };
+      nameEl.textContent = name || '';
+      nameEl.style.display = name ? '' : 'none';
+      dialogueEl.classList.add('show');
+      nextEl.classList.remove('show');
+      var full = model.dialogue.text;
+      textEl.textContent = '';
+
+      return new Promise(function (resolve) {
+        var i = 0, done = false, resolved = false;
+        function finish() { textEl.textContent = full; done = true; nextEl.classList.add('show'); if (typing) { clearInterval(typing.timer); typing = null; } }
+        function advance() {
+          if (!done) { finish(); return; }
+          if (resolved) return; resolved = true;
+          dialogueEl.removeEventListener('click', onClick);
+          root.removeEventListener('click', onClick);
+          advanceListeners.forEach(function (fn) { try { fn(); } catch (e) {} });
+          resolve();
+        }
+        function onClick() { advance(); }
+        if (o.instant || typeSpeed <= 0) { finish(); }
+        else {
+          typing = { timer: setInterval(function () {
+            i++; textEl.textContent = full.slice(0, i);
+            if (i >= full.length) finish();
+          }, typeSpeed) };
+        }
+        dialogueEl.addEventListener('click', onClick);
+      });
+    }
+
+    // ---- choices ----
+    function choices(list, o) {
+      o = o || {};
+      choicesEl.innerHTML = '';
+      choicesEl.style.display = 'flex';
+      return new Promise(function (resolve) {
+        (list || []).forEach(function (item, idx) {
+          var label = (item && item.label != null) ? item.label : item;
+          var value = (item && item.value != null) ? item.value : idx;
+          var b = document.createElement('button');
+          b.className = 'weld-vn-choice';
+          b.textContent = label;
+          b.addEventListener('click', function () {
+            choicesEl.style.display = 'none';
+            resolve(value);
+          });
+          choicesEl.appendChild(b);
+        });
+      });
+    }
+
+    // ---- script runner ----
+    // steps: { bg }, { background, fit }, { show, image, position, scale, flip },
+    //        { hide }, { name, text } or { say, name }, { choices, onChoose },
+    //        { wait }, { clear:'characters'|'all' }
+    function run(script) {
+      var steps = script || [];
+      var idx = 0;
+      function step() {
+        if (idx >= steps.length) return Promise.resolve();
+        var s = steps[idx++];
+        var p = Promise.resolve();
+        if (s.bg != null || s.background != null) background(s.bg != null ? s.bg : s.background, { fit: s.fit });
+        if (s.clear === 'all') { clearCharacters(); clearDialogue(); }
+        else if (s.clear === 'characters') clearCharacters();
+        if (s.hide != null) hide(s.hide);
+        if (s.show != null) show(s.show, s);
+        if (s.wait != null) p = p.then(function () { return new Promise(function (r) { setTimeout(r, s.wait); }); });
+        if (s.say != null || s.text != null) p = p.then(function () { return say(s.name || '', s.say != null ? s.say : s.text, s); });
+        if (s.choices != null) p = p.then(function () { return choices(s.choices, s).then(function (v) { if (s.onChoose) s.onChoose(v); }); });
+        return p.then(step);
+      }
+      return step();
+    }
+
+    function clearDialogue() { dialogueEl.classList.remove('show'); model.dialogue = null; }
+    function clear() { clearCharacters(); clearDialogue(); choicesEl.style.display = 'none'; background({}); return api; }
+    function destroy() { if (root.parentNode) root.parentNode.removeChild(root); advanceListeners = []; }
+    function onAdvance(fn) { advanceListeners.push(fn); return function () { var i = advanceListeners.indexOf(fn); if (i !== -1) advanceListeners.splice(i, 1); }; }
+
+    // ---- snapshot to canvas (for sharing/export) ----
+    function snapshot(o) {
+      o = o || {};
+      var W = o.width || 1280, H = o.height || 720;
+      var canvas = document.createElement('canvas');
+      canvas.width = W; canvas.height = H;
+      var ctx = canvas.getContext('2d');
+
+      // background
+      var bgP = Promise.resolve();
+      var bg = model.bg || {};
+      if (bg.image) bgP = loadImage(bg.image).then(function (img) {
+        var sc = Math.max(W / img.width, H / img.height);
+        ctx.drawImage(img, (W - img.width * sc) / 2, (H - img.height * sc) / 2, img.width * sc, img.height * sc);
+      });
+      else { ctx.fillStyle = (bg.color || (typeof bg === 'string' ? bg : '#000')); if (bg.gradient) { var g = ctx.createLinearGradient(0, 0, 0, H); bg.gradient.forEach(function (c, i) { g.addColorStop(bg.gradient.length === 1 ? 0 : i / (bg.gradient.length - 1), c); }); ctx.fillStyle = g; } ctx.fillRect(0, 0, W, H); }
+
+      return bgP.then(function () {
+        // characters (ensure drawables loaded)
+        var ids = Object.keys(model.chars);
+        return ids.reduce(function (chain, id) {
+          var rec = model.chars[id];
+          if (!rec.norm) return chain;
+          return chain.then(function () {
+            var dp = rec.norm.drawable ? Promise.resolve(rec.norm.drawable) : loadImage(rec.norm.url);
+            return dp.then(function (drawable) {
+              var aspect = rec.norm.aspect || (drawable.width / drawable.height) || 0.6;
+              var dh = rec.scale * H, dw = dh * aspect;
+              var cx = posToFrac(rec.position) * W;
+              var x = cx - dw / 2, y = H - dh;
+              ctx.save();
+              if (rec.dim) ctx.filter = 'brightness(0.55)';
+              if (rec.flip) { ctx.translate(x + dw, y); ctx.scale(-1, 1); ctx.drawImage(drawable, 0, 0, dw, dh); }
+              else ctx.drawImage(drawable, x, y, dw, dh);
+              ctx.restore();
+            });
+          });
+        }, Promise.resolve());
+      }).then(function () {
+        // dialogue
+        if (model.dialogue && o.dialogue !== false) {
+          var bx = W * 0.03, bw = W * 0.94, bh = H * 0.24, by = H - bh - H * 0.035;
+          roundRect(ctx, bx, by, bw, bh, 14); ctx.fillStyle = 'rgba(8,12,22,0.82)'; ctx.fill();
+          ctx.strokeStyle = 'rgba(68,147,248,0.85)'; ctx.lineWidth = 2; roundRect(ctx, bx, by, bw, bh, 14); ctx.stroke();
+          if (model.dialogue.name) {
+            ctx.font = '600 ' + Math.round(H * 0.026) + 'px DM Sans, sans-serif';
+            var nw = ctx.measureText(model.dialogue.name).width + 30;
+            roundRect(ctx, bx + 16, by - H * 0.022, nw, H * 0.045, 8); ctx.fillStyle = '#4493f8'; ctx.fill();
+            ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; ctx.fillText(model.dialogue.name, bx + 31, by + 1);
+          }
+          ctx.fillStyle = '#e6edf3'; ctx.textBaseline = 'top'; ctx.font = Math.round(H * 0.03) + 'px DM Sans, sans-serif';
+          wrapText(ctx, model.dialogue.text, bx + 22, by + 24, bw - 44, H * 0.04);
+        }
+        return canvas;
+      });
+    }
+
+    function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+    function wrapText(ctx, text, x, y, maxW, lh) { var words = String(text).split(' '), line = '', yy = y; for (var i = 0; i < words.length; i++) { var t = line + words[i] + ' '; if (ctx.measureText(t).width > maxW && i > 0) { ctx.fillText(line, x, yy); line = words[i] + ' '; yy += lh; } else line = t; } ctx.fillText(line, x, yy); }
+
+    var api = {
+      background: background, show: show, hide: hide, clearCharacters: clearCharacters,
+      say: say, choices: choices, run: run, clear: clear, destroy: destroy,
+      onAdvance: onAdvance, snapshot: snapshot, el: root
+    };
+    return api;
+  }
+
+  window.weld.vn = {
+    create: create,
+    version: '1.0.0'
+  };
+
+  return window.weld.vn;

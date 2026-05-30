@@ -1,0 +1,193 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--amber:#d29922;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:780px;margin:0 auto;padding:34px 18px 90px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 0 16px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+.breadcrumb a{color:var(--muted);}.breadcrumb .sep{color:var(--faint);margin:0 8px;}.breadcrumb .cur{color:var(--ink);}.breadcrumb .act a{color:var(--accent);}
+.hdr{margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}.hdr h1{font:700 24px var(--mono);letter-spacing:-0.5px;}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;}
+.hdr .lead{color:var(--muted);margin-top:8px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;}
+.panel h2{font:600 13px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:8px 0;}
+.lbl{font:600 12px var(--mono);color:var(--muted);min-width:74px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 15px;font:600 13px var(--font);cursor:pointer;transition:.12s;}
+.btn:hover{filter:brightness(1.08);}.btn.ghost{background:var(--faint);color:var(--ink);}.btn.sm{padding:6px 11px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+input[type=text],textarea{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:8px 10px;font:13px var(--font);}
+input[type=text]{flex:1;min-width:120px;}textarea{width:100%;font:12.5px/1.5 var(--mono);resize:vertical;}
+.mono{font:13px var(--mono);}
+.out{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font:12.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;min-height:20px;color:#c9d1d9;}
+.chip{display:inline-block;background:var(--faint);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font:600 12px var(--mono);margin:2px;}
+.chip.k{background:rgba(63,185,80,.14);border-color:rgba(63,185,80,.4);color:#7ee787;}
+.chip.d{opacity:.4;text-decoration:line-through;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:9px 13px;border-radius:0 4px 4px 0;margin:12px 0 0;font-size:12.5px;color:#c9d1d9;}
+.note.warn{background:rgba(210,153,34,.08);border-color:var(--amber);}
+.tag{font:600 10px var(--mono);padding:2px 7px;border-radius:4px;background:rgba(63,185,80,.14);color:#7ee787;border:1px solid rgba(63,185,80,.4);}
+.tag.ai{background:rgba(210,153,34,.12);color:#e3b341;border-color:rgba(210,153,34,.4);}
+.bar{height:14px;background:var(--accent);border-radius:3px;transition:width .3s;}
+.footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);}.footer a{color:var(--muted);}
+.flex{display:flex;gap:10px;align-items:center;}.wrap{flex-wrap:wrap;}.grow{flex:1;}.mt{margin-top:10px;}
+</style>
+<div id="page">
+  <div class="breadcrumb"><span><a href="https://perchance.org/weld-ui-index">weld</a><span class="sep">/</span>weld.voice<span class="sep">/</span><span class="cur">demo</span></span><span class="act"><a href="https://perchance.org/weld-voice-plugin">docs &rarr;</a></span></div>
+  <div class="hdr"><div class="hdr-row"><h1>weld.voice &mdash; demo</h1><span class="ver">v1.0.0</span></div><p class="lead">Speech for chat bots: text-to-speech for replies and best-effort speech-to-text for input, via the browser Web Speech API. Speak some text, or try the mic.</p></div>
+
+  <div class="panel"><h2>Capabilities <span class="tag ai">browser API</span></h2>
+    <div id="vcaps" class="out">checking...</div></div>
+  <div class="panel"><h2>Speak (text &rarr; speech)</h2>
+    <textarea id="vtext" rows="3">The torchlight flickered as the party stepped into the crypt.</textarea>
+    <div class="row mt"><span class="lbl">rate</span><input id="vrate" class="volume-slider" type="range" min="0.5" max="1.6" step="0.05" value="1.05"><span id="vrateval" class="mono" style="color:var(--muted)">1.05x</span></div>
+    <div class="row"><button id="vspeak" class="btn">Speak</button><button id="vstop" class="btn ghost">Stop</button></div></div>
+  <div class="panel"><h2>Listen (speech &rarr; text)</h2>
+    <div class="row"><button id="vlisten" class="btn">Start listening</button><button id="vlstop" class="btn ghost">Stop</button></div>
+    <div id="vheard" class="out mt" style="min-height:40px"></div>
+    <div class="note">TTS works broadly (including inside the Perchance frame). STT needs a microphone permission and may be blocked in a sandboxed frame &mdash; the listen button is disabled if <code>supported().stt</code> is false.</div></div>
+  <footer class="footer"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
+</div>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.voice) return window.weld.voice;
+
+// -----------------------------------------------------------------
+// weld.voice: read replies aloud and (where the browser allows) take
+// voice input. TTS via SpeechSynthesis is broadly supported and works
+// inside the Perchance frame. STT via SpeechRecognition is best-effort:
+// it needs a mic permission and may be blocked in a sandboxed frame, so
+// every STT call is guarded and supported() tells you up front.
+// -----------------------------------------------------------------
+
+var synth = (typeof window !== 'undefined' && window.speechSynthesis) ? window.speechSynthesis : null;
+var Recognition = (typeof window !== 'undefined')
+  ? (window.SpeechRecognition || window.webkitSpeechRecognition || null)
+  : null;
+
+function supported() {
+  return { tts: !!synth, stt: !!Recognition };
+}
+
+// ---- voices ----
+function voices() { return synth ? synth.getVoices() : []; }
+
+function pickVoice(want) {
+  if (!synth || want == null) return null;
+  var list = synth.getVoices();
+  if (typeof want === 'number') return list[want] || null;
+  var w = String(want).toLowerCase();
+  for (var i = 0; i < list.length; i++) {
+    var v = list[i];
+    if (v.name.toLowerCase() === w || v.voiceURI.toLowerCase() === w) return v;
+  }
+  for (var j = 0; j < list.length; j++) {
+    if (list[j].name.toLowerCase().indexOf(w) !== -1) return list[j];
+    if (list[j].lang && list[j].lang.toLowerCase().indexOf(w) !== -1) return list[j];
+  }
+  return null;
+}
+
+// ---- text to speech ----
+// speak(text, opts) -> the utterance (or null). opts:
+//   rate (0.1-10, default 1), pitch (0-2, default 1), volume (0-1),
+//   voice (name/index/lang substring), lang, interrupt (bool),
+//   onStart, onEnd, onError, onBoundary
+function speak(text, opts) {
+  opts = opts || {};
+  if (!synth) { if (opts.onError) opts.onError('tts-unsupported'); return null; }
+  var str = String(text == null ? '' : text);
+  if (!str.trim()) return null;
+  if (opts.interrupt) synth.cancel();
+
+  var u = new SpeechSynthesisUtterance(str);
+  if (opts.rate != null) u.rate = opts.rate;
+  if (opts.pitch != null) u.pitch = opts.pitch;
+  if (opts.volume != null) u.volume = opts.volume;
+  if (opts.lang) u.lang = opts.lang;
+  var v = pickVoice(opts.voice);
+  if (v) u.voice = v;
+  if (opts.onStart) u.onstart = function () { opts.onStart(); };
+  if (opts.onEnd) u.onend = function () { opts.onEnd(); };
+  if (opts.onError) u.onerror = function (e) { opts.onError((e && e.error) || 'tts-error'); };
+  if (opts.onBoundary) u.onboundary = function (e) { opts.onBoundary(e); };
+  synth.speak(u);
+  return u;
+}
+
+function stop() { if (synth) synth.cancel(); }
+function pause() { if (synth) synth.pause(); }
+function resume() { if (synth) synth.resume(); }
+function speaking() { return !!(synth && synth.speaking); }
+
+// ---- speech to text (best-effort) ----
+// listen(opts) -> a session handle, or null if unsupported. opts:
+//   lang (default 'en-US'), interim (bool), continuous (bool),
+//   onResult(text, isFinal), onEnd, onError, onStart
+// handle: { stop(), abort(), active() }
+function listen(opts) {
+  opts = opts || {};
+  if (!Recognition) { if (opts.onError) opts.onError('stt-unsupported'); return null; }
+  var rec;
+  try { rec = new Recognition(); } catch (e) { if (opts.onError) opts.onError('stt-init-failed'); return null; }
+  rec.lang = opts.lang || 'en-US';
+  rec.interimResults = !!opts.interim;
+  rec.continuous = !!opts.continuous;
+  var active = true;
+
+  rec.onresult = function (e) {
+    if (!opts.onResult) return;
+    for (var i = e.resultIndex; i < e.results.length; i++) {
+      var r = e.results[i];
+      opts.onResult(r[0] ? r[0].transcript : '', r.isFinal);
+    }
+  };
+  rec.onerror = function (e) { if (opts.onError) opts.onError((e && e.error) || 'stt-error'); };
+  rec.onend = function () { active = false; if (opts.onEnd) opts.onEnd(); };
+  if (opts.onStart) rec.onstart = function () { opts.onStart(); };
+
+  try { rec.start(); } catch (e) { if (opts.onError) opts.onError('stt-start-failed'); return null; }
+
+  return {
+    stop: function () { try { rec.stop(); } catch (e) {} },
+    abort: function () { try { rec.abort(); } catch (e) {} },
+    active: function () { return active; }
+  };
+}
+
+window.weld.voice = {
+  supported: supported,
+  voices: voices,
+  speak: speak,
+  stop: stop,
+  pause: pause,
+  resume: resume,
+  speaking: speaking,
+  listen: listen,
+  version: '1.0.0'
+};
+
+return window.weld.voice;
+})();
+</script>
+<script>
+(function(){
+  function $(id){return document.getElementById(id);}
+  function boot(){ if(!window.weld||!window.weld.voice){return setTimeout(boot,100);} init(); }
+  function init(){
+    var V=window.weld.voice, caps=V.supported(), session=null;
+    $('vcaps').innerHTML='text-to-speech: '+(caps.tts?'<span style="color:#7ee787">available</span>':'<span style="color:#ff7b72">unavailable</span>')+'\nspeech-to-text: '+(caps.stt?'<span style="color:#7ee787">available</span>':'<span style="color:#e3b341">unavailable here (needs mic / may be sandboxed)</span>');
+    $('vrate').oninput=function(){ $('vrateval').textContent=(+this.value).toFixed(2)+'x'; };
+    $('vspeak').onclick=function(){ if(!caps.tts){ alert('TTS not available in this browser'); return; } V.speak($('vtext').value,{rate:+$('vrate').value, interrupt:true}); };
+    $('vstop').onclick=function(){ V.stop(); };
+    if(!caps.stt){ $('vlisten').disabled=true; }
+    $('vlisten').onclick=function(){ if(!caps.stt) return; $('vheard').textContent='listening...'; session=V.listen({ interim:true, onResult:function(text,isFinal){ $('vheard').textContent=text+(isFinal?'':' ...'); } }); };
+    $('vlstop').onclick=function(){ if(session&&session.stop) session.stop(); };
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+})();
+</script>

@@ -1,0 +1,241 @@
+$meta
+  title       = weld.summarize
+  description = Rolling and hierarchical chat-history compression. Keeps recent turns verbatim and folds older ones into a running summary (and summaries-of-summaries) so a long conversation keeps its memory inside the token budget. Pairs with weld.stream and weld.tokens.
+  tags        = weld, summarize, memory, context, budget, ai, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.summarize) return window.weld.summarize;
+
+  // -----------------------------------------------------------------
+  // weld.summarize: keep a long chat inside the context window without
+  // amnesia. weld.prompt can only DROP old turns when the budget is
+  // blown; this CONDENSES them instead.
+  //
+  //   - rolling():   a stateful summarizer. Feed it messages; it keeps
+  //                  the most recent N verbatim and rolls everything
+  //                  older into a running summary, re-summarizing
+  //                  (summary-of-summary) when the summary itself grows.
+  //   - summarize(): a one-shot. Hand it text or messages, get a synopsis.
+  //
+  // Summaries are generated through weld.stream; token counting uses
+  // weld.tokens when present, else a chars/4 estimate. Both are soft
+  // dependencies -- without weld.stream, summarize() reports an error
+  // rather than throwing.
+  // -----------------------------------------------------------------
+
+  function getStream() { return (window.weld && window.weld.stream) ? window.weld.stream : null; }
+  function getTokens() { return (window.weld && window.weld.tokens) ? window.weld.tokens : null; }
+
+  function estimateTokens(text) {
+    var t = getTokens();
+    if (t && t.isLoaded && t.isLoaded() && t.countSync) {
+      var n = t.countSync(String(text || ''));
+      if (n != null) return n;
+    }
+    var stream = getStream();
+    if (stream && stream.count) {
+      var sc = stream.count(String(text || ''));
+      if (sc != null) return sc;
+    }
+    return Math.ceil(String(text || '').length / 4);
+  }
+
+  // Normalize a message into "Name: text" wire form for summarizing.
+  function lineOf(msg) {
+    if (msg == null) return '';
+    if (typeof msg === 'string') return msg;
+    var who = msg.name || msg.role || msg.author || '';
+    var body = msg.content != null ? msg.content : (msg.text != null ? msg.text : '');
+    return who ? (who + ': ' + body) : String(body);
+  }
+
+  function joinMessages(messages) {
+    if (!Array.isArray(messages)) return String(messages == null ? '' : messages);
+    return messages.map(lineOf).filter(function (l) { return l && l.trim(); }).join('\n');
+  }
+
+  var DEFAULT_PROMPT =
+    'Summarize the conversation excerpt below. Capture the durable facts, '
+    + 'decisions, character details, and unresolved threads that matter for '
+    + 'continuing the conversation. Write a tight third-person synopsis in past '
+    + 'tense. Do not invent anything. Output only the summary.';
+
+  // Generate a synopsis of some text via weld.stream.
+  // Returns Promise<{ ok, summary, error }>.
+  function runSummary(text, opts) {
+    opts = opts || {};
+    var stream = getStream();
+    if (!stream) {
+      return Promise.resolve({ ok: false, summary: '', error: 'weld.summarize: weld.stream is not loaded' });
+    }
+    var body = String(text || '').trim();
+    if (!body) return Promise.resolve({ ok: true, summary: '', error: null });
+
+    var instruction = (opts.prompt || DEFAULT_PROMPT);
+    if (opts.priorSummary) {
+      instruction += '\n\nA summary of earlier events already exists; fold the new '
+        + 'excerpt into it and return one consolidated summary.\n\nExisting summary:\n'
+        + opts.priorSummary;
+    }
+    if (opts.maxWords) {
+      instruction += '\n\nKeep the summary under about ' + opts.maxWords + ' words.';
+    }
+    instruction += '\n\nExcerpt:\n' + body;
+
+    return stream.run({ instruction: instruction }).then(function (res) {
+      if (res.error) return { ok: false, summary: '', error: res.error };
+      return { ok: true, summary: String(res.text || '').trim(), error: null };
+    });
+  }
+
+  // One-shot: summarize text or an array of messages.
+  function summarize(input, opts) {
+    var text = Array.isArray(input) ? joinMessages(input) : String(input == null ? '' : input);
+    return runSummary(text, opts);
+  }
+
+  // -----------------------------------------------------------------
+  // rolling(opts) -> a stateful summarizer.
+  //
+  // opts:
+  //   keepRecent   (number)  messages kept verbatim (default 8)
+  //   tokenBudget  (number)  compress when kept text exceeds this
+  //                          (default: weld.stream.budget() or 5000)
+  //   summaryMaxWords (number) cap on the running summary (default 200)
+  //   prompt       (string)  override the summarization instruction
+  //
+  // methods:
+  //   add(message)       append; may trigger async compression
+  //   addMany(messages)
+  //   compressNow()      -> Promise; force a compression pass
+  //   state()            -> { summary, recent, generation }
+  //   context()          -> "Summary of earlier events: ...\n\nName: msg..."
+  //   summary()          -> the running summary string
+  //   recent()           -> the verbatim-kept messages
+  //   reset()
+  //   onChange(fn)       subscribe to state changes; returns unsubscribe
+  // -----------------------------------------------------------------
+  function rolling(opts) {
+    opts = opts || {};
+    var keepRecent = opts.keepRecent || 8;
+    var summaryMaxWords = opts.summaryMaxWords || 200;
+    var budget = opts.tokenBudget;
+    if (budget == null) {
+      var stream = getStream();
+      budget = (stream && stream.budget && stream.budget()) || 5000;
+    }
+
+    var recent = [];      // verbatim-kept messages
+    var summary = '';     // running synopsis of everything older
+    var generation = 0;   // how many compression passes have run
+    var compressing = false;
+    var listeners = [];
+
+    function emit() {
+      var snap = state();
+      listeners.forEach(function (fn) { try { fn(snap); } catch (e) {} });
+    }
+
+    function overBudget() {
+      return estimateTokens(joinMessages(recent)) > budget;
+    }
+
+    function compressNow() {
+      if (compressing) return Promise.resolve(state());
+      // Compress everything except the last keepRecent messages.
+      if (recent.length <= keepRecent) return Promise.resolve(state());
+      compressing = true;
+      var cut = recent.length - keepRecent;
+      var older = recent.slice(0, cut);
+      var keptTail = recent.slice(cut);
+      return runSummary(joinMessages(older), {
+        priorSummary: summary || null,
+        maxWords: summaryMaxWords,
+        prompt: opts.prompt
+      }).then(function (r) {
+        compressing = false;
+        if (r.ok && r.summary) {
+          summary = r.summary;
+          recent = keptTail;
+          generation += 1;
+          emit();
+        }
+        return state();
+      }, function () { compressing = false; return state(); });
+    }
+
+    function maybeCompress() {
+      if (recent.length > keepRecent && overBudget()) return compressNow();
+      return Promise.resolve(state());
+    }
+
+    function add(message) {
+      recent.push(message);
+      emit();
+      return maybeCompress();
+    }
+
+    function addMany(messages) {
+      if (Array.isArray(messages)) recent = recent.concat(messages);
+      emit();
+      return maybeCompress();
+    }
+
+    function context(opts2) {
+      opts2 = opts2 || {};
+      var out = [];
+      if (summary) out.push((opts2.label || 'Summary of earlier events') + ': ' + summary);
+      var tail = joinMessages(recent);
+      if (tail) out.push(tail);
+      return out.join('\n\n');
+    }
+
+    function state() {
+      return { summary: summary, recent: recent.slice(), generation: generation };
+    }
+
+    function reset() { recent = []; summary = ''; generation = 0; emit(); }
+
+    function onChange(fn) {
+      listeners.push(fn);
+      return function () {
+        var i = listeners.indexOf(fn);
+        if (i !== -1) listeners.splice(i, 1);
+      };
+    }
+
+    // Restore from a saved state() snapshot.
+    function load(snap) {
+      if (!snap) return;
+      summary = snap.summary || '';
+      recent = Array.isArray(snap.recent) ? snap.recent.slice() : [];
+      generation = snap.generation || 0;
+      emit();
+    }
+
+    return {
+      add: add,
+      addMany: addMany,
+      compressNow: compressNow,
+      context: context,
+      state: state,
+      load: load,
+      summary: function () { return summary; },
+      recent: function () { return recent.slice(); },
+      reset: reset,
+      onChange: onChange
+    };
+  }
+
+  window.weld.summarize = {
+    summarize: summarize,
+    rolling: rolling,
+    estimateTokens: estimateTokens,
+    joinMessages: joinMessages,
+    version: '1.0.0'
+  };
+
+  return window.weld.summarize;

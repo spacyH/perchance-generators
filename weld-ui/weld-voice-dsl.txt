@@ -1,0 +1,127 @@
+$meta
+  title       = weld.voice
+  description = Speech for chat bots. Text-to-speech for replies (rate, pitch, voice, queueing) and best-effort speech-to-text for input, both via the browser Web Speech API. No network, no dependencies. Stash on window.weld.voice.
+  tags        = weld, voice, tts, speech, accessibility, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.voice) return window.weld.voice;
+
+  // -----------------------------------------------------------------
+  // weld.voice: read replies aloud and (where the browser allows) take
+  // voice input. TTS via SpeechSynthesis is broadly supported and works
+  // inside the Perchance frame. STT via SpeechRecognition is best-effort:
+  // it needs a mic permission and may be blocked in a sandboxed frame, so
+  // every STT call is guarded and supported() tells you up front.
+  // -----------------------------------------------------------------
+
+  var synth = (typeof window !== 'undefined' && window.speechSynthesis) ? window.speechSynthesis : null;
+  var Recognition = (typeof window !== 'undefined')
+    ? (window.SpeechRecognition || window.webkitSpeechRecognition || null)
+    : null;
+
+  function supported() {
+    return { tts: !!synth, stt: !!Recognition };
+  }
+
+  // ---- voices ----
+  function voices() { return synth ? synth.getVoices() : []; }
+
+  function pickVoice(want) {
+    if (!synth || want == null) return null;
+    var list = synth.getVoices();
+    if (typeof want === 'number') return list[want] || null;
+    var w = String(want).toLowerCase();
+    for (var i = 0; i < list.length; i++) {
+      var v = list[i];
+      if (v.name.toLowerCase() === w || v.voiceURI.toLowerCase() === w) return v;
+    }
+    for (var j = 0; j < list.length; j++) {
+      if (list[j].name.toLowerCase().indexOf(w) !== -1) return list[j];
+      if (list[j].lang && list[j].lang.toLowerCase().indexOf(w) !== -1) return list[j];
+    }
+    return null;
+  }
+
+  // ---- text to speech ----
+  // speak(text, opts) -> the utterance (or null). opts:
+  //   rate (0.1-10, default 1), pitch (0-2, default 1), volume (0-1),
+  //   voice (name/index/lang substring), lang, interrupt (bool),
+  //   onStart, onEnd, onError, onBoundary
+  function speak(text, opts) {
+    opts = opts || {};
+    if (!synth) { if (opts.onError) opts.onError('tts-unsupported'); return null; }
+    var str = String(text == null ? '' : text);
+    if (!str.trim()) return null;
+    if (opts.interrupt) synth.cancel();
+
+    var u = new SpeechSynthesisUtterance(str);
+    if (opts.rate != null) u.rate = opts.rate;
+    if (opts.pitch != null) u.pitch = opts.pitch;
+    if (opts.volume != null) u.volume = opts.volume;
+    if (opts.lang) u.lang = opts.lang;
+    var v = pickVoice(opts.voice);
+    if (v) u.voice = v;
+    if (opts.onStart) u.onstart = function () { opts.onStart(); };
+    if (opts.onEnd) u.onend = function () { opts.onEnd(); };
+    if (opts.onError) u.onerror = function (e) { opts.onError((e && e.error) || 'tts-error'); };
+    if (opts.onBoundary) u.onboundary = function (e) { opts.onBoundary(e); };
+    synth.speak(u);
+    return u;
+  }
+
+  function stop() { if (synth) synth.cancel(); }
+  function pause() { if (synth) synth.pause(); }
+  function resume() { if (synth) synth.resume(); }
+  function speaking() { return !!(synth && synth.speaking); }
+
+  // ---- speech to text (best-effort) ----
+  // listen(opts) -> a session handle, or null if unsupported. opts:
+  //   lang (default 'en-US'), interim (bool), continuous (bool),
+  //   onResult(text, isFinal), onEnd, onError, onStart
+  // handle: { stop(), abort(), active() }
+  function listen(opts) {
+    opts = opts || {};
+    if (!Recognition) { if (opts.onError) opts.onError('stt-unsupported'); return null; }
+    var rec;
+    try { rec = new Recognition(); } catch (e) { if (opts.onError) opts.onError('stt-init-failed'); return null; }
+    rec.lang = opts.lang || 'en-US';
+    rec.interimResults = !!opts.interim;
+    rec.continuous = !!opts.continuous;
+    var active = true;
+
+    rec.onresult = function (e) {
+      if (!opts.onResult) return;
+      for (var i = e.resultIndex; i < e.results.length; i++) {
+        var r = e.results[i];
+        opts.onResult(r[0] ? r[0].transcript : '', r.isFinal);
+      }
+    };
+    rec.onerror = function (e) { if (opts.onError) opts.onError((e && e.error) || 'stt-error'); };
+    rec.onend = function () { active = false; if (opts.onEnd) opts.onEnd(); };
+    if (opts.onStart) rec.onstart = function () { opts.onStart(); };
+
+    try { rec.start(); } catch (e) { if (opts.onError) opts.onError('stt-start-failed'); return null; }
+
+    return {
+      stop: function () { try { rec.stop(); } catch (e) {} },
+      abort: function () { try { rec.abort(); } catch (e) {} },
+      active: function () { return active; }
+    };
+  }
+
+  window.weld.voice = {
+    supported: supported,
+    voices: voices,
+    speak: speak,
+    stop: stop,
+    pause: pause,
+    resume: resume,
+    speaking: speaking,
+    listen: listen,
+    version: '1.0.0'
+  };
+
+  return window.weld.voice;

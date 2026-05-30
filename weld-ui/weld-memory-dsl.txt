@@ -1,0 +1,238 @@
+$meta
+  title       = weld.memory
+  description = Learned long-term memory for chat bots. Extracts durable facts from a conversation via the model, stores them (weld.persist or in-memory), ranks them by relevance, and injects the pertinent ones into the next prompt. Distinct from lorebook: dynamic and model-learned, not author-authored. Soft deps on weld.stream and weld.persist.
+  tags        = weld, memory, facts, recall, context, ai, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.memory) {
+    window.weld.memory.attach({ stream: window.weld.stream, persist: window.weld.persist });
+    return window.weld.memory;
+  }
+
+  // -----------------------------------------------------------------
+  // weld.memory: the facts a bot LEARNS, as opposed to the facts an
+  // author writes. weld.lorebook injects static, hand-keyed entries;
+  // weld.memory grows on its own:
+  //
+  //   observe(text) -> ask the model to extract durable facts -> store
+  //   relevant(text) -> rank stored facts against the current input
+  //   inject(text)   -> a ready-to-prepend "Known facts:" block
+  //
+  // Storage uses weld.persist when present (collection 'memories'),
+  // otherwise an in-memory store with optional localStorage mirroring.
+  // Extraction uses weld.stream; without it, you can still remember()
+  // and recall facts manually.
+  // -----------------------------------------------------------------
+
+  var deps = { stream: null, persist: null };
+  var dbName = 'weld-memory';
+  var collname = 'memories';
+  var store = {};       // id -> fact, the in-memory mirror (always kept warm)
+  var col = null;       // weld.persist collection handle, if available
+  var seq = 0;
+  var ready = false;
+
+  function nextId() { seq += 1; return 'm' + Date.now() + '_' + seq; }
+
+  function attach(d) {
+    if (d && d.stream) deps.stream = d.stream;
+    if (d && d.persist && !col) {
+      deps.persist = d.persist;
+      try {
+        var db = d.persist.open(dbName);
+        col = db.collection(collname);
+      } catch (e) { col = null; }
+    }
+  }
+  function stream() { return deps.stream || (window.weld && window.weld.stream) || null; }
+
+  // Hydrate the in-memory mirror from persist (call once on load).
+  function load() {
+    if (!col) { ready = true; return Promise.resolve(all()); }
+    return Promise.resolve(col.getAll()).then(function (rows) {
+      (rows || []).forEach(function (r) { if (r && r.id) store[r.id] = r; });
+      ready = true;
+      return all();
+    }, function () { ready = true; return all(); });
+  }
+
+  function persistPut(fact) {
+    if (!col) return Promise.resolve(fact);
+    return Promise.resolve(col.put(fact)).then(function () { return fact; }, function () { return fact; });
+  }
+  function persistDel(id) {
+    if (!col) return Promise.resolve(true);
+    return Promise.resolve(col.delete(id)).then(function () { return true; }, function () { return true; });
+  }
+
+  function normalizeText(s) { return String(s == null ? '' : s).replace(/\s+/g, ' ').trim(); }
+
+  // Add a fact. fact may be a string or { text, tags, score, source }.
+  // Deduplicates on normalized text. Returns the stored record.
+  function remember(fact) {
+    var rec = (typeof fact === 'string') ? { text: fact } : (fact || {});
+    var text = normalizeText(rec.text);
+    if (!text) return null;
+    var lower = text.toLowerCase();
+    // Dedup: bump score instead of storing twice.
+    var existing = null, ids = Object.keys(store);
+    for (var i = 0; i < ids.length; i++) {
+      if (String(store[ids[i]].text).toLowerCase() === lower) { existing = store[ids[i]]; break; }
+    }
+    if (existing) {
+      existing.score = (existing.score || 1) + 1;
+      existing.updatedAt = Date.now();
+      persistPut(existing);
+      return existing;
+    }
+    var record = {
+      id: rec.id || nextId(),
+      text: text,
+      tags: rec.tags || [],
+      score: rec.score != null ? rec.score : 1,
+      source: rec.source || null,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+    store[record.id] = record;
+    persistPut(record);
+    return record;
+  }
+
+  function rememberMany(facts) {
+    if (!Array.isArray(facts)) return [];
+    return facts.map(remember).filter(Boolean);
+  }
+
+  function forget(id) {
+    if (store[id]) delete store[id];
+    persistDel(id);
+    return true;
+  }
+
+  function clear() {
+    store = {};
+    if (col) Promise.resolve(col.clear()).catch(function () {});
+    return true;
+  }
+
+  function all() {
+    return Object.keys(store).map(function (k) { return store[k]; });
+  }
+
+  // Keyword relevance: overlap of significant words, weighted by stored score.
+  var STOP = { the:1, a:1, an:1, and:1, or:1, but:1, is:1, are:1, was:1, were:1,
+    to:1, of:1, in:1, on:1, at:1, for:1, with:1, my:1, your:1, i:1, you:1, it:1,
+    he:1, she:1, they:1, we:1, that:1, this:1, do:1, did:1, have:1, has:1 };
+
+  function words(text) {
+    return normalizeText(text).toLowerCase()
+      .replace(/[^a-z0-9\u00c0-\u024f' ]+/g, ' ')
+      .split(/\s+/)
+      .filter(function (w) { return w.length > 2 && !STOP[w]; });
+  }
+
+  function score(queryWords, fact) {
+    var fw = words(fact.text);
+    if (!fw.length) return 0;
+    var set = {};
+    fw.forEach(function (w) { set[w] = true; });
+    var hits = 0;
+    queryWords.forEach(function (w) { if (set[w]) hits += 1; });
+    if (!hits) return 0;
+    return hits * (1 + Math.log(1 + (fact.score || 1)));
+  }
+
+  // relevant(text, opts) -> ranked facts.
+  // opts: { limit (default 6), minScore (default 0.5) }
+  function relevant(text, opts) {
+    opts = opts || {};
+    var limit = opts.limit || 6;
+    var minScore = opts.minScore != null ? opts.minScore : 0.5;
+    var qw = words(text);
+    if (!qw.length) return [];
+    var scored = all().map(function (f) { return { fact: f, s: score(qw, f) }; })
+      .filter(function (x) { return x.s >= minScore; })
+      .sort(function (a, b) { return b.s - a.s; })
+      .slice(0, limit)
+      .map(function (x) { return x.fact; });
+    return scored;
+  }
+
+  function search(query) { return relevant(query, { limit: 50, minScore: 0.5 }); }
+
+  // inject(text, opts) -> a prompt-ready block of the relevant facts.
+  function inject(text, opts) {
+    opts = opts || {};
+    var facts = relevant(text, opts);
+    if (!facts.length) return '';
+    var label = opts.label || 'Known facts about the user and world';
+    var lines = facts.map(function (f) { return '- ' + f.text; });
+    return label + ':\n' + lines.join('\n');
+  }
+
+  var EXTRACT_PROMPT =
+    'Read the conversation excerpt and extract durable, reusable facts worth '
+    + 'remembering long-term: stable preferences, names, relationships, ongoing '
+    + 'goals, and world details. Ignore small talk and anything transient. '
+    + 'Return a JSON array of short factual strings, e.g. ["The user\'s dog is '
+    + 'named Max.", "The user prefers concise replies."]. If there is nothing '
+    + 'worth keeping, return []. Output only the JSON array.';
+
+  // observe(text) -> extract facts via the model and store the new ones.
+  // Returns Promise<{ added, facts, error }>.
+  function observe(text, opts) {
+    opts = opts || {};
+    var body = normalizeText(text);
+    if (!body) return Promise.resolve({ added: 0, facts: [], error: null });
+
+    // Prefer weld.structured if present (robust JSON), else weld.stream raw.
+    var structured = (window.weld && window.weld.structured) ? window.weld.structured : null;
+    var instruction = (opts.prompt || EXTRACT_PROMPT) + '\n\nExcerpt:\n' + body;
+
+    if (structured) {
+      return structured.generate({ instruction: instruction, startWith: '[' , shape: 'a JSON array of short factual strings' })
+        .then(function (r) {
+          if (!r.ok || !Array.isArray(r.value)) return { added: 0, facts: [], error: r.error || 'no facts extracted' };
+          var added = rememberMany(r.value.map(function (t) { return { text: t, source: 'observed' }; }));
+          return { added: added.length, facts: added, error: null };
+        });
+    }
+
+    var s = stream();
+    if (!s) return Promise.resolve({ added: 0, facts: [], error: 'weld.memory: weld.stream is not loaded' });
+    return s.run({ instruction: instruction, startWith: '[' }).then(function (res) {
+      if (res.error) return { added: 0, facts: [], error: res.error };
+      var list = [];
+      try {
+        var raw = res.text;
+        var open = raw.indexOf('['), close = raw.lastIndexOf(']');
+        if (open !== -1 && close > open) list = JSON.parse(raw.slice(open, close + 1));
+      } catch (e) { list = []; }
+      if (!Array.isArray(list)) list = [];
+      var added = rememberMany(list.map(function (t) { return { text: String(t), source: 'observed' }; }));
+      return { added: added.length, facts: added, error: null };
+    });
+  }
+
+  window.weld.memory = {
+    attach: attach,
+    load: load,
+    remember: remember,
+    rememberMany: rememberMany,
+    forget: forget,
+    clear: clear,
+    all: all,
+    relevant: relevant,
+    search: search,
+    inject: inject,
+    observe: observe,
+    isReady: function () { return ready; },
+    version: '1.0.0'
+  };
+
+  window.weld.memory.attach({ stream: window.weld.stream, persist: window.weld.persist });
+  return window.weld.memory;

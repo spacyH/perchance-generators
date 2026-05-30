@@ -1,0 +1,289 @@
+$meta
+  title       = weld.cards
+  description = Import and export character cards in the SillyTavern/TavernAI V2 PNG format. Reads the embedded JSON from a card image, writes a JSON spec into a PNG, and maps to/from a plain character object. Pure-JS PNG chunk parsing with CRC32. Stash on window.weld.cards.
+  tags        = weld, cards, character, tavern, sillytavern, import, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.cards) return window.weld.cards;
+
+  // -----------------------------------------------------------------
+  // weld.cards: interop with the huge existing library of character
+  // cards. The community standard (SillyTavern / TavernAI "V2") embeds a
+  // JSON character spec inside a PNG as a tEXt chunk whose keyword is
+  // "chara" and whose value is base64-encoded JSON. weld.cards reads and
+  // writes that, so users can drop in cards they already have instead of
+  // authoring personas from scratch.
+  //
+  //   read(bytes)  -> { spec, raw }      parse a card PNG
+  //   write(bytes, spec) -> Uint8Array   embed a spec into a base PNG
+  //   toCharacter(spec) / fromCharacter(char)  map to a plain object
+  //   readFile(file) / download(bytes, name)   browser helpers
+  //
+  // Pure JS: PNG chunk walking + CRC32 + base64. No dependencies.
+  // -----------------------------------------------------------------
+
+  var PNG_SIG = [137, 80, 78, 71, 13, 10, 26, 10];
+  var KEYWORD = 'chara';
+  var KEYWORD_V3 = 'ccv3';
+
+  // ---- CRC32 (PNG polynomial) ----
+  var CRC_TABLE = (function () {
+    var table = new Array(256);
+    for (var n = 0; n < 256; n++) {
+      var c = n;
+      for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      table[n] = c >>> 0;
+    }
+    return table;
+  })();
+
+  function crc32(bytes, start, end) {
+    var crc = 0xFFFFFFFF;
+    for (var i = start; i < end; i++) crc = CRC_TABLE[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  // ---- base64 (works on byte arrays; avoids atob/btoa unicode issues) ----
+  var B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+  function bytesToB64(bytes) {
+    var out = '';
+    for (var i = 0; i < bytes.length; i += 3) {
+      var b0 = bytes[i], b1 = i + 1 < bytes.length ? bytes[i + 1] : 0, b2 = i + 2 < bytes.length ? bytes[i + 2] : 0;
+      out += B64.charAt(b0 >> 2);
+      out += B64.charAt(((b0 & 3) << 4) | (b1 >> 4));
+      out += (i + 1 < bytes.length) ? B64.charAt(((b1 & 15) << 2) | (b2 >> 6)) : '=';
+      out += (i + 2 < bytes.length) ? B64.charAt(b2 & 63) : '=';
+    }
+    return out;
+  }
+
+  function b64ToBytes(str) {
+    var clean = String(str).replace(/[^A-Za-z0-9+/=]/g, '');
+    var bytes = [];
+    for (var i = 0; i < clean.length; i += 4) {
+      var e0 = B64.indexOf(clean.charAt(i)), e1 = B64.indexOf(clean.charAt(i + 1));
+      var e2 = B64.indexOf(clean.charAt(i + 2)), e3 = B64.indexOf(clean.charAt(i + 3));
+      var c0 = (e0 << 2) | (e1 >> 4);
+      var c1 = ((e1 & 15) << 4) | (e2 >> 2);
+      var c2 = ((e2 & 3) << 6) | e3;
+      bytes.push(c0 & 0xFF);
+      if (clean.charAt(i + 2) !== '=') bytes.push(c1 & 0xFF);
+      if (clean.charAt(i + 3) !== '=') bytes.push(c2 & 0xFF);
+    }
+    return bytes;
+  }
+
+  // ---- UTF-8 <-> bytes (the JSON may contain non-ASCII) ----
+  function strToUtf8(str) {
+    var s = unescape(encodeURIComponent(String(str)));
+    var bytes = new Array(s.length);
+    for (var i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i) & 0xFF;
+    return bytes;
+  }
+  function utf8ToStr(bytes) {
+    var s = '';
+    for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    try { return decodeURIComponent(escape(s)); } catch (e) { return s; }
+  }
+  function asciiToBytes(str) {
+    var bytes = new Array(str.length);
+    for (var i = 0; i < str.length; i++) bytes[i] = str.charCodeAt(i) & 0xFF;
+    return bytes;
+  }
+
+  function toByteArray(input) {
+    if (input instanceof Uint8Array) return input;
+    if (Array.isArray(input)) return new Uint8Array(input);
+    if (input && input.buffer) return new Uint8Array(input.buffer);
+    throw new Error('weld.cards: expected bytes (Uint8Array/ArrayBuffer)');
+  }
+
+  function readUint32(b, off) {
+    return ((b[off] << 24) | (b[off + 1] << 16) | (b[off + 2] << 8) | b[off + 3]) >>> 0;
+  }
+  function writeUint32(arr, val) {
+    arr.push((val >>> 24) & 0xFF, (val >>> 16) & 0xFF, (val >>> 8) & 0xFF, val & 0xFF);
+  }
+
+  function isPng(b) {
+    for (var i = 0; i < 8; i++) if (b[i] !== PNG_SIG[i]) return false;
+    return true;
+  }
+
+  // Walk PNG chunks; returns array of { type, dataStart, dataEnd }.
+  function chunks(b) {
+    var list = [];
+    var off = 8;
+    while (off + 8 <= b.length) {
+      var len = readUint32(b, off);
+      var type = String.fromCharCode(b[off + 4], b[off + 5], b[off + 6], b[off + 7]);
+      var dataStart = off + 8;
+      var dataEnd = dataStart + len;
+      list.push({ type: type, dataStart: dataStart, dataEnd: dataEnd });
+      off = dataEnd + 4; // skip CRC
+      if (type === 'IEND') break;
+    }
+    return list;
+  }
+
+  // Find the character JSON in a card PNG. Returns the parsed spec or null.
+  function read(input) {
+    var b = toByteArray(input);
+    if (!isPng(b)) throw new Error('weld.cards: not a PNG');
+    var found = null, foundKeyword = null;
+    var cs = chunks(b);
+    for (var i = 0; i < cs.length; i++) {
+      if (cs[i].type !== 'tEXt') continue;
+      var data = b.subarray ? b.subarray(cs[i].dataStart, cs[i].dataEnd) : b.slice(cs[i].dataStart, cs[i].dataEnd);
+      // tEXt = keyword \0 text
+      var nul = -1;
+      for (var j = 0; j < data.length; j++) if (data[j] === 0) { nul = j; break; }
+      if (nul === -1) continue;
+      var keyword = '';
+      for (var k = 0; k < nul; k++) keyword += String.fromCharCode(data[k]);
+      if (keyword !== KEYWORD && keyword !== KEYWORD_V3) continue;
+      var valueBytes = [];
+      for (var m = nul + 1; m < data.length; m++) valueBytes.push(data[m]);
+      var json = utf8ToStr(b64ToBytes(utf8ToStr(valueBytes)));
+      try {
+        found = JSON.parse(json);
+        foundKeyword = keyword;
+        if (keyword === KEYWORD_V3) break; // prefer V3 if both exist
+      } catch (e) { /* keep scanning */ }
+    }
+    if (!found) return null;
+    return { spec: found, keyword: foundKeyword };
+  }
+
+  // Build a tEXt chunk (with CRC) for keyword/value.
+  function makeTextChunk(keyword, valueB64) {
+    var dataBytes = asciiToBytes(keyword).concat([0]).concat(asciiToBytes(valueB64));
+    var chunk = [];
+    writeUint32(chunk, dataBytes.length);
+    var typeBytes = asciiToBytes('tEXt');
+    var crcInput = typeBytes.concat(dataBytes);
+    var full = chunk.concat(typeBytes).concat(dataBytes);
+    // CRC covers type + data.
+    var crcBuf = new Uint8Array(crcInput);
+    var crc = crc32(crcBuf, 0, crcBuf.length);
+    writeUint32(full, crc);
+    return full;
+  }
+
+  // Embed a spec into a base PNG (any PNG works as the portrait).
+  // Strips any existing chara/ccv3 chunk first, inserts before IEND.
+  function write(basePng, spec) {
+    var b = toByteArray(basePng);
+    if (!isPng(b)) throw new Error('weld.cards: base image is not a PNG');
+    var json = JSON.stringify(spec);
+    var valueB64 = bytesToB64(strToUtf8(json));
+    var newChunk = makeTextChunk(KEYWORD, valueB64);
+
+    var out = [];
+    for (var i = 0; i < 8; i++) out.push(b[i]); // signature
+    var cs = chunks(b);
+    var inserted = false;
+    for (var c = 0; c < cs.length; c++) {
+      var ch = cs[c];
+      var chunkStart = ch.dataStart - 8;
+      var chunkEnd = ch.dataEnd + 4; // include CRC
+      // Skip existing chara/ccv3 tEXt chunks.
+      if (ch.type === 'tEXt') {
+        var data = b.subarray ? b.subarray(ch.dataStart, ch.dataEnd) : b.slice(ch.dataStart, ch.dataEnd);
+        var nul = -1; for (var j = 0; j < data.length; j++) if (data[j] === 0) { nul = j; break; }
+        var kw = ''; for (var k = 0; k < (nul === -1 ? 0 : nul); k++) kw += String.fromCharCode(data[k]);
+        if (kw === KEYWORD || kw === KEYWORD_V3) continue;
+      }
+      if (ch.type === 'IEND' && !inserted) {
+        for (var n = 0; n < newChunk.length; n++) out.push(newChunk[n]);
+        inserted = true;
+      }
+      for (var p = chunkStart; p < chunkEnd; p++) out.push(b[p]);
+    }
+    return new Uint8Array(out);
+  }
+
+  // ---- mapping to a plain character object ----
+  // Accepts either a V2 envelope ({ spec, data }) or a flat object.
+  function dataOf(spec) {
+    if (spec && spec.data && typeof spec.data === 'object') return spec.data; // V2/V3 envelope
+    return spec || {};
+  }
+
+  function toCharacter(spec) {
+    var d = dataOf(spec);
+    return {
+      name: d.name || '',
+      description: d.description || '',
+      personality: d.personality || '',
+      scenario: d.scenario || '',
+      first_message: d.first_mes || d.first_message || '',
+      example_dialogue: d.mes_example || d.example_dialogue || '',
+      system_prompt: d.system_prompt || '',
+      creator_notes: d.creator_notes || '',
+      tags: d.tags || [],
+      creator: d.creator || ''
+    };
+  }
+
+  function fromCharacter(char) {
+    char = char || {};
+    var data = {
+      name: char.name || '',
+      description: char.description || '',
+      personality: char.personality || '',
+      scenario: char.scenario || '',
+      first_mes: char.first_message || char.first_mes || '',
+      mes_example: char.example_dialogue || char.mes_example || '',
+      system_prompt: char.system_prompt || '',
+      creator_notes: char.creator_notes || '',
+      tags: char.tags || [],
+      creator: char.creator || '',
+      character_version: char.version || '1.0'
+    };
+    return { spec: 'chara_card_v2', spec_version: '2.0', data: data };
+  }
+
+  // ---- browser helpers ----
+  function readFile(file) {
+    return new Promise(function (resolve, reject) {
+      if (typeof FileReader === 'undefined') { reject(new Error('weld.cards: FileReader unavailable')); return; }
+      var fr = new FileReader();
+      fr.onload = function () {
+        try { resolve(read(new Uint8Array(fr.result))); }
+        catch (e) { reject(e); }
+      };
+      fr.onerror = function () { reject(fr.error); };
+      fr.readAsArrayBuffer(file);
+    });
+  }
+
+  function download(bytes, filename) {
+    var b = toByteArray(bytes);
+    var blob = new Blob([b], { type: 'image/png' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename || 'character.png';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  window.weld.cards = {
+    read: read,
+    write: write,
+    toCharacter: toCharacter,
+    fromCharacter: fromCharacter,
+    readFile: readFile,
+    download: download,
+    isPng: function (input) { try { return isPng(toByteArray(input)); } catch (e) { return false; } },
+    version: '1.0.0'
+  };
+
+  return window.weld.cards;

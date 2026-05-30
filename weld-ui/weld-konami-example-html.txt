@@ -1,0 +1,336 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--amber:#d29922;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:780px;margin:0 auto;padding:34px 18px 90px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 0 16px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+.breadcrumb a{color:var(--muted);}.breadcrumb .sep{color:var(--faint);margin:0 8px;}.breadcrumb .cur{color:var(--ink);}.breadcrumb .act a{color:var(--accent);}
+.hdr{margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}.hdr h1{font:700 24px var(--mono);letter-spacing:-0.5px;}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;}
+.hdr .lead{color:var(--muted);margin-top:8px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;}
+.panel h2{font:600 13px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:8px 0;}
+.lbl{font:600 12px var(--mono);color:var(--muted);min-width:74px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 15px;font:600 13px var(--font);cursor:pointer;transition:.12s;}
+.btn:hover{filter:brightness(1.08);}.btn.ghost{background:var(--faint);color:var(--ink);}.btn.sm{padding:6px 11px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+input[type=text],textarea{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:8px 10px;font:13px var(--font);}
+input[type=text]{flex:1;min-width:120px;}textarea{width:100%;font:12.5px/1.5 var(--mono);resize:vertical;}
+.mono{font:13px var(--mono);}
+.out{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font:12.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;min-height:20px;color:#c9d1d9;}
+.chip{display:inline-block;background:var(--faint);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font:600 12px var(--mono);margin:2px;}
+.chip.k{background:rgba(63,185,80,.14);border-color:rgba(63,185,80,.4);color:#7ee787;}
+.chip.d{opacity:.4;text-decoration:line-through;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:9px 13px;border-radius:0 4px 4px 0;margin:12px 0 0;font-size:12.5px;color:#c9d1d9;}
+.note.warn{background:rgba(210,153,34,.08);border-color:var(--amber);}
+.tag{font:600 10px var(--mono);padding:2px 7px;border-radius:4px;background:rgba(63,185,80,.14);color:#7ee787;border:1px solid rgba(63,185,80,.4);}
+.tag.ai{background:rgba(210,153,34,.12);color:#e3b341;border-color:rgba(210,153,34,.4);}
+.bar{height:14px;background:var(--accent);border-radius:3px;transition:width .3s;}
+.footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);}.footer a{color:var(--muted);}
+.flex{display:flex;gap:10px;align-items:center;}.wrap{flex-wrap:wrap;}.grow{flex:1;}.mt{margin-top:10px;}
+</style>
+<div id="page">
+  <div class="breadcrumb"><span><a href="https://perchance.org/weld-ui-index">weld</a><span class="sep">/</span>weld.konami<span class="sep">/</span><span class="cur">demo</span></span><span class="act"><a href="https://perchance.org/weld-konami-plugin">docs &rarr;</a></span></div>
+  <div class="hdr"><div class="hdr-row"><h1>weld.konami &mdash; demo</h1><span class="ver">v1.0.0</span></div><p class="lead">A key-sequence detector for Easter eggs. Type the Konami code (it fires confetti), or register a custom word to watch for. Simulate buttons included for touch.</p></div>
+
+  <div class="panel"><h2>Enter the code <span class="tag">events</span> <span class="tag">+ confetti</span></h2>
+    <p class="mono" style="color:var(--muted)">Type it on your keyboard: <b style="color:var(--ink)">&uarr; &uarr; &darr; &darr; &larr; &rarr; &larr; &rarr; B A</b></p>
+    <div id="kdots" class="row mt"></div>
+    <div id="kstatus" class="out mt" style="text-align:center">listening for the sequence...</div>
+    <div class="row mt"><span class="lbl">or type</span><input id="kword" type="text" value="xyzzy"><button id="kwatch" class="btn ghost">Watch this word</button></div>
+    <div id="kwordstatus" class="mono mt" style="color:var(--muted)"></div>
+    <div class="note">onKonami() fires your callback (and a confetti burst if weld.confetti is loaded). onCode(word) watches for a typed word &mdash; great for hidden unlocks. On mobile, use the simulate buttons below.</div>
+    <div class="row mt wrap"><span class="lbl">simulate</span><button class="btn ghost sm ksim" data-k="ArrowUp">&uarr;</button><button class="btn ghost sm ksim" data-k="ArrowDown">&darr;</button><button class="btn ghost sm ksim" data-k="ArrowLeft">&larr;</button><button class="btn ghost sm ksim" data-k="ArrowRight">&rarr;</button><button class="btn ghost sm ksim" data-k="b">B</button><button class="btn ghost sm ksim" data-k="a">A</button><button class="btn ghost sm" id="kreset">reset</button></div></div>
+  <footer class="footer"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
+</div>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.konami) return window.weld.konami;
+
+// -----------------------------------------------------------------
+// weld.konami: the secret handshake. Register a sequence of keys (or a
+// typed word) and a callback; weld.konami keeps a rolling buffer of
+// recent keydowns and fires when the tail matches. The classic code is
+// built in. With no callback it pops confetti, if weld.confetti is around.
+// -----------------------------------------------------------------
+
+// Up Up Down Down Left Right Left Right B A
+var KONAMI = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown',
+  'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+
+var watchers = [];   // { seq:[normalized keys], cb, buffer:[] }
+var attached = false;
+
+function normalizeKey(k) {
+  if (k == null) return '';
+  if (k.length === 1) return k.toLowerCase();
+  return k; // named keys like ArrowUp keep their case
+}
+
+function tailMatches(buffer, seq) {
+  if (buffer.length < seq.length) return false;
+  var offset = buffer.length - seq.length;
+  for (var i = 0; i < seq.length; i++) {
+    if (buffer[offset + i] !== seq[i]) return false;
+  }
+  return true;
+}
+
+function onKeydown(e) {
+  var key = normalizeKey(e.key);
+  if (!key) return;
+  for (var i = 0; i < watchers.length; i++) {
+    var w = watchers[i];
+    w.buffer.push(key);
+    if (w.buffer.length > w.seq.length) w.buffer.shift();
+    if (tailMatches(w.buffer, w.seq)) {
+      w.buffer = [];
+      try { w.cb(); } catch (err) { /* swallow */ }
+    }
+  }
+}
+
+function ensureAttached() {
+  if (attached || typeof document === 'undefined') return;
+  document.addEventListener('keydown', onKeydown);
+  attached = true;
+}
+
+function defaultPayload() {
+  if (window.weld && window.weld.confetti) window.weld.confetti.fireworks({ shots: 4 });
+  else if (window.weld && window.weld.toast) window.weld.toast.success('Achievement unlocked!');
+}
+
+function register(seq, cb) {
+  var normalized = (seq || []).map(normalizeKey);
+  if (!normalized.length) return function () {};
+  var watcher = { seq: normalized, cb: cb || defaultPayload, buffer: [] };
+  watchers.push(watcher);
+  ensureAttached();
+  return function unsubscribe() {
+    var idx = watchers.indexOf(watcher);
+    if (idx !== -1) watchers.splice(idx, 1);
+  };
+}
+
+// The classic code.
+function onKonami(cb) { return register(KONAMI, cb); }
+
+// Any custom key sequence (array of e.key values).
+function onSequence(keys, cb) { return register(keys, cb); }
+
+// A typed word, e.g. onCode('xyzzy', fn) -> matches when typed in order.
+function onCode(word, cb) { return register(String(word).split(''), cb); }
+
+// For testing / programmatic triggering: feed a key as if pressed.
+function feed(key) { onKeydown({ key: key }); }
+
+function reset() { watchers.forEach(function (w) { w.buffer = []; }); }
+
+window.weld.konami = {
+  onKonami: onKonami,
+  onSequence: onSequence,
+  onCode: onCode,
+  feed: feed,
+  reset: reset,
+  KONAMI: KONAMI.slice(),
+  version: '1.0.0'
+};
+
+return window.weld.konami;
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.confetti) return window.weld.confetti;
+
+// -----------------------------------------------------------------
+// weld.confetti: a little joy. A single full-window canvas overlay
+// (pointer-events:none, so it never blocks clicks) renders gravity-y
+// confetti and tears down when the last particle settles. Cheap enough
+// to fire on every good outcome.
+// -----------------------------------------------------------------
+
+var DEFAULT_COLORS = ['#4493f8', '#3fb950', '#d29922', '#f85149', '#a371f7', '#58a6ff', '#ffffff'];
+
+var canvas = null, ctx = null, particles = [], raf = null, lastTs = 0;
+
+function ensureCanvas() {
+  if (canvas) return;
+  canvas = document.createElement('canvas');
+  canvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;'
+    + 'pointer-events:none;z-index:99999;';
+  document.body.appendChild(canvas);
+  ctx = canvas.getContext('2d');
+  resize();
+  if (typeof window !== 'undefined') window.addEventListener('resize', resize);
+}
+
+function resize() {
+  if (!canvas) return;
+  var dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+  canvas.width = Math.floor((window.innerWidth || 800) * dpr);
+  canvas.height = Math.floor((window.innerHeight || 600) * dpr);
+  if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function teardown() {
+  if (raf) { cancelAnimationFrame(raf); raf = null; }
+  if (canvas && canvas.parentNode) canvas.parentNode.removeChild(canvas);
+  if (typeof window !== 'undefined') window.removeEventListener('resize', resize);
+  canvas = null; ctx = null; particles = []; lastTs = 0;
+}
+
+function spawn(opts) {
+  opts = opts || {};
+  var W = (typeof window !== 'undefined' ? window.innerWidth : 800) || 800;
+  var H = (typeof window !== 'undefined' ? window.innerHeight : 600) || 600;
+  var count = opts.count || 120;
+  var colors = opts.colors || DEFAULT_COLORS;
+  var ox = opts.x != null ? opts.x : W / 2;
+  var oy = opts.y != null ? opts.y : H / 3;
+  var spread = opts.spread != null ? opts.spread : Math.PI * 2; // full circle by default
+  var baseAngle = opts.angle != null ? opts.angle : -Math.PI / 2; // upward
+  var power = opts.power || 9;
+
+  for (var i = 0; i < count; i++) {
+    var angle = baseAngle + (Math.random() - 0.5) * spread;
+    var speed = power * (0.4 + Math.random() * 0.9);
+    particles.push({
+      x: ox, y: oy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      size: 4 + Math.random() * 5,
+      color: colors[(Math.random() * colors.length) | 0],
+      rot: Math.random() * Math.PI,
+      vr: (Math.random() - 0.5) * 0.3,
+      life: 0,
+      ttl: 90 + Math.random() * 50,
+      shape: Math.random() < 0.5 ? 'rect' : 'circle'
+    });
+  }
+}
+
+function step(ts) {
+  if (!ctx) return;
+  var dt = lastTs ? Math.min((ts - lastTs) / 16.67, 3) : 1;
+  lastTs = ts;
+  var W = (typeof window !== 'undefined' ? window.innerWidth : 800) || 800;
+  var H = (typeof window !== 'undefined' ? window.innerHeight : 600) || 600;
+  ctx.clearRect(0, 0, W, H);
+
+  for (var i = particles.length - 1; i >= 0; i--) {
+    var p = particles[i];
+    p.vy += 0.22 * dt;       // gravity
+    p.vx *= 0.99;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.rot += p.vr * dt;
+    p.life += dt;
+    var alpha = Math.max(0, 1 - p.life / p.ttl);
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rot);
+    ctx.fillStyle = p.color;
+    if (p.shape === 'rect') ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+    else { ctx.beginPath(); ctx.arc(0, 0, p.size / 2, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+
+    if (p.life >= p.ttl || p.y > H + 40) particles.splice(i, 1);
+  }
+
+  if (particles.length) raf = requestAnimationFrame(step);
+  else teardown();
+}
+
+function run() {
+  if (!raf) { lastTs = 0; raf = requestAnimationFrame(step); }
+}
+
+// burst(opts): one celebratory pop. opts: count, colors, x, y, spread,
+// angle (radians), power.
+function burst(opts) {
+  if (typeof document === 'undefined') return;
+  ensureCanvas();
+  spawn(opts);
+  run();
+}
+
+// fireworks(opts): a few staggered bursts at random points up top.
+function fireworks(opts) {
+  opts = opts || {};
+  var shots = opts.shots || 3;
+  var gap = opts.gap || 350;
+  for (var i = 0; i < shots; i++) {
+    (function (n) {
+      setTimeout(function () {
+        var W = (typeof window !== 'undefined' ? window.innerWidth : 800) || 800;
+        var H = (typeof window !== 'undefined' ? window.innerHeight : 600) || 600;
+        burst({
+          x: W * (0.2 + Math.random() * 0.6),
+          y: H * (0.2 + Math.random() * 0.3),
+          count: opts.count || 90,
+          spread: Math.PI * 2,
+          power: 8,
+          colors: opts.colors
+        });
+      }, n * gap);
+    })(i);
+  }
+}
+
+// A celebratory side-cannon pair (left + right), good for "win" moments.
+function cannons(opts) {
+  opts = opts || {};
+  var H = (typeof window !== 'undefined' ? window.innerHeight : 600) || 600;
+  var W = (typeof window !== 'undefined' ? window.innerWidth : 800) || 800;
+  burst({ x: 0, y: H * 0.7, angle: -Math.PI / 4, spread: Math.PI / 3, count: opts.count || 80, power: 13, colors: opts.colors });
+  burst({ x: W, y: H * 0.7, angle: -3 * Math.PI / 4, spread: Math.PI / 3, count: opts.count || 80, power: 13, colors: opts.colors });
+}
+
+function stop() { teardown(); }
+
+window.weld.confetti = {
+  burst: burst,
+  fireworks: fireworks,
+  cannons: cannons,
+  stop: stop,
+  version: '1.0.0'
+};
+
+return window.weld.confetti;
+})();
+</script>
+<script>
+(function(){
+  function $(id){return document.getElementById(id);}
+  function boot(){ if(!window.weld||!window.weld.konami){return setTimeout(boot,100);} init(); }
+  function init(){
+    var K=window.weld.konami;
+    var seq=K.KONAMI||['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
+    var progress=0;
+    function renderDots(){ var html=''; for(var i=0;i<seq.length;i++){ html+='<span class="chip '+(i<progress?'k':'')+'" style="min-width:16px;text-align:center">'+(i<progress?'\u2713':'\u00b7')+'</span>'; } $('kdots').innerHTML=html; }
+    renderDots();
+    K.onKonami(function(){ $('kstatus').textContent='\ud83c\udf89 KONAMI! unlocked.'; $('kstatus').style.color='#7ee787'; progress=seq.length; renderDots(); });
+    // track progress for the dots (best-effort mirror of the detector)
+    function feedKey(k){ var want=seq[progress]; var norm=(k.length===1?k.toLowerCase():k); if(norm===(want.length===1?want.toLowerCase():want)){ progress++; } else { progress=(norm===seq[0]?1:0); } if(progress>=seq.length){ /* onKonami handler fires separately */ } renderDots(); }
+    window.addEventListener('keydown',function(e){ feedKey(e.key); });
+    [].forEach.call(document.querySelectorAll('.ksim'),function(b){ b.onclick=function(){ var k=b.getAttribute('data-k'); if(K.feed) K.feed(k); feedKey(k); }; });
+    $('kreset').onclick=function(){ progress=0; if(K.reset)K.reset(); $('kstatus').textContent='listening for the sequence...'; $('kstatus').style.color=''; renderDots(); };
+    $('kwatch').onclick=function(){ var w=$('kword').value.trim(); if(!w)return; K.onCode(w,function(){ $('kwordstatus').textContent='\u2728 "'+w+'" detected!'; $('kwordstatus').style.color='#7ee787'; }); $('kwordstatus').textContent='watching for "'+w+'"... type it now'; };
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+})();
+</script>

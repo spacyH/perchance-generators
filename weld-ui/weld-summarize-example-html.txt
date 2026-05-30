@@ -1,0 +1,305 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--amber:#d29922;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:780px;margin:0 auto;padding:34px 18px 90px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 0 16px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+.breadcrumb a{color:var(--muted);}.breadcrumb .sep{color:var(--faint);margin:0 8px;}.breadcrumb .cur{color:var(--ink);}.breadcrumb .act a{color:var(--accent);}
+.hdr{margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}.hdr h1{font:700 24px var(--mono);letter-spacing:-0.5px;}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;}
+.hdr .lead{color:var(--muted);margin-top:8px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;}
+.panel h2{font:600 13px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:8px 0;}
+.lbl{font:600 12px var(--mono);color:var(--muted);min-width:74px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 15px;font:600 13px var(--font);cursor:pointer;transition:.12s;}
+.btn:hover{filter:brightness(1.08);}.btn.ghost{background:var(--faint);color:var(--ink);}.btn.sm{padding:6px 11px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+input[type=text],textarea{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:8px 10px;font:13px var(--font);}
+input[type=text]{flex:1;min-width:120px;}textarea{width:100%;font:12.5px/1.5 var(--mono);resize:vertical;}
+.mono{font:13px var(--mono);}
+.out{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font:12.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;min-height:20px;color:#c9d1d9;}
+.chip{display:inline-block;background:var(--faint);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font:600 12px var(--mono);margin:2px;}
+.chip.k{background:rgba(63,185,80,.14);border-color:rgba(63,185,80,.4);color:#7ee787;}
+.chip.d{opacity:.4;text-decoration:line-through;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:9px 13px;border-radius:0 4px 4px 0;margin:12px 0 0;font-size:12.5px;color:#c9d1d9;}
+.note.warn{background:rgba(210,153,34,.08);border-color:var(--amber);}
+.tag{font:600 10px var(--mono);padding:2px 7px;border-radius:4px;background:rgba(63,185,80,.14);color:#7ee787;border:1px solid rgba(63,185,80,.4);}
+.tag.ai{background:rgba(210,153,34,.12);color:#e3b341;border-color:rgba(210,153,34,.4);}
+.bar{height:14px;background:var(--accent);border-radius:3px;transition:width .3s;}
+.footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);}.footer a{color:var(--muted);}
+.flex{display:flex;gap:10px;align-items:center;}.wrap{flex-wrap:wrap;}.grow{flex:1;}.mt{margin-top:10px;}
+</style>
+<div id="page">
+  <div class="breadcrumb"><span><a href="https://perchance.org/weld-ui-index">weld</a><span class="sep">/</span>weld.summarize<span class="sep">/</span><span class="cur">demo</span></span><span class="act"><a href="https://perchance.org/weld-summarize-plugin">docs &rarr;</a></span></div>
+  <div class="hdr"><div class="hdr-row"><h1>weld.summarize &mdash; demo</h1><span class="ver">v1.0.0</span></div><p class="lead">Keep a long chat inside the context window: recent turns stay verbatim while older ones fold into a running summary. Watch the buffer and token budget here; the actual compression calls the model on Perchance.</p></div>
+
+  <div class="panel"><h2>Rolling context <span class="tag">buffer pure</span> <span class="tag ai">compress on Perchance</span></h2>
+    <div class="row"><input id="zmsg" type="text" value="The party descended into the crypt and lit their torches."><button id="zadd" class="btn">Add turn</button></div>
+    <div class="row"><span class="lbl">budget</span><div class="grow" style="background:var(--faint);border-radius:4px;overflow:hidden;height:14px"><div id="zbar" class="bar" style="width:0%"></div></div><span id="ztok" class="mono" style="min-width:120px;text-align:right"></span></div>
+    <div class="mt"><div class="lbl mono">context() &rarr; what gets sent to the model:</div><div id="zctx" class="out mt" style="min-height:60px"></div></div>
+    <div class="row mt"><button id="zcompress" class="btn ghost">Compress now <span class="tag ai">on Perchance</span></button><button id="zreset" class="btn ghost sm">Reset</button><span id="zgen" class="mono" style="color:var(--muted)"></span></div>
+    <div class="note">add() appends to a recent buffer; once it grows past the token budget the oldest turns are folded into a running summary by the model. Watch the buffer and token estimate climb &mdash; compression itself needs the model (Perchance).</div></div>
+  <footer class="footer"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
+</div>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.summarize) return window.weld.summarize;
+
+// -----------------------------------------------------------------
+// weld.summarize: keep a long chat inside the context window without
+// amnesia. weld.prompt can only DROP old turns when the budget is
+// blown; this CONDENSES them instead.
+//
+//   - rolling():   a stateful summarizer. Feed it messages; it keeps
+//                  the most recent N verbatim and rolls everything
+//                  older into a running summary, re-summarizing
+//                  (summary-of-summary) when the summary itself grows.
+//   - summarize(): a one-shot. Hand it text or messages, get a synopsis.
+//
+// Summaries are generated through weld.stream; token counting uses
+// weld.tokens when present, else a chars/4 estimate. Both are soft
+// dependencies -- without weld.stream, summarize() reports an error
+// rather than throwing.
+// -----------------------------------------------------------------
+
+function getStream() { return (window.weld && window.weld.stream) ? window.weld.stream : null; }
+function getTokens() { return (window.weld && window.weld.tokens) ? window.weld.tokens : null; }
+
+function estimateTokens(text) {
+  var t = getTokens();
+  if (t && t.isLoaded && t.isLoaded() && t.countSync) {
+    var n = t.countSync(String(text || ''));
+    if (n != null) return n;
+  }
+  var stream = getStream();
+  if (stream && stream.count) {
+    var sc = stream.count(String(text || ''));
+    if (sc != null) return sc;
+  }
+  return Math.ceil(String(text || '').length / 4);
+}
+
+// Normalize a message into "Name: text" wire form for summarizing.
+function lineOf(msg) {
+  if (msg == null) return '';
+  if (typeof msg === 'string') return msg;
+  var who = msg.name || msg.role || msg.author || '';
+  var body = msg.content != null ? msg.content : (msg.text != null ? msg.text : '');
+  return who ? (who + ': ' + body) : String(body);
+}
+
+function joinMessages(messages) {
+  if (!Array.isArray(messages)) return String(messages == null ? '' : messages);
+  return messages.map(lineOf).filter(function (l) { return l && l.trim(); }).join('\n');
+}
+
+var DEFAULT_PROMPT =
+  'Summarize the conversation excerpt below. Capture the durable facts, '
+  + 'decisions, character details, and unresolved threads that matter for '
+  + 'continuing the conversation. Write a tight third-person synopsis in past '
+  + 'tense. Do not invent anything. Output only the summary.';
+
+// Generate a synopsis of some text via weld.stream.
+// Returns Promise<{ ok, summary, error }>.
+function runSummary(text, opts) {
+  opts = opts || {};
+  var stream = getStream();
+  if (!stream) {
+    return Promise.resolve({ ok: false, summary: '', error: 'weld.summarize: weld.stream is not loaded' });
+  }
+  var body = String(text || '').trim();
+  if (!body) return Promise.resolve({ ok: true, summary: '', error: null });
+
+  var instruction = (opts.prompt || DEFAULT_PROMPT);
+  if (opts.priorSummary) {
+    instruction += '\n\nA summary of earlier events already exists; fold the new '
+      + 'excerpt into it and return one consolidated summary.\n\nExisting summary:\n'
+      + opts.priorSummary;
+  }
+  if (opts.maxWords) {
+    instruction += '\n\nKeep the summary under about ' + opts.maxWords + ' words.';
+  }
+  instruction += '\n\nExcerpt:\n' + body;
+
+  return stream.run({ instruction: instruction }).then(function (res) {
+    if (res.error) return { ok: false, summary: '', error: res.error };
+    return { ok: true, summary: String(res.text || '').trim(), error: null };
+  });
+}
+
+// One-shot: summarize text or an array of messages.
+function summarize(input, opts) {
+  var text = Array.isArray(input) ? joinMessages(input) : String(input == null ? '' : input);
+  return runSummary(text, opts);
+}
+
+// -----------------------------------------------------------------
+// rolling(opts) -> a stateful summarizer.
+//
+// opts:
+//   keepRecent   (number)  messages kept verbatim (default 8)
+//   tokenBudget  (number)  compress when kept text exceeds this
+//                          (default: weld.stream.budget() or 5000)
+//   summaryMaxWords (number) cap on the running summary (default 200)
+//   prompt       (string)  override the summarization instruction
+//
+// methods:
+//   add(message)       append; may trigger async compression
+//   addMany(messages)
+//   compressNow()      -> Promise; force a compression pass
+//   state()            -> { summary, recent, generation }
+//   context()          -> "Summary of earlier events: ...\n\nName: msg..."
+//   summary()          -> the running summary string
+//   recent()           -> the verbatim-kept messages
+//   reset()
+//   onChange(fn)       subscribe to state changes; returns unsubscribe
+// -----------------------------------------------------------------
+function rolling(opts) {
+  opts = opts || {};
+  var keepRecent = opts.keepRecent || 8;
+  var summaryMaxWords = opts.summaryMaxWords || 200;
+  var budget = opts.tokenBudget;
+  if (budget == null) {
+    var stream = getStream();
+    budget = (stream && stream.budget && stream.budget()) || 5000;
+  }
+
+  var recent = [];      // verbatim-kept messages
+  var summary = '';     // running synopsis of everything older
+  var generation = 0;   // how many compression passes have run
+  var compressing = false;
+  var listeners = [];
+
+  function emit() {
+    var snap = state();
+    listeners.forEach(function (fn) { try { fn(snap); } catch (e) {} });
+  }
+
+  function overBudget() {
+    return estimateTokens(joinMessages(recent)) > budget;
+  }
+
+  function compressNow() {
+    if (compressing) return Promise.resolve(state());
+    // Compress everything except the last keepRecent messages.
+    if (recent.length <= keepRecent) return Promise.resolve(state());
+    compressing = true;
+    var cut = recent.length - keepRecent;
+    var older = recent.slice(0, cut);
+    var keptTail = recent.slice(cut);
+    return runSummary(joinMessages(older), {
+      priorSummary: summary || null,
+      maxWords: summaryMaxWords,
+      prompt: opts.prompt
+    }).then(function (r) {
+      compressing = false;
+      if (r.ok && r.summary) {
+        summary = r.summary;
+        recent = keptTail;
+        generation += 1;
+        emit();
+      }
+      return state();
+    }, function () { compressing = false; return state(); });
+  }
+
+  function maybeCompress() {
+    if (recent.length > keepRecent && overBudget()) return compressNow();
+    return Promise.resolve(state());
+  }
+
+  function add(message) {
+    recent.push(message);
+    emit();
+    return maybeCompress();
+  }
+
+  function addMany(messages) {
+    if (Array.isArray(messages)) recent = recent.concat(messages);
+    emit();
+    return maybeCompress();
+  }
+
+  function context(opts2) {
+    opts2 = opts2 || {};
+    var out = [];
+    if (summary) out.push((opts2.label || 'Summary of earlier events') + ': ' + summary);
+    var tail = joinMessages(recent);
+    if (tail) out.push(tail);
+    return out.join('\n\n');
+  }
+
+  function state() {
+    return { summary: summary, recent: recent.slice(), generation: generation };
+  }
+
+  function reset() { recent = []; summary = ''; generation = 0; emit(); }
+
+  function onChange(fn) {
+    listeners.push(fn);
+    return function () {
+      var i = listeners.indexOf(fn);
+      if (i !== -1) listeners.splice(i, 1);
+    };
+  }
+
+  // Restore from a saved state() snapshot.
+  function load(snap) {
+    if (!snap) return;
+    summary = snap.summary || '';
+    recent = Array.isArray(snap.recent) ? snap.recent.slice() : [];
+    generation = snap.generation || 0;
+    emit();
+  }
+
+  return {
+    add: add,
+    addMany: addMany,
+    compressNow: compressNow,
+    context: context,
+    state: state,
+    load: load,
+    summary: function () { return summary; },
+    recent: function () { return recent.slice(); },
+    reset: reset,
+    onChange: onChange
+  };
+}
+
+window.weld.summarize = {
+  summarize: summarize,
+  rolling: rolling,
+  estimateTokens: estimateTokens,
+  joinMessages: joinMessages,
+  version: '1.0.0'
+};
+
+return window.weld.summarize;
+})();
+</script>
+<script>
+(function(){
+  function $(id){return document.getElementById(id);}
+  var CAP=140;
+  function boot(){ if(!window.weld||!window.weld.summarize){return setTimeout(boot,100);} init(); }
+  function init(){
+    var Z=window.weld.summarize, roll=Z.rolling({budget:CAP});
+    function est(s){ try{ if(typeof Z.estimateTokens==='function') return Z.estimateTokens(s); }catch(e){} return Math.ceil((s||'').length/4); }
+    function render(){ var ctx=roll.context()||'', t=est(ctx), st=roll.state()||{recent:[],generation:0,summary:''}; $('zctx').textContent=ctx||'(empty)'; var w=Math.min(100,Math.round(t/CAP*100)); $('zbar').style.width=w+'%'; $('zbar').style.background=t>CAP?'#d29922':'var(--accent)'; $('ztok').textContent='~'+t+' / '+CAP+' tok'; $('zgen').textContent='generation '+st.generation+' \u00b7 '+(st.recent?st.recent.length:0)+' recent'+(st.summary?' \u00b7 summarized':''); }
+    function add(){ var v=$('zmsg').value.trim(); if(!v) return; roll.add({role:'user',content:v}); render(); }
+    $('zadd').onclick=add; $('zmsg').addEventListener('keydown',function(e){ if(e.key==='Enter') add(); });
+    $('zcompress').onclick=function(){ if(window.weld.stream){ $('zgen').textContent='Compressing...'; Promise.resolve(roll.compressNow&&roll.compressNow()).then(render).catch(function(){ render(); }); } else { var n=$('zgen'); n.textContent='Compression runs on Perchance (needs the model).'; n.style.color='#e3b341'; } };
+    $('zreset').onclick=function(){ roll.reset&&roll.reset(); render(); };
+    ['The party descended into the crypt and lit their torches.','A cold draft carried the smell of old iron and dust.','Far below, something heavy shifted in the dark.'].forEach(function(m){ roll.add({role:'user',content:m}); });
+    render();
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+})();
+</script>

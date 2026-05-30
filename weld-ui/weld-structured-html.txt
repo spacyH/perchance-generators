@@ -1,0 +1,436 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.structured<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-structured-example">demo &rarr;</a></span></div>
+<div class="hdr">
+  <div class="hdr-row">
+      <h1>weld.structured</h1>
+      <span class="ver">v1.0.0</span>
+  </div>
+  <p class="lead">Reliable structured output from a plain text model. Prime for JSON, parse tolerantly, validate against a small schema, and repair-retry on failure &mdash; the layer an agent needs to turn prose into data it can act on.</p>
+</div>
+<h2>Install</h2>
+<p>Import the plugin once. It stashes its API on <code>window.weld.structured</code> and runs generations through <code>weld.stream</code> when present, falling back to <code>ai-text-plugin</code> directly.</p>
+<pre data-codeid="install"></pre>
+
+<h2>Quick start</h2>
+<p>Describe the JSON you want with a small schema, and <code>generate()</code> primes the model, parses the reply, validates it, and repair-retries on failure &mdash; returning a clean result object.</p>
+<pre data-codeid="quick"></pre>
+
+<h2>generate(opts)</h2>
+<div class="sig" data-codeid="sig_generate"></div>
+<p>Returns a promise for <code>{ ok, value, raw, error, attempts }</code>. On success, <code>value</code> is the parsed, validated object. On failure after all repairs, <code>ok</code> is false and <code>error</code> explains why, with <code>raw</code> holding the last text the model produced.</p>
+<h4>opts</h4>
+<table>
+<tr><th>field</th><th>meaning</th></tr>
+<tr><td><code>instruction</code></td><td>your task / system prompt</td></tr>
+<tr><td><code>schema</code></td><td>a field schema (see below)</td></tr>
+<tr><td><code>example</code></td><td>alternative to schema: a sample object to mimic</td></tr>
+<tr><td><code>shape</code></td><td>free-text description of the desired JSON</td></tr>
+<tr><td><code>startWith</code></td><td>priming prefix, default <code>{</code></td></tr>
+<tr><td><code>stopSequences</code></td><td>passthrough to weld.stream</td></tr>
+<tr><td><code>repairAttempts</code></td><td>extra tries on failure, default 1</td></tr>
+</table>
+
+<h2>Schema format</h2>
+<p>A schema is <code>{ fields: { name: spec } }</code>. Each spec is optional but narrows what counts as valid.</p>
+<pre data-codeid="schema_ex"></pre>
+<table>
+<tr><th>spec key</th><th>meaning</th></tr>
+<tr><td><code>type</code></td><td>string, number, integer, boolean, array, object</td></tr>
+<tr><td><code>required</code></td><td>field must be present</td></tr>
+<tr><td><code>enum</code></td><td>value must be one of a fixed list</td></tr>
+<tr><td><code>of</code></td><td>for arrays: the type of each item</td></tr>
+</table>
+<div class="note">Set <code>allowExtra: false</code> on the schema to reject any field you did not declare.</div>
+
+<h2>The repair loop</h2>
+<p>Text models wrap JSON in prose, fence it, trail commas, or stop mid-object. <code>generate()</code> handles the first three by parsing tolerantly. For the rest, a failed parse or validation triggers a re-ask that includes the exact error, up to <code>repairAttempts</code> times. <code>attempts</code> in the result tells you how many tries it took.</p>
+<pre data-codeid="repair_ex"></pre>
+
+<h2>Parsing without generating</h2>
+<p>The parsing and validation pieces are exposed on their own, so you can run them over text from anywhere.</p>
+<div class="sig" data-codeid="sig_parse"></div>
+<div class="sig" data-codeid="sig_extract"></div>
+<div class="sig" data-codeid="sig_validate"></div>
+<div class="sig" data-codeid="sig_describe"></div>
+<pre data-codeid="parse_ex"></pre>
+<script>
+(function(){
+  var examples = {
+  'install': 'output\n  weld-structured = \{import:weld-structured-plugin\}\n  weld-stream     = \{import:weld-stream-plugin\}\n  aiTextPlugin    = \{import:ai-text-plugin\}',
+  'quick': 'var r = await weld.structured.generate(\{\n  instruction: \'Extract the order from this message: \' + msg,\n  schema: \{ fields: \{\n    item: \{ type: \'string\', required: true \},\n    quantity: \{ type: \'integer\', required: true \},\n    rush: \{ type: \'boolean\' \}\n  \} \}\n\});\nif (r.ok) processOrder(r.value);   // \{ item, quantity, rush \}\nelse showError(r.error);',
+  'sig_generate': 'weld.structured.generate(opts) -> Promise<\{ ok, value, raw, error, attempts \}>',
+  'schema_ex': 'var schema = \{ fields: \{\n  mood:    \{ type: \'string\', enum: \[\'happy\',\'sad\',\'neutral\'], required: true \},\n  score:   \{ type: \'integer\' \},\n  tags:    \{ type: \'array\', of: \'string\' \}\n\}, allowExtra: false \};',
+  'repair_ex': 'var r = await weld.structured.generate(\{\n  instruction: task,\n  schema: schema,\n  repairAttempts: 2     // up to 3 generations total\n\});\nconsole.log(r.attempts);  // 1 if it parsed first try, more if it had to repair',
+  'sig_parse': 'weld.structured.parse(text) -> \{ value \} | \{ error \}',
+  'sig_extract': 'weld.structured.extract(text) -> string | null',
+  'sig_validate': 'weld.structured.validate(value, schema) -> \{ ok, error \}',
+  'sig_describe': 'weld.structured.describeSchema(schema) -> string',
+  'parse_ex': 'var out = weld.structured.parse(\'Sure! ```json\\n\{"a":1,\}\\n```\');\nout.value;   // \{ a: 1 \}   (fences stripped, trailing comma tolerated)\n\nweld.structured.validate(\{ a: 1 \}, \{ fields: \{ a: \{ type: \'integer\' \} \} \}).ok;  // true'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    document.querySelectorAll('[data-codeid]').forEach(function(n){
+      var src = examples[n.getAttribute('data-codeid')];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.structured) return window.weld.structured;
+
+// -----------------------------------------------------------------
+// weld.structured: coax dependable JSON out of a plain text model.
+//
+// A text model will not reliably emit clean JSON on its own -- it wraps
+// it in prose, fences it, trails a comma, or stops mid-object. This
+// plugin makes the round-trip robust:
+//   1. prime    -- append an explicit "respond with only JSON" directive
+//   2. parse    -- pull the first balanced {...} / [...] out of the text,
+//                  stripping code fences, tolerating trailing commas
+//   3. validate -- check it against a tiny field schema
+//   4. repair   -- on parse/validation failure, re-ask with the error,
+//                  up to opts.repairAttempts times
+//
+// Generation goes through weld.stream (so boxed strings, stopReason,
+// and the serial queue are already handled). If weld.stream is absent
+// we fall back to window.root.aiTextPlugin directly.
+// -----------------------------------------------------------------
+
+function getStream() {
+  return (window.weld && window.weld.stream) ? window.weld.stream : null;
+}
+
+// Strip ```json fences and surrounding prose noise.
+function stripFences(text) {
+  var s = String(text == null ? '' : text);
+  var fence = String.fromCharCode(96, 96, 96);
+  var i = s.indexOf(fence);
+  if (i === -1) return s;
+  // Drop an opening fence + optional language tag, and a closing fence.
+  s = s.replace(new RegExp(fence + '[a-zA-Z0-9_-]*\\n?'), '');
+  var j = s.lastIndexOf(fence);
+  if (j !== -1) s = s.slice(0, j);
+  return s;
+}
+
+// Find the first complete balanced JSON value (object or array),
+// respecting strings and escapes so braces inside strings don't count.
+function extractBalanced(text) {
+  var s = String(text == null ? '' : text);
+  var startObj = s.indexOf('{');
+  var startArr = s.indexOf('[');
+  var start;
+  if (startObj === -1) start = startArr;
+  else if (startArr === -1) start = startObj;
+  else start = Math.min(startObj, startArr);
+  if (start === -1) return null;
+
+  var open = s.charAt(start);
+  var close = (open === '{') ? '}' : ']';
+  var depth = 0, inStr = false, esc = false;
+  for (var i = start; i < s.length; i++) {
+    var c = s.charAt(i);
+    if (inStr) {
+      if (esc) { esc = false; }
+      else if (c === '\\') { esc = true; }
+      else if (c === '"') { inStr = false; }
+      continue;
+    }
+    if (c === '"') { inStr = true; continue; }
+    if (c === open) depth += 1;
+    else if (c === close) {
+      depth -= 1;
+      if (depth === 0) return s.slice(start, i + 1);
+    }
+  }
+  return null; // never closed (likely truncated)
+}
+
+function looseFix(jsonText) {
+  var s = String(jsonText);
+  // Remove trailing commas before } or ].
+  s = s.replace(/,\s*([}\]])/g, '$1');
+  return s;
+}
+
+// Parse text -> value. Returns { value } or { error }.
+function parse(text) {
+  var candidate = extractBalanced(stripFences(text));
+  if (candidate == null) return { error: 'no JSON object or array found in the output' };
+  try {
+    return { value: JSON.parse(candidate) };
+  } catch (e1) {
+    try {
+      return { value: JSON.parse(looseFix(candidate)) };
+    } catch (e2) {
+      return { error: 'JSON parse failed: ' + String(e2.message || e2) };
+    }
+  }
+}
+
+// Minimal schema validation.
+// schema = { fields: { name: { type, required, enum, of } }, allowExtra }
+//   type: 'string' | 'number' | 'integer' | 'boolean' | 'array' | 'object'
+// Returns { ok:true } or { ok:false, error }.
+function typeOk(val, type) {
+  switch (type) {
+    case 'string':  return typeof val === 'string';
+    case 'number':  return typeof val === 'number' && !isNaN(val);
+    case 'integer': return typeof val === 'number' && !isNaN(val) && Math.floor(val) === val;
+    case 'boolean': return typeof val === 'boolean';
+    case 'array':   return Array.isArray(val);
+    case 'object':  return val !== null && typeof val === 'object' && !Array.isArray(val);
+    default:        return true;
+  }
+}
+
+function validate(value, schema) {
+  if (!schema || !schema.fields) return { ok: true };
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return { ok: false, error: 'expected a JSON object at the top level' };
+  }
+  var fields = schema.fields;
+  var names = Object.keys(fields);
+  for (var i = 0; i < names.length; i++) {
+    var key = names[i];
+    var spec = fields[key] || {};
+    var present = Object.prototype.hasOwnProperty.call(value, key);
+    if (!present) {
+      if (spec.required) return { ok: false, error: 'missing required field "' + key + '"' };
+      continue;
+    }
+    var v = value[key];
+    if (spec.type && !typeOk(v, spec.type)) {
+      return { ok: false, error: 'field "' + key + '" should be ' + spec.type };
+    }
+    if (spec.enum && spec.enum.indexOf(v) === -1) {
+      return { ok: false, error: 'field "' + key + '" must be one of: ' + spec.enum.join(', ') };
+    }
+    if (spec.type === 'array' && spec.of && Array.isArray(v)) {
+      for (var j = 0; j < v.length; j++) {
+        if (!typeOk(v[j], spec.of)) {
+          return { ok: false, error: 'every item of "' + key + '" should be ' + spec.of };
+        }
+      }
+    }
+  }
+  if (schema.allowExtra === false) {
+    var extra = Object.keys(value).filter(function (k) { return names.indexOf(k) === -1; });
+    if (extra.length) return { ok: false, error: 'unexpected field(s): ' + extra.join(', ') };
+  }
+  return { ok: true };
+}
+
+// Describe a schema in words for the priming directive.
+function describeSchema(schema) {
+  if (!schema || !schema.fields) return '';
+  var parts = Object.keys(schema.fields).map(function (k) {
+    var spec = schema.fields[k] || {};
+    var bits = [k + ' (' + (spec.type || 'any')];
+    if (spec.required) bits.push('required');
+    if (spec.enum) bits.push('one of: ' + spec.enum.join('/'));
+    return bits.join(', ') + ')';
+  });
+  return 'JSON object with fields: ' + parts.join('; ') + '.';
+}
+
+function buildInstruction(opts, repairNote) {
+  var base = String(opts.instruction || '');
+  var shape = opts.shape
+    || describeSchema(opts.schema)
+    || (opts.example ? 'JSON shaped like: ' + JSON.stringify(opts.example) : 'a single JSON value');
+  var directive = 'Respond with ONLY ' + shape
+    + ' Output strictly valid JSON and nothing else -- no prose, no markdown, no code fences.';
+  var instruction = base ? (base + '\n\n' + directive) : directive;
+  if (repairNote) {
+    instruction += '\n\nYour previous reply could not be used (' + repairNote
+      + '). Return corrected JSON only.';
+  }
+  return instruction;
+}
+
+// Run one generation through weld.stream (or the raw plugin).
+function generateOnce(instruction, opts) {
+  var stream = getStream();
+  var runOpts = {
+    instruction: instruction,
+    startWith: opts.startWith != null ? opts.startWith : '{',
+    stopSequences: opts.stopSequences || null
+  };
+  if (stream) {
+    return stream.run(runOpts).then(function (res) {
+      return { text: res.text, error: res.error, truncated: res.truncated };
+    });
+  }
+  // Fallback: call ai-text-plugin directly and normalize the boxed String.
+  var plugin = null;
+  try { if (window.root && typeof window.root.aiTextPlugin === 'function') plugin = window.root.aiTextPlugin; } catch (e) {}
+  if (!plugin) {
+    return Promise.resolve({ text: '', error: 'weld.structured: neither weld.stream nor ai-text-plugin is available' });
+  }
+  return Promise.resolve(plugin({ instruction: instruction, startWith: runOpts.startWith }))
+    .then(function (raw) {
+      var startWith = runOpts.startWith || '';
+      var body = (raw && raw.generatedText != null) ? String(raw.generatedText) : String(raw);
+      // startWith is echoed back when calling the raw plugin; re-attach it.
+      return { text: startWith + body, error: null };
+    }, function (err) {
+      return { text: '', error: String((err && err.message) || err) };
+    });
+}
+
+// -----------------------------------------------------------------
+// Public: generate(opts) -> Promise<{ ok, value, raw, error, attempts }>
+//
+// opts:
+//   instruction     (string)  your task / system prompt
+//   schema          (object)  { fields: { name: { type, required, enum, of } } }
+//   example         (object)  alternative to schema: a sample shape to mimic
+//   shape           (string)  free-text description of the desired JSON
+//   startWith       (string)  default '{' to prime an object
+//   stopSequences   (array)   passthrough to weld.stream
+//   repairAttempts  (number)  extra tries on failure (default 1)
+// -----------------------------------------------------------------
+function generate(opts) {
+  opts = opts || {};
+  var maxRepairs = (opts.repairAttempts == null) ? 1 : opts.repairAttempts;
+  var attempt = 0;
+  var lastRaw = '', lastError = null;
+
+  function step(repairNote) {
+    attempt += 1;
+    var instruction = buildInstruction(opts, repairNote);
+    return generateOnce(instruction, opts).then(function (gen) {
+      lastRaw = gen.text || '';
+      if (gen.error) {
+        lastError = gen.error;
+        return maybeRetry('generation error: ' + gen.error);
+      }
+      var parsed = parse(lastRaw);
+      if (parsed.error) {
+        lastError = parsed.error;
+        return maybeRetry(parsed.error);
+      }
+      var check = validate(parsed.value, opts.schema);
+      if (!check.ok) {
+        lastError = check.error;
+        return maybeRetry(check.error);
+      }
+      return { ok: true, value: parsed.value, raw: lastRaw, error: null, attempts: attempt };
+    });
+  }
+
+  function maybeRetry(note) {
+    if (attempt <= maxRepairs) return step(note);
+    return { ok: false, value: null, raw: lastRaw, error: lastError, attempts: attempt };
+  }
+
+  return step(null);
+}
+
+window.weld.structured = {
+  generate: generate,
+  parse: parse,
+  validate: validate,
+  extract: extractBalanced,
+  describeSchema: describeSchema,
+  version: '1.0.0'
+};
+
+return window.weld.structured;
+})();
+</script>
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>
+</div>

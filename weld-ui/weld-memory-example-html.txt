@@ -1,0 +1,304 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--amber:#d29922;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:780px;margin:0 auto;padding:34px 18px 90px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 0 16px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+.breadcrumb a{color:var(--muted);}.breadcrumb .sep{color:var(--faint);margin:0 8px;}.breadcrumb .cur{color:var(--ink);}.breadcrumb .act a{color:var(--accent);}
+.hdr{margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}.hdr h1{font:700 24px var(--mono);letter-spacing:-0.5px;}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;}
+.hdr .lead{color:var(--muted);margin-top:8px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;}
+.panel h2{font:600 13px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:8px 0;}
+.lbl{font:600 12px var(--mono);color:var(--muted);min-width:74px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 15px;font:600 13px var(--font);cursor:pointer;transition:.12s;}
+.btn:hover{filter:brightness(1.08);}.btn.ghost{background:var(--faint);color:var(--ink);}.btn.sm{padding:6px 11px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+input[type=text],textarea{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:8px 10px;font:13px var(--font);}
+input[type=text]{flex:1;min-width:120px;}textarea{width:100%;font:12.5px/1.5 var(--mono);resize:vertical;}
+.mono{font:13px var(--mono);}
+.out{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font:12.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;min-height:20px;color:#c9d1d9;}
+.chip{display:inline-block;background:var(--faint);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font:600 12px var(--mono);margin:2px;}
+.chip.k{background:rgba(63,185,80,.14);border-color:rgba(63,185,80,.4);color:#7ee787;}
+.chip.d{opacity:.4;text-decoration:line-through;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:9px 13px;border-radius:0 4px 4px 0;margin:12px 0 0;font-size:12.5px;color:#c9d1d9;}
+.note.warn{background:rgba(210,153,34,.08);border-color:var(--amber);}
+.tag{font:600 10px var(--mono);padding:2px 7px;border-radius:4px;background:rgba(63,185,80,.14);color:#7ee787;border:1px solid rgba(63,185,80,.4);}
+.tag.ai{background:rgba(210,153,34,.12);color:#e3b341;border-color:rgba(210,153,34,.4);}
+.bar{height:14px;background:var(--accent);border-radius:3px;transition:width .3s;}
+.footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);}.footer a{color:var(--muted);}
+.flex{display:flex;gap:10px;align-items:center;}.wrap{flex-wrap:wrap;}.grow{flex:1;}.mt{margin-top:10px;}
+</style>
+<div id="page">
+  <div class="breadcrumb"><span><a href="https://perchance.org/weld-ui-index">weld</a><span class="sep">/</span>weld.memory<span class="sep">/</span><span class="cur">demo</span></span><span class="act"><a href="https://perchance.org/weld-memory-plugin">docs &rarr;</a></span></div>
+  <div class="hdr"><div class="hdr-row"><h1>weld.memory &mdash; demo</h1><span class="ver">v1.0.0</span></div><p class="lead">Long-term memory for a chat: store durable facts, rank the ones relevant to the next prompt, and inject them as context. Recall and injection run here; automatic fact-extraction uses the model on Perchance.</p></div>
+
+  <div class="panel"><h2>Stored facts <span class="tag">pure</span></h2>
+    <div class="row"><input id="mfact" type="text" placeholder="Add a fact about the user or world..."><button id="madd" class="btn">Remember</button></div>
+    <div id="mlist" class="mt"></div>
+    <div style="color:var(--muted);font-size:11px;margin-top:6px">click a fact to forget it</div></div>
+  <div class="panel"><h2>Recall for a prompt</h2>
+    <div class="row"><span class="lbl">prompt</span><input id="mq" type="text" value="tell me about the water"><button id="mrecall" class="btn">Recall</button></div>
+    <div class="row"><span class="lbl">ranked</span><div id="mrel" class="grow"></div></div>
+    <div class="mt"><div class="lbl mono">inject() &rarr; prepended to your prompt:</div><div id="minj" class="out mt"></div></div>
+    <div class="note">relevant() ranks facts by keyword overlap; inject() formats the top ones as a context block. On Perchance, <code>observe(text)</code> uses the model to extract durable facts from a conversation automatically.</div></div>
+  <footer class="footer"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
+</div>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.memory) {
+  window.weld.memory.attach({ stream: window.weld.stream, persist: window.weld.persist });
+  return window.weld.memory;
+}
+
+// -----------------------------------------------------------------
+// weld.memory: the facts a bot LEARNS, as opposed to the facts an
+// author writes. weld.lorebook injects static, hand-keyed entries;
+// weld.memory grows on its own:
+//
+//   observe(text) -> ask the model to extract durable facts -> store
+//   relevant(text) -> rank stored facts against the current input
+//   inject(text)   -> a ready-to-prepend "Known facts:" block
+//
+// Storage uses weld.persist when present (collection 'memories'),
+// otherwise an in-memory store with optional localStorage mirroring.
+// Extraction uses weld.stream; without it, you can still remember()
+// and recall facts manually.
+// -----------------------------------------------------------------
+
+var deps = { stream: null, persist: null };
+var dbName = 'weld-memory';
+var collname = 'memories';
+var store = {};       // id -> fact, the in-memory mirror (always kept warm)
+var col = null;       // weld.persist collection handle, if available
+var seq = 0;
+var ready = false;
+
+function nextId() { seq += 1; return 'm' + Date.now() + '_' + seq; }
+
+function attach(d) {
+  if (d && d.stream) deps.stream = d.stream;
+  if (d && d.persist && !col) {
+    deps.persist = d.persist;
+    try {
+      var db = d.persist.open(dbName);
+      col = db.collection(collname);
+    } catch (e) { col = null; }
+  }
+}
+function stream() { return deps.stream || (window.weld && window.weld.stream) || null; }
+
+// Hydrate the in-memory mirror from persist (call once on load).
+function load() {
+  if (!col) { ready = true; return Promise.resolve(all()); }
+  return Promise.resolve(col.getAll()).then(function (rows) {
+    (rows || []).forEach(function (r) { if (r && r.id) store[r.id] = r; });
+    ready = true;
+    return all();
+  }, function () { ready = true; return all(); });
+}
+
+function persistPut(fact) {
+  if (!col) return Promise.resolve(fact);
+  return Promise.resolve(col.put(fact)).then(function () { return fact; }, function () { return fact; });
+}
+function persistDel(id) {
+  if (!col) return Promise.resolve(true);
+  return Promise.resolve(col.delete(id)).then(function () { return true; }, function () { return true; });
+}
+
+function normalizeText(s) { return String(s == null ? '' : s).replace(/\s+/g, ' ').trim(); }
+
+// Add a fact. fact may be a string or { text, tags, score, source }.
+// Deduplicates on normalized text. Returns the stored record.
+function remember(fact) {
+  var rec = (typeof fact === 'string') ? { text: fact } : (fact || {});
+  var text = normalizeText(rec.text);
+  if (!text) return null;
+  var lower = text.toLowerCase();
+  // Dedup: bump score instead of storing twice.
+  var existing = null, ids = Object.keys(store);
+  for (var i = 0; i < ids.length; i++) {
+    if (String(store[ids[i]].text).toLowerCase() === lower) { existing = store[ids[i]]; break; }
+  }
+  if (existing) {
+    existing.score = (existing.score || 1) + 1;
+    existing.updatedAt = Date.now();
+    persistPut(existing);
+    return existing;
+  }
+  var record = {
+    id: rec.id || nextId(),
+    text: text,
+    tags: rec.tags || [],
+    score: rec.score != null ? rec.score : 1,
+    source: rec.source || null,
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  };
+  store[record.id] = record;
+  persistPut(record);
+  return record;
+}
+
+function rememberMany(facts) {
+  if (!Array.isArray(facts)) return [];
+  return facts.map(remember).filter(Boolean);
+}
+
+function forget(id) {
+  if (store[id]) delete store[id];
+  persistDel(id);
+  return true;
+}
+
+function clear() {
+  store = {};
+  if (col) Promise.resolve(col.clear()).catch(function () {});
+  return true;
+}
+
+function all() {
+  return Object.keys(store).map(function (k) { return store[k]; });
+}
+
+// Keyword relevance: overlap of significant words, weighted by stored score.
+var STOP = { the:1, a:1, an:1, and:1, or:1, but:1, is:1, are:1, was:1, were:1,
+  to:1, of:1, in:1, on:1, at:1, for:1, with:1, my:1, your:1, i:1, you:1, it:1,
+  he:1, she:1, they:1, we:1, that:1, this:1, do:1, did:1, have:1, has:1 };
+
+function words(text) {
+  return normalizeText(text).toLowerCase()
+    .replace(/[^a-z0-9\u00c0-\u024f' ]+/g, ' ')
+    .split(/\s+/)
+    .filter(function (w) { return w.length > 2 && !STOP[w]; });
+}
+
+function score(queryWords, fact) {
+  var fw = words(fact.text);
+  if (!fw.length) return 0;
+  var set = {};
+  fw.forEach(function (w) { set[w] = true; });
+  var hits = 0;
+  queryWords.forEach(function (w) { if (set[w]) hits += 1; });
+  if (!hits) return 0;
+  return hits * (1 + Math.log(1 + (fact.score || 1)));
+}
+
+// relevant(text, opts) -> ranked facts.
+// opts: { limit (default 6), minScore (default 0.5) }
+function relevant(text, opts) {
+  opts = opts || {};
+  var limit = opts.limit || 6;
+  var minScore = opts.minScore != null ? opts.minScore : 0.5;
+  var qw = words(text);
+  if (!qw.length) return [];
+  var scored = all().map(function (f) { return { fact: f, s: score(qw, f) }; })
+    .filter(function (x) { return x.s >= minScore; })
+    .sort(function (a, b) { return b.s - a.s; })
+    .slice(0, limit)
+    .map(function (x) { return x.fact; });
+  return scored;
+}
+
+function search(query) { return relevant(query, { limit: 50, minScore: 0.5 }); }
+
+// inject(text, opts) -> a prompt-ready block of the relevant facts.
+function inject(text, opts) {
+  opts = opts || {};
+  var facts = relevant(text, opts);
+  if (!facts.length) return '';
+  var label = opts.label || 'Known facts about the user and world';
+  var lines = facts.map(function (f) { return '- ' + f.text; });
+  return label + ':\n' + lines.join('\n');
+}
+
+var EXTRACT_PROMPT =
+  'Read the conversation excerpt and extract durable, reusable facts worth '
+  + 'remembering long-term: stable preferences, names, relationships, ongoing '
+  + 'goals, and world details. Ignore small talk and anything transient. '
+  + 'Return a JSON array of short factual strings, e.g. ["The user\'s dog is '
+  + 'named Max.", "The user prefers concise replies."]. If there is nothing '
+  + 'worth keeping, return []. Output only the JSON array.';
+
+// observe(text) -> extract facts via the model and store the new ones.
+// Returns Promise<{ added, facts, error }>.
+function observe(text, opts) {
+  opts = opts || {};
+  var body = normalizeText(text);
+  if (!body) return Promise.resolve({ added: 0, facts: [], error: null });
+
+  // Prefer weld.structured if present (robust JSON), else weld.stream raw.
+  var structured = (window.weld && window.weld.structured) ? window.weld.structured : null;
+  var instruction = (opts.prompt || EXTRACT_PROMPT) + '\n\nExcerpt:\n' + body;
+
+  if (structured) {
+    return structured.generate({ instruction: instruction, startWith: '[' , shape: 'a JSON array of short factual strings' })
+      .then(function (r) {
+        if (!r.ok || !Array.isArray(r.value)) return { added: 0, facts: [], error: r.error || 'no facts extracted' };
+        var added = rememberMany(r.value.map(function (t) { return { text: t, source: 'observed' }; }));
+        return { added: added.length, facts: added, error: null };
+      });
+  }
+
+  var s = stream();
+  if (!s) return Promise.resolve({ added: 0, facts: [], error: 'weld.memory: weld.stream is not loaded' });
+  return s.run({ instruction: instruction, startWith: '[' }).then(function (res) {
+    if (res.error) return { added: 0, facts: [], error: res.error };
+    var list = [];
+    try {
+      var raw = res.text;
+      var open = raw.indexOf('['), close = raw.lastIndexOf(']');
+      if (open !== -1 && close > open) list = JSON.parse(raw.slice(open, close + 1));
+    } catch (e) { list = []; }
+    if (!Array.isArray(list)) list = [];
+    var added = rememberMany(list.map(function (t) { return { text: String(t), source: 'observed' }; }));
+    return { added: added.length, facts: added, error: null };
+  });
+}
+
+window.weld.memory = {
+  attach: attach,
+  load: load,
+  remember: remember,
+  rememberMany: rememberMany,
+  forget: forget,
+  clear: clear,
+  all: all,
+  relevant: relevant,
+  search: search,
+  inject: inject,
+  observe: observe,
+  isReady: function () { return ready; },
+  version: '1.0.0'
+};
+
+window.weld.memory.attach({ stream: window.weld.stream, persist: window.weld.persist });
+return window.weld.memory;
+})();
+</script>
+<script>
+(function(){
+  function $(id){return document.getElementById(id);}
+  function boot(){ if(!window.weld||!window.weld.memory){return setTimeout(boot,100);} init(); }
+  function init(){
+    var M=window.weld.memory;
+    function render(){ var facts=M.all()||[]; $('mlist').innerHTML=facts.map(function(f){ return '<span class="chip" data-id="'+f.id+'" style="cursor:pointer">'+f.text+'</span>'; }).join('')||'<span style="color:var(--muted)">no facts yet</span>';
+      [].forEach.call($('mlist').querySelectorAll('.chip'),function(c){ c.onclick=function(){ M.forget(c.getAttribute('data-id')); render(); }; }); }
+    ['The hero is named Aria','Aria fears deep water','The story is set in the coastal town of Brine','The user prefers short, vivid replies'].forEach(function(t){ M.remember(t); });
+    render();
+    $('madd').onclick=function(){ var v=$('mfact').value.trim(); if(v){ M.remember(v); $('mfact').value=''; render(); } };
+    $('mfact').addEventListener('keydown',function(e){ if(e.key==='Enter') $('madd').click(); });
+    $('mrecall').onclick=function(){ var q=$('mq').value; var rel=M.relevant(q,{limit:5})||[]; $('mrel').innerHTML=rel.length?rel.map(function(f){ return '<span class="chip k">'+f.text+'</span>'; }).join(''):'<span style="color:var(--muted)">nothing matched</span>'; $('minj').textContent=M.inject(q)||'(no relevant facts)'; };
+    $('mrecall').click();
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+})();
+</script>

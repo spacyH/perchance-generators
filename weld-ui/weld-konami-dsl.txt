@@ -1,0 +1,102 @@
+$meta
+  title       = weld.konami
+  description = A key-sequence detector for Easter eggs. Watches for the Konami code (or any custom sequence) and fires your callback -- by default a confetti burst if weld.confetti is loaded. Also matches typed words. Stash on window.weld.konami.
+  tags        = weld, konami, easter-egg, keyboard, fun, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.konami) return window.weld.konami;
+
+  // -----------------------------------------------------------------
+  // weld.konami: the secret handshake. Register a sequence of keys (or a
+  // typed word) and a callback; weld.konami keeps a rolling buffer of
+  // recent keydowns and fires when the tail matches. The classic code is
+  // built in. With no callback it pops confetti, if weld.confetti is around.
+  // -----------------------------------------------------------------
+
+  // Up Up Down Down Left Right Left Right B A
+  var KONAMI = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown',
+    'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+
+  var watchers = [];   // { seq:[normalized keys], cb, buffer:[] }
+  var attached = false;
+
+  function normalizeKey(k) {
+    if (k == null) return '';
+    if (k.length === 1) return k.toLowerCase();
+    return k; // named keys like ArrowUp keep their case
+  }
+
+  function tailMatches(buffer, seq) {
+    if (buffer.length < seq.length) return false;
+    var offset = buffer.length - seq.length;
+    for (var i = 0; i < seq.length; i++) {
+      if (buffer[offset + i] !== seq[i]) return false;
+    }
+    return true;
+  }
+
+  function onKeydown(e) {
+    var key = normalizeKey(e.key);
+    if (!key) return;
+    for (var i = 0; i < watchers.length; i++) {
+      var w = watchers[i];
+      w.buffer.push(key);
+      if (w.buffer.length > w.seq.length) w.buffer.shift();
+      if (tailMatches(w.buffer, w.seq)) {
+        w.buffer = [];
+        try { w.cb(); } catch (err) { /* swallow */ }
+      }
+    }
+  }
+
+  function ensureAttached() {
+    if (attached || typeof document === 'undefined') return;
+    document.addEventListener('keydown', onKeydown);
+    attached = true;
+  }
+
+  function defaultPayload() {
+    if (window.weld && window.weld.confetti) window.weld.confetti.fireworks({ shots: 4 });
+    else if (window.weld && window.weld.toast) window.weld.toast.success('Achievement unlocked!');
+  }
+
+  function register(seq, cb) {
+    var normalized = (seq || []).map(normalizeKey);
+    if (!normalized.length) return function () {};
+    var watcher = { seq: normalized, cb: cb || defaultPayload, buffer: [] };
+    watchers.push(watcher);
+    ensureAttached();
+    return function unsubscribe() {
+      var idx = watchers.indexOf(watcher);
+      if (idx !== -1) watchers.splice(idx, 1);
+    };
+  }
+
+  // The classic code.
+  function onKonami(cb) { return register(KONAMI, cb); }
+
+  // Any custom key sequence (array of e.key values).
+  function onSequence(keys, cb) { return register(keys, cb); }
+
+  // A typed word, e.g. onCode('xyzzy', fn) -> matches when typed in order.
+  function onCode(word, cb) { return register(String(word).split(''), cb); }
+
+  // For testing / programmatic triggering: feed a key as if pressed.
+  function feed(key) { onKeydown({ key: key }); }
+
+  function reset() { watchers.forEach(function (w) { w.buffer = []; }); }
+
+  window.weld.konami = {
+    onKonami: onKonami,
+    onSequence: onSequence,
+    onCode: onCode,
+    feed: feed,
+    reset: reset,
+    KONAMI: KONAMI.slice(),
+    version: '1.0.0'
+  };
+
+  return window.weld.konami;

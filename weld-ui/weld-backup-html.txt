@@ -197,7 +197,7 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
 'use strict';
 
 if (!window.weld) window.weld = {};
-if (window.weld.backup) return;
+if (window.weld.backup) return window.weld.backup;
 
 var FORMAT_VERSION = 1;     // bumped only if envelope format changes (not the data inside)
 var SIGNATURE = 'weld-backup';
@@ -501,7 +501,114 @@ function countTotal(data) {
   return n;
 }
 
+// SHARE LINK — compress + upload + URL
+// uploader: the uploadPlugin function (from DSL import)
+// opts: { paramName?, generatorName? }
+function share(data, uploader, opts) {
+  opts = opts || {};
+  if (typeof uploader !== 'function') {
+    return Promise.reject(new Error('backup.share: uploader function required (pass uploadPlugin)'));
+  }
+  var json = JSON.stringify(data);
+  // Compress with gzip if available, otherwise send raw
+  var blobPromise;
+  if (typeof CompressionStream !== 'undefined') {
+    blobPromise = new Response(
+      new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'))
+    ).blob();
+  } else {
+    blobPromise = Promise.resolve(new Blob([json], { type: 'application/json' }));
+  }
+  return blobPromise.then(function(blob) {
+    return Promise.resolve(uploader(blob));
+  }).then(function(result) {
+    if (!result || result.error) {
+      throw new Error('upload failed: ' + (result && result.error || 'unknown'));
+    }
+    var url = String(result.url || result);
+    // Extract filename from CDN URL
+    var fileName = url.replace('https://user.uploads.dev/file/', '');
+    var paramName = opts.paramName || 'data';
+    var base = 'https://perchance.org/' + (opts.generatorName || window.generatorName || 'generator');
+    return base + '?' + paramName + '=' + encodeURIComponent(fileName);
+  });
+}
+
+// CONSUME SHARE — check URL for shared data, fetch + decompress
+// fetcher: a fetch-compatible function (superFetch or window.fetch)
+// opts: { paramName?, onFound? }
+function consumeShare(fetcher, opts) {
+  opts = opts || {};
+  var paramName = opts.paramName || 'data';
+  var params;
+  try { params = new URL(window.location.href).searchParams; }
+  catch (e) { return Promise.resolve(null); }
+  var raw = params.get(paramName);
+  if (!raw) return Promise.resolve(null);
+
+  // Extract just the filename (handle legacy formats with ~ separator)
+  var fileName = raw.split('~').slice(-1)[0];
+  if (!fileName) return Promise.resolve(null);
+
+  var fetchFn = typeof fetcher === 'function' ? fetcher : window.fetch;
+  var cdnUrl = 'https://user.uploads.dev/file/' + fileName;
+  return Promise.resolve(fetchFn(cdnUrl, {
+    signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined
+  })).then(function(r) {
+    if (r && typeof r.blob === 'function') return r.blob();
+    // superFetch might return different shape
+    if (r instanceof Blob) return r;
+    return new Blob([typeof r === 'string' ? r : JSON.stringify(r)]);
+  }).then(function(blob) {
+    // Try to decompress
+    if (typeof DecompressionStream !== 'undefined') {
+      return new Response(
+        blob.stream().pipeThrough(new DecompressionStream('gzip'))
+      ).text().catch(function() {
+        // Not gzipped — try raw
+        return blob.text();
+      });
+    }
+    return blob.text();
+  }).then(function(text) {
+    try { return JSON.parse(text); }
+    catch (e) { throw new Error('backup.consumeShare: invalid JSON in share data'); }
+  }).then(function(data) {
+    if (typeof opts.onFound === 'function') opts.onFound(data);
+    return data;
+  });
+}
+
 // PUBLIC API
+// ---- upload-plugin helpers: unguessable-id blob store / link-identity
+//      (same injected-uploader style as share/consumeShare) ----
+var UPLOAD_PREFIX = 'https://user.uploads.dev/file/';
+function parseUploadId(url) {
+  try {
+    var base = (typeof location !== 'undefined' && location.href) ? location.href : 'https://x/';
+    var path = new URL(String(url), base).pathname;
+    var name = (path.split('/').filter(Boolean).pop() || '');
+    var id = (name.split('.')[0] || '').toLowerCase().replace(/[^0-9a-f]/g, '');
+    return (id.length === 32 && /^[0-9a-f]+$/.test(id)) ? id : '';
+  } catch (e) { return ''; }
+}
+function safeUploadUrl(url) {
+  try { var u = new URL(String(url)); if (u.protocol !== 'https:') return ''; if (u.hostname !== 'user.uploads.dev') return ''; if (u.pathname.indexOf('/file/') !== 0) return ''; return u.href; } catch (e) { return ''; }
+}
+function upload(uploader, blobOrString) {
+  if (typeof uploader !== 'function') return Promise.reject(new Error('backup.upload: uploader function required (pass uploadPlugin)'));
+  return Promise.resolve(uploader(blobOrString)).then(function (res) {
+    if (!res || res.error || !res.url) throw new Error('backup.upload: upload failed: ' + ((res && res.error) || 'unknown'));
+    return { url: res.url, id: parseUploadId(res.url) };
+  });
+}
+function uploadJson(uploader, obj) { return upload(uploader, JSON.stringify(obj)); }
+function fetchJson(fetcher, url) {
+  var f = fetcher || (typeof fetch !== 'undefined' ? fetch : null);
+  if (typeof f !== 'function') return Promise.reject(new Error('backup.fetchJson: fetcher function required'));
+  return Promise.resolve(f(url)).then(function (r) { return (r && typeof r.text === 'function') ? r.text() : r; }).then(function (t) { try { return JSON.parse(t); } catch (e) { throw new Error('backup.fetchJson: invalid JSON'); } });
+}
+
 window.weld.backup = {
   exportData: exportData,
   exportBlob: exportBlob,
@@ -512,13 +619,28 @@ window.weld.backup = {
   fromDb: fromDb,
   downloadFromDb: downloadFromDb,
   toDb: toDb,
+  share: share,
+  upload: upload,
+  uploadJson: uploadJson,
+  fetchJson: fetchJson,
+  parseUploadId: parseUploadId,
+  safeUploadUrl: safeUploadUrl,
+  consumeShare: consumeShare,
   FORMAT_VERSION: FORMAT_VERSION,
-  version: '1.0.0',
+  version: '1.1.0',
 };
 
+return window.weld.backup;
 })();
-
 </script>
+  <h2>Upload helpers <span style="font:600 11px monospace;color:#7ee787;border:1px solid rgba(63,185,80,.4);padding:1px 7px;border-radius:4px">v1.1.0</span></h2>
+  <p>The upload-plugin primitives behind share links, exposed for reuse &mdash; an unguessable-id blob store for link-based identity, shared payloads, or images. The uploader/fetcher are injected, the same style as <code>share()</code>.</p>
+  <pre>weld.backup.upload(uploader, blobOrString) -> Promise&lt;{ url, id }&gt;   // id = 128-bit unguessable file id
+weld.backup.uploadJson(uploader, obj)       -> Promise&lt;{ url, id }&gt;
+weld.backup.fetchJson(fetcher, url)         -> Promise&lt;parsed JSON&gt;
+weld.backup.parseUploadId(url)              -> '&lt;32-hex id&gt;' | ''
+weld.backup.safeUploadUrl(url)              -> validated https user.uploads.dev /file/ URL | ''</pre>
+
 <footer class="footer">
   <span>&#169; 2026 therealwestninja.</span> &#183;
   <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;

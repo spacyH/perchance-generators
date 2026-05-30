@@ -1,0 +1,373 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--amber:#d29922;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:780px;margin:0 auto;padding:34px 18px 90px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 0 16px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+.breadcrumb a{color:var(--muted);}.breadcrumb .sep{color:var(--faint);margin:0 8px;}.breadcrumb .cur{color:var(--ink);}.breadcrumb .act a{color:var(--accent);}
+.hdr{margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}.hdr h1{font:700 24px var(--mono);letter-spacing:-0.5px;}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;}
+.hdr .lead{color:var(--muted);margin-top:8px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;}
+.panel h2{font:600 13px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:8px 0;}
+.lbl{font:600 12px var(--mono);color:var(--muted);min-width:74px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 15px;font:600 13px var(--font);cursor:pointer;transition:.12s;}
+.btn:hover{filter:brightness(1.08);}.btn.ghost{background:var(--faint);color:var(--ink);}.btn.sm{padding:6px 11px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+input[type=text],textarea{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:8px 10px;font:13px var(--font);}
+input[type=text]{flex:1;min-width:120px;}textarea{width:100%;font:12.5px/1.5 var(--mono);resize:vertical;}
+.mono{font:13px var(--mono);}
+.out{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font:12.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;min-height:20px;color:#c9d1d9;}
+.chip{display:inline-block;background:var(--faint);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font:600 12px var(--mono);margin:2px;}
+.chip.k{background:rgba(63,185,80,.14);border-color:rgba(63,185,80,.4);color:#7ee787;}
+.chip.d{opacity:.4;text-decoration:line-through;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:9px 13px;border-radius:0 4px 4px 0;margin:12px 0 0;font-size:12.5px;color:#c9d1d9;}
+.note.warn{background:rgba(210,153,34,.08);border-color:var(--amber);}
+.tag{font:600 10px var(--mono);padding:2px 7px;border-radius:4px;background:rgba(63,185,80,.14);color:#7ee787;border:1px solid rgba(63,185,80,.4);}
+.tag.ai{background:rgba(210,153,34,.12);color:#e3b341;border-color:rgba(210,153,34,.4);}
+.bar{height:14px;background:var(--accent);border-radius:3px;transition:width .3s;}
+.footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);}.footer a{color:var(--muted);}
+.flex{display:flex;gap:10px;align-items:center;}.wrap{flex-wrap:wrap;}.grow{flex:1;}.mt{margin-top:10px;}
+</style>
+<div id="page">
+  <div class="breadcrumb"><span><a href="https://perchance.org/weld-ui-index">weld</a><span class="sep">/</span>weld.comments<span class="sep">/</span><span class="cur">demo</span></span><span class="act"><a href="https://perchance.org/weld-comments-plugin">docs &rarr;</a></span></div>
+  <div class="hdr"><div class="hdr-row"><h1>weld.comments &mdash; demo</h1><span class="ver">v1.1.0</span></div><p class="lead">Drop a discussion thread onto anything, or use the same comments-plugin as a serverless append store. The thread embed is live on Perchance; channel building works here.</p></div>
+
+  <div class="panel"><h2>Open a thread <span class="tag ai">live on Perchance</span></h2>
+    <p class="mono" style="color:var(--muted)">Each item gets its own channel, hashed from a key you choose.</p>
+    <div class="row mt"><span class="lbl">item key</span><input id="mkey" type="text" value="demo-image-001"></div>
+    <div class="row"><span class="lbl">title</span><input id="mtitle" type="text" value="Discuss this image"></div>
+    <div class="row"><button id="mopen" class="btn">Open comments</button><button id="mdisabled" class="btn ghost">Try a disabled item</button></div>
+    <div class="mt"><div class="lbl mono">channel() for this key:</div><div id="mchan" class="out mt"></div></div>
+    <div class="note warn">The comment thread only renders when this runs on Perchance (it loads Perchance\'s comments service in an iframe). The channel hashing below works anywhere.</div></div>
+  <div class="panel"><h2>Serverless store <span class="tag">v1.1.0</span></h2>
+    <p class="mono" style="color:var(--muted)">channelString() builds an append-store channel with the storage modifiers &mdash; the engine behind anonymous-inbox apps.</p>
+    <div class="row"><span class="lbl">box id</span><input id="mbox" type="text" value="a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"></div>
+    <div class="row wrap"><button class="btn ghost sm cs" data-m="ids">anonymous (+ids)</button><button class="btn ghost sm cs" data-m="u">username (+u)</button><button class="btn ghost sm cs" data-m="auth">owner (+auth)</button></div>
+    <div id="mcsout" class="out mt"></div></div>
+  <footer class="footer"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
+</div>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.comments) return window.weld.comments;
+
+// -----------------------------------------------------------------
+// weld.comments: per-item discussion threads.
+//
+// Perchance hosts a comments-plugin embed. The reusable trick is to
+// give every item (image, post, scene...) its own channel by hashing a
+// stable key, theme the embed to match your app, and present it either
+// as an overlay modal or inline. weld.comments wraps all of that:
+//
+//   channel(key)            -> a stable channel id for that key
+//   open({ key, title, ... })  themed overlay with the thread
+//   inline(target, opts)       embed into an element
+//   close()
+//
+// No app identity is baked in -- you pass your app slug and (optional)
+// admin hash. Defaults are sensible and generic.
+// -----------------------------------------------------------------
+
+var EMBED_BASE = 'https://comments-plugin.perchance.org/embed/';
+var STYLE_ID = 'weld-comments-style';
+var overlay = null;
+
+// Stable short hash (djb2 -> base36) for deriving a channel from any key.
+function hash(text) {
+  text = String(text == null ? '' : text);
+  var h = 5381;
+  for (var i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) | 0;
+  return Math.abs(h).toString(36);
+}
+
+// A channel id for an item. prefix groups channels under your app.
+function channel(key, prefix) {
+  prefix = prefix || defaultApp();
+  return prefix + '-' + hash(key);
+}
+
+function defaultApp() {
+  try { if (window.generatorName) return String(window.generatorName); } catch (e) {}
+  return 'weld';
+}
+
+function resolveTheme(theme) {
+  if (theme === 'light' || theme === 'dark') return theme;
+  try { if (document.body && document.body.classList.contains('light-theme')) return 'light'; } catch (e) {}
+  return 'dark';
+}
+
+function defaultConfig() {
+  return {
+    loadFonts: 'Open Sans, Inter',
+    containerStyle: 'width:100%;height:100%;',
+    inputAreaStyle: 'height:68px;',
+    commentPlaceholderText: 'Add a comment...',
+    submitButtonText: 'comment',
+    allowBots: false
+  };
+}
+
+// Build the embed src. app = generator slug the thread lives under.
+function buildSrc(app, chan, config) {
+  config = config || {};
+  var merged = {};
+  var d = defaultConfig();
+  for (var k in d) merged[k] = d[k];
+  for (var k2 in config) merged[k2] = config[k2];
+  merged.channel = chan;
+  var adminHash = merged.adminPasswordHash || '';
+  var encoded = encodeURIComponent(JSON.stringify(merged));
+  var src = EMBED_BASE + app + '+' + chan + '?';
+  if (adminHash) src += 'adminPasswordHash=' + adminHash;
+  return src + '#' + encoded;
+}
+
+function ensureStyle() {
+  if (typeof document === 'undefined' || document.getElementById(STYLE_ID)) return;
+  var st = document.createElement('style');
+  st.id = STYLE_ID;
+  st.textContent =
+    '.weld-comments-ov{z-index:99999;position:fixed;inset:0;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;padding:14px;box-sizing:border-box;}'
+    + '.weld-comments-card{width:min(980px,100%);height:min(760px,92dvh);background:var(--background-color,var(--bg-color,#111));color:var(--text-color,#eee);border:1px solid var(--border-color,#444);border-radius:12px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.35);}'
+    + '.weld-comments-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;border-bottom:1px solid var(--border-color,#444);}'
+    + '.weld-comments-title{font-weight:700;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}'
+    + '.weld-comments-x{border:1px solid var(--border-color,#444);background:var(--input-bg,#222);color:var(--text-color,#eee);border-radius:8px;width:30px;height:30px;cursor:pointer;}'
+    + '.weld-comments-layout{display:grid;grid-template-columns:minmax(180px,34%) 1fr;min-height:0;flex:1;}'
+    + '.weld-comments-preview{border-right:1px solid var(--border-color,#444);background:var(--input-bg,#151515);display:flex;align-items:center;justify-content:center;min-height:0;padding:10px;}'
+    + '.weld-comments-preview img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;}'
+    + '.weld-comments-wrap{position:relative;min-width:0;min-height:0;}'
+    + '.weld-comments-frame{width:100%;height:100%;border:none;background:transparent;}'
+    + '.weld-comments-loading{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;background:var(--background-color,var(--bg-color,#111));color:var(--text-color,#eee);font:13px/1.4 Open Sans,sans-serif;transition:opacity .18s ease;pointer-events:none;}'
+    + '.weld-comments-spin{width:22px;height:22px;border-radius:999px;border:2px solid rgba(128,128,128,.35);border-top-color:currentColor;animation:weldCommentsSpin .8s linear infinite;}'
+    + '@keyframes weldCommentsSpin{to{transform:rotate(360deg);}}'
+    + '@media (max-width:700px){.weld-comments-card{width:calc(100vw - 24px);max-width:calc(100vw - 24px);height:min(720px,calc(100dvh - 32px));}.weld-comments-layout{grid-template-columns:1fr;}.weld-comments-preview{display:none;}}';
+  document.head.appendChild(st);
+}
+
+function ensureOverlay() {
+  if (overlay) return overlay;
+  ensureStyle();
+  overlay = document.createElement('div');
+  overlay.className = 'weld-comments-ov';
+  overlay.innerHTML =
+    '<div class="weld-comments-card">'
+    + '<div class="weld-comments-head"><div class="weld-comments-title" data-title>Comments</div>'
+    + '<button class="weld-comments-x" data-close>x</button></div>'
+    + '<div class="weld-comments-layout">'
+    + '<div class="weld-comments-preview" data-preview><img data-img></div>'
+    + '<div class="weld-comments-wrap">'
+    + '<div class="weld-comments-loading" data-loading><div class="weld-comments-spin"></div><div>Loading comments...</div></div>'
+    + '<iframe class="weld-comments-frame" data-frame allow="clipboard-read *; clipboard-write *"></iframe>'
+    + '</div></div></div>';
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+  overlay.querySelector('[data-close]').addEventListener('click', close);
+  var frame = overlay.querySelector('[data-frame]');
+  var loading = overlay.querySelector('[data-loading]');
+  frame.addEventListener('load', function () {
+    loading.style.opacity = '0';
+    setTimeout(function () { if (loading.style.opacity === '0') loading.style.display = 'none'; }, 200);
+  });
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+// open(opts):
+//   key       (required) anything stable -> derives the channel
+//   title     header text
+//   image     optional preview image url
+//   app       generator slug the thread lives under (default generatorName)
+//   theme     'auto' | 'light' | 'dark'
+//   prefix    channel prefix (default app)
+//   disabled  if true, show a "comments disabled" notice instead
+//   config    passthrough to the comments embed (placeholder, submitButtonText,
+//             allowBots, adminPasswordHash, ...)
+function open(opts) {
+  opts = opts || {};
+  if (opts.disabled) { notifyDisabled(); return; }
+  if (typeof document === 'undefined') return;
+  var app = opts.app || defaultApp();
+  var chan = channel(opts.key, opts.prefix || app);
+  var cfg = {};
+  var base = opts.config || {};
+  for (var k in base) cfg[k] = base[k];
+  cfg.forceColorScheme = resolveTheme(opts.theme);
+  var src = buildSrc(app, chan, cfg);
+
+  var ov = ensureOverlay();
+  ov.querySelector('[data-title]').textContent = opts.title || 'Comments';
+  var preview = ov.querySelector('[data-preview]');
+  var img = ov.querySelector('[data-img]');
+  if (opts.image) { preview.style.display = ''; img.src = opts.image; }
+  else { preview.style.display = 'none'; }
+
+  var frame = ov.querySelector('[data-frame]');
+  var loading = ov.querySelector('[data-loading]');
+  ov.style.display = 'flex';
+  if (frame.getAttribute('data-src') !== src) {
+    loading.style.display = 'flex'; loading.style.opacity = '1';
+    frame.setAttribute('data-src', src);
+    frame.src = src;
+  }
+  return chan;
+}
+
+function close() { if (overlay) overlay.style.display = 'none'; }
+
+// inline(target, opts): embed the thread into an element instead of a modal.
+function inline(target, opts) {
+  opts = opts || {};
+  var el = (typeof target === 'string') ? document.querySelector(target) : target;
+  if (!el) return null;
+  var app = opts.app || defaultApp();
+  var chan = channel(opts.key, opts.prefix || app);
+  var cfg = {};
+  var base = opts.config || {};
+  for (var k in base) cfg[k] = base[k];
+  cfg.forceColorScheme = resolveTheme(opts.theme);
+  var frame = document.createElement('iframe');
+  frame.style.cssText = opts.style || 'width:100%;height:100%;border:none;background:transparent;';
+  frame.setAttribute('allow', 'clipboard-read *; clipboard-write *');
+  frame.src = buildSrc(app, chan, cfg);
+  el.appendChild(frame);
+  return frame;
+}
+
+function notifyDisabled() {
+  if (window.weld && window.weld.toast) { window.weld.toast.show('Comments are disabled for this item.', 'info'); return; }
+  if (typeof document === 'undefined') return;
+  var p = document.createElement('div');
+  p.style.cssText = 'z-index:100000;position:fixed;left:50%;bottom:18px;transform:translateX(-50%);max-width:min(360px,calc(100vw - 28px));padding:10px 13px;border-radius:10px;border:1px solid var(--border-color,#444);background:var(--input-bg,#222);color:var(--text-color,#eee);box-shadow:0 8px 28px rgba(0,0,0,.35);font:13px/1.45 Open Sans,sans-serif;opacity:0;transition:opacity .18s ease;pointer-events:none;';
+  p.textContent = 'Comments disabled for this item.';
+  document.body.appendChild(p);
+  requestAnimationFrame(function () { p.style.opacity = '1'; });
+  setTimeout(function () { p.style.opacity = '0'; setTimeout(function () { p.remove(); }, 250); }, 2400);
+}
+
+// ---- secure datastore: comments-plugin as an append store, optionally
+//      end-to-end encrypted (the pattern behind anonymous-inbox apps) ----
+var attachedSecret = null;
+function attach(deps) { if (deps && deps.secret) attachedSecret = deps.secret; return window.weld.comments; }
+function resolveSecret() {
+  var sp = attachedSecret || (window.weld && window.weld._secret) || window.secret;
+  if (!sp || typeof sp.encrypt !== 'function') throw new Error('weld.comments: secret-plugin not attached -- call weld.comments.attach({ secret: secretPlugin })');
+  return sp;
+}
+
+var CIPHER_RE = /^ENCRYPTED_[0-9]+_[\s\S]+_ENCRYPTED_END$/;
+function isCiphertext(text) { return typeof text === 'string' && CIPHER_RE.test(text); }
+
+function sha256Hex(text) {
+  var bytes = new TextEncoder().encode(String(text == null ? '' : text));
+  return Promise.resolve(crypto.subtle.digest('SHA-256', bytes)).then(function (buf) {
+    var arr = new Uint8Array(buf), out = '';
+    for (var i = 0; i < arr.length; i++) out += arr[i].toString(16).padStart(2, '0');
+    return out;
+  });
+}
+
+// Public-key crypto helpers (wrap secret-plugin). decrypt() is normalized
+// through String() so a boxed-string return can never break === checks.
+var cryptoApi = {
+  generateKeyPair: function () { var k = resolveSecret().generateKeyPair(); return { publicKey: k.public || k.publicKey, privateKey: k.private || k.privateKey }; },
+  encrypt: function (text, publicKey) { return String(resolveSecret().encrypt(String(text), publicKey)); },
+  decrypt: function (ciphertext, privateKey) { return String(resolveSecret().decrypt(ciphertext, privateKey)); },
+  keyPairMatches: function (publicKey, privateKey) { try { var sp = resolveSecret(), probe = 'weld:' + Date.now() + ':' + Math.random().toString(36).slice(2); return String(sp.decrypt(sp.encrypt(probe, publicKey), privateKey)) === probe; } catch (e) { return false; } },
+  publicKeyHash: function (publicKey) { return sha256Hex(String(publicKey)); },
+  isCiphertext: isCiphertext
+};
+
+// Build a comments-plugin channel string with the storage modifiers:
+//   channelString(id)                          -> "id+ids:channel"   (inter-channel anonymity)
+//   channelString(id, { u: 'name' })           -> "id+u:name,ids:channel"
+//   channelString(id, { auth: hash })          -> "id+auth:hash,ids:channel"  (ownership via key)
+//   channelString(id, { ids: false })          -> "id"
+function channelString(id, opts) {
+  opts = opts || {};
+  var base = String(id == null ? '' : id), mods = [];
+  if (opts.u) mods.push('u:' + String(opts.u).toLowerCase());
+  else if (opts.auth) mods.push('auth:' + String(opts.auth));
+  if (opts.ids !== false) mods.push('ids:channel');
+  return mods.length ? base + '+' + mods.join(',') : base;
+}
+
+// store(opts): treat a comments-plugin controller as an append-only store.
+//   opts.controller : the comments-plugin controller (submit(); optional
+//                     setNicknameForNextComment(), getComments()/comments, onUpdate())
+//   opts.keys       : { publicKey, privateKey } -> encrypt on post, decrypt on list
+//   opts.anonymous  : post with no nickname (default true)
+function store(opts) {
+  opts = opts || {};
+  var ctrl = opts.controller;
+  if (!ctrl || typeof ctrl.submit !== 'function') throw new Error('weld.comments.store: a comments-plugin controller with submit() is required');
+  var keys = opts.keys || null, anon = opts.anonymous !== false;
+  function post(record) {
+    var payload = (typeof record === 'string') ? record : JSON.stringify(record);
+    if (keys) payload = cryptoApi.encrypt(payload, keys.publicKey);
+    var pre = Promise.resolve();
+    if (anon && typeof ctrl.setNicknameForNextComment === 'function') pre = Promise.resolve(ctrl.setNicknameForNextComment(''));
+    return pre.then(function () { return ctrl.submit(payload); });
+  }
+  function rawComments() { if (typeof ctrl.getComments === 'function') return ctrl.getComments() || []; if (Array.isArray(ctrl.comments)) return ctrl.comments; return []; }
+  function list(o) {
+    o = o || {}; var blocked = o.blocked || {}, out = [];
+    rawComments().forEach(function (c) {
+      if (!c || typeof c.message !== 'string') return;
+      var msg = c.message.trim(), uid = (c.user && typeof c.user.id === 'string') ? c.user.id : '';
+      if (uid && blocked[uid]) return;
+      var value = msg;
+      if (keys) { if (!isCiphertext(msg)) return; try { value = cryptoApi.decrypt(msg, keys.privateKey); } catch (e) { return; } }
+      if (o.parse !== false) { try { value = JSON.parse(value); } catch (e) {} }
+      out.push({ value: value, userId: uid, time: Number((c.time || c.createdAt || 0)), raw: c });
+    });
+    if (o.sort !== false) out.sort(function (a, b) { return b.time - a.time; });
+    return out;
+  }
+  function onNew(cb) { if (typeof ctrl.onComment === 'function') return ctrl.onComment(cb); if (typeof ctrl.onUpdate === 'function') return ctrl.onUpdate(function () { cb(list()); }); return function () {}; }
+  return { post: post, list: list, onNew: onNew, channel: opts.channel || null };
+}
+
+window.weld.comments = {
+  channel: channel,
+  hash: hash,
+  buildSrc: buildSrc,
+  open: open,
+  inline: inline,
+  close: close,
+  attach: attach,
+  crypto: cryptoApi,
+  channelString: channelString,
+  isCiphertext: isCiphertext,
+  store: store,
+  version: '1.1.0'
+};
+
+return window.weld.comments;
+})();
+</script>
+<script>
+(function(){
+  function $(id){return document.getElementById(id);}
+  function boot(){ if(!window.weld||!window.weld.comments){return setTimeout(boot,100);} init(); }
+  function init(){
+    var CM=window.weld.comments;
+    function refreshChan(){ $('mchan').textContent=CM.channel($('mkey').value,'weld-comments-example'); }
+    $('mkey').addEventListener('input',refreshChan); refreshChan();
+    $('mopen').onclick=function(){ CM.open({ key:$('mkey').value, title:$('mtitle').value, app:'weld-comments-example', theme:'auto' }); };
+    $('mdisabled').onclick=function(){ CM.open({ key:$('mkey').value, disabled:true }); };
+    [].forEach.call(document.querySelectorAll('.cs'),function(b){ b.onclick=function(){ var id=$('mbox').value, m=b.getAttribute('data-m'), out;
+      if(m==='ids') out=CM.channelString(id);
+      else if(m==='u') out=CM.channelString(id,{u:'alice'});
+      else out=CM.channelString(id,{auth:'<sha256 of public key>'});
+      $('mcsout').textContent=out; }; });
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+})();
+</script>

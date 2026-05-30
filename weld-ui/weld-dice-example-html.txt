@@ -1,0 +1,304 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--amber:#d29922;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:780px;margin:0 auto;padding:34px 18px 90px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 0 16px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+.breadcrumb a{color:var(--muted);}.breadcrumb .sep{color:var(--faint);margin:0 8px;}.breadcrumb .cur{color:var(--ink);}.breadcrumb .act a{color:var(--accent);}
+.hdr{margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}.hdr h1{font:700 24px var(--mono);letter-spacing:-0.5px;}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;}
+.hdr .lead{color:var(--muted);margin-top:8px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;}
+.panel h2{font:600 13px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:8px 0;}
+.lbl{font:600 12px var(--mono);color:var(--muted);min-width:74px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 15px;font:600 13px var(--font);cursor:pointer;transition:.12s;}
+.btn:hover{filter:brightness(1.08);}.btn.ghost{background:var(--faint);color:var(--ink);}.btn.sm{padding:6px 11px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+input[type=text],textarea{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:8px 10px;font:13px var(--font);}
+input[type=text]{flex:1;min-width:120px;}textarea{width:100%;font:12.5px/1.5 var(--mono);resize:vertical;}
+.mono{font:13px var(--mono);}
+.out{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font:12.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;min-height:20px;color:#c9d1d9;}
+.chip{display:inline-block;background:var(--faint);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font:600 12px var(--mono);margin:2px;}
+.chip.k{background:rgba(63,185,80,.14);border-color:rgba(63,185,80,.4);color:#7ee787;}
+.chip.d{opacity:.4;text-decoration:line-through;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:9px 13px;border-radius:0 4px 4px 0;margin:12px 0 0;font-size:12.5px;color:#c9d1d9;}
+.note.warn{background:rgba(210,153,34,.08);border-color:var(--amber);}
+.tag{font:600 10px var(--mono);padding:2px 7px;border-radius:4px;background:rgba(63,185,80,.14);color:#7ee787;border:1px solid rgba(63,185,80,.4);}
+.tag.ai{background:rgba(210,153,34,.12);color:#e3b341;border-color:rgba(210,153,34,.4);}
+.bar{height:14px;background:var(--accent);border-radius:3px;transition:width .3s;}
+.footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);}.footer a{color:var(--muted);}
+.flex{display:flex;gap:10px;align-items:center;}.wrap{flex-wrap:wrap;}.grow{flex:1;}.mt{margin-top:10px;}
+</style>
+<div id="page">
+  <div class="breadcrumb"><span><a href="https://perchance.org/weld-ui-index">weld</a><span class="sep">/</span>weld.dice<span class="sep">/</span><span class="cur">demo</span></span><span class="act"><a href="https://perchance.org/weld-dice-plugin">docs &rarr;</a></span></div>
+  <div class="hdr"><div class="hdr-row"><h1>weld.dice &mdash; demo</h1><span class="ver">v1.0.0</span></div><p class="lead">Randomness you can actually use: dice notation, weighted loot tables, draw-without-replacement decks, and a seeded RNG. Everything here runs purely in the browser.</p></div>
+
+  <div class="panel"><h2>Dice roller <span class="tag">pure</span></h2>
+    <div class="row"><input id="dn" type="text" value="4d6kh3"><button id="droll" class="btn">Roll</button></div>
+    <div class="row wrap"><span class="lbl">try</span><button class="btn ghost sm qd" data-n="1d20">d20</button><button class="btn ghost sm qd" data-n="2d20kh1">advantage</button><button class="btn ghost sm qd" data-n="4d6kh3">stat</button><button class="btn ghost sm qd" data-n="2d6+3">2d6+3</button><button class="btn ghost sm qd" data-n="1d100">d100</button></div>
+    <div id="dout" class="out mt"></div></div>
+  <div class="panel"><h2>Weighted loot table <span class="tag">pure</span></h2>
+    <p class="mono" style="color:var(--muted)">common 70 &middot; rare 25 &middot; legendary 5</p>
+    <div class="row"><button id="ddraw" class="btn">Draw 50</button></div>
+    <div id="dtable" class="mt"></div></div>
+  <div class="panel"><h2>Deck &mdash; draw without replacement <span class="tag">pure</span></h2>
+    <div class="row"><button id="ddeck" class="btn">Draw a card</button><button id="dreset" class="btn ghost">New shuffled deck</button><span id="dremain" class="mono" style="color:var(--muted)"></span></div>
+    <div id="ddrawn" class="mt"></div></div>
+  <div class="panel"><h2>Seeded RNG &mdash; reproducible <span class="tag">pure</span></h2>
+    <div class="row"><span class="lbl">seed</span><input id="dseed" type="text" value="weld-123"><button id="drng" class="btn">Generate 6</button></div>
+    <div id="drngout" class="out mt"></div>
+    <div class="note">Same seed &rarr; same sequence on every run &mdash; deterministic generators you can share by seed.</div></div>
+  <footer class="footer"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
+</div>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.dice) return window.weld.dice;
+
+// -----------------------------------------------------------------
+// weld.dice: the randomness primitives Perchance generators reach for,
+// in one tested place. Dice-notation roller with keep/drop and
+// advantage, weighted picks, decks that draw without replacement, and
+// a seedable RNG so a generator can be made reproducible. No model, no
+// DOM, no dependencies.
+// -----------------------------------------------------------------
+
+// mulberry32: tiny, fast, seedable PRNG. Returns a function -> [0,1).
+function mulberry32(seed) {
+  var a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    var t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function hashSeed(input) {
+  var str = String(input);
+  var h = 2166136261 >>> 0;
+  for (var i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+// The default stream uses Math.random; rng(seed) returns a seeded one.
+var defaultRand = Math.random;
+
+function makeRng(seed) {
+  var s = (typeof seed === 'number') ? seed : hashSeed(seed);
+  var fn = mulberry32(s);
+  return {
+    next: fn,
+    int: function (min, max) { return Math.floor(fn() * (max - min + 1)) + min; },
+    pick: function (arr) { return arr[Math.floor(fn() * arr.length)]; },
+    bool: function (p) { return fn() < (p == null ? 0.5 : p); }
+  };
+}
+
+function randFor(opts) {
+  if (opts && opts.rng && typeof opts.rng.next === 'function') return opts.rng.next;
+  if (opts && typeof opts.rand === 'function') return opts.rand;
+  if (opts && opts.seed != null) return makeRng(opts.seed).next;
+  return defaultRand;
+}
+
+function rollDie(sides, rand) { return Math.floor(rand() * sides) + 1; }
+
+// Parse and evaluate dice notation. Supports:
+//   NdS            e.g. 3d6
+//   dS             single die, e.g. d20
+//   +N / -N        flat modifiers anywhere
+//   khN / klN      keep highest / lowest N of the dice
+//   dhN / dlN      drop highest / lowest N
+//   !              exploding dice (reroll+add on max)
+//   "adv" / "dis"  shorthand for 2d20kh1 / 2d20kl1
+// Returns { total, rolls, kept, notation }.
+function roll(notation, opts) {
+  var rand = randFor(opts);
+  var spec = String(notation == null ? '' : notation).trim().toLowerCase();
+  if (spec === 'adv') spec = '2d20kh1';
+  else if (spec === 'dis') spec = '2d20kl1';
+
+  var total = 0;
+  var allRolls = [];
+  var keptAll = [];
+
+  // Split into additive terms, keeping their signs.
+  var terms = spec.replace(/\s+/g, '').match(/[+-]?[^+-]+/g) || [];
+  for (var t = 0; t < terms.length; t++) {
+    var term = terms[t];
+    var sign = 1;
+    if (term.charAt(0) === '+') term = term.slice(1);
+    else if (term.charAt(0) === '-') { sign = -1; term = term.slice(1); }
+
+    var dieMatch = term.match(/^(\d*)d(\d+)(!?)((?:k[hl]\d+|d[hl]\d+)?)$/);
+    if (dieMatch) {
+      var n = dieMatch[1] === '' ? 1 : parseInt(dieMatch[1], 10);
+      var sides = parseInt(dieMatch[2], 10);
+      var explode = dieMatch[3] === '!';
+      var mod = dieMatch[4];
+      var rolls = [];
+      for (var i = 0; i < n; i++) {
+        var r = rollDie(sides, rand);
+        rolls.push(r);
+        if (explode) {
+          var guard = 0;
+          while (r === sides && guard < 50) { r = rollDie(sides, rand); rolls.push(r); guard += 1; }
+        }
+      }
+      allRolls = allRolls.concat(rolls);
+
+      var kept = rolls.slice();
+      if (mod) {
+        var keep = mod.charAt(0) === 'k';
+        var high = mod.charAt(1) === 'h';
+        var count = parseInt(mod.slice(2), 10);
+        var sorted = rolls.slice().sort(function (a, b) { return b - a; }); // desc
+        if (keep) kept = high ? sorted.slice(0, count) : sorted.slice(sorted.length - count);
+        else kept = high ? sorted.slice(count) : sorted.slice(0, sorted.length - count);
+      }
+      keptAll = keptAll.concat(kept);
+      var sum = kept.reduce(function (a, b) { return a + b; }, 0);
+      total += sign * sum;
+    } else if (/^\d+$/.test(term)) {
+      total += sign * parseInt(term, 10);
+    }
+    // Unknown terms are ignored rather than throwing.
+  }
+
+  return { total: total, rolls: allRolls, kept: keptAll, notation: String(notation) };
+}
+
+// Just the number.
+function rollTotal(notation, opts) { return roll(notation, opts).total; }
+
+// Uniform integer in [min, max] inclusive.
+function between(min, max, opts) {
+  var rand = randFor(opts);
+  return Math.floor(rand() * (max - min + 1)) + min;
+}
+
+// Weighted pick. entries: array of { value, weight } OR a plain object
+// { value: weight, ... }. Returns the chosen value.
+function weighted(entries, opts) {
+  var rand = randFor(opts);
+  var list = [];
+  if (Array.isArray(entries)) {
+    list = entries.map(function (e) {
+      if (e && typeof e === 'object' && 'weight' in e) return { value: e.value, weight: Math.max(0, +e.weight || 0) };
+      return { value: e, weight: 1 };
+    });
+  } else if (entries && typeof entries === 'object') {
+    list = Object.keys(entries).map(function (k) { return { value: k, weight: Math.max(0, +entries[k] || 0) }; });
+  }
+  var total = list.reduce(function (a, e) { return a + e.weight; }, 0);
+  if (total <= 0) return undefined;
+  var r = rand() * total;
+  for (var i = 0; i < list.length; i++) {
+    r -= list[i].weight;
+    if (r < 0) return list[i].value;
+  }
+  return list[list.length - 1].value;
+}
+
+function pick(arr, opts) {
+  if (!arr || !arr.length) return undefined;
+  var rand = randFor(opts);
+  return arr[Math.floor(rand() * arr.length)];
+}
+
+// Fisher-Yates shuffle (returns a new array).
+function shuffle(arr, opts) {
+  var rand = randFor(opts);
+  var a = arr.slice();
+  for (var i = a.length - 1; i > 0; i--) {
+    var j = Math.floor(rand() * (i + 1));
+    var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+  }
+  return a;
+}
+
+// Sample k distinct items (draw without replacement, single shot).
+function sample(arr, k, opts) {
+  return shuffle(arr, opts).slice(0, k);
+}
+
+// A deck: draws without replacement until empty, then optionally reshuffles.
+// deck(items, { seed, reshuffle }) -> { draw, drawN, remaining, reset, size }
+function deck(items, opts) {
+  opts = opts || {};
+  var rand = randFor(opts);
+  var source = (items || []).slice();
+  var pile = shuffle(source, { rand: rand });
+
+  function draw() {
+    if (!pile.length) {
+      if (opts.reshuffle) pile = shuffle(source, { rand: rand });
+      else return undefined;
+    }
+    return pile.shift();
+  }
+  function drawN(n) {
+    var out = [];
+    for (var i = 0; i < n; i++) {
+      var c = draw();
+      if (c === undefined) break;
+      out.push(c);
+    }
+    return out;
+  }
+  return {
+    draw: draw,
+    drawN: drawN,
+    remaining: function () { return pile.length; },
+    reset: function () { pile = shuffle(source, { rand: rand }); },
+    size: function () { return source.length; }
+  };
+}
+
+window.weld.dice = {
+  roll: roll,
+  rollTotal: rollTotal,
+  between: between,
+  weighted: weighted,
+  pick: pick,
+  shuffle: shuffle,
+  sample: sample,
+  deck: deck,
+  rng: makeRng,
+  version: '1.0.0'
+};
+
+return window.weld.dice;
+})();
+</script>
+<script>
+(function(){
+  function $(id){return document.getElementById(id);}
+  function boot(){ if(!window.weld||!window.weld.dice){return setTimeout(boot,100);} init(); }
+  function init(){
+    var dice=window.weld.dice, deck=null;
+    function chips(rolls,kept){ var k=(kept||[]).slice(); return rolls.map(function(v){ var i=k.indexOf(v),c='chip'; if(i>=0){c+=' k';k.splice(i,1);}else c+=' d'; return '<span class="'+c+'">'+v+'</span>'; }).join(''); }
+    function roll(){ var r=dice.roll($('dn').value); $('dout').innerHTML='<b style="font-size:18px;color:#7ee787">'+r.total+'</b> &nbsp; '+chips(r.rolls,r.kept)+'<div style="color:var(--muted);font-size:11px;margin-top:6px">'+r.notation+' &middot; green = kept</div>'; }
+    $('droll').onclick=roll;
+    [].forEach.call(document.querySelectorAll('.qd'),function(b){ b.onclick=function(){ $('dn').value=b.getAttribute('data-n'); roll(); }; });
+    $('ddraw').onclick=function(){ var counts={common:0,rare:0,legendary:0},i,k; for(i=0;i<50;i++){ k=dice.weighted({common:70,rare:25,legendary:5}); counts[k]++; }
+      var max=Math.max(counts.common,counts.rare,counts.legendary),html=''; ['common','rare','legendary'].forEach(function(key){ var n=counts[key],w=Math.round(n/max*100); html+='<div class="row" style="margin:5px 0"><span class="lbl" style="min-width:80px">'+key+'</span><div class="grow" style="background:var(--faint);border-radius:3px"><div class="bar" style="width:'+w+'%"></div></div><span class="mono" style="width:30px;text-align:right">'+n+'</span></div>'; }); $('dtable').innerHTML=html; };
+    function newDeck(){ var ranks=['A','2','3','4','5','6','7','8','9','10','J','Q','K'],suits=['\u2660','\u2665','\u2666','\u2663'],d=[]; suits.forEach(function(su){ ranks.forEach(function(r){ d.push(r+su); }); }); deck=dice.deck(d); $('ddrawn').innerHTML=''; $('dremain').textContent=deck.remaining()+' left'; }
+    $('ddeck').onclick=function(){ if(!deck||deck.remaining()===0) newDeck(); var c=deck.draw(); var red=(c.indexOf('\u2665')>=0||c.indexOf('\u2666')>=0); $('ddrawn').innerHTML+='<span class="chip" style="'+(red?'color:#ff7b72':'')+'">'+c+'</span>'; $('dremain').textContent=deck.remaining()+' left'; };
+    $('dreset').onclick=newDeck;
+    $('drng').onclick=function(){ var rng=dice.rng($('dseed').value),out=[],i; for(i=0;i<6;i++) out.push(rng.int(1,100)); $('drngout').textContent=out.join('  '); };
+    newDeck();
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+})();
+</script>

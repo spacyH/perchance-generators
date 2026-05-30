@@ -1,0 +1,157 @@
+$meta
+  title       = weld.regen
+  description = Regenerate and swipe between alternate replies. The bridge between weld.stream and weld.branching: re-runs a generation, stores each take as a sibling node, and lets you swipe through variants or edit-and-resend. Soft deps on weld.stream and weld.branching.
+  tags        = weld, regen, swipe, variants, branching, ai, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.regen) {
+    window.weld.regen.attach({ stream: window.weld.stream, branching: window.weld.branching });
+    return window.weld.regen;
+  }
+
+  // -----------------------------------------------------------------
+  // weld.regen: the "swipe" feature every chat app wants, built as the
+  // connective tissue between two plugins that already exist.
+  //
+  //   weld.branching  gives you the conversation tree (nodes, siblings).
+  //   weld.stream     runs the model.
+  //
+  // weld.regen ties them together: re-running the current assistant reply
+  // appends the new take as a SIBLING of the old one (a branch from the
+  // same parent), so you keep every alternative and can swipe between
+  // them -- exactly the character.ai style swipe deck.
+  //
+  // You supply how to build the instruction (a build() callback or a
+  // literal instruction); weld.regen owns the tree bookkeeping.
+  // -----------------------------------------------------------------
+
+  var deps = { stream: null, branching: null };
+  function attach(d) {
+    if (d && d.stream) deps.stream = d.stream;
+    if (d && d.branching) deps.branching = d.branching;
+  }
+  function stream() { return deps.stream || (window.weld && window.weld.stream) || null; }
+  function branching() { return deps.branching || (window.weld && window.weld.branching) || null; }
+
+  function resolveInstruction(opts) {
+    if (typeof opts.build === 'function') return Promise.resolve(opts.build());
+    if (opts.instruction != null) return Promise.resolve(opts.instruction);
+    return Promise.resolve(null);
+  }
+
+  // Run one generation through weld.stream, forwarding stream callbacks.
+  function generate(instruction, opts) {
+    var s = stream();
+    if (!s) return Promise.resolve({ text: '', error: 'weld.regen: weld.stream is not loaded' });
+    var runOpts = { instruction: instruction };
+    ['startWith', 'hideStartWith', 'stopSequences', 'chat', 'onChunk', 'onToken'].forEach(function (k) {
+      if (opts[k] != null) runOpts[k] = opts[k];
+    });
+    return s.run(runOpts);
+  }
+
+  // -----------------------------------------------------------------
+  // regenerate(opts) -> Promise<{ node, result, error }>
+  //
+  // opts:
+  //   tree         (required) a weld.branching tree
+  //   nodeId       the assistant node to make a sibling of
+  //                (default: the active leaf, tree.getActiveId())
+  //   build()/instruction   how to produce the prompt (see above)
+  //   data(result) optional: map a stream result -> node data
+  //                (default: { role:'assistant', content: result.text, meta })
+  //   setActive    (bool) switch the tree to the new node (default true)
+  //   ...plus any weld.stream run options (onChunk, chat, startWith, ...)
+  // -----------------------------------------------------------------
+  function regenerate(opts) {
+    opts = opts || {};
+    var tree = opts.tree;
+    if (!tree || typeof tree.append !== 'function') {
+      return Promise.resolve({ node: null, result: null, error: 'weld.regen: opts.tree must be a weld.branching tree' });
+    }
+    var targetId = opts.nodeId || tree.getActiveId();
+
+    return resolveInstruction(opts).then(function (instruction) {
+      if (instruction == null || String(instruction).trim() === '') {
+        return { node: null, result: null, error: 'weld.regen: no instruction (pass build() or instruction)' };
+      }
+      return generate(instruction, opts).then(function (result) {
+        if (result.error) return { node: null, result: result, error: result.error };
+
+        var data = (typeof opts.data === 'function')
+          ? opts.data(result)
+          : { role: 'assistant', content: result.text, meta: { stopReason: result.stopReason, truncated: result.truncated, regenerated: true } };
+
+        var node;
+        var existing = targetId ? tree.get(targetId) : null;
+        if (existing && existing.parentId) {
+          // Sibling: branch from the same parent as the target node.
+          node = tree.branch(targetId, data);
+        } else if (existing) {
+          // Target is a root: add another root-level sibling via append(null parent).
+          node = tree.append(data, null);
+        } else {
+          // No target yet: just append at the active position.
+          node = tree.append(data);
+        }
+        if (opts.setActive !== false && node && node.id) tree.setActive(node.id);
+        return { node: node, result: result, error: null };
+      });
+    });
+  }
+
+  // Swipe among the siblings of a node. dir: +1 / -1 (default +1).
+  // Returns the node now active, or null.
+  function swipe(tree, nodeId, dir) {
+    if (!tree) return null;
+    var id = nodeId || tree.getActiveId();
+    if (!id) return null;
+    if (typeof tree.switchSibling === 'function') {
+      var moved = tree.switchSibling(id, (dir == null ? 1 : dir));
+      if (moved && moved.id && tree.setActive) tree.setActive(moved.id);
+      return moved || null;
+    }
+    return null;
+  }
+
+  // The list of sibling takes for a node, with a 1-based position.
+  // Returns { index, count, items:[{ id, data, active }] }.
+  function variants(tree, nodeId) {
+    var empty = { index: 0, count: 0, items: [] };
+    if (!tree || typeof tree.siblings !== 'function') return empty;
+    var id = nodeId || tree.getActiveId();
+    if (!id) return empty;
+    var sibs = tree.siblings(id) || [];
+    var activeId = tree.getActiveId ? tree.getActiveId() : id;
+    var items = sibs.map(function (n) {
+      return { id: n.id, data: n.data, active: n.id === activeId };
+    });
+    var index = 0;
+    for (var i = 0; i < items.length; i++) if (items[i].active) { index = i + 1; break; }
+    return { index: index, count: items.length, items: items };
+  }
+
+  // Edit a node's text in place (e.g. the user fixes the reply).
+  function edit(tree, nodeId, newContent) {
+    if (!tree) return null;
+    var n = tree.get(nodeId);
+    if (!n) return null;
+    if (n.data && typeof n.data === 'object') n.data.content = newContent;
+    else n.data = { content: newContent };
+    return n;
+  }
+
+  window.weld.regen = {
+    attach: attach,
+    regenerate: regenerate,
+    swipe: swipe,
+    variants: variants,
+    edit: edit,
+    version: '1.0.0'
+  };
+
+  window.weld.regen.attach({ stream: window.weld.stream, branching: window.weld.branching });
+  return window.weld.regen;

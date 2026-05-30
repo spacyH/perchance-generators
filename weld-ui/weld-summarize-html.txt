@@ -1,0 +1,407 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.summarize<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-summarize-example">demo &rarr;</a></span></div>
+<div class="hdr">
+  <div class="hdr-row">
+      <h1>weld.summarize</h1>
+      <span class="ver">v1.0.0</span>
+  </div>
+  <p class="lead">Keep a long conversation inside the token budget without amnesia. Where weld.prompt can only drop old turns, weld.summarize condenses them &mdash; keeping recent turns verbatim and folding the rest into a rolling, hierarchical summary.</p>
+</div>
+<h2>Install</h2>
+<p>Import the plugin once anywhere in your generator. It stashes its API on <code>window.weld.summarize</code>. It calls <code>weld.stream</code> to write summaries and <code>weld.tokens</code> to measure the budget; both are soft dependencies, so import them too for the full experience.</p>
+<pre data-codeid="install"></pre>
+
+<h2>Quick start</h2>
+<p>The common case is a <strong>rolling</strong> summarizer: feed it every message, keep the most recent turns verbatim, and let it fold older turns into a running summary as the budget fills. Build your prompt from <code>context()</code>.</p>
+<pre data-codeid="quick"></pre>
+
+<h2>summarize(input, opts)</h2>
+<div class="sig" data-codeid="sig_summarize"></div>
+<p>One-shot synopsis of a string or an array of messages. Returns a promise for <code>{ ok, summary, error }</code>. Messages may be plain strings or objects with <code>role</code>/<code>name</code> and <code>content</code>/<code>text</code>.</p>
+<pre data-codeid="oneshot_ex"></pre>
+<h4>opts</h4>
+<table>
+<tr><th>field</th><th>meaning</th></tr>
+<tr><td><code>prompt</code></td><td>override the summarization instruction</td></tr>
+<tr><td><code>maxWords</code></td><td>soft cap on the summary length</td></tr>
+<tr><td><code>priorSummary</code></td><td>an existing summary to fold the new excerpt into</td></tr>
+</table>
+
+<h2>rolling(opts)</h2>
+<div class="sig" data-codeid="sig_rolling"></div>
+<p>Returns a stateful summarizer. Add messages as they happen; when the verbatim tail exceeds the token budget, the oldest turns are compressed into the running summary and dropped from the tail.</p>
+<h4>opts</h4>
+<table>
+<tr><th>field</th><th>default</th><th>meaning</th></tr>
+<tr><td><code>keepRecent</code></td><td>8</td><td>messages kept verbatim</td></tr>
+<tr><td><code>tokenBudget</code></td><td>stream.budget() or 5000</td><td>compress when the tail exceeds this</td></tr>
+<tr><td><code>summaryMaxWords</code></td><td>200</td><td>cap on the running summary</td></tr>
+<tr><td><code>prompt</code></td><td>built-in</td><td>override the instruction</td></tr>
+</table>
+<h4>methods</h4>
+<pre data-codeid="rolling_methods"></pre>
+<div class="note">Compression is asynchronous. <code>add()</code> returns a promise that resolves once any triggered compression finishes, so you can <code>await</code> it before building the next prompt if you need the freshest context.</div>
+
+<h2>How hierarchical compression works</h2>
+<p>When the tail overflows, the older slice is summarized. If a running summary already exists, the new slice is folded <em>into</em> it &mdash; a summary of the previous summary plus the newly dropped turns. Over a long conversation this keeps one bounded synopsis instead of an ever-growing transcript, so the bot remembers the shape of the whole chat while only the recent turns stay word-for-word.</p>
+<pre data-codeid="context_ex"></pre>
+
+<h2>Persisting and restoring</h2>
+<p><code>state()</code> returns a plain snapshot &mdash; the summary, the verbatim tail, and a generation counter. Save it with <code>weld.persist</code> or <code>weld.history</code>, and restore with <code>load()</code>.</p>
+<pre data-codeid="persist_ex"></pre>
+
+<h2>Helpers</h2>
+<div class="sig" data-codeid="sig_estimate"></div>
+<div class="sig" data-codeid="sig_join"></div>
+<p><code>estimateTokens</code> uses <code>weld.tokens</code> when it is loaded, falls back to <code>weld.stream.count</code>, and finally to a chars/4 estimate. <code>joinMessages</code> renders a message array into the <code>Name: text</code> wire form.</p>
+<script>
+(function(){
+  var examples = {
+  'install': 'output\n  weld-summarize = \{import:weld-summarize-plugin\}\n  weld-stream    = \{import:weld-stream-plugin\}\n  weld-tokens    = \{import:weld-tokens-plugin\}\n  aiTextPlugin   = \{import:ai-text-plugin\}',
+  'quick': 'var convo = weld.summarize.rolling(\{ keepRecent: 6 \});\n\n// each turn:\nawait convo.add(\{ role: \'user\', content: userText \});\nawait convo.add(\{ role: \'assistant\', content: replyText \});\n\n// build the next prompt from the compressed context:\nvar prompt = systemPrompt + \'\\n\\n\' + convo.context() + \'\\n\\nAssistant:\';',
+  'sig_summarize': 'weld.summarize.summarize(input, opts) -> Promise<\{ ok, summary, error \}>',
+  'oneshot_ex': 'var r = await weld.summarize.summarize(messages, \{ maxWords: 120 \});\nif (r.ok) console.log(r.summary);',
+  'sig_rolling': 'weld.summarize.rolling(opts) -> summarizer',
+  'rolling_methods': 'convo.add(message)        // append; may trigger async compression\nconvo.addMany(messages)\nawait convo.compressNow() // force a compression pass\nconvo.context(opts)       // \'Summary of earlier events: ...\\n\\nName: msg...\'\nconvo.state()             // \{ summary, recent, generation \}\nconvo.summary()           // the running summary string\nconvo.recent()            // the verbatim-kept messages\nconvo.onChange(fn)        // subscribe; returns an unsubscribe fn\nconvo.reset()',
+  'context_ex': '// after many turns, context() stays bounded:\n// Summary of earlier events: The user introduced themselves as Mara,\n// a teacher planning a trip to Kyoto, and asked about temples...\n//\n// User: what about food?\n// Assistant: ...',
+  'persist_ex': 'var snap = convo.state();\nawait weld.persist.open(\'chat\').collection(\'sessions\').put(\{ id: \'main\', snap: snap \});\n\n// later:\nvar row = await weld.persist.open(\'chat\').collection(\'sessions\').get(\'main\');\nconvo.load(row.snap);',
+  'sig_estimate': 'weld.summarize.estimateTokens(text) -> number',
+  'sig_join': 'weld.summarize.joinMessages(messages) -> string'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    document.querySelectorAll('[data-codeid]').forEach(function(n){
+      var src = examples[n.getAttribute('data-codeid')];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.summarize) return window.weld.summarize;
+
+// -----------------------------------------------------------------
+// weld.summarize: keep a long chat inside the context window without
+// amnesia. weld.prompt can only DROP old turns when the budget is
+// blown; this CONDENSES them instead.
+//
+//   - rolling():   a stateful summarizer. Feed it messages; it keeps
+//                  the most recent N verbatim and rolls everything
+//                  older into a running summary, re-summarizing
+//                  (summary-of-summary) when the summary itself grows.
+//   - summarize(): a one-shot. Hand it text or messages, get a synopsis.
+//
+// Summaries are generated through weld.stream; token counting uses
+// weld.tokens when present, else a chars/4 estimate. Both are soft
+// dependencies -- without weld.stream, summarize() reports an error
+// rather than throwing.
+// -----------------------------------------------------------------
+
+function getStream() { return (window.weld && window.weld.stream) ? window.weld.stream : null; }
+function getTokens() { return (window.weld && window.weld.tokens) ? window.weld.tokens : null; }
+
+function estimateTokens(text) {
+  var t = getTokens();
+  if (t && t.isLoaded && t.isLoaded() && t.countSync) {
+    var n = t.countSync(String(text || ''));
+    if (n != null) return n;
+  }
+  var stream = getStream();
+  if (stream && stream.count) {
+    var sc = stream.count(String(text || ''));
+    if (sc != null) return sc;
+  }
+  return Math.ceil(String(text || '').length / 4);
+}
+
+// Normalize a message into "Name: text" wire form for summarizing.
+function lineOf(msg) {
+  if (msg == null) return '';
+  if (typeof msg === 'string') return msg;
+  var who = msg.name || msg.role || msg.author || '';
+  var body = msg.content != null ? msg.content : (msg.text != null ? msg.text : '');
+  return who ? (who + ': ' + body) : String(body);
+}
+
+function joinMessages(messages) {
+  if (!Array.isArray(messages)) return String(messages == null ? '' : messages);
+  return messages.map(lineOf).filter(function (l) { return l && l.trim(); }).join('\n');
+}
+
+var DEFAULT_PROMPT =
+  'Summarize the conversation excerpt below. Capture the durable facts, '
+  + 'decisions, character details, and unresolved threads that matter for '
+  + 'continuing the conversation. Write a tight third-person synopsis in past '
+  + 'tense. Do not invent anything. Output only the summary.';
+
+// Generate a synopsis of some text via weld.stream.
+// Returns Promise<{ ok, summary, error }>.
+function runSummary(text, opts) {
+  opts = opts || {};
+  var stream = getStream();
+  if (!stream) {
+    return Promise.resolve({ ok: false, summary: '', error: 'weld.summarize: weld.stream is not loaded' });
+  }
+  var body = String(text || '').trim();
+  if (!body) return Promise.resolve({ ok: true, summary: '', error: null });
+
+  var instruction = (opts.prompt || DEFAULT_PROMPT);
+  if (opts.priorSummary) {
+    instruction += '\n\nA summary of earlier events already exists; fold the new '
+      + 'excerpt into it and return one consolidated summary.\n\nExisting summary:\n'
+      + opts.priorSummary;
+  }
+  if (opts.maxWords) {
+    instruction += '\n\nKeep the summary under about ' + opts.maxWords + ' words.';
+  }
+  instruction += '\n\nExcerpt:\n' + body;
+
+  return stream.run({ instruction: instruction }).then(function (res) {
+    if (res.error) return { ok: false, summary: '', error: res.error };
+    return { ok: true, summary: String(res.text || '').trim(), error: null };
+  });
+}
+
+// One-shot: summarize text or an array of messages.
+function summarize(input, opts) {
+  var text = Array.isArray(input) ? joinMessages(input) : String(input == null ? '' : input);
+  return runSummary(text, opts);
+}
+
+// -----------------------------------------------------------------
+// rolling(opts) -> a stateful summarizer.
+//
+// opts:
+//   keepRecent   (number)  messages kept verbatim (default 8)
+//   tokenBudget  (number)  compress when kept text exceeds this
+//                          (default: weld.stream.budget() or 5000)
+//   summaryMaxWords (number) cap on the running summary (default 200)
+//   prompt       (string)  override the summarization instruction
+//
+// methods:
+//   add(message)       append; may trigger async compression
+//   addMany(messages)
+//   compressNow()      -> Promise; force a compression pass
+//   state()            -> { summary, recent, generation }
+//   context()          -> "Summary of earlier events: ...\n\nName: msg..."
+//   summary()          -> the running summary string
+//   recent()           -> the verbatim-kept messages
+//   reset()
+//   onChange(fn)       subscribe to state changes; returns unsubscribe
+// -----------------------------------------------------------------
+function rolling(opts) {
+  opts = opts || {};
+  var keepRecent = opts.keepRecent || 8;
+  var summaryMaxWords = opts.summaryMaxWords || 200;
+  var budget = opts.tokenBudget;
+  if (budget == null) {
+    var stream = getStream();
+    budget = (stream && stream.budget && stream.budget()) || 5000;
+  }
+
+  var recent = [];      // verbatim-kept messages
+  var summary = '';     // running synopsis of everything older
+  var generation = 0;   // how many compression passes have run
+  var compressing = false;
+  var listeners = [];
+
+  function emit() {
+    var snap = state();
+    listeners.forEach(function (fn) { try { fn(snap); } catch (e) {} });
+  }
+
+  function overBudget() {
+    return estimateTokens(joinMessages(recent)) > budget;
+  }
+
+  function compressNow() {
+    if (compressing) return Promise.resolve(state());
+    // Compress everything except the last keepRecent messages.
+    if (recent.length <= keepRecent) return Promise.resolve(state());
+    compressing = true;
+    var cut = recent.length - keepRecent;
+    var older = recent.slice(0, cut);
+    var keptTail = recent.slice(cut);
+    return runSummary(joinMessages(older), {
+      priorSummary: summary || null,
+      maxWords: summaryMaxWords,
+      prompt: opts.prompt
+    }).then(function (r) {
+      compressing = false;
+      if (r.ok && r.summary) {
+        summary = r.summary;
+        recent = keptTail;
+        generation += 1;
+        emit();
+      }
+      return state();
+    }, function () { compressing = false; return state(); });
+  }
+
+  function maybeCompress() {
+    if (recent.length > keepRecent && overBudget()) return compressNow();
+    return Promise.resolve(state());
+  }
+
+  function add(message) {
+    recent.push(message);
+    emit();
+    return maybeCompress();
+  }
+
+  function addMany(messages) {
+    if (Array.isArray(messages)) recent = recent.concat(messages);
+    emit();
+    return maybeCompress();
+  }
+
+  function context(opts2) {
+    opts2 = opts2 || {};
+    var out = [];
+    if (summary) out.push((opts2.label || 'Summary of earlier events') + ': ' + summary);
+    var tail = joinMessages(recent);
+    if (tail) out.push(tail);
+    return out.join('\n\n');
+  }
+
+  function state() {
+    return { summary: summary, recent: recent.slice(), generation: generation };
+  }
+
+  function reset() { recent = []; summary = ''; generation = 0; emit(); }
+
+  function onChange(fn) {
+    listeners.push(fn);
+    return function () {
+      var i = listeners.indexOf(fn);
+      if (i !== -1) listeners.splice(i, 1);
+    };
+  }
+
+  // Restore from a saved state() snapshot.
+  function load(snap) {
+    if (!snap) return;
+    summary = snap.summary || '';
+    recent = Array.isArray(snap.recent) ? snap.recent.slice() : [];
+    generation = snap.generation || 0;
+    emit();
+  }
+
+  return {
+    add: add,
+    addMany: addMany,
+    compressNow: compressNow,
+    context: context,
+    state: state,
+    load: load,
+    summary: function () { return summary; },
+    recent: function () { return recent.slice(); },
+    reset: reset,
+    onChange: onChange
+  };
+}
+
+window.weld.summarize = {
+  summarize: summarize,
+  rolling: rolling,
+  estimateTokens: estimateTokens,
+  joinMessages: joinMessages,
+  version: '1.0.0'
+};
+
+return window.weld.summarize;
+})();
+</script>
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>
+</div>
