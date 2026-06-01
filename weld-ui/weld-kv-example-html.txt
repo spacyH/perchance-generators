@@ -1,0 +1,231 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--amber:#d29922;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:780px;margin:0 auto;padding:34px 18px 90px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 0 16px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+.breadcrumb a{color:var(--muted);}.breadcrumb .sep{color:var(--faint);margin:0 8px;}.breadcrumb .cur{color:var(--ink);}.breadcrumb .act a{color:var(--accent);}
+.hdr{margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}.hdr h1{font:700 24px var(--mono);letter-spacing:-0.5px;}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;}
+.hdr .lead{color:var(--muted);margin-top:8px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;}
+.panel h2{font:600 13px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:8px 0;}
+.lbl{font:600 12px var(--mono);color:var(--muted);min-width:74px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 15px;font:600 13px var(--font);cursor:pointer;transition:.12s;}
+.btn:hover{filter:brightness(1.08);}.btn.ghost{background:var(--faint);color:var(--ink);}.btn.sm{padding:6px 11px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+input[type=text],textarea{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:8px 10px;font:13px var(--font);}
+input[type=text]{flex:1;min-width:120px;}textarea{width:100%;font:12.5px/1.5 var(--mono);resize:vertical;}
+.mono{font:13px var(--mono);}
+.out{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font:12.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;min-height:20px;color:#c9d1d9;}
+.chip{display:inline-block;background:var(--faint);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font:600 12px var(--mono);margin:2px;}
+.chip.k{background:rgba(63,185,80,.14);border-color:rgba(63,185,80,.4);color:#7ee787;}
+.chip.d{opacity:.4;text-decoration:line-through;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:9px 13px;border-radius:0 4px 4px 0;margin:12px 0 0;font-size:12.5px;color:#c9d1d9;}
+.note.warn{background:rgba(210,153,34,.08);border-color:var(--amber);}
+.tag{font:600 10px var(--mono);padding:2px 7px;border-radius:4px;background:rgba(63,185,80,.14);color:#7ee787;border:1px solid rgba(63,185,80,.4);}
+.tag.ai{background:rgba(210,153,34,.12);color:#e3b341;border-color:rgba(210,153,34,.4);}
+.bar{height:14px;background:var(--accent);border-radius:3px;transition:width .3s;}
+.footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);}.footer a{color:var(--muted);}
+.flex{display:flex;gap:10px;align-items:center;}.wrap{flex-wrap:wrap;}.grow{flex:1;}.mt{margin-top:10px;}
+</style>
+<div id="page">
+<div class="breadcrumb"><span><a href="https://perchance.org/weld-ui-index">weld</a><span class="sep">/</span>weld.kv<span class="sep">/</span><span class="cur">demo</span></span><span class="act"><a href="https://perchance.org/weld-kv-plugin">docs &rarr;</a></span></div>
+<div class="hdr"><div class="hdr-row"><h1>weld.kv &mdash; demo</h1><span class="ver">v1.0.0</span></div><p class="lead">Store and read JSON values in named folders, the way save-data should work: cross-device on Perchance. Runs against an in-memory mock here so you can try the API.</p></div>
+  <div class="panel"><h2>Save slots <span class="tag">cross-device on Perchance</span></h2>
+    <div class="row"><span class="lbl">folder</span>
+      <button class="btn sm fbtn" data-f="save-data">save-data</button>
+      <button class="btn ghost sm fbtn" data-f="settings">settings</button></div>
+    <div class="row"><span class="lbl">key</span><input id="key" type="text" value="slot1"></div>
+    <div class="row"><span class="lbl">value (JSON)</span><input id="val" type="text" value='{ "level": 4, "gold": 120 }'></div>
+    <div class="row"><button id="set" class="btn">Set</button><button id="get" class="btn ghost">Get</button><button id="del" class="btn ghost">Delete</button><button id="keys" class="btn ghost">Keys</button></div>
+    <div id="out" class="out mt"></div>
+    <div class="note">This demo uses an <b>in-memory mock</b> of kv-plugin so it runs anywhere. On Perchance, the same calls hit the real server KV and the data follows the user to other devices &mdash; unlike <code>localStorage</code>/<code>weld.persist</code>, which stay on one browser. Switch folders to see isolated namespaces.</div>
+  </div>
+<footer class="footer"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
+</div>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.kv) return window.weld.kv;
+
+// -----------------------------------------------------------------
+// weld.kv: the storage layer people reach for and get wrong.
+//
+// Browser storage (localStorage, IndexedDB, the Cache API -- what
+// weld.persist wraps) is LOCAL to one browser on one device. It does not
+// follow a user to their phone. For cross-device persistence Perchance
+// exposes kv-plugin: server-side key-value reachable as root.kv. weld.kv
+// wraps it with the ergonomics browser storage has and kv lacks:
+//
+//   var store = weld.kv.folder('save-data');   // a named namespace
+//   await store.set('slot1', { level: 4, gold: 120 });   // JSON, server-side
+//   var save = await store.get('slot1', {});             // get-with-default
+//   await store.has('slot1');  await store.keys();  await store.delete('slot1');
+//
+// Everything is async (it hits the server). Values are JSON-serialized
+// automatically, so you store objects, not just strings. With a local
+// mirror enabled, the last-seen value is cached in memory/IndexedDB so a
+// read can return instantly (or survive a flaky connection) and reconcile.
+// -----------------------------------------------------------------
+
+var deps = { kv: null, persist: null };
+function getKv() {
+  if (deps.kv) return deps.kv;
+  try { if (typeof root !== 'undefined' && root.kv) return root.kv; } catch (e) {}
+  if (window.weld && window.weld.__kv) return window.weld.__kv;
+  return null;
+}
+function attach(d) {
+  if (!d) return;
+  if (d.kv) deps.kv = d.kv;
+  if (d.persist) deps.persist = d.persist;
+}
+function available() { return !!getKv(); }
+
+// Resolve a folder handle from kv-plugin. kv-plugin exposes a default
+// `folder`, and (depending on version) a way to open a named folder.
+function rawFolder(name) {
+  var kv = getKv();
+  if (!kv) return null;
+  if (name) {
+    if (typeof kv.folder === 'function') { try { return kv.folder(name); } catch (e) {} }
+    if (kv.folders && typeof kv.folders === 'function') { try { return kv.folders(name); } catch (e) {} }
+  }
+  // default folder (object or function form)
+  if (kv.folder && typeof kv.folder === 'object') return kv.folder;
+  if (typeof kv.folder === 'function') { try { return kv.folder(name || 'default'); } catch (e) {} }
+  return kv;
+}
+
+function encode(v) { return JSON.stringify({ v: v }); }
+function decode(s) {
+  if (s == null) return undefined;
+  if (typeof s !== 'string') { return s; } // already an object (some kv versions)
+  try { var o = JSON.parse(s); return (o && 'v' in o) ? o.v : o; } catch (e) { return s; }
+}
+
+// optional local mirror via weld.persist (or an in-memory map)
+function mirrorCol(folderName) {
+  var p = deps.persist || (window.weld && window.weld.persist) || null;
+  if (!p) return null;
+  try { return p.open('weld-kv').collection('mirror-' + folderName); } catch (e) { return null; }
+}
+var memMirror = {};
+
+function folder(name, opts) {
+  name = String(name || 'default');
+  opts = opts || {};
+  var useMirror = opts.mirror !== false;
+  var memKeyPrefix = name + '::';
+
+  function mset(key, value) {
+    if (!useMirror) return;
+    memMirror[memKeyPrefix + key] = value;
+    var col = mirrorCol(name);
+    if (col) { try { col.put({ id: key, value: value }); } catch (e) {} }
+  }
+  function mget(key) {
+    if (!useMirror) return undefined;
+    var k = memKeyPrefix + key;
+    if (k in memMirror) return memMirror[k];
+    return undefined;
+  }
+
+  function set(key, value) {
+    var f = rawFolder(name);
+    if (!f || typeof f.set !== 'function') return Promise.reject(new Error('weld.kv: kv-plugin not available (root.kv missing). This needs the server KV plugin imported.'));
+    mset(key, value);
+    return Promise.resolve(f.set(String(key), encode(value))).then(function () { return value; });
+  }
+
+  function get(key, dflt) {
+    var f = rawFolder(name);
+    if (!f || typeof f.get !== 'function') {
+      var m = mget(key);
+      return Promise.resolve(m !== undefined ? m : dflt);
+    }
+    return Promise.resolve(f.get(String(key))).then(function (raw) {
+      var val = decode(raw);
+      if (val === undefined) return dflt;
+      mset(key, val);
+      return val;
+    }, function () {
+      var m = mget(key);
+      return (m !== undefined) ? m : dflt; // offline / error -> mirror
+    });
+  }
+
+  function has(key) { return get(key, undefined).then(function (v) { return v !== undefined; }); }
+
+  function del(key) {
+    var f = rawFolder(name);
+    delete memMirror[memKeyPrefix + key];
+    var col = mirrorCol(name); if (col) { try { col.delete(key); } catch (e) {} }
+    if (!f || typeof f.delete !== 'function') return Promise.resolve(false);
+    return Promise.resolve(f.delete(String(key))).then(function () { return true; }, function () { return false; });
+  }
+
+  function keys() {
+    var f = rawFolder(name);
+    if (f && typeof f.keys === 'function') {
+      return Promise.resolve(f.keys()).then(function (ks) { return Array.isArray(ks) ? ks : []; }, function () { return mirrorKeys(); });
+    }
+    if (f && typeof f.getAll === 'function') {
+      return Promise.resolve(f.getAll()).then(function (all) { return all && typeof all === 'object' ? Object.keys(all) : []; }, function () { return mirrorKeys(); });
+    }
+    return Promise.resolve(mirrorKeys());
+  }
+  function mirrorKeys() {
+    return Object.keys(memMirror).filter(function (k) { return k.indexOf(memKeyPrefix) === 0; })
+      .map(function (k) { return k.slice(memKeyPrefix.length); });
+  }
+
+  function getMany(keyList) {
+    return Promise.all((keyList || []).map(function (k) { return get(k).then(function (v) { return { key: k, value: v }; }); }))
+      .then(function (rows) { var o = {}; rows.forEach(function (r) { o[r.key] = r.value; }); return o; });
+  }
+
+  return { set: set, get: get, has: has, delete: del, keys: keys, getMany: getMany, name: name };
+}
+
+window.weld.kv = {
+  folder: folder,
+  attach: attach,
+  available: available,
+  version: '1.0.0'
+};
+
+return window.weld.kv;
+})();
+</script>
+<script>
+
+  function boot(){ if(!window.weld||!window.weld.kv){return setTimeout(boot,100);} init(); }
+  function init(){
+    var KV=window.weld.kv, $=function(id){return document.getElementById(id);};
+    // in-memory mock of kv-plugin (root.kv)
+    var server={};
+    KV.attach({ kv:{ folder:function(name){ server[name]=server[name]||{}; var s=server[name];
+      return { set:function(k,v){ s[k]=v; return Promise.resolve(); }, get:function(k){ return Promise.resolve(s[k]); },
+               delete:function(k){ delete s[k]; return Promise.resolve(); }, keys:function(){ return Promise.resolve(Object.keys(s)); } }; } } });
+    var fname='save-data';
+    [].forEach.call(document.querySelectorAll('.fbtn'),function(b){ b.onclick=function(){ fname=b.getAttribute('data-f');
+      [].forEach.call(document.querySelectorAll('.fbtn'),function(x){x.classList.toggle('ghost',x!==b);}); }; });
+    function store(){ return KV.folder(fname); }
+    function show(v){ $('out').textContent=(typeof v==='string')?v:JSON.stringify(v,null,2); }
+    $('set').onclick=function(){ var v; try{ v=JSON.parse($('val').value); }catch(e){ v=$('val').value; }
+      store().set($('key').value, v).then(function(){ show('set '+fname+'/'+$('key').value+' = '+JSON.stringify(v)); }); };
+    $('get').onclick=function(){ store().get($('key').value, '(not set)').then(show); };
+    $('del').onclick=function(){ store().delete($('key').value).then(function(ok){ show('deleted: '+ok); }); };
+    $('keys').onclick=function(){ store().keys().then(function(ks){ show(fname+' keys: '+JSON.stringify(ks)); }); };
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+
+</script>

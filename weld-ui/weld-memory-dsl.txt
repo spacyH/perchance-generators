@@ -27,7 +27,7 @@ $output() =>
   // and recall facts manually.
   // -----------------------------------------------------------------
 
-  var deps = { stream: null, persist: null };
+  var deps = { stream: null, persist: null, embed: null };
   var dbName = 'weld-memory';
   var collname = 'memories';
   var store = {};       // id -> fact, the in-memory mirror (always kept warm)
@@ -39,6 +39,7 @@ $output() =>
 
   function attach(d) {
     if (d && d.stream) deps.stream = d.stream;
+    if (d && d.embed) deps.embed = d.embed;
     if (d && d.persist && !col) {
       deps.persist = d.persist;
       try {
@@ -174,6 +175,46 @@ $output() =>
     return label + ':\n' + lines.join('\n');
   }
 
+  function getEmbed() { return deps.embed || (window.weld && window.weld.embed) || null; }
+  function useEmbedder(e) { if (e) deps.embed = e; }
+
+  // relevantSemantic(text, opts) -> Promise<fact[]> ranked by meaning via
+  // weld.embed when available; falls back to the keyword relevant().
+  function relevantSemantic(text, opts) {
+    opts = opts || {};
+    var limit = opts.limit || 6;
+    var minScore = opts.minScore != null ? opts.minScore : 0.25; // cosine scale
+    var embed = getEmbed();
+    var facts = all();
+    if (!embed || !facts.length || !String(text || '').trim()) {
+      return Promise.resolve(relevant(text, opts));
+    }
+    return embed.rank(text, facts, { key: 'text', topK: limit, minScore: minScore })
+      .then(function (ranked) {
+        // On the lexical fallback engine there is no synonymy, so a weak
+        // top score means embeddings add nothing here -- prefer the
+        // keyword path, which may catch a shared term the cosine missed.
+        var weak = !ranked || !ranked.length || (ranked[0].score < 0.15);
+        var lexical = embed.info && embed.info().backend === 'fallback';
+        if (weak || (lexical && ranked[0].score < 0.3)) {
+          var kw = relevant(text, opts);
+          if (kw.length) return kw;
+        }
+        if (!ranked || !ranked.length) return relevant(text, opts);
+        return ranked.map(function (r) { return r.item; });
+      }, function () { return relevant(text, opts); });
+  }
+
+  // injectAsync(text, opts) -> Promise<string>: semantic version of inject().
+  function injectAsync(text, opts) {
+    opts = opts || {};
+    return relevantSemantic(text, opts).then(function (facts) {
+      if (!facts.length) return '';
+      var label = opts.label || 'Known facts about the user and world';
+      return label + ':\n' + facts.map(function (f) { return '- ' + f.text; }).join('\n');
+    });
+  }
+
   var EXTRACT_PROMPT =
     'Read the conversation excerpt and extract durable, reusable facts worth '
     + 'remembering long-term: stable preferences, names, relationships, ongoing '
@@ -218,20 +259,82 @@ $output() =>
     });
   }
 
+  // rememberSmart(fact, opts) -> Promise<record>: like remember(), but
+  // before inserting it checks for a SEMANTICALLY near-duplicate via
+  // weld.embed and, if one is found above opts.mergeThreshold (default
+  // 0.92 cosine), reinforces that existing fact instead of adding a near
+  // copy. Falls back to exact-text dedup when no embedder is present.
+  function rememberSmart(fact, opts) {
+    opts = opts || {};
+    var rec = (typeof fact === 'string') ? { text: fact } : (fact || {});
+    var text = normalizeText(rec.text);
+    if (!text) return Promise.resolve(null);
+    var embed = getEmbed();
+    var facts = all();
+    if (!embed || !facts.length) return Promise.resolve(remember(rec));
+
+    var threshold = opts.mergeThreshold != null ? opts.mergeThreshold : 0.92;
+    return embed.rank(text, facts, { key: 'text', topK: 1, minScore: threshold })
+      .then(function (ranked) {
+        if (ranked && ranked.length) {
+          var dup = ranked[0].item;
+          dup.score = (dup.score || 1) + 1;
+          dup.updatedAt = Date.now();
+          persistPut(dup);
+          return dup;
+        }
+        return remember(rec);
+      }, function () { return remember(rec); });
+  }
+
+  // decay(opts): age out stale facts. Each fact's effective weight is
+  // score * 0.5^(ageDays / halfLife). prune() removes facts whose weight
+  // falls below opts.minWeight. Keeps memory from growing without bound.
+  // opts: { halfLifeDays (default 30), minWeight (default 0.25), now }
+  function effectiveWeight(fact, opts) {
+    opts = opts || {};
+    var halfLife = opts.halfLifeDays != null ? opts.halfLifeDays : 30;
+    var now = opts.now || Date.now();
+    var ageDays = (now - (fact.updatedAt || fact.createdAt || now)) / 86400000;
+    var decayFactor = Math.pow(0.5, ageDays / Math.max(0.0001, halfLife));
+    return (fact.score || 1) * decayFactor;
+  }
+
+  function prune(opts) {
+    opts = opts || {};
+    var minWeight = opts.minWeight != null ? opts.minWeight : 0.25;
+    var removed = [];
+    all().forEach(function (f) {
+      // pinned facts are never pruned
+      if (f.pinned) return;
+      if (effectiveWeight(f, opts) < minWeight) { removed.push(f.id); forget(f.id); }
+    });
+    return removed;
+  }
+
+  function pin(id, on) { if (store[id]) { store[id].pinned = on !== false; persistPut(store[id]); } return store[id] || null; }
+
   window.weld.memory = {
     attach: attach,
     load: load,
     remember: remember,
+    rememberSmart: rememberSmart,
     rememberMany: rememberMany,
+    decayWeight: effectiveWeight,
+    prune: prune,
+    pin: pin,
     forget: forget,
     clear: clear,
     all: all,
     relevant: relevant,
+    relevantSemantic: relevantSemantic,
     search: search,
     inject: inject,
+    injectAsync: injectAsync,
+    useEmbedder: useEmbedder,
     observe: observe,
     isReady: function () { return ready; },
-    version: '1.0.0'
+    version: '1.2.0'
   };
 
   window.weld.memory.attach({ stream: window.weld.stream, persist: window.weld.persist });

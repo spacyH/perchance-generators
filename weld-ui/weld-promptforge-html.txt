@@ -1,0 +1,364 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.promptforge<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-promptforge-example">demo &rarr;</a></span></div>
+<div class="hdr">
+  <div class="hdr-row">
+      <h1>weld.promptforge</h1>
+      <span class="ver">v1.0.0</span>
+  </div>
+  <p class="lead">Evolutionary image-prompt generation. Generate candidates, score them by how often their results get upvoted, and breed the winners back in &mdash; with faithful/balanced/creative modes and score-weighted promotion.</p>
+</div>
+<h2>Install</h2>
+<p>Import the plugin plus <code>weld.stream</code> (which it uses to generate) and the AI plugin. <code>weld.structured</code> is optional but recommended &mdash; when present, prompt candidates come back as clean JSON. Stashes its API on <code>window.weld.promptforge</code>.</p>
+<pre data-codeid="install"></pre>
+
+<h2>The loop</h2>
+<p>Create a forge, generate candidate prompts, render their images, and feed back which ones produced good results. Scores rise, and proven prompts get bred into &mdash; and sometimes promoted ahead of &mdash; future generations.</p>
+<pre data-codeid="loop"></pre>
+
+<h2>create(opts)</h2>
+<div class="sig" data-codeid="sig_create"></div>
+<table>
+<tr><th>opt</th><th>default</th><th>meaning</th></tr>
+<tr><td><code>instruction</code></td><td>''</td><td>the base request to build prompts from</td></tr>
+<tr><td><code>mode</code></td><td>'balanced'</td><td>faithful / balanced / creative &mdash; how far the model may roam</td></tr>
+<tr><td><code>mixAcross</code></td><td>false</td><td>let highly-rated prompts from earlier instructions carry over as taste signal</td></tr>
+<tr><td><code>promoteRate</code></td><td>0.6</td><td>chance a generation swaps a proven prompt into the instruction slot</td></tr>
+<tr><td><code>exampleCount</code></td><td>6</td><td>how many top prompts to show the model as examples</td></tr>
+</table>
+
+<h2>Generating and scoring</h2>
+<div class="sig" data-codeid="sig_gen"></div>
+<div class="sig" data-codeid="sig_used"></div>
+<div class="sig" data-codeid="sig_up"></div>
+<div class="sig" data-codeid="sig_score"></div>
+<p>Score is simply <strong>upvotes &divide; uses</strong> &mdash; a self-normalizing rate, so a prompt used once and upvoted once (1.0) and one used ten times and upvoted ten times (1.0) rank equally, while a one-hit fluke can't dominate a proven workhorse. Mark a prompt with <code>used()</code> when you render it and <code>upvote()</code> when its result lands.</p>
+
+<h2>The three modes</h2>
+<pre data-codeid="modes"></pre>
+<div class="note">Faithful sticks tight to the instruction; balanced keeps your subject and explicit asks but varies mood, lighting, and styling; creative reinterprets freely. Each generation also rotates a diversity directive and, most of the time, asks the model to use brace-variant <code>&#123;a&#124;b&#124;c&#125;</code> syntax for in-prompt variety.</div>
+
+<h2>Promotion &amp; breeding</h2>
+<p>Two mechanisms compound taste over time. <strong>Breeding</strong>: the top prompts are shown to the model each round as <code>&lt;highly_rated&gt;</code> examples to build on. <strong>Promotion</strong>: a fraction of the time (<code>promoteRate</code>), a score-weighted pick replaces the instruction itself, so the system explores directions it has already proven it likes &mdash; while the rest of the time it stays anchored to your real instruction to prevent drift.</p>
+
+<h2>Persistence</h2>
+<div class="sig" data-codeid="sig_state"></div>
+<div class="sig" data-codeid="sig_load"></div>
+<p>Save <code>state()</code> with weld.persist and restore with <code>load()</code> to carry the evolved prompt pool across sessions.</p>
+<script>
+(function(){
+  var examples = {
+  'install': 'output\n  weld-promptforge = \{import:weld-promptforge-plugin\}\n  weld-stream      = \{import:weld-stream-plugin\}\n  weld-structured  = \{import:weld-structured-plugin\}\n  aiTextPlugin     = \{import:ai-text-plugin\}',
+  'loop': 'var forge = weld.promptforge.create(\{ instruction: \'a knight in a forest\', mode: \'balanced\' \});\n\nvar prompts = await forge.generate(4);\nfor (var i = 0; i < prompts.length; i++) \{\n  forge.used(prompts\[i]);              // mark it rendered\n  var img = await renderImage(prompts\[i]);\n  if (userLikes(img)) forge.upvote(prompts\[i]);\n\}\n\nvar next = await forge.generate(4);    // winners are bred back in',
+  'sig_create': 'weld.promptforge.create(opts) -> forge',
+  'sig_gen': 'forge.generate(n) -> Promise<string\[]>',
+  'sig_used': 'forge.used(text)      // count a render',
+  'sig_up': 'forge.upvote(text)    // a good result',
+  'sig_score': 'forge.score(text) -> number   // upvotes / uses',
+  'modes': 'forge.setMode(\'faithful\');   // stay strictly on the requested subject\nforge.setMode(\'balanced\');   // keep the subject, vary mood/lighting/style\nforge.setMode(\'creative\');   // reinterpret and remix freely',
+  'sig_state': 'forge.state() -> snapshot',
+  'sig_load': 'forge.load(snapshot)'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    document.querySelectorAll('[data-codeid]').forEach(function(n){
+      var src = examples[n.getAttribute('data-codeid')];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.promptforge) return window.weld.promptforge;
+
+// -----------------------------------------------------------------
+// weld.promptforge: stop hand-tuning image prompts; let good ones win.
+//
+// A community prompt optimizer cracked the loop: ask an LLM for several
+// prompt variants, render them, let the user upvote results, score each
+// prompt by its upvote RATE (votes / uses -- self-normalizing), and feed
+// the proven winners back into the next round, sometimes promoting a
+// top prompt into the instruction slot. weld.promptforge packages that:
+//
+//   var forge = weld.promptforge.create({ instruction, mode })
+//   var prompts = await forge.generate(4)   // candidate prompt strings
+//   forge.used(promptText)                  // mark it rendered
+//   forge.upvote(promptText)                // result was good
+//   forge.top(n) / forge.score(text) / forge.state() / forge.load(s)
+//
+// Generation goes through weld.stream; if weld.structured is present it
+// is used for a clean JSON array, else a numbered-list parse is used.
+// -----------------------------------------------------------------
+
+function getStream() { return (window.weld && window.weld.stream) ? window.weld.stream : null; }
+function getStructured() { return (window.weld && window.weld.structured) ? window.weld.structured : null; }
+
+var EXTRA = [
+  'Look closely at the instruction: what is the underlying intent? Fulfill it deeply.',
+  'Explore bold variations that still obey the instruction; avoid timid small changes.',
+  'Prefer concrete, descriptive detail over generic adjectives.',
+  'Try a concise comma-separated tag style for some prompts.',
+  'Include camera language (lens, shot type, angle) only if consistent with the instruction.',
+  'For one prompt focus on mood and lighting; for another, on composition.',
+  'Vary specificity: some prompts terse, others richly detailed.'
+];
+
+var MODE_DIRECTIVE = {
+  faithful: 'EXACTLY satisfy the instruction. Stay strictly on the requested subject.',
+  balanced: 'Keep the core subject and any explicit asks intact, but bring fresh angles, mood, lighting, and styling.',
+  creative: 'Build on the instruction with a creative touch; reinterpret and remix freely, including bold departures, while keeping the core idea recognizable.'
+};
+
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+// Curly-brace variant guidance, ~60% of the time, to inject diversity.
+// The literal characters are assembled at runtime so plugin source stays
+// clear of the Perchance brace scanner.
+function curlyGuidance() {
+  if (Math.random() >= 0.6) return '';
+  var ob = String.fromCharCode(123), cb = String.fromCharCode(125), bar = String.fromCharCode(124);
+  var ex = ob + 'candid' + bar + 'studio' + bar + 'cinematic' + cb + ' '
+    + ob + 'portrait' + bar + 'wide shot' + cb;
+  return '\nUse brace-variant syntax for diversity: add a few brace blocks with '
+    + 'pipe-separated options (lighting, expression, angle, styling) where every '
+    + 'variant still obeys the instruction. Example: "' + ex + ' of ..."';
+}
+
+function buildInstruction(forge, n, promotedPrompt) {
+  var base = promotedPrompt || forge.instruction;
+  var lines = [];
+  lines.push('You write image-generation prompts.');
+  lines.push(MODE_DIRECTIVE[forge.mode] || MODE_DIRECTIVE.balanced);
+  lines.push(pick(EXTRA));
+  var top = forge.topList(forge.exampleCount);
+  if (top.length) {
+    var intro = forge.mixAcross
+      ? 'Here are prompts the user has rated highly before. Treat them as a signal of taste, not a template; vary how much you borrow.'
+      : 'Here are highly-rated prompts. Study what works and breed their best parts into new ones.';
+    lines.push('\n' + intro + '\n<highly_rated>\n'
+      + top.map(function (p) { return '- ' + p.text; }).join('\n') + '\n</highly_rated>');
+  }
+  lines.push(curlyGuidance());
+  lines.push('\nInstruction:\n' + base);
+  lines.push('\nWrite ' + n + ' distinct prompt' + (n > 1 ? 's' : '')
+    + ', one per line, no numbering, no commentary. Each on its own line.');
+  return lines.filter(Boolean).join('\n');
+}
+
+function parseList(text) {
+  if (!text) return [];
+  return String(text).split(/\r?\n/).map(function (l) {
+    return l.replace(/^\s*(?:\d+[.)\-:]|[*\u2022\-\u2013])\s*/, '').replace(/^"(.*)"$/, '$1').trim();
+  }).filter(function (l) { return l.length > 0; });
+}
+
+function create(opts) {
+  opts = opts || {};
+  var forge = {
+    instruction: String(opts.instruction || ''),
+    mode: opts.mode || 'balanced',          // faithful | balanced | creative
+    mixAcross: !!opts.mixAcross,
+    promoteRate: opts.promoteRate != null ? opts.promoteRate : 0.6,
+    exampleCount: opts.exampleCount != null ? opts.exampleCount : 6,
+    prompts: {}        // text -> { text, used, votes, score, createdAt }
+  };
+
+  function recompute(p) { p.score = p.used > 0 ? p.votes / p.used : 0; }
+
+  function ensure(text) {
+    var key = String(text || '').trim();
+    if (!key) return null;
+    if (!forge.prompts[key]) forge.prompts[key] = { text: key, used: 0, votes: 0, score: 0, createdAt: Date.now() };
+    return forge.prompts[key];
+  }
+
+  function all() { return Object.keys(forge.prompts).map(function (k) { return forge.prompts[k]; }); }
+  function scored() { return all().filter(function (p) { return p.used > 0; }); }
+  forge.topList = function (limit) {
+    return scored().sort(function (a, b) { return b.score - a.score; }).slice(0, limit || 6);
+  };
+  function topList(limit) { return forge.topList(limit); }
+
+  // roulette selection weighted by score (proven prompts chosen more often)
+  function weightedPick(arr) {
+    if (!arr.length) return null;
+    var weights = arr.map(function (p) { return Math.max(0, p.score); });
+    var sum = weights.reduce(function (a, b) { return a + b; }, 0);
+    if (sum <= 0) return arr[Math.floor(Math.random() * arr.length)];
+    var r = Math.random() * sum, c = 0;
+    for (var i = 0; i < arr.length; i++) { c += weights[i]; if (r <= c) return arr[i]; }
+    return arr[arr.length - 1];
+  }
+
+  // generate(n) -> Promise<string[]> of candidate prompts.
+  function generate(n) {
+    n = n || 3;
+    var stream = getStream();
+    if (!stream) return Promise.resolve({ /* graceful */ }).then(function () { return []; });
+
+    // Maybe promote a proven prompt into the instruction slot.
+    var promoted = null;
+    var pool = scored();
+    if (pool.length && Math.random() < forge.promoteRate) {
+      var winner = weightedPick(pool);
+      if (winner) promoted = winner.text;
+    }
+    var instruction = buildInstruction(forge, n, promoted);
+
+    var structured = getStructured();
+    if (structured) {
+      return structured.generate({
+        instruction: instruction, startWith: '[',
+        shape: 'a JSON array of ' + n + ' image-prompt strings'
+      }).then(function (r) {
+        var list = (r.ok && Array.isArray(r.value)) ? r.value.map(String) : [];
+        if (!list.length && r.raw) list = parseList(r.raw);
+        list.forEach(ensure);
+        return list;
+      });
+    }
+    return stream.run({ instruction: instruction }).then(function (res) {
+      if (res.error) return [];
+      var list = parseList(res.text);
+      list.forEach(ensure);
+      return list;
+    });
+  }
+
+  function used(text) { var p = ensure(text); if (p) { p.used += 1; recompute(p); } return p; }
+  function upvote(text, by) { var p = ensure(text); if (p) { p.votes += (by || 1); recompute(p); } return p; }
+  function record(text, r) { r = r || {}; var p = ensure(text); if (!p) return null; if (r.used) p.used += r.used; if (r.votes) p.votes += r.votes; recompute(p); return p; }
+
+  function score(text) { var p = forge.prompts[String(text || '').trim()]; return p ? p.score : 0; }
+  function setInstruction(text) { forge.instruction = String(text || ''); }
+  function setMode(m) { if (MODE_DIRECTIVE[m]) forge.mode = m; }
+
+  function state() {
+    return { instruction: forge.instruction, mode: forge.mode, mixAcross: forge.mixAcross,
+      promoteRate: forge.promoteRate, prompts: forge.prompts };
+  }
+  function load(s) {
+    if (!s) return;
+    forge.instruction = s.instruction || forge.instruction;
+    forge.mode = s.mode || forge.mode;
+    if (s.mixAcross != null) forge.mixAcross = s.mixAcross;
+    if (s.promoteRate != null) forge.promoteRate = s.promoteRate;
+    forge.prompts = s.prompts || {};
+  }
+
+  return {
+    generate: generate,
+    used: used,
+    upvote: upvote,
+    record: record,
+    score: score,
+    top: function (n) { return topList(n); },
+    all: all,
+    setInstruction: setInstruction,
+    setMode: setMode,
+    state: state,
+    load: load
+  };
+}
+
+window.weld.promptforge = {
+  create: create,
+  MODES: ['faithful', 'balanced', 'creative'],
+  version: '1.0.0'
+};
+
+return window.weld.promptforge;
+})();
+</script>
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>
+</div>

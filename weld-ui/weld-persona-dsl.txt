@@ -1,0 +1,248 @@
+$meta
+  title       = weld.persona
+  description = A character personality model for AI roleplay. Turns trait sliders into a vivid prose "dossier" (nearest archetype, drivers, baseline), renders mood as physical tells / speech / inner sensation by intensity, and describes relationship dynamics (closeness, trust, tension). Pure math and tables -- no dependencies, no model calls. Stash on window.weld.persona.
+  tags        = weld, persona, character, personality, mood, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.persona) return window.weld.persona;
+
+  // -----------------------------------------------------------------
+  // weld.persona: a richer character model than a freeform bio string.
+  //
+  // Eight 0-100 trait sliders are interpolated into a 4-axis vector
+  // (warmth, energy, control, openness), matched to the nearest archetype,
+  // and rendered as a prose dossier you prepend to the system prompt.
+  // Moods become concrete physical tells + speech patterns + inner
+  // sensations, scaled by intensity. Relationships become a few sharp
+  // lines about how the character treats someone. All deterministic
+  // tables and arithmetic -- no model, no network, no dependencies.
+  // -----------------------------------------------------------------
+
+  // Each anchor maps a slider band to an adjective + a contribution to the
+  // 4-axis vector { w: warmth, e: energy, c: control, o: openness }.
+  var ANCHORS = {
+    warmth: [
+      { min: 0,   adj: 'icy and hostile',            d: { w:-1.0, e:-0.2, c: 0.3, o:-0.8 } },
+      { min: 21,  adj: 'guarded and aloof',          d: { w:-0.5, e:-0.3, c: 0.1, o:-0.5 } },
+      { min: 41,  adj: 'neutral and even',           d: { w: 0,   e: 0,   c: 0,   o: 0   } },
+      { min: 61,  adj: 'warm and approachable',      d: { w: 0.6, e: 0.3, c:-0.2, o: 0.4 } },
+      { min: 81,  adj: 'affectionate and doting',    d: { w: 1.0, e: 0.6, c:-0.4, o: 0.6 } }
+    ],
+    assertiveness: [
+      { min: 0,   adj: 'deferential and apologetic', d: { w: 0.2, e:-0.6, c:-1.0, o:-0.3 } },
+      { min: 41,  adj: 'balanced and compromising',  d: { w: 0,   e: 0,   c: 0,   o: 0   } },
+      { min: 61,  adj: 'confident and bold',         d: { w:-0.1, e: 0.5, c: 0.7, o: 0.2 } },
+      { min: 81,  adj: 'dominant and commanding',    d: { w:-0.4, e: 0.8, c: 1.0, o:-0.2 } }
+    ],
+    reactivity: [
+      { min: 0,   adj: 'stoic and unflappable',      d: { w:-0.2, e:-0.7, c: 0.8, o:-0.5 } },
+      { min: 41,  adj: 'emotionally steady',         d: { w: 0,   e: 0,   c: 0,   o: 0   } },
+      { min: 81,  adj: 'volatile and intense',       d: { w: 0.2, e: 1.0, c:-0.7, o: 0.3 } }
+    ],
+    curiosity: [
+      { min: 0,   adj: 'concrete and closed-minded', d: { w:-0.4, e:-0.5, c: 0.2, o:-1.0 } },
+      { min: 41,  adj: 'moderately inquisitive',     d: { w: 0,   e: 0,   c: 0,   o: 0   } },
+      { min: 81,  adj: 'restless and probing',       d: { w: 0.1, e: 0.6, c:-0.2, o: 1.0 } }
+    ],
+    empathy: [
+      { min: 0,   adj: 'detached and callous',       d: { w:-0.9, e:-0.4, c: 0.4, o:-0.6 } },
+      { min: 41,  adj: 'reasonably understanding',   d: { w: 0,   e: 0,   c: 0,   o: 0   } },
+      { min: 81,  adj: 'deeply attuned to others',   d: { w: 1.0, e: 0.3, c:-0.6, o: 0.6 } }
+    ],
+    caution: [
+      { min: 0,   adj: 'reckless and impulsive',     d: { w:-0.1, e: 0.9, c:-0.5, o: 0.7 } },
+      { min: 41,  adj: 'calculated and careful',     d: { w: 0,   e: 0,   c: 0,   o: 0   } },
+      { min: 81,  adj: 'wary and risk-averse',       d: { w:-0.3, e:-0.8, c: 0.7, o:-0.7 } }
+    ],
+    playfulness: [
+      { min: 0,   adj: 'earnest and humorless',      d: { w:-0.5, e:-0.6, c: 0.5, o:-0.7 } },
+      { min: 41,  adj: 'balanced in humor',          d: { w: 0,   e: 0,   c: 0,   o: 0   } },
+      { min: 81,  adj: 'witty and mischievous',      d: { w: 0.6, e: 0.9, c:-0.5, o: 0.8 } }
+    ],
+    confidence: [
+      { min: 0,   adj: 'self-doubting and timid',    d: { w:-0.1, e:-0.5, c:-0.7, o:-0.4 } },
+      { min: 41,  adj: 'secure in themselves',       d: { w: 0,   e: 0,   c: 0,   o: 0   } },
+      { min: 81,  adj: 'unshakably self-assured',    d: { w: 0.1, e: 0.6, c: 0.8, o: 0.2 } }
+    ]
+  };
+
+  var ARCHETYPES = {
+    'The Stoic':      { w:-0.7, e:-1.0, c: 0.9, o:-0.5 },
+    'The Empath':     { w: 1.0, e: 0.5, c:-0.8, o: 0.8 },
+    'The Scholar':    { w:-0.4, e:-0.5, c: 0.5, o: 1.2 },
+    'The Instigator': { w: 0.4, e: 1.5, c: 0.8, o: 0.6 },
+    'The Guardian':   { w: 0.8, e:-0.4, c: 1.2, o:-0.8 },
+    'The Maverick':   { w: 0.2, e: 1.0, c:-1.0, o: 1.0 },
+    'The Charmer':    { w: 1.0, e: 0.8, c: 0.2, o: 0.4 },
+    'The Recluse':    { w:-0.8, e:-0.8, c:-0.2, o: 0.2 }
+  };
+
+  function clamp(v) { return Math.max(0, Math.min(100, Number(v) || 0)); }
+
+  // Interpolate a slider value across its anchor bands.
+  function interpolate(val, key) {
+    var list = ANCHORS[key];
+    if (!list) return { adj: '', d: { w:0, e:0, c:0, o:0 } };
+    val = clamp(val);
+    if (val <= list[0].min) return { adj: list[0].adj, d: list[0].d };
+    if (val >= list[list.length - 1].min) return { adj: list[list.length - 1].adj, d: list[list.length - 1].d };
+    var low = list[0], high = list[list.length - 1];
+    for (var i = 0; i < list.length - 1; i++) {
+      if (val >= list[i].min && val <= list[i + 1].min) { low = list[i]; high = list[i + 1]; break; }
+    }
+    var f = (val - low.min) / ((high.min - low.min) || 1);
+    return {
+      adj: val > (low.min + (high.min - low.min) / 2) ? high.adj : low.adj,
+      d: {
+        w: low.d.w + (high.d.w - low.d.w) * f,
+        e: low.d.e + (high.d.e - low.d.e) * f,
+        c: low.d.c + (high.d.c - low.d.c) * f,
+        o: low.d.o + (high.d.o - low.d.o) * f
+      }
+    };
+  }
+
+  function nearestArchetype(vec) {
+    var best = 'Balanced Individual', min = Infinity;
+    for (var name in ARCHETYPES) {
+      var c = ARCHETYPES[name];
+      var dist = Math.sqrt(
+        Math.pow(vec.w - c.w, 2) + Math.pow(vec.e - c.e, 2) +
+        Math.pow(vec.c - c.c, 2) + Math.pow(vec.o - c.o, 2));
+      if (dist < min) { min = dist; best = name; }
+    }
+    return best;
+  }
+
+  // dossier(traits) -> { archetype, vector, text, results }.
+  // traits: { warmth, assertiveness, reactivity, curiosity, empathy,
+  //           caution, playfulness, confidence } each 0-100 (missing = 50).
+  function dossier(traits) {
+    traits = traits || {};
+    var vec = { w: 0, e: 0, c: 0, o: 0 };
+    var results = {};
+    var keys = Object.keys(ANCHORS);
+    keys.forEach(function (k) {
+      var val = traits[k] == null ? 50 : traits[k];
+      var interp = interpolate(val, k);
+      results[k] = { value: clamp(val), adj: interp.adj };
+      vec.w += interp.d.w; vec.e += interp.d.e; vec.c += interp.d.c; vec.o += interp.d.o;
+    });
+    var archetype = nearestArchetype(vec);
+
+    var drivers = [], anchors = [];
+    keys.forEach(function (k) {
+      var v = results[k].value;
+      if (v < 30 || v > 70) drivers.push(results[k].adj);
+      else anchors.push(results[k].adj);
+    });
+
+    // A "bridge" line for an interesting internal contrast.
+    var bridge = '';
+    if ((traits.empathy || 50) > 75 && (traits.reactivity || 50) < 35) {
+      bridge = 'Beneath a ' + results.reactivity.adj + ' surface, they are ' + results.empathy.adj + '. ';
+    } else if ((traits.warmth || 50) > 75 && (traits.playfulness || 50) < 25) {
+      bridge = 'Their ' + results.warmth.adj + ' nature is carried with a ' + results.playfulness.adj + ' seriousness. ';
+    } else if ((traits.confidence || 50) < 25 && (traits.assertiveness || 50) > 70) {
+      bridge = 'They push hard and ' + results.assertiveness.adj + ', yet underneath they are ' + results.confidence.adj + '. ';
+    }
+
+    var headline = 'They embody the archetype of ' + archetype + '.';
+    var core = drivers.length ? ('At core, they are ' + listJoin(drivers) + '.') : 'They are a balanced individual.';
+    var base = anchors.length ? (' This rests on a ' + listJoin(anchors) + ' baseline.') : '';
+    var text = headline + '\n\n' + bridge + core + base;
+
+    return { archetype: archetype, vector: vec, text: text, results: results };
+  }
+
+  function listJoin(arr) {
+    if (arr.length <= 1) return arr.join('');
+    if (arr.length === 2) return arr[0] + ' and ' + arr[1];
+    return arr.slice(0, -1).join(', ') + ', and ' + arr[arr.length - 1];
+  }
+
+  // --- moods: concrete sensory tells, scaled by intensity ---
+  var MOODS = {
+    rage:    { tells:['clenched jaw','white knuckles','flushed face','flared nostrils','a pulsing vein at the temple'], speech:['words come out as snarls','voice rises to a shout','a deadly low whisper','clipped, barking phrases'], inner:['heat flooding the chest','a pounding heart','a roar in the ears','tunnel vision'] },
+    anxiety: { tells:['shallow breathing','fidgeting hands','darting eyes','a bitten lip','tightly crossed arms'], speech:['a thin, shaky voice','sentences that trail off','rapid stuttering','frequent throat-clearing'], inner:['a knot in the stomach','jittery energy','cold hands','a sense of being watched'] },
+    euphoria:{ tells:['an uncontrollable smile','dilated pupils','wild gestures','bounding energy','bright eyes'], speech:['a fast, musical voice','laughing mid-sentence','excited rambling','a breathless tone'], inner:['lightness in the chest','a feeling of invincibility','a warm glow','crystal mental clarity'] },
+    sorrow:  { tells:['downcast eyes','slumped shoulders','a trembling lip','slow movements','a distant stare'], speech:['a quiet, flat voice','long pauses','words that catch','near-silence'], inner:['a heaviness in the chest','a hollow ache','exhaustion','a lump in the throat'] },
+    affection:{tells:['soft eyes','a gentle smile','leaning in','an unguarded posture','lingering glances'], speech:['a warm, lowered voice','easy laughter','tender phrasing','using their name often'], inner:['a flutter in the chest','warmth spreading','a pull toward them','quiet contentment'] },
+    suspicion:{tells:['narrowed eyes','a half-step back','arms folded','glances at the exits','a tight mouth'], speech:['careful, measured words','probing questions','a cool tone','long deliberate pauses'], inner:['a prickle of doubt','heightened alertness','a coiled readiness','calculation behind the eyes'] },
+    neutral: { tells:['a steady gaze','relaxed shoulders','still hands'], speech:['a measured tone','even pacing'], inner:['calm breathing','a quiet mind'] }
+  };
+
+  function pickN(arr, n, rand) {
+    rand = rand || Math.random;
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(rand() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; }
+    return a.slice(0, Math.max(0, Math.min(n, a.length)));
+  }
+
+  // mood(name, intensity, opts) -> prose injecting physical reality.
+  // intensity 0-100; more intensity -> more cues. opts.rand for determinism.
+  function mood(name, intensity, opts) {
+    opts = opts || {};
+    var key = String(name || '').toLowerCase();
+    var known = MOODS[key];
+    var prof = known || MOODS.neutral;
+    var label = known ? key : 'neutral';
+    intensity = clamp(intensity == null ? 50 : intensity);
+    var n = intensity > 75 ? 3 : intensity > 40 ? 2 : 1;
+    var level = intensity > 75 ? 'overwhelming' : intensity > 40 ? 'evident' : 'subtle';
+    var tells = pickN(prof.tells, n, opts.rand);
+    var speech = pickN(prof.speech, Math.max(1, n - 1), opts.rand);
+    var inner = pickN(prof.inner, Math.max(1, n - 1), opts.rand);
+    return 'They are feeling ' + level + ' ' + label + '.\n'
+      + 'Physical tells: ' + listJoin(tells) + '.\n'
+      + 'In speech: ' + listJoin(speech) + '.\n'
+      + 'Inwardly: ' + listJoin(inner) + '.';
+  }
+
+  // relationship(rel) -> prose about how they regard someone.
+  // rel: { closeness, trust, tension, attraction } each 0-100.
+  function relationship(rel) {
+    if (!rel) return 'They have no prior history with this person.';
+    var p = [];
+    var c = rel.closeness || 0, t = rel.trust == null ? 50 : rel.trust, x = rel.tension || 0, a = rel.attraction || 0;
+    if (c > 80) p.push('This person is vital to them; the bond is deep.');
+    else if (c > 40) p.push('They are friendly and at ease together.');
+    else if (c > 15) p.push('They are acquaintances, still feeling each other out.');
+    else p.push('This person is essentially a stranger; they keep a polite distance.');
+    if (t < 25) p.push('They distrust this person and read hidden motives into their actions.');
+    else if (t > 80) p.push('They trust this person almost without reservation.');
+    if (x > 70) p.push('The air between them is charged; words feel loaded.');
+    if (a > 70) p.push('They feel a strong, distracting pull toward this person.');
+    return p.join(' ');
+  }
+
+  // systemPrompt(opts) -> one assembled block ready to prepend.
+  // opts: { name, traits, mood:{name,intensity}, relationship, extra }
+  function systemPrompt(opts) {
+    opts = opts || {};
+    var parts = [];
+    if (opts.name) parts.push('You are ' + opts.name + '.');
+    if (opts.traits) parts.push(dossier(opts.traits).text);
+    if (opts.mood && opts.mood.name) parts.push(mood(opts.mood.name, opts.mood.intensity, opts));
+    if (opts.relationship) parts.push(relationship(opts.relationship));
+    if (opts.extra) parts.push(String(opts.extra));
+    return parts.join('\n\n');
+  }
+
+  window.weld.persona = {
+    dossier: dossier,
+    mood: mood,
+    relationship: relationship,
+    systemPrompt: systemPrompt,
+    interpolate: interpolate,
+    nearestArchetype: nearestArchetype,
+    TRAITS: Object.keys(ANCHORS),
+    MOODS: Object.keys(MOODS),
+    ARCHETYPES: Object.keys(ARCHETYPES),
+    version: '1.0.0'
+  };
+
+  return window.weld.persona;

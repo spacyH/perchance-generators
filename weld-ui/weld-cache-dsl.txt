@@ -1,0 +1,152 @@
+$meta
+  title       = weld.cache
+  description = A response cache for AI apps. Exact key/value with LRU + TTL, a wrap() that memoizes any async function by its arguments, and -- when weld.embed is attached -- a semantic mode that reuses a past result when a new prompt is close enough in meaning, not just identical. Cuts latency and model spend. Stash on window.weld.cache.
+  tags        = weld, cache, memoize, semantic, performance, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.cache) return window.weld.cache;
+
+  // -----------------------------------------------------------------
+  // weld.cache: don't pay for the same answer twice. Exact caching is the
+  // floor (LRU-bounded, TTL-expiring). The interesting part is SEMANTIC
+  // reuse: with weld.embed attached, a new prompt that means the same as a
+  // recent one ("what's the capital of France?" vs "France's capital?")
+  // can return the cached answer instead of calling the model again. The
+  // serial broker in weld.stream makes every saved call meaningfully
+  // faster, and quota goes further.
+  //
+  //   var c = weld.cache.create({ max: 200, ttlMs: 3600000 });
+  //   var ask = c.wrap(myGenerate);          // memoized by arguments
+  //   c.attach({ embed: weld.embed });
+  //   await c.memoize(prompt, () => generate(prompt), { threshold: 0.93 });
+  // -----------------------------------------------------------------
+
+  function getEmbed(deps) { return (deps && deps.embed) || (window.weld && window.weld.embed) || null; }
+
+  function stableKey(x) {
+    if (typeof x === 'string') return x;
+    try { return JSON.stringify(x, Object.keys(x || {}).sort()); }
+    catch (e) { return String(x); }
+  }
+
+  function create(createOpts) {
+    createOpts = createOpts || {};
+    var max = createOpts.max || 200;
+    var ttlMs = createOpts.ttlMs || 0;          // 0 = no expiry
+    var deps = { embed: createOpts.embed || null };
+    var defaultThreshold = createOpts.threshold != null ? createOpts.threshold : 0.93;
+
+    var store = {};        // key -> { value, at, vec? }
+    var order = [];        // LRU: most-recent at the end
+    var hits = 0, misses = 0, semanticHits = 0;
+
+    function touch(key) {
+      var i = order.indexOf(key); if (i !== -1) order.splice(i, 1);
+      order.push(key);
+    }
+    function evictIfNeeded() {
+      while (order.length > max) { var k = order.shift(); delete store[k]; }
+    }
+    function fresh(entry) { return !ttlMs || (Date.now() - entry.at) < ttlMs; }
+
+    function get(key) {
+      key = stableKey(key);
+      var e = store[key];
+      if (e && fresh(e)) { hits++; touch(key); return e.value; }
+      if (e) { delete store[key]; var i = order.indexOf(key); if (i !== -1) order.splice(i, 1); }
+      misses++;
+      return undefined;
+    }
+    function has(key) { var e = store[stableKey(key)]; return !!(e && fresh(e)); }
+
+    function set(key, value, opts) {
+      key = stableKey(key);
+      var entry = { value: value, at: Date.now() };
+      if (opts && opts.vec) entry.vec = opts.vec;
+      store[key] = entry; touch(key); evictIfNeeded();
+      return value;
+    }
+    function del(key) { key = stableKey(key); delete store[key]; var i = order.indexOf(key); if (i !== -1) order.splice(i, 1); }
+    function clear() { store = {}; order = []; }
+
+    // wrap(fn): memoize an async (or sync) function by its arguments.
+    function wrap(fn, wrapOpts) {
+      wrapOpts = wrapOpts || {};
+      var keyFn = wrapOpts.key || function () { return stableKey([].slice.call(arguments)); };
+      return function () {
+        var args = [].slice.call(arguments);
+        var key = keyFn.apply(null, args);
+        var cached = get(key);
+        if (cached !== undefined) return Promise.resolve(cached);
+        return Promise.resolve(fn.apply(this, args)).then(function (result) {
+          set(key, result);
+          return result;
+        });
+      };
+    }
+
+    // memoize(text, producer, opts): exact-first, then optional semantic.
+    // If an entry's text is within opts.threshold cosine of `text`, reuse
+    // it; otherwise run producer(), store with its vector, and return.
+    // opts: { threshold, semantic (default true if embed present) }
+    function memoize(text, producer, opts) {
+      opts = opts || {};
+      var key = String(text);
+      var exact = get(key);
+      if (exact !== undefined) return Promise.resolve(exact);
+
+      var embed = getEmbed(deps);
+      var wantSemantic = (opts.semantic !== false) && embed;
+      var threshold = opts.threshold != null ? opts.threshold : defaultThreshold;
+
+      if (!wantSemantic) {
+        return Promise.resolve(producer()).then(function (v) { set(key, v); return v; });
+      }
+      // gather entries that carry a vector
+      var keys = order.filter(function (k) { return store[k] && store[k].vec && fresh(store[k]); });
+      var lookup = wantSemanticMatch(embed, text, keys, threshold);
+      return lookup.then(function (matchKey) {
+        if (matchKey != null) { semanticHits++; touch(matchKey); return store[matchKey].value; }
+        return embed.embed(text).then(function (vec) {
+          return Promise.resolve(producer()).then(function (v) {
+            set(key, v, { vec: vec });
+            return v;
+          });
+        });
+      });
+    }
+
+    function wantSemanticMatch(embed, text, keys, threshold) {
+      if (!keys.length) return Promise.resolve(null);
+      var items = keys.map(function (k) { return { k: k, vec: store[k].vec }; });
+      // embed the query once, compare to stored vectors directly
+      return embed.embed(text).then(function (qv) {
+        if (!qv) return null;
+        var best = null, bestScore = -1;
+        for (var i = 0; i < items.length; i++) {
+          var s = embed.similarity(qv, items[i].vec);
+          if (s > bestScore) { bestScore = s; best = items[i].k; }
+        }
+        return bestScore >= threshold ? best : null;
+      }, function () { return null; });
+    }
+
+    function attach(d) { if (d && d.embed) deps.embed = d.embed; }
+    function stats() { return { size: order.length, hits: hits, misses: misses, semanticHits: semanticHits, max: max }; }
+
+    return {
+      get: get, set: set, has: has, delete: del, clear: clear,
+      wrap: wrap, memoize: memoize, attach: attach, stats: stats,
+      size: function () { return order.length; }
+    };
+  }
+
+  window.weld.cache = {
+    create: create,
+    version: '1.0.0'
+  };
+
+  return window.weld.cache;

@@ -1,0 +1,218 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--amber:#d29922;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:780px;margin:0 auto;padding:34px 18px 90px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 0 16px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+.breadcrumb a{color:var(--muted);}.breadcrumb .sep{color:var(--faint);margin:0 8px;}.breadcrumb .cur{color:var(--ink);}.breadcrumb .act a{color:var(--accent);}
+.hdr{margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}.hdr h1{font:700 24px var(--mono);letter-spacing:-0.5px;}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;}
+.hdr .lead{color:var(--muted);margin-top:8px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;}
+.panel h2{font:600 13px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:8px 0;}
+.lbl{font:600 12px var(--mono);color:var(--muted);min-width:74px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 15px;font:600 13px var(--font);cursor:pointer;transition:.12s;}
+.btn:hover{filter:brightness(1.08);}.btn.ghost{background:var(--faint);color:var(--ink);}.btn.sm{padding:6px 11px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+input[type=text],textarea{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:8px 10px;font:13px var(--font);}
+input[type=text]{flex:1;min-width:120px;}textarea{width:100%;font:12.5px/1.5 var(--mono);resize:vertical;}
+.mono{font:13px var(--mono);}
+.out{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font:12.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;min-height:20px;color:#c9d1d9;}
+.chip{display:inline-block;background:var(--faint);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font:600 12px var(--mono);margin:2px;}
+.chip.k{background:rgba(63,185,80,.14);border-color:rgba(63,185,80,.4);color:#7ee787;}
+.chip.d{opacity:.4;text-decoration:line-through;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:9px 13px;border-radius:0 4px 4px 0;margin:12px 0 0;font-size:12.5px;color:#c9d1d9;}
+.note.warn{background:rgba(210,153,34,.08);border-color:var(--amber);}
+.tag{font:600 10px var(--mono);padding:2px 7px;border-radius:4px;background:rgba(63,185,80,.14);color:#7ee787;border:1px solid rgba(63,185,80,.4);}
+.tag.ai{background:rgba(210,153,34,.12);color:#e3b341;border-color:rgba(210,153,34,.4);}
+.bar{height:14px;background:var(--accent);border-radius:3px;transition:width .3s;}
+.footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);}.footer a{color:var(--muted);}
+.flex{display:flex;gap:10px;align-items:center;}.wrap{flex-wrap:wrap;}.grow{flex:1;}.mt{margin-top:10px;}
+</style>
+<div id="page">
+<div class="breadcrumb"><span><a href="https://perchance.org/weld-ui-index">weld</a><span class="sep">/</span>weld.registry<span class="sep">/</span><span class="cur">demo</span></span><span class="act"><a href="https://perchance.org/weld-registry-plugin">docs &rarr;</a></span></div>
+<div class="hdr"><div class="hdr-row"><h1>weld.registry &mdash; demo</h1><span class="ver">v1.0.0</span></div><p class="lead">Explore the Perchance generator catalogue: look up stats, download source, resolve dependencies, and list generators. Runs against a mock catalogue here; hits perchance.org/api/* on Perchance.</p></div>
+  <div class="panel"><h2>Generator explorer <span class="tag">read-only API</span></h2>
+    <div class="row"><span class="lbl">generator</span><input id="gen" type="text" value="adventure-generator"></div>
+    <div class="row">
+      <button id="bStats" class="btn">Stats</button>
+      <button id="bSource" class="btn ghost">Source</button>
+      <button id="bDeps" class="btn ghost">+ Dependencies</button>
+      <button id="bShot" class="btn ghost">Screenshot URL</button>
+    </div>
+    <div id="out" class="out mt"></div>
+    <div class="note">This demo uses a <b>mock</b> catalogue so it runs anywhere. On Perchance these hit <code>perchance.org/api/*</code> for real &mdash; including <code>download</code>, which returns a generator's full DSL source (how you can study any public plugin). All calls are read-only.</div>
+  </div>
+  <div class="panel"><h2>List the catalogue</h2>
+    <div class="row"><span class="lbl">max</span><input id="max" type="text" value="5" style="max-width:80px;"><button id="bList" class="btn">List</button></div>
+    <div id="listout" class="out mt"></div>
+  </div>
+<footer class="footer"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
+</div>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.registry) return window.weld.registry;
+
+// -----------------------------------------------------------------
+// weld.registry: read the Perchance generator catalogue.
+//
+// Perchance exposes a public HTTP API on perchance.org/api/* that most
+// authors never touch because the endpoints are undocumented and return
+// mixed shapes. weld.registry wraps each one as a named method with a
+// parsed, predictable result:
+//
+//   await weld.registry.stats('some-generator')      // views / likes
+//   await weld.registry.list({ max: 20 })            // catalogue slice
+//   await weld.registry.download('some-generator')   // full DSL source
+//   await weld.registry.withDependencies('some-gen') // source + its plugins
+//   weld.registry.screenshotUrl('some-generator')    // preview image URL
+//   await weld.registry.fileInfo(uploadedUrl)        // upload metadata
+//
+// Because downloadGenerator returns full source, this is also how you can
+// study how any public plugin works -- the same way the Weld suite stays
+// compatible with the platform. All calls are read-only.
+// -----------------------------------------------------------------
+
+var BASE = 'https://perchance.org/api/';
+var UPLOAD_BASE = 'https://upload.perchance.org/api/';
+
+var deps = { fetch: null };
+function attach(d) { if (d && d.fetch) deps.fetch = d.fetch; }
+function wf() { return deps.fetch || (window.weld && window.weld.fetch) || null; }
+
+// Low-level GET that returns text, preferring weld.fetch (proxy-aware),
+// falling back to a direct browser fetch.
+function getText(url) {
+  var f = wf();
+  if (f && typeof f.text === 'function') return f.text(url);
+  if (typeof fetch === 'function') return fetch(url).then(function (r) { return r.text(); });
+  return Promise.reject(new Error('weld.registry: no fetch available (import super-fetch / attach weld.fetch)'));
+}
+function getJson(url) {
+  return getText(url).then(function (t) {
+    try { return JSON.parse(t); }
+    catch (e) { throw new Error('weld.registry: expected JSON from ' + url + ' but got "' + String(t).slice(0, 60) + '"'); }
+  });
+}
+function enc(s) { return encodeURIComponent(String(s == null ? '' : s)); }
+function need(name, label) {
+  if (name == null || String(name).length === 0) throw new Error('weld.registry: ' + (label || 'generatorName') + ' is required');
+  return String(name);
+}
+
+// --- getGeneratorStats?name= -> { views, likes, ... } ---
+function stats(name) {
+  try { name = need(name, 'name'); } catch (e) { return Promise.reject(e); }
+  return getJson(BASE + 'getGeneratorStats?name=' + enc(name));
+}
+
+// --- getGeneratorList?max= -> a catalogue slice ---
+function list(opts) {
+  opts = opts || {};
+  var max = opts.max != null ? opts.max : 20;
+  var url = BASE + 'getGeneratorList?max=' + enc(max);
+  if (opts.search) url += '&search=' + enc(opts.search);
+  if (opts.sort) url += '&sort=' + enc(opts.sort);
+  return getJson(url).then(function (data) {
+    // normalize to an array regardless of the wrapper shape the API uses
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.generators)) return data.generators;
+    if (data && Array.isArray(data.list)) return data.list;
+    return data;
+  });
+}
+
+// --- downloadGenerator?generatorName= -> full DSL source (text) ---
+function download(name) {
+  try { name = need(name); } catch (e) { return Promise.reject(e); }
+  return getText(BASE + 'downloadGenerator?generatorName=' + enc(name));
+}
+// convenience: does the downloaded source look like a real generator?
+function hasSource(text) { return typeof text === 'string' && text.length > 100 && text.indexOf('$output') !== -1; }
+
+// --- getGeneratorsAndDependencies?generatorNames= -> source + imported plugins ---
+function withDependencies(names) {
+  var joined;
+  try {
+    if (Array.isArray(names)) { if (!names.length) throw new Error('x'); joined = names.map(String).join(','); }
+    else joined = need(names, 'generatorNames');
+  } catch (e) { return Promise.reject(new Error('weld.registry: generatorNames is required')); }
+  return getJson(BASE + 'getGeneratorsAndDependencies?generatorNames=' + enc(joined));
+}
+
+// --- getGeneratorScreenshot?generatorName= -> a preview image URL ---
+// Synchronous: this endpoint *is* the image, so return the URL to use in <img>.
+function screenshotUrl(name) { return BASE + 'getGeneratorScreenshot?generatorName=' + enc(need(name)); }
+
+// --- upload.perchance.org/api/fileInfo?url= -> metadata for an uploaded file ---
+function fileInfo(url) {
+  var u = (url && url.url) ? String(url.url) : String(url || '');
+  if (!u) return Promise.reject(new Error('weld.registry: a file URL is required'));
+  return getJson(UPLOAD_BASE + 'fileInfo?url=' + enc(u));
+}
+
+// Endpoint descriptors -- useful for tooling / docs / the monitor.
+var ENDPOINTS = [
+  { method: 'stats',            path: 'getGeneratorStats?name=',                 returns: 'json'  },
+  { method: 'list',             path: 'getGeneratorList?max=',                   returns: 'json'  },
+  { method: 'download',         path: 'downloadGenerator?generatorName=',        returns: 'text'  },
+  { method: 'withDependencies', path: 'getGeneratorsAndDependencies?generatorNames=', returns: 'json' },
+  { method: 'screenshotUrl',    path: 'getGeneratorScreenshot?generatorName=',   returns: 'url'   },
+  { method: 'fileInfo',         path: 'fileInfo?url= (upload.perchance.org)',    returns: 'json'  }
+];
+
+window.weld.registry = {
+  stats: stats,
+  list: list,
+  download: download,
+  hasSource: hasSource,
+  withDependencies: withDependencies,
+  screenshotUrl: screenshotUrl,
+  fileInfo: fileInfo,
+  attach: attach,
+  endpoints: function () { return ENDPOINTS.slice(); },
+  base: BASE,
+  version: '1.0.0'
+};
+
+return window.weld.registry;
+})();
+</script>
+<script>
+
+  function boot(){ if(!window.weld||!window.weld.registry){return setTimeout(boot,100);} init(); }
+  function init(){
+    var R=window.weld.registry, $=function(id){return document.getElementById(id);};
+    // mock catalogue via a fake weld.fetch
+    var CAT={ 'adventure-generator':{ stats:{views:48213,likes:1207,favorites:402}, source:'$meta\n  title\n    Adventure Generator\n\n'+ '$output() =>\n  // ...full DSL source here...\n'.repeat(6) },
+              'pixel-portrait':{ stats:{views:9120,likes:344,favorites:88}, source:'$output() => { /* pixel portrait */ }'+ 'x'.repeat(160) } };
+    var ALL=Object.keys(CAT).map(function(n){ return { name:n, likes:CAT[n].stats.likes }; });
+    R.attach({ fetch:{
+      text:function(u){
+        var m=/(getGeneratorStats\?name=|downloadGenerator\?generatorName=|getGeneratorsAndDependencies\?generatorNames=|getGeneratorList\?max=)([^&]*)/.exec(u);
+        var key=m?decodeURIComponent(m[2]):''; var ent=CAT[key];
+        if(/getGeneratorStats/.test(u)) return Promise.resolve(JSON.stringify(ent?ent.stats:{error:'not found'}));
+        if(/downloadGenerator/.test(u)) return Promise.resolve(ent?ent.source:'(not found)');
+        if(/getGeneratorsAndDependencies/.test(u)) return Promise.resolve(JSON.stringify({ generator:key, dependencies:['ai-text-plugin','weld-stream-plugin'], source:(ent&&ent.source||'').slice(0,80)+'...' }));
+        if(/getGeneratorList/.test(u)){ var mx=+(key||5); return Promise.resolve(JSON.stringify({ generators:ALL.slice(0,mx) })); }
+        return Promise.resolve('{}');
+      },
+      json:function(u){ return this.text(u).then(JSON.parse); }
+    }});
+    function show(v){ $('out').textContent=(typeof v==='string')?v:JSON.stringify(v,null,2); }
+    $('bStats').onclick=function(){ R.stats($('gen').value).then(show); };
+    $('bSource').onclick=function(){ R.download($('gen').value).then(function(t){ $('out').textContent=t+'\n\n[ hasSource: '+R.hasSource(t)+' ]'; }); };
+    $('bDeps').onclick=function(){ R.withDependencies($('gen').value).then(show); };
+    $('bShot').onclick=function(){ $('out').textContent=R.screenshotUrl($('gen').value); };
+    $('bList').onclick=function(){ R.list({ max: +$('max').value || 5 }).then(function(arr){ $('listout').textContent=JSON.stringify(arr,null,2); }); };
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+
+</script>

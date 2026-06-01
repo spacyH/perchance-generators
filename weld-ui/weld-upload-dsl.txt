@@ -1,0 +1,189 @@
+$meta
+  title       = weld.upload
+  description = A v2 of Perchance's upload-plugin. Same backend (upload.perchance.org), but with the ergonomics the original lacks: a normalized result (the raw URL is a boxed String), pre-upload MIME and size validation with clear errors, progress callbacks, batch uploads with concurrency, fileInfo metadata lookup, deletion, and dedup awareness. Composes with weld.background (cut out before upload) and weld.gallery. Stash on window.weld.upload.
+  tags        = weld, upload, files, storage, v2, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.upload) return window.weld.upload;
+
+  // -----------------------------------------------------------------
+  // weld.upload: upload-plugin, but pleasant.
+  //
+  // The base plugin hands back { url, size, error, deletionUrl } where url
+  // is a BOXED String (so === fails), validates filetypes opaquely
+  // (text/html -> invalid_filetype, JS -> .bin, SVG/PDF kept), and dedups
+  // identical blobs to the same URL. It has no validation-before-upload,
+  // no progress, no batch, no typed errors. weld.upload v2 adds all of it:
+  //
+  //   var r = await weld.upload.file(blob, { accept:['image/*'], maxBytes: 5e6 });
+  //   r.url; r.size; r.deletionUrl;            // plain strings now
+  //   await weld.upload.info(r.url);           // fileInfo metadata
+  //   await weld.upload.remove(r);             // delete via deletionUrl
+  //   await weld.upload.batch(files, { concurrency: 2, onProgress });
+  //
+  // Validation runs BEFORE the network call, so a too-big or wrong-type
+  // file fails instantly with a clear reason instead of an opaque server
+  // rejection. Everything degrades gracefully if the base plugin is absent.
+  // -----------------------------------------------------------------
+
+  var deps = { uploadPlugin: null, fetch: null };
+  function getUploader() {
+    return deps.uploadPlugin
+      || (window.weld && window.weld.__uploadPlugin)
+      || (typeof window !== 'undefined' && typeof window.uploadPlugin === 'function' ? window.uploadPlugin : null)
+      || (typeof uploadPlugin === 'function' ? uploadPlugin : null);
+  }
+  function attach(d) {
+    if (!d) return;
+    if (d.uploadPlugin) deps.uploadPlugin = d.uploadPlugin;
+    if (d.fetch) deps.fetch = d.fetch;
+  }
+  function available() { return !!getUploader(); }
+
+  // ---- validation (before the network) ----
+  function matchesAccept(type, accept) {
+    if (!accept || !accept.length) return true;
+    type = String(type || '');
+    for (var i = 0; i < accept.length; i++) {
+      var a = String(accept[i]);
+      if (a === type) return true;
+      if (a.slice(-2) === '/*' && type.indexOf(a.slice(0, -1)) === 0) return true; // image/*
+      if (a.charAt(0) === '.' && /\.[a-z0-9]+$/i.test(type)) { /* extension form handled by caller */ }
+    }
+    return false;
+  }
+  // filetypes the base backend rejects outright
+  var BLOCKED = { 'text/html': 'invalid_filetype' };
+
+  function validate(blob, opts) {
+    opts = opts || {};
+    if (blob == null) return 'no file provided';
+    var size = (typeof blob.size === 'number') ? blob.size : null;
+    var type = (blob.type != null) ? String(blob.type) : '';
+    if (opts.maxBytes && size != null && size > opts.maxBytes) {
+      return 'file is ' + size + ' bytes, over the ' + opts.maxBytes + '-byte limit';
+    }
+    if (BLOCKED[type]) return type + ' is rejected by the backend (' + BLOCKED[type] + ')';
+    if (opts.accept && type && !matchesAccept(type, opts.accept)) {
+      return 'type "' + type + '" is not in the accept list (' + opts.accept.join(', ') + ')';
+    }
+    return null; // ok
+  }
+
+  // ---- normalize the base plugin's boxed result ----
+  function normalize(res) {
+    if (res == null) return { ok: false, url: null, size: null, deletionUrl: null, error: 'no result', raw: res };
+    var error = res.error ? String(res.error) : null;
+    var url = (res.url != null) ? String(res.url) : null; // unbox the boxed String
+    return {
+      ok: !error && !!url,
+      url: url,
+      size: (typeof res.size === 'number') ? res.size : null,
+      deletionUrl: (res.deletionUrl != null) ? String(res.deletionUrl) : null,
+      error: error,
+      raw: res
+    };
+  }
+
+  // file(blob, opts) -> Promise<normalized result>.
+  // opts: { accept:[mime...], maxBytes, onProgress }
+  function file(blob, opts) {
+    opts = opts || {};
+    var bad = validate(blob, opts);
+    if (bad) return Promise.resolve({ ok: false, url: null, size: (blob && blob.size) || null, deletionUrl: null, error: bad, raw: null });
+
+    var up = getUploader();
+    if (!up) return Promise.resolve({ ok: false, url: null, size: null, deletionUrl: null, error: 'weld.upload: upload-plugin not available', raw: null });
+
+    if (typeof opts.onProgress === 'function') { try { opts.onProgress(0, blob); } catch (e) {} }
+    var call;
+    try { call = up(blob, opts.pluginOpts || {}); }
+    catch (e) { return Promise.resolve({ ok: false, url: null, size: null, deletionUrl: null, error: String(e && e.message || e), raw: null }); }
+
+    return Promise.resolve(call).then(function (res) {
+      if (typeof opts.onProgress === 'function') { try { opts.onProgress(1, blob); } catch (e) {} }
+      return normalize(res);
+    }, function (err) {
+      return { ok: false, url: null, size: null, deletionUrl: null, error: String(err && err.message || err), raw: null };
+    });
+  }
+
+  // batch(files, opts) -> Promise<[normalized...]> with bounded concurrency
+  // and overall progress. opts: { concurrency, onProgress, accept, maxBytes }
+  function batch(files, opts) {
+    opts = opts || {};
+    var list = [].slice.call(files || []);
+    var concurrency = Math.max(1, opts.concurrency || 2);
+    var results = new Array(list.length);
+    var done = 0, next = 0;
+
+    function worker() {
+      if (next >= list.length) return Promise.resolve();
+      var i = next++;
+      return file(list[i], { accept: opts.accept, maxBytes: opts.maxBytes }).then(function (r) {
+        results[i] = r; done++;
+        if (typeof opts.onProgress === 'function') { try { opts.onProgress(done, list.length, r); } catch (e) {} }
+        return worker();
+      });
+    }
+    var workers = [];
+    for (var w = 0; w < Math.min(concurrency, list.length); w++) workers.push(worker());
+    return Promise.all(workers).then(function () { return results; });
+  }
+
+  // info(url) -> Promise<fileInfo metadata | null> via upload.perchance.org.
+  // Uses weld.fetch if attached/available, else a direct fetch.
+  function info(url) {
+    url = (url && url.url) ? String(url.url) : String(url || '');
+    if (!url) return Promise.resolve(null);
+    var endpoint = 'https://upload.perchance.org/api/fileInfo?url=' + encodeURIComponent(url);
+    var wf = deps.fetch || (window.weld && window.weld.fetch) || null;
+    if (wf && typeof wf.json === 'function') return wf.json(endpoint, { direct: false }).catch(function () { return null; });
+    if (typeof fetch === 'function') return fetch(endpoint).then(function (r) { return r.json(); }).catch(function () { return null; });
+    return Promise.resolve(null);
+  }
+
+  // remove(result|deletionUrl) -> Promise<boolean>. Hits the deletionUrl.
+  function remove(target) {
+    var del = (target && target.deletionUrl) ? String(target.deletionUrl) : String(target || '');
+    if (!del) return Promise.resolve(false);
+    var wf = deps.fetch || (window.weld && window.weld.fetch) || null;
+    if (wf && typeof wf.get === 'function') return wf.get(del).then(function (r) { return !!r.ok; }, function () { return false; });
+    if (typeof fetch === 'function') return fetch(del).then(function (r) { return !!(r && (r.ok || r.status === 200)); }, function () { return false; });
+    return Promise.resolve(false);
+  }
+
+  // dataUrlToBlob: convenience for uploading a canvas/dataURL (e.g. a
+  // weld.background cutout or a weld.image generation).
+  function dataUrlToBlob(dataUrl) {
+    var parts = String(dataUrl).split(',');
+    var mime = (parts[0].match(/:(.*?);/) || [])[1] || 'application/octet-stream';
+    var bin = atob(parts[1] || '');
+    var arr = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type: mime });
+  }
+  // fromDataUrl(dataUrl, opts): upload a canvas/dataURL directly.
+  function fromDataUrl(dataUrl, opts) {
+    try { return file(dataUrlToBlob(dataUrl), opts); }
+    catch (e) { return Promise.resolve({ ok: false, url: null, error: 'weld.upload: bad data URL (' + (e && e.message) + ')', raw: null }); }
+  }
+
+  window.weld.upload = {
+    file: file,
+    batch: batch,
+    info: info,
+    remove: remove,
+    fromDataUrl: fromDataUrl,
+    dataUrlToBlob: dataUrlToBlob,
+    validate: validate,
+    normalize: normalize,
+    attach: attach,
+    available: available,
+    version: '1.0.0'
+  };
+
+  return window.weld.upload;

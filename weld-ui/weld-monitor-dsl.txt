@@ -1,0 +1,696 @@
+$meta
+  title       = weld.monitor
+  description = A repeatable regression-test suite for the Perchance platform. Runs ~100 assertions across 8 groups -- infrastructure, public API, environment, the root bridge, upload, superFetch, ai-text, and text-to-image -- with pass/fail/drift/skip and a stable fingerprint so platform drift is one glance away. Exposes the suite programmatically so any app can self-check. Stash on window.weld.monitor.
+  tags        = weld, monitor, test, platform, regression, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.monitor) return window.weld.monitor;
+
+  // -----------------------------------------------------------------
+  // weld.monitor: the executable companion to the Perchance Platform
+  // reference. Everything the docs describe -- the domains, the root
+  // bridge, the sandbox posture, the AI/image plugin contracts -- can
+  // change. This suite pins each one as an assertion and rolls the
+  // results into a single fingerprint, so "is it me or the platform?"
+  // is a one-click answer.
+  //
+  //   var report = await weld.monitor.run({
+  //     onResult:   function (t)  {},   // each platform test, as it lands
+  //     onInfra:    function (t)  {},   // each infrastructure check
+  //     onProgress: function (p, msg) {}
+  //   });
+  //   // report = { counts, tests, infrastructure, fingerprint, startedAt, finishedAt }
+  //
+  // The test logic is verbatim from the standalone monitor; only the
+  // result sink changed -- it emits via callbacks instead of touching
+  // the DOM, so any UI (the example page is one) can render it.
+  // -----------------------------------------------------------------
+
+  // result state + sinks (set per-run)
+  var TESTS, COUNTS, INFRA, ICOUNTS, SINK;
+
+  function rec(g, n, s, e, a, note) {
+    var row = { group: g, name: n, status: s, expected: e, actual: a, note: note || null };
+    TESTS.push(row); COUNTS[s] = (COUNTS[s] || 0) + 1;
+    if (SINK && SINK.onResult) { try { SINK.onResult(row); } catch (x) {} }
+  }
+  function assertEq(g, n, exp, act, o) { o = o || {}; var p = o.cmp ? o.cmp(exp, act) : ss(exp) === ss(act); var s = p ? 'PASS' : (o.soft ? 'DRIFT' : 'FAIL'); rec(g, n, s, exp, act, o.note); return p; }
+  function assertTrue(g, n, act, o) { return assertEq(g, n, true, !!act, o); }
+  function assertSkip(g, n, r) { rec(g, n, 'SKIP', null, null, r); }
+  function ss(v) { try { return JSON.stringify(v); } catch (e) { return String(v); } }
+
+  function infraRec(n, s, exp, act, note) {
+    var row = { group: 'infra', name: n, status: s, expected: exp, actual: act, note: note || null };
+    INFRA.push(row); ICOUNTS[s] = (ICOUNTS[s] || 0) + 1;
+    if (SINK && SINK.onInfra) { try { SINK.onInfra(row); } catch (x) {} }
+  }
+  function infraSkip(n, r) { infraRec(n, 'SKIP', null, null, r); }
+  function setProg(p, m) { if (SINK && SINK.onProgress) { try { SINK.onProgress(p, m || ''); } catch (x) {} } }
+
+  function grab(n){try{if(typeof root!=='undefined'&&root[n]!==undefined)return root[n];}catch(e){}try{if(window[n]!==undefined)return window[n];}catch(e){}return undefined;}
+  function ownKeys(o){if(o==null)return[];try{return Object.getOwnPropertyNames(o).filter(function(k){return!/^\d+$/.test(k)&&k!=='length';}).sort();}catch(e){return[];}}
+  function sleep(ms){return new Promise(function(r){setTimeout(r,ms);});}
+  function T(p,ms,lbl){return new Promise(function(res,rej){var d=false;var t=setTimeout(function(){if(!d){d=true;rej(new Error('TIMEOUT '+(lbl||'')));}},ms);Promise.resolve(p).then(function(v){if(!d){d=true;clearTimeout(t);res(v);}},function(e){if(!d){d=true;clearTimeout(t);rej(e);}});});}
+  function arrEq(a,b){if(!Array.isArray(a)||!Array.isArray(b)||a.length!==b.length)return false;var x=a.slice().sort(),y=b.slice().sort();for(var i=0;i<x.length;i++)if(x[i]!==y[i])return false;return true;}
+  function supOf(a,e){return Array.isArray(a)&&Array.isArray(e)&&e.every(function(k){return a.indexOf(k)!==-1;});}
+  function fnv(s){var h=0x811c9dc5;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=(h*0x01000193)>>>0;}return('00000000'+h.toString(16)).slice(-8);}
+  var pn=performance.now.bind(performance);
+
+  async function testInfra(){
+    setProg(0,'0 · Infrastructure diagnostics');
+    var sf=grab('superFetch');
+    var sfAvail=typeof sf==='function';
+    var directOk=0,directFail=0,proxyOk=0,proxyFail=0;
+
+    /* ─── TIER A: Cloudflare status (via superFetch — depends on CF) ─── */
+    if(sfAvail){
+      try{
+        var stR=await T(sf('https://www.cloudflarestatus.com/api/v2/status.json'),15000,'cf-st');
+        var stJ=await stR.json();
+        var ind=stJ&&stJ.status&&stJ.status.indicator||'unknown';
+        var desc=stJ&&stJ.status&&stJ.status.description||'';
+        infraRec('CF: overall status',ind==='none'?'PASS':'DRIFT',
+          'none (All Systems Operational)',ind+' ('+desc+')',
+          ind==='none'?null:'Cloudflare reports issues — may explain test failures');
+        proxyOk++;
+      }catch(e){infraSkip('CF: overall status','fetch failed: '+String(e&&e.message||e));proxyFail++;}
+
+      try{
+        var cpR=await T(sf('https://www.cloudflarestatus.com/api/v2/components.json'),15000,'cf-cp');
+        var cpJ=await cpR.json();
+        var comps=(cpJ&&cpJ.components)||[];
+        var bad=comps.filter(function(c){return c.status!=='operational'&&!c.group;});
+        if(bad.length===0) infraRec('CF: components','PASS','all operational','all '+comps.length+' operational',null);
+        else infraRec('CF: components','DRIFT','all operational',bad.length+' degraded: '+bad.map(function(c){return c.name+':'+c.status;}).join(', '),null);
+      }catch(e){infraSkip('CF: components','fetch failed');}
+
+      try{
+        var incR=await T(sf('https://www.cloudflarestatus.com/api/v2/incidents/unresolved.json'),15000,'cf-inc');
+        var incJ=await incR.json();
+        var incs=(incJ&&incJ.incidents)||[];
+        if(incs.length===0) infraRec('CF: active incidents','PASS','0','0 active',null);
+        else infraRec('CF: active incidents','DRIFT','0',incs.length+': '+incs.map(function(i){return i.name+' ['+i.impact+']';}).join('; '),null);
+      }catch(e){infraSkip('CF: active incidents','fetch failed');}
+
+      try{
+        var mxR=await T(sf('https://www.cloudflarestatus.com/api/v2/scheduled-maintenances/active.json'),15000,'cf-mx');
+        var mxJ=await mxR.json();
+        var mxs=(mxJ&&mxJ.scheduled_maintenances)||[];
+        if(mxs.length===0) infraRec('CF: maintenance','PASS','none','no active maintenance',null);
+        else infraRec('CF: maintenance','DRIFT','none',mxs.length+': '+mxs.map(function(m){return m.name;}).join('; '),null);
+      }catch(e){infraSkip('CF: maintenance','fetch failed');}
+    }else{
+      infraSkip('CF: status','superFetch unavailable');
+    }
+
+    /* ─── TIER A2: GitHub status (via superFetch — Fastly-hosted, but transport is CF) ─── */
+    if(sfAvail){
+      try{
+        var ghR=await T(sf('https://www.githubstatus.com/api/v2/status.json'),15000,'gh-st');
+        var ghJ=await ghR.json();
+        var ghInd=ghJ&&ghJ.status&&ghJ.status.indicator||'unknown';
+        var ghDesc=ghJ&&ghJ.status&&ghJ.status.description||'';
+        infraRec('GitHub: status (via proxy)',ghInd==='none'?'PASS':'DRIFT',
+          'none',ghInd+' ('+ghDesc+')',
+          ghInd==='none'?'Fastly-hosted; fetched through CF proxy':null);
+        proxyOk++;
+      }catch(e){infraSkip('GitHub: status (via proxy)','fetch failed');proxyFail++;}
+    }
+
+    /* ─── TIER B: CF-independent checks (direct fetch — still works if CF is down) ─── */
+
+    // Google DNS-over-HTTPS — Google infrastructure, CORS-enabled, no CF dependency
+    try{
+      var t0=pn();
+      var dnsR=await T(fetch('https://dns.google/resolve?name=perchance.org&type=A'),10000,'dns');
+      var dnsMs=pn()-t0;
+      var dnsJ=await dnsR.json();
+      var resolved=dnsJ&&dnsJ.Answer&&dnsJ.Answer.length>0;
+      infraRec('Google DNS (dns.google)',resolved?'PASS':'DRIFT',
+        'resolves perchance.org',resolved?'resolved in '+Math.round(dnsMs)+'ms':'no answer records',
+        'Google infrastructure — independent of Cloudflare');
+      directOk++;
+    }catch(e){infraSkip('Google DNS (dns.google)','failed: '+String(e&&e.message||e));directFail++;}
+
+    // GitHub API — Fastly CDN, CORS-enabled, no CF
+    try{
+      var t1=pn();
+      var zenR=await T(fetch('https://api.github.com/zen'),10000,'zen');
+      var zenMs=pn()-t1;
+      var zenT=await zenR.text();
+      infraRec('GitHub API (api.github.com)',zenT.length>5?'PASS':'DRIFT',
+        'returns content',zenT.length+' chars in '+Math.round(zenMs)+'ms',
+        'Fastly CDN — independent of Cloudflare');
+      directOk++;
+    }catch(e){infraSkip('GitHub API (api.github.com)','failed: '+String(e&&e.message||e));directFail++;}
+
+    // GitHub Status direct — Fastly/Atlassian, CORS
+    try{
+      var t2=pn();
+      var ghDR=await T(fetch('https://www.githubstatus.com/api/v2/status.json'),10000,'gh-direct');
+      var ghDMs=pn()-t2;
+      var ghDJ=await ghDR.json();
+      var ghDInd=ghDJ&&ghDJ.status&&ghDJ.status.indicator||'unknown';
+      infraRec('GitHub Status (direct fetch)',ghDInd==='none'?'PASS':'DRIFT',
+        'none',ghDInd+' in '+Math.round(ghDMs)+'ms',
+        'Same data as proxy path — but this one survives a CF outage');
+      directOk++;
+    }catch(e){infraSkip('GitHub Status (direct fetch)','failed (may lack CORS): '+String(e&&e.message||e));directFail++;}
+
+    // raw.githubusercontent.com — on superFetch bypass list, Fastly CDN
+    try{
+      var t3=pn();
+      var rawR=await T(fetch('https://raw.githubusercontent.com/jquery/jquery/3.7.1/package.json'),10000,'raw-gh');
+      var rawMs=pn()-t3;
+      var rawOk=rawR.ok;
+      infraRec('GitHub Raw (bypass list)',rawOk?'PASS':'DRIFT',
+        'reachable','HTTP '+rawR.status+' in '+Math.round(rawMs)+'ms',
+        'Fastly CDN, on superFetch bypass list — no CF dependency');
+      directOk++;
+    }catch(e){infraSkip('GitHub Raw (bypass list)','failed: '+String(e&&e.message||e));directFail++;}
+
+    // cdn.jsdelivr.net — on bypass list, multi-CDN (Fastly/Bunny/CF)
+    try{
+      var t4=pn();
+      var jsdR=await T(fetch('https://cdn.jsdelivr.net/npm/lodash@4.17.21/package.json'),10000,'jsdelivr');
+      var jsdMs=pn()-t4;
+      infraRec('jsdelivr CDN (bypass list)',jsdR.ok?'PASS':'DRIFT',
+        'reachable','HTTP '+jsdR.status+' in '+Math.round(jsdMs)+'ms',
+        'Multi-CDN (Fastly/Bunny/CF) — partially CF-independent');
+      directOk++;
+    }catch(e){infraSkip('jsdelivr CDN (bypass list)','failed: '+String(e&&e.message||e));directFail++;}
+
+    /* ─── TIER C: Perchance infrastructure latency ─── */
+    var brokers=[
+      ['perchance.org','https://perchance.org/api/getGeneratorStats?name=ai-text-plugin'],
+      ['text-generation broker','https://text-generation.perchance.org/embed'],
+      ['image-generation broker','https://image-generation.perchance.org/'],
+      ['upload service','https://upload.perchance.org/'],
+      ['fetch proxy','https://fetch-plugin.perchance.org/'],
+    ];
+    for(var bi=0;bi<brokers.length;bi++){
+      var bN=brokers[bi][0],bU=brokers[bi][1];
+      var bt0=pn(),bReach=false,bNote='';
+      try{
+        if(sfAvail){var br=await T(sf(bU),15000,'bk'+bi);bReach=true;bNote=Math.round(pn()-bt0)+'ms';}
+        else{await T(fetch(bU,{mode:'no-cors'}),10000,'bk'+bi);bReach=true;bNote=Math.round(pn()-bt0)+'ms (no-cors)';}
+      }catch(e){bNote='unreachable: '+String(e&&e.message||e);}
+      infraRec('Perchance: '+bN,bReach?'PASS':'DRIFT','reachable',bReach?bNote:'DOWN — '+bNote,
+        bReach?null:'Broker down → related test group will fail');
+    }
+
+    /* ─── DIAGNOSTIC SUMMARY ─── */
+    var diag='';
+    if(proxyFail>0 && directOk>0){
+      diag='CF PROXY DOWN — superFetch failed but direct fetches work. Cloudflare is likely the issue.';
+    }else if(proxyFail>0 && directFail>0 && directOk===0){
+      diag='NETWORK ISSUE — both proxy and direct fetches failed. Local connectivity problem or total outage.';
+    }else if(proxyOk>0 && directOk>0){
+      diag='ALL CLEAR — both Cloudflare proxy and direct (non-CF) paths are working.';
+    }else if(proxyOk>0 && directFail>0){
+      diag='PARTIAL — CF proxy works but some direct fetches failed. Non-CF CDNs may have issues.';
+    }else{
+      diag='INCONCLUSIVE — not enough data points to determine infrastructure state.';
+    }
+    var diagStatus=(proxyFail>0||directFail>1)?'DRIFT':'PASS';
+    infraRec('DIAGNOSTIC',diagStatus,'ALL CLEAR',diag,
+      'proxy: '+proxyOk+' ok / '+proxyFail+' fail | direct: '+directOk+' ok / '+directFail+' fail');
+  }
+
+  /* ═══ 1 · ENVIRONMENT ═══ */
+  async function testEnv(){
+    setProg(10,'2 · Environment');
+    assertEq('env','crossOriginIsolated',false,window.crossOriginIsolated);
+    assertTrue('env','generatorPublicId is 32 hex',typeof window.generatorPublicId==='string'&&window.generatorPublicId.length===32&&/^[a-f0-9]+$/.test(window.generatorPublicId));
+    assertTrue('env','generatorName is non-empty string',typeof window.generatorName==='string'&&window.generatorName.length>0);
+    // v3: generatorLastEditTime
+    assertTrue('env','generatorLastEditTime is a number',typeof window.generatorLastEditTime==='number'&&window.generatorLastEditTime>0);
+
+    // v3 FIX: window.open — accept either 'blocked' or 'opened' (varies by sandbox config)
+    var wo;try{var w=window.open('','_blank');if(w){w.close();wo='opened';}else wo='blocked';}catch(e){wo='threw';}
+    assertTrue('env','window.open blocked or opened',wo==='blocked'||wo==='opened',{note:'got: '+wo+'; expected blocked in sandbox'});
+
+    var notifPerm=typeof Notification!=='undefined'?Notification.permission:'absent';
+    assertTrue('env','Notification.permission is denied or default',notifPerm==='denied'||notifPerm==='default',{note:'got: '+notifPerm});
+    assertEq('env','typeof SharedArrayBuffer','undefined',typeof SharedArrayBuffer);
+    assertTrue('env','indexedDB present',typeof indexedDB!=='undefined');
+    assertTrue('env','caches present',typeof caches!=='undefined');
+    assertTrue('env','localStorage works',(function(){try{localStorage.setItem('__m','1');localStorage.removeItem('__m');return true;}catch(e){return false;}})());
+    assertTrue('env','cookies writable',(function(){try{document.cookie='__m2=1';return document.cookie.indexOf('__m2=1')!==-1;}catch(e){return false;}})());
+    // v3: Fullscreen API
+    assertTrue('env','Fullscreen API available',typeof document.documentElement.requestFullscreen==='function'||typeof document.documentElement.webkitRequestFullscreen==='function');
+    // v3: Camera/mic
+    assertTrue('env','mediaDevices present',!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia));
+
+    // Broker iframe check moved to end of testText (broker loads on first AI call)
+  }
+
+  /* ═══ 2 · ROOT PROXY & DSL ═══ */
+  async function testRoot(){
+    setProg(15,'3 · root Proxy');
+    if(typeof root==='undefined'){assertSkip('root','root','root undefined');return;}
+    assertEq('root','typeof root','function',(function(){try{return typeof root;}catch(e){return 'threw';}})());
+    assertEq('root',"'aiTextPlugin' in root",true,(function(){try{return 'aiTextPlugin' in root;}catch(e){return 'threw';}})());
+    assertEq('root','root.<missing> → undefined','undefined',(function(){try{return typeof root.__x_miss__;}catch(e){return 'threw';}})());
+    assertEq('root','Reflect.ownKeys throws','threw',(function(){try{Reflect.ownKeys(root);return'ok';}catch(e){return'threw';}})());
+    assertEq('root','JSON.stringify(root)','undefined',(function(){try{return String(JSON.stringify(root));}catch(e){return'threw';}})());
+    ['aiTextPlugin','textToImagePlugin','uploadPlugin','superFetch'].forEach(function(h){
+      assertEq('root','handle: '+h,true,(function(){try{return h in root;}catch(e){return false;}})());
+    });
+    // v3: DSL list object
+    var list;try{list=root.monitorTestList;}catch(e){}
+    if(list&&typeof list==='object'){
+      assertTrue('root','DSL list has $root key',ownKeys(list).indexOf('$root')!==-1);
+      assertTrue('root','DSL list.evaluateItem is string',typeof list.evaluateItem==='string');
+    }else{assertSkip('root','DSL list','monitorTestList not in root — check top-editor');}
+    // v3: DSL function returns undefined (one-way bridge)
+    var fn;try{fn=root.monitorTestFunc;}catch(e){}
+    if(typeof fn==='function'){
+      var ret;try{ret=fn('hello');}catch(e){ret='threw';}
+      assertEq('root','DSL func returns undefined',undefined,ret,{note:'one-way bridge — return values are dropped'});
+    }else{assertSkip('root','DSL func','monitorTestFunc not in root — check top-editor');}
+    // v3: kv-plugin
+    var kv;try{kv=root.kv;}catch(e){}
+    if(kv&&typeof kv==='object'&&kv.folder){
+      try{
+        var folder=kv.folder;
+        if(typeof folder.set==='function'&&typeof folder.get==='function'){
+          var testKey='__monitor_v3_'+Date.now();
+          await folder.set(testKey,'testval');
+          var got=await folder.get(testKey);
+          assertEq('root','kv set/get round-trip','testval',got);
+          await folder.delete(testKey);
+        }else{assertSkip('root','kv set/get','kv.folder.set not a function');}
+      }catch(e){assertSkip('root','kv set/get error','kv threw: '+String(e&&e.message||e));}
+    }else{assertSkip('root','kv unavailable','kv-plugin not available');}
+  }
+
+  /* ═══ 3 · AI-TEXT-PLUGIN ═══ */
+  async function testText(){
+    setProg(48,'6 · ai-text-plugin');
+    var plugin=grab('aiTextPlugin');
+    if(typeof plugin!=='function'){assertSkip('text','plugin','not callable');return;}
+    // getMetaObject
+    var meta;try{meta=plugin({getMetaObject:true});}catch(e){}
+    assertTrue('text','getMetaObject is object',meta&&typeof meta==='object');
+    assertEq('text','idealMaxContextTokens=6000',6000,meta&&meta.idealMaxContextTokens);
+    assertEq('text','typeof countTokens','function',typeof(meta&&meta.countTokens));
+    if(meta&&meta.countTokens){
+      var ct=meta.countTokens('Hello, world! This is a test sentence.');
+      assertTrue('text','countTokens in [5,20]',typeof ct==='number'&&ct>=5&&ct<=20,{note:'got '+ct});
+    }
+    // Handle
+    var handle;try{handle=plugin({instruction:'Write a detailed paragraph about the history of astronomy, covering ancient civilizations through the telescope era.',startWith:''});}
+    catch(e){assertSkip('text','handle','threw');return;}
+    var EH=['id','inputs','liveResponseText','loadingIndicatorHtml','onFinishPromise','stop','submitUserRating','textStream','toString'];
+    assertEq('text','handle 9 props',EH,ownKeys(handle).filter(function(k){return EH.indexOf(k)!==-1;}).sort(),{cmp:arrEq});
+    assertTrue('text','textStream is ReadableStream',handle.textStream instanceof ReadableStream);
+    assertTrue('text','id format',typeof handle.id==='string'&&/^aiTextCompletion\d+$/.test(handle.id));
+    assertEq('text','submitUserRating.length=1',1,handle.submitUserRating&&handle.submitUserRating.length);
+    assertTrue('text','handle.inputs.instruction exists',handle.inputs&&typeof handle.inputs.instruction==='string');
+
+    // v3: sample liveResponseText during generation
+    var lrtSamples=[],lrtDone=false;
+    (async function(){while(!lrtDone){await sleep(1000);try{lrtSamples.push(String(handle.liveResponseText||'').length);}catch(e){}}})();
+
+    var result,err;try{result=await T(handle,90000,'gen');}catch(e){err=String(e&&e.message||e);}
+    lrtDone=true;
+    if(err){assertSkip('text','generation','failed: '+err);return;}
+    // v3: liveResponseText grew
+    if(lrtSamples.length>=2){
+      assertTrue('text','liveResponseText updates live',lrtSamples[lrtSamples.length-1]>lrtSamples[0],
+        {note:'samples: ['+lrtSamples.join(',')+']'});
+    }else{assertSkip('text','liveResponseText','not enough samples (gen was too fast)');}
+
+    assertTrue('text','result instanceof String',result instanceof String);
+    assertEq('text','typeof result','object',typeof result);
+    assertEq('text','result keys',['generatedText','stopReason','text'],ownKeys(result),{cmp:arrEq});
+    assertTrue('text','stopReason in vocab',['natural','artificial','error','user'].indexOf(String(result.stopReason))!==-1);
+    // These two probes INTENTIONALLY use !== / === on a boxed String: the
+    // first proves the box is not its own text (the trap), the second proves
+    // coercion fixes it. The strict comparison here is the test, not a bug.
+    assertTrue('text','boxed trap: result !== generatedText',result!==result.generatedText);
+    assertTrue('text','String(result) === generatedText',String(result)===result.generatedText);
+    // onFinishPromise shape
+    try{var ofp=await T(handle.onFinishPromise,5000,'ofp');
+      assertEq('text','onFinishPromise keys',['generatedText','stopReason','text'],ownKeys(ofp),{cmp:arrEq});
+    }catch(e){assertSkip('text','onFinishPromise','failed');}
+
+    // Speculative opts dead
+    setProg(54,'6 · speculative opts');
+    try{var sp=await T(plugin({instruction:'List 10 fruits, one per line.',startWith:'',temperature:0.01,maxTokens:3,max_tokens:3,model:'gpt-4'}),90000,'spec');
+      assertTrue('text','speculative opts dead (output>15ch)',String(sp).length>15,{note:String(sp).length+' chars'});
+    }catch(e){assertSkip('text','speculative opts','failed');}
+
+    // stopSequences 21/20
+    setProg(58,'6 · stopSequences');
+    var s21=[],s20=[];for(var i=0;i<21;i++){s21.push('zq'+i);if(i<20)s20.push('zq'+i);}
+    try{var r21=await T(plugin({instruction:'Hi',startWith:'',stopSequences:s21}),30000,'21');
+      assertEq('text','21 stops → error','error',String(r21.stopReason));
+      assertEq('text','21 stops → empty','',String(r21.generatedText||''));
+    }catch(e){assertSkip('text','21 stops','failed');}
+    try{var r20=await T(plugin({instruction:'Hi',startWith:'',stopSequences:s20}),60000,'20');
+      assertTrue('text','20 stops → not error',String(r20.stopReason)!=='error');
+    }catch(e){assertSkip('text','20 stops','failed');}
+
+    // .stop() → "user"
+    setProg(62,'6 · .stop()');
+    try{var ck=0,sh;
+      sh=plugin({instruction:'Count from one to fifty.',startWith:'',onChunk:function(){ck++;if(ck>=2)try{sh.stop();}catch(e){}}});
+      var sr=await T(sh,60000,'stop');
+      assertEq('text','.stop() → "user"','user',String(sr.stopReason));
+    }catch(e){assertSkip('text','.stop()','failed');}
+
+    // textStream yields strings
+    setProg(66,'6 · textStream');
+    try{var sh2=plugin({instruction:'Say hello.',startWith:''});
+      var chunks=[],it=sh2.textStream[Symbol.asyncIterator](),cx=0;
+      while(cx<500){var step=await T(it.next(),60000,'ch');if(step.done)break;chunks.push(step.value);cx++;}
+      await T(sh2,5000,'fin');
+      assertTrue('text','textStream >0 chunks',chunks.length>0);
+      assertTrue('text','textStream chunks are strings',chunks.every(function(c){return typeof c==='string';}));
+    }catch(e){assertSkip('text','textStream','failed: '+String(e&&e.message||e));}
+
+    // v3: concurrency — serial per broker
+    setProg(68,'6 · concurrency');
+    try{
+      var ct0=pn();
+      var c1Done=0,c2Done=0;
+      var c1=plugin({instruction:'Write a short sentence about the sky.',startWith:''});
+      var c2=plugin({instruction:'Write a short sentence about the sea.',startWith:''});
+      // Record actual resolution timestamps via .then()
+      Promise.resolve(c1).then(function(){c1Done=pn();});
+      Promise.resolve(c2).then(function(){c2Done=pn();});
+      await T(c1,90000,'c1');
+      await T(c2,90000,'c2');
+      if(!c1Done)c1Done=pn(); if(!c2Done)c2Done=pn();
+      var totalMs=c2Done-ct0, firstMs=c1Done-ct0;
+      // Serial: total ≈ c1 + c2 → total significantly > first alone
+      // Parallel: total ≈ max(c1,c2) → total roughly equals first
+      // Check: c2 resolved AFTER c1 AND total is >1.15x first
+      assertTrue('text','serial: c2 finished after c1',c2Done>c1Done,
+        {note:'c1 done at '+Math.round(firstMs)+'ms, c2 done at '+Math.round(totalMs)+'ms'});
+      assertTrue('text','serial: total > 1.15x first call',totalMs>firstMs*1.15,
+        {note:'total='+Math.round(totalMs)+'ms, first='+Math.round(firstMs)+'ms, ratio='+((totalMs/firstMs).toFixed(2))});
+    }catch(e){assertSkip('text','concurrency','failed: '+String(e&&e.message||e));}
+
+    // Broker iframe check (moved here from env — broker loads on first AI call)
+    var iframes=document.querySelectorAll('iframe');
+    var brokerFound=false;
+    for(var bi=0;bi<iframes.length;bi++){if(/text-generation\.perchance\.org\/embed/.test(iframes[bi].src||''))brokerFound=true;}
+    assertTrue('text','text-gen broker iframe present',brokerFound,{note:'checked '+iframes.length+' iframes after AI calls'});
+  }
+
+  /* ═══ 4 · TEXT-TO-IMAGE-PLUGIN ═══ */
+  async function testImage(){
+    setProg(74,'7 · text-to-image-plugin');
+    var t2i=grab('textToImagePlugin');
+    if(typeof t2i!=='function'){assertSkip('image','plugin','not callable');return;}
+    // Sync shape
+    var sync;try{sync=t2i({prompt:'a blue circle',resolution:'512x512'});}catch(e){}
+    if(!sync){assertSkip('image','sync','threw');return;}
+    assertEq('image','sync not boxed String',false,sync instanceof String);
+    assertEq('image','sync keys',['evaluateItem','iframeHtml','onFinishPromise','toString'],ownKeys(sync),{cmp:arrEq});
+    // Await + shape
+    var t0=pn(),data,err;
+    try{data=await T(sync,50000,'img');}catch(e){err=String(e&&e.message||e);}
+    var imgMs=pn()-t0;
+    if(err){assertSkip('image','generation','failed: '+err);return;}
+    assertTrue('image','result instanceof String',data instanceof String);
+    assertEq('image','result keys',['canvas','dataUrl','inputs'],ownKeys(data),{cmp:arrEq});
+    assertEq('image','canvas 512x512',[512,512],[data.canvas.width,data.canvas.height]);
+    assertTrue('image','inputs has documented keys',supOf(ownKeys(data.inputs),['prompt','seed','resolution','guidanceScale','negativePrompt']));
+    assertEq('image','guidanceScale default=7',7,data.inputs.guidanceScale);
+    assertTrue('image','negativePrompt in inputs',data.inputs.negativePrompt!==undefined);
+    // v3: generation time in expected range
+    assertTrue('image','gen time 2-30s',imgMs>2000&&imgMs<30000,{note:Math.round(imgMs)+'ms',soft:true});
+
+    // v3: other valid resolutions — batch test all 3 remaining
+    setProg(80,'7 · resolutions');
+    var resTests=[ ['768x768',768,768],['512x768',512,768],['768x512',768,512]];
+    for(var ri=0;ri<resTests.length;ri++){
+      var rn=resTests[ri][0],rw=resTests[ri][1],rh=resTests[ri][2];
+      try{var rd=await T(t2i({prompt:'a dot',resolution:rn}),50000,rn);
+        assertEq('image',rn+' → '+rw+'x'+rh,[rw,rh],[rd.canvas.width,rd.canvas.height]);
+      }catch(e){assertSkip('image',rn,'failed: '+String(e&&e.message||e));}
+    }
+
+    // 1024x1024 rejected — either resolves with 0x0 canvas or hangs (both = rejection)
+    setProg(86,'7 · invalid resolution');
+    var inv1024Ok=false,invNote='';
+    try{var inv=await T(t2i({prompt:'a dot',resolution:'1024x1024'}),5000,'1024');
+      inv1024Ok=(inv.canvas.width===0&&inv.canvas.height===0);
+      invNote='canvas '+inv.canvas.width+'x'+inv.canvas.height;
+    }catch(e){inv1024Ok=true;invNote='timed out (never resolved — valid rejection)';}
+    assertTrue('image','1024x1024 rejected',inv1024Ok,{note:invNote});
+
+    // v3: multiple inline params in one call
+    setProg(88,'7 · inline params');
+    try{var ip=await T(t2i({prompt:'a star (seed:::42)(guidanceScale:::15)(saveTitle:::probetest)'}),50000,'inline');
+      assertEq('image','(seed:::42)=42',42,ip.inputs.seed);
+      assertEq('image','(guidanceScale:::15)=15',15,ip.inputs.guidanceScale);
+      assertEq('image','(saveTitle:::probetest)','probetest',ip.inputs.saveTitle);
+      assertTrue('image','params stripped from prompt',String(ip.inputs.prompt).indexOf(':::')===-1);
+    }catch(e){assertSkip('image','inline params','failed: '+String(e&&e.message||e));}
+
+    // Empty prompt hangs (5s timeout)
+    var emptyOk=false;
+    try{await T(t2i({prompt:'',resolution:'512x512'}),5000,'empty');emptyOk=true;}catch(e){}
+    assertEq('image','empty prompt hangs',false,emptyOk);
+
+    // v3: removeBackground — produces PNG
+    setProg(92,'7 · removeBackground');
+    try{var rb=await T(t2i({prompt:'a red apple, white background',resolution:'512x512',removeBackground:true}),90000,'rmbg');
+      assertTrue('image','removeBackground → PNG dataUrl',typeof rb.dataUrl==='string'&&rb.dataUrl.indexOf('data:image/png')===0,
+        {note:rb.dataUrl?rb.dataUrl.slice(0,30):'(absent)'});
+    }catch(e){assertSkip('image','removeBackground','failed (model download may have timed out): '+String(e&&e.message||e));}
+  }
+
+  /* ═══ 5 · UPLOAD-PLUGIN ═══ */
+  async function testUpload(){
+    setProg(22,'4 · upload-plugin');
+    var up=grab('uploadPlugin');
+    if(typeof up!=='function'){assertSkip('upload','plugin','not callable');return;}
+    // Basic upload
+    var blob=new Blob(['mv3 '+Math.random()],{type:'text/plain'});
+    var r,err;try{r=await T(up(blob),30000,'up');}catch(e){err=String(e&&e.message||e);}
+    if(err){assertSkip('upload','basic','failed: '+err);return;}
+    assertTrue('upload','has url/size/error/deletionUrl',supOf(ownKeys(r),['url','size','error','deletionUrl']));
+    assertTrue('upload','url is boxed String',r.url instanceof String);
+    assertEq('upload','size matches',blob.size,r.size);
+    assertTrue('upload','deletionUrl format',typeof r.deletionUrl==='string'&&r.deletionUrl.indexOf('/api/delete')!==-1);
+    // Content addressing
+    var dup=new Blob(['dedup-xyz-fixed'],{type:'text/plain'});
+    try{var d1=await T(up(dup),15000,'d1'),d2=await T(up(dup),15000,'d2');
+      assertEq('upload','dedup: same blob → same URL',String(d1.url),String(d2.url));
+    }catch(e){assertSkip('upload','dedup','failed');}
+    // text/html rejected
+    try{var html=await T(up(new Blob(['<html></html>'],{type:'text/html'})),25000,'html');
+      assertEq('upload','text/html → invalid_filetype','invalid_filetype',String(html&&html.error));
+    }catch(e){assertSkip('upload','text/html','failed');}
+    // JS → .bin
+    try{var js=await T(up(new Blob(['alert(1)'],{type:'application/javascript'})),15000,'js');
+      assertTrue('upload','JS accepted',!js.error);
+      assertTrue('upload','JS → .bin',String(js.url).endsWith('.bin'));
+    }catch(e){assertSkip('upload','JS','failed');}
+    // SVG → .svg
+    try{var svg=await T(up(new Blob(['<svg xmlns="http://www.w3.org/2000/svg"/>'],{type:'image/svg+xml'})),15000,'svg');
+      assertTrue('upload','SVG accepted',!svg.error);
+      assertTrue('upload','SVG → .svg',String(svg.url).endsWith('.svg'));
+    }catch(e){assertSkip('upload','SVG','failed');}
+    // v3: PDF accepted
+    try{var pdf=await T(up(new Blob(['%PDF-1.4 test'],{type:'application/pdf'})),15000,'pdf');
+      assertTrue('upload','PDF accepted',!pdf.error);
+    }catch(e){assertSkip('upload','PDF','failed');}
+    // v3: webp, mp4, mp3
+    var mimes=[ ['image/webp','webp'],['video/mp4','mp4'],['audio/mpeg','mp3']];
+    for(var mi=0;mi<mimes.length;mi++){
+      var mime=mimes[mi][0],ext=mimes[mi][1];
+      try{var mr=await T(up(new Blob(['test'+mi],{type:mime})),15000,ext);
+        assertTrue('upload',ext+' accepted',!mr.error);
+      }catch(e){assertSkip('upload',ext,'failed');}
+    }
+    // expires strict format
+    try{var exp=await T(up(new Blob(['e'+Math.random()],{type:'text/plain'}),{expires:3600}),15000,'exp');
+      assertEq('upload','expires:3600 → invalid_expiry','invalid_expiry',String(exp&&exp.error));
+    }catch(e){assertSkip('upload','expires','failed');}
+    // v3: zero-byte blob
+    try{var zb=await T(up(new Blob([],{type:'text/plain'})),15000,'zero');
+      assertTrue('upload','zero-byte accepted',!zb.error);
+    }catch(e){assertSkip('upload','zero-byte','failed');}
+    // v3: 5MB accepted
+    try{var big=new Blob([new Uint8Array(5*1024*1024)],{type:'application/octet-stream'});
+      var br=await T(up(big),30000,'5mb');
+      assertTrue('upload','5MB accepted',!br.error);
+    }catch(e){assertSkip('upload','5MB','failed: '+String(e&&e.message||e));}
+    // v3: 6MB rejected
+    try{var huge=new Blob([new Uint8Array(6*1024*1024)],{type:'application/octet-stream'});
+      var hr=await T(up(huge),30000,'6mb');
+      assertEq('upload','6MB → file_too_big','file_too_big',String(hr&&hr.error));
+    }catch(e){assertSkip('upload','6MB','failed: '+String(e&&e.message||e));}
+    // Deletion works
+    try{var del=await T(up(new Blob(['del'+Math.random()],{type:'text/plain'})),15000,'del');
+      await fetch(del.deletionUrl);await sleep(1000);
+      var chk=await fetch(String(del.url));
+      assertTrue('upload','deletion → 404',chk.status===404,{note:'got '+chk.status});
+    }catch(e){assertSkip('upload','deletion','failed');}
+  }
+
+  /* ═══ 6 · SUPERFETCH ═══ */
+  async function testFetch(){
+    setProg(38,'5 · superFetch');
+    var sf=grab('superFetch');
+    if(typeof sf!=='function'){assertSkip('fetch','plugin','not callable');return;}
+    // Headers stripped
+    try{var hr=await T(sf('https://httpbin.org/headers?_='+Date.now(),{headers:{'X-Mon':'sec42'}}),20000,'hdr');
+      var hj=await hr.json();
+      assertEq('fetch','headers stripped',false,JSON.stringify(hj.headers||{}).indexOf('sec42')!==-1);
+    }catch(e){assertSkip('fetch','headers','failed');}
+    // v3: SSRF — 5 targets
+    var ssrfTargets=['http://169.254.169.254/latest/meta-data/','http://localhost:80/','http://127.0.0.1/','http://10.0.0.1/','http://192.168.1.1/'];
+    for(var si=0;si<ssrfTargets.length;si++){
+      var url=ssrfTargets[si],label=url.replace(/https?:\/\//,'').replace(/\/.*/,'');
+      var blocked=false;
+      try{await T(sf(url),10000,'ssrf');} catch(e){blocked=true;}
+      assertEq('fetch','SSRF: '+label+' blocked',true,blocked);
+    }
+    // Bypass — raw.githubusercontent
+    try{var t0=pn();var bp=await T(sf('https://raw.githubusercontent.com/jquery/jquery/3.7.1/package.json'),20000,'bp');
+      assertTrue('fetch','github bypass <3s',(pn()-t0)<3000,{note:Math.round(pn()-t0)+'ms'});
+      assertTrue('fetch','github bypass content',(await bp.text()).length>100);
+    }catch(e){assertSkip('fetch','github bypass','failed');}
+    // v3: jsdelivr bypass
+    try{var t1=pn();var jp=await T(sf('https://cdn.jsdelivr.net/npm/lodash@4.17.21/package.json'),20000,'jsdr');
+      assertTrue('fetch','jsdelivr bypass <3s',(pn()-t1)<3000,{note:Math.round(pn()-t1)+'ms'});
+    }catch(e){assertSkip('fetch','jsdelivr bypass','failed');}
+    // No 100KB cap
+    try{var big=await T(sf('https://raw.githubusercontent.com/jquery/jquery/3.7.1/dist/jquery.js'),25000,'big');
+      var bt=await big.text();var bs=new Blob([bt]).size;
+      assertTrue('fetch','no 100KB cap',bs>200000,{note:bs.toLocaleString()+' bytes'});
+    }catch(e){assertSkip('fetch','100KB','failed');}
+    // POST body
+    try{var pr=await T(sf('https://httpbin.org/post',{method:'POST',body:JSON.stringify({probe:'mv3'})}),20000,'post');
+      var pj=await pr.json();
+      assertTrue('fetch','POST body forwarded',(pj.json&&pj.json.probe==='mv3')||(typeof pj.data==='string'&&pj.data.indexOf('mv3')!==-1));
+    }catch(e){assertSkip('fetch','POST','failed');}
+    // Cache
+    try{var cu='https://httpbin.org/uuid?fixed=v3c';
+      var ca=await(await T(sf(cu),15000,'c1')).text();
+      var cb=await(await T(sf(cu),15000,'c2')).text();
+      assertEq('fetch','cache: same URL → same',ca,cb);
+    }catch(e){assertSkip('fetch','cache','failed');}
+    // Redirect
+    try{var rr=await T(sf('https://httpbin.org/redirect-to?url='+encodeURIComponent('https://httpbin.org/get')+'&status_code=302'),20000,'redir');
+      assertEq('fetch','302 redirect → 200',200,rr.status);
+    }catch(e){assertSkip('fetch','redirect','failed');}
+    // v3: data: URL
+    try{var dr=await T(sf('data:text/plain;charset=utf-8,hello%20world'),10000,'data');
+      var dt=await dr.text();
+      assertEq('fetch','data: URL → "hello world"','hello world',dt);
+    }catch(e){assertSkip('fetch','data: URL','failed');}
+    // v3: status passthrough (418)
+    try{var tr=await T(sf('https://httpbin.org/status/418'),15000,'418');
+      assertEq('fetch','status 418 passthrough',418,tr.status);
+    }catch(e){assertSkip('fetch','418','failed');}
+  }
+
+  /* ═══ 7 · PUBLIC HTTP API ═══ */
+  async function testApi(){
+    setProg(3,'1 · Public API');
+    var sf=grab('superFetch');
+    if(typeof sf!=='function'){assertSkip('api','api','superFetch unavailable');return;}
+    var gen='ai-text-plugin';
+    var eps=[
+      ['getGeneratorStats','https://perchance.org/api/getGeneratorStats?name='+gen,200],
+      ['getGeneratorList','https://perchance.org/api/getGeneratorList?max=3',200],
+      ['downloadGenerator','https://perchance.org/api/downloadGenerator?generatorName='+gen,200],
+      ['getGeneratorsAndDeps','https://perchance.org/api/getGeneratorsAndDependencies?generatorNames='+gen,200],
+      ['getGeneratorScreenshot','https://perchance.org/api/getGeneratorScreenshot?generatorName='+gen,200],
+    ];
+    for(var i=0;i<eps.length;i++){
+      try{var r=await T(sf(eps[i][1]),15000,eps[i][0]);
+        assertEq('api',eps[i][0]+' → '+eps[i][2],eps[i][2],r.status);
+      }catch(e){assertSkip('api',eps[i][0],'failed');}
+    }
+    // downloadGenerator content
+    try{var dl=await T(sf('https://perchance.org/api/downloadGenerator?generatorName='+gen+'&listsOnly=true'),15000,'dl');
+      var dlt=await dl.text();
+      assertTrue('api','downloadGenerator has source',dlt.length>100&&dlt.indexOf('$output')!==-1);
+    }catch(e){assertSkip('api','downloadGenerator content','failed');}
+    // v3: fileInfo endpoint
+    var up=grab('uploadPlugin');
+    if(typeof up==='function'){
+      try{var blob=new Blob(['fileinfo-test'],{type:'text/plain'});
+        var ur=await T(up(blob),20000,'fi-up');
+        var fiUrl='https://upload.perchance.org/api/fileInfo?url='+encodeURIComponent(String(ur.url));
+        var fi=await T(sf(fiUrl),15000,'fi');
+        assertEq('api','fileInfo → 200',200,fi.status);
+        var fij=await fi.json();
+        assertTrue('api','fileInfo returns JSON metadata',typeof fij==='object'&&(fij.tags!==undefined||fij.extension!==undefined||fij.size!==undefined),
+          {note:'keys: '+Object.keys(fij).join(',')});
+      }catch(e){assertSkip('api','fileInfo','failed: '+String(e&&e.message||e));}
+    }
+  }
+
+  // FNV-1a fingerprint over group:name=status (excludes infra by design).
+  function fingerprint(tests) {
+    var sig = (tests || TESTS || []).map(function (t) { return t.group + ':' + t.name + '=' + t.status; }).join('|');
+    return fnv(sig);
+  }
+
+  var RUNNING = false;
+  function run(opts) {
+    if (RUNNING) return Promise.reject(new Error('weld.monitor: a run is already in progress'));
+    RUNNING = true;
+    SINK = opts || {};
+    TESTS = []; COUNTS = { PASS: 0, FAIL: 0, DRIFT: 0, SKIP: 0 };
+    INFRA = []; ICOUNTS = { PASS: 0, FAIL: 0, DRIFT: 0, SKIP: 0 };
+    var startedAt = new Date().toISOString();
+    var groups = [ ['infra', testInfra], ['api', testApi], ['env', testEnv], ['root', testRoot],
+                  ['upload', testUpload], ['fetch', testFetch], ['text', testText], ['image', testImage]];
+
+    function step(i) {
+      if (i >= groups.length) return Promise.resolve();
+      return Promise.resolve().then(function () { return groups[i][1](); })
+        .catch(function (e) { rec(groups[i][0], 'orchestrator', 'FAIL', 'no-throw', String((e && e.message) || e), null); })
+        .then(function () { return step(i + 1); });
+    }
+
+    return step(0).then(function () {
+      setProg(100, 'complete');
+      var fp = fingerprint(TESTS);
+      var report = {
+        suite: 'weld.monitor', version: '1.0.0',
+        startedAt: startedAt, finishedAt: new Date().toISOString(),
+        userAgent: (typeof navigator !== 'undefined') ? navigator.userAgent : '',
+        counts: COUNTS, fingerprint: fp,
+        tests: TESTS, infrastructure: { counts: ICOUNTS, checks: INFRA }
+      };
+      RUNNING = false;
+      return report;
+    }, function (e) { RUNNING = false; throw e; });
+  }
+
+  var GROUPS = [
+    { id: 'infra',  title: 'Infrastructure Status', note: 'separate from platform fingerprint' },
+    { id: 'api',    title: 'Public HTTP API' },
+    { id: 'env',    title: 'Environment' },
+    { id: 'root',   title: 'root Proxy & DSL Bridge' },
+    { id: 'upload', title: 'upload-plugin' },
+    { id: 'fetch',  title: 'superFetch' },
+    { id: 'text',   title: 'ai-text-plugin', note: 'slow — multiple generations' },
+    { id: 'image',  title: 'text-to-image-plugin', note: 'slowest — multiple images' }
+  ];
+
+  window.weld.monitor = {
+    run: run,
+    fingerprint: fingerprint,
+    isRunning: function () { return RUNNING; },
+    groups: GROUPS,
+    version: '1.0.0'
+  };
+
+  return window.weld.monitor;

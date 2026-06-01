@@ -72,7 +72,7 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
 <div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.image<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-image-example">demo &rarr;</a></span></div>  <div class="hdr">
     <div class="hdr-row">
       <h1>weld.image</h1>
-      <span class="ver">v1.0.0</span>
+      <span class="ver">v1.1.0</span>
     </div>
     <p class="lead">Promise-based text-to-image: styles, batching, retry. A thin wrapper around Perchance's text-to-image-plugin with the ergonomics you actually want.</p>
   </div>
@@ -92,13 +92,26 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
 <pre data-codeid="code3"></pre>
 <h2>Single generation</h2><h3>weld.image.generate(opts)</h3>
 <div class="sig" data-codeid="sig4"></div>
-<p>Wraps the text-to-image plugin in a Promise. Resolves with the result data (typically <code>\{imageId, prompt, seed\}</code>) when generation finishes, or rejects on timeout.</p>
+<p>Wraps the text-to-image plugin in a Promise. Resolves with a <strong>normalized</strong> result object &mdash; <code>&#123; dataUrl, canvas, inputs, seed, text, raw &#125;</code> &mdash; when generation finishes, or rejects on timeout. (The original boxed-String result is kept on <code>raw</code>.)</p>
 <p>Options are passed straight through to the underlying plugin, plus three weld-specific ones:</p>
 <ul>
 <li><code>into</code>: CSS selector or element. The generated iframe is inserted there automatically.</li>
 <li><code>timeoutMs</code>: how long to wait before rejecting. Default 120 seconds.</li>
 <li><code>onFinish</code>: optional callback fired in parallel with the Promise resolution.</li>
 </ul>
+
+<h2>Reliability &mdash; the text-to-image truth layer</h2>
+<p>The underlying plugin has three sharp edges that produce bugs with no error message. <code>generate()</code> handles all three so you don't have to:</p>
+<ul>
+<li><strong>Boxed-String results.</strong> The raw awaited result is a boxed <code>String</code> carrying <code>canvas</code>/<code>dataUrl</code>/<code>inputs</code>, so <code>===</code> comparisons silently fail. <code>generate()</code> returns a plain object instead; use <code>weld.image.normalizeResult(data)</code> if you call the plugin directly elsewhere.</li>
+<li><strong>Only four resolutions.</strong> <code>512&times;512</code>, <code>512&times;768</code>, <code>768&times;512</code>, <code>768&times;768</code>. Anything else is rejected up front with a clear error rather than a silent failure. Check one with <code>weld.image.validResolution('768x768')</code>.</li>
+<li><strong>Empty prompt hangs forever.</strong> An empty/whitespace prompt never returns from the backend, so <code>generate()</code> rejects it immediately.</li>
+</ul>
+<h3>weld.image.regenerate(opts)</h3>
+<div class="sig" data-codeid="sig_regen"></div>
+<p>Reproduce or vary an image deterministically. With an explicit <code>seed</code>, the same prompt + seed reproduces the same image &mdash; the "regenerate at full quality from a saved thumbnail + seed" pattern. Pass <code>vary: true</code> to roll a fresh seed for an alternate take. The resolved object's <code>seed</code> is the one used, so you can save it.</p>
+<pre data-codeid="regen_ex"></pre>
+
 <h3>weld.image.embed(opts)</h3>
 <div class="sig" data-codeid="sig5"></div>
 <p>Synchronous version that returns the iframe HTML for you to insert manually. Useful when you want to position multiple images precisely or batch insertion into a list.</p>
@@ -150,8 +163,10 @@ Perchance's text-to-image backend silently ignores the <code>negativePrompt</cod
   'code1': 'output\n  weld-image = \{import:weld-image-plugin\}',
   'code2': 'root.weldImage();   // trigger $output\n\nconst data = await weld.image.generate(\{\n  prompt: \'A castle at sunset\',\n  into: \'#image-host\'   // optional: inject the iframe into this element\n\});\nconsole.log(data.imageId, data.seed);',
   'code3': 'const prompt = weld.image.withStyle(\'A castle at sunset\', \'cinematic\');\n// "A castle at sunset, cinematic shot, dramatic lighting, ..."\n\nconst data = await weld.image.generate(\{ prompt, into: \'#image-host\' \});',
-  'sig4': 'weld.image.generate(opts)  ->  Promise<data>',
+  'sig4': 'weld.image.generate(opts)  ->  Promise<\{ dataUrl, canvas, inputs, seed, text, raw \}>',
   'sig5': 'weld.image.embed(opts)  ->  string  (iframe HTML)',
+  'sig_regen': 'weld.image.regenerate(opts)  ->  Promise<result>   // seed-stable, or vary:true',
+  'regen_ex': 'var a = await weld.image.regenerate(\{ prompt: p, seed: 1234 \});  // same image every time\nvar b = await weld.image.regenerate(\{ prompt: p, vary: true \});   // a fresh alternate\nsave(b.seed);  // keep the seed to reproduce b later',
   'code6': 'const html = weld.image.embed(\{ prompt: \'A red car\', seed: 42 \});\ndocument.getElementById(\'host\').innerHTML = html;',
   'sig7': 'weld.image.withResolution(opts, resName)  ->  newOpts',
   'code8': 'const opts = weld.image.withResolution(\{ prompt: \'A river\' \}, \'landscape\');\n// \{ prompt: \'A river\', width: 768, height: 512 \}',

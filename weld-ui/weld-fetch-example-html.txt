@@ -1,0 +1,236 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--amber:#d29922;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:780px;margin:0 auto;padding:34px 18px 90px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 0 16px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+.breadcrumb a{color:var(--muted);}.breadcrumb .sep{color:var(--faint);margin:0 8px;}.breadcrumb .cur{color:var(--ink);}.breadcrumb .act a{color:var(--accent);}
+.hdr{margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}.hdr h1{font:700 24px var(--mono);letter-spacing:-0.5px;}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;}
+.hdr .lead{color:var(--muted);margin-top:8px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;}
+.panel h2{font:600 13px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:8px 0;}
+.lbl{font:600 12px var(--mono);color:var(--muted);min-width:74px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 15px;font:600 13px var(--font);cursor:pointer;transition:.12s;}
+.btn:hover{filter:brightness(1.08);}.btn.ghost{background:var(--faint);color:var(--ink);}.btn.sm{padding:6px 11px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+input[type=text],textarea{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:8px 10px;font:13px var(--font);}
+input[type=text]{flex:1;min-width:120px;}textarea{width:100%;font:12.5px/1.5 var(--mono);resize:vertical;}
+.mono{font:13px var(--mono);}
+.out{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font:12.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;min-height:20px;color:#c9d1d9;}
+.chip{display:inline-block;background:var(--faint);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font:600 12px var(--mono);margin:2px;}
+.chip.k{background:rgba(63,185,80,.14);border-color:rgba(63,185,80,.4);color:#7ee787;}
+.chip.d{opacity:.4;text-decoration:line-through;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:9px 13px;border-radius:0 4px 4px 0;margin:12px 0 0;font-size:12.5px;color:#c9d1d9;}
+.note.warn{background:rgba(210,153,34,.08);border-color:var(--amber);}
+.tag{font:600 10px var(--mono);padding:2px 7px;border-radius:4px;background:rgba(63,185,80,.14);color:#7ee787;border:1px solid rgba(63,185,80,.4);}
+.tag.ai{background:rgba(210,153,34,.12);color:#e3b341;border-color:rgba(210,153,34,.4);}
+.bar{height:14px;background:var(--accent);border-radius:3px;transition:width .3s;}
+.footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);}.footer a{color:var(--muted);}
+.flex{display:flex;gap:10px;align-items:center;}.wrap{flex-wrap:wrap;}.grow{flex:1;}.mt{margin-top:10px;}
+</style>
+<div id="page">
+<div class="breadcrumb"><span><a href="https://perchance.org/weld-ui-index">weld</a><span class="sep">/</span>weld.fetch<span class="sep">/</span><span class="cur">demo</span></span><span class="act"><a href="https://perchance.org/weld-fetch-plugin">docs &rarr;</a></span></div>
+<div class="hdr"><div class="hdr-row"><h1>weld.fetch &mdash; demo</h1><span class="ver">v1.0.0</span></div><p class="lead">Make an outbound request and see whether it routes through the superFetch proxy or goes direct. Runs against a mock backend here; wires to the real proxy on Perchance.</p></div>
+  <div class="panel"><h2>Make a request <span class="tag">routing shown</span></h2>
+    <div class="row"><span class="lbl">method</span>
+      <button class="btn sm mbtn" data-m="GET">GET</button>
+      <button class="btn ghost sm mbtn" data-m="POST">POST</button></div>
+    <div class="row"><span class="lbl">url</span><input id="url" type="text" value="https://api.example.com/widgets/42"></div>
+    <div class="row" id="bodyrow" style="display:none;"><span class="lbl">body</span><input id="body" type="text" value='{ "name": "gadget" }'></div>
+    <div class="row"><label class="mono" style="font-size:12px;"><input type="checkbox" id="direct"> force direct (skip proxy)</label><button id="send" class="btn">Send</button></div>
+    <div class="row"><span class="lbl">routed via</span><span id="via" class="chip">—</span></div>
+    <div id="out" class="out mt"></div>
+    <div class="note">This demo uses a <b>mock</b> backend so it runs anywhere. On Perchance, unknown hosts route through the superFetch proxy (request headers are stripped, SSRF is blocked, redirects followed); known CORS-friendly hosts (raw.githubusercontent, jsdelivr, api.github) go direct automatically. Try a <code>raw.githubusercontent.com</code> URL to see the route switch to "direct".</div>
+  </div>
+<footer class="footer"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
+</div>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.fetch) return window.weld.fetch;
+
+// -----------------------------------------------------------------
+// weld.fetch: reach the outside world from inside the sandbox.
+//
+// A generator runs in a sandboxed iframe, so a plain fetch() to a third
+// party is usually blocked by CORS. Perchance provides superFetch, which
+// routes requests through fetch-plugin.perchance.org. weld.fetch wraps it
+// with the helpers people actually want and encodes the proxy's quirks:
+//
+//   - request headers are STRIPPED by the proxy (don't rely on them)
+//   - internal/SSRF targets are blocked
+//   - redirects are followed; there is no small body cap
+//   - identical URLs may be cached by the proxy
+//
+//   await weld.fetch.json('https://api.example.com/data')   // GET + parse
+//   await weld.fetch.post(url, { body: payload, json: true })
+//   await weld.fetch.get(url, { timeoutMs: 8000, retries: 2 })
+//
+// For hosts that already send permissive CORS (raw.githubusercontent,
+// jsdelivr, ...), set { direct: true } (or call when superFetch is
+// absent) to use the browser's own fetch and skip the proxy hop.
+// -----------------------------------------------------------------
+
+var deps = { superFetch: null };
+function getSF() {
+  return deps.superFetch
+    || (window.weld && window.weld.__superFetch)
+    || (typeof window !== 'undefined' && typeof window.superFetch === 'function' ? window.superFetch : null)
+    || (typeof superFetch === 'function' ? superFetch : null);
+}
+function attach(d) { if (d && d.superFetch) deps.superFetch = d.superFetch; }
+
+// Hosts known to serve permissive CORS -- safe to hit directly, skipping
+// the proxy. Extendable via opts.direct or addDirectHost().
+var DIRECT_HOSTS = ['raw.githubusercontent.com', 'cdn.jsdelivr.net', 'api.github.com'];
+function isDirectHost(url) {
+  try { var h = new URL(url).hostname; return DIRECT_HOSTS.indexOf(h) !== -1; }
+  catch (e) { return false; }
+}
+function addDirectHost(h) { if (h && DIRECT_HOSTS.indexOf(h) === -1) DIRECT_HOSTS.push(String(h)); }
+
+function withTimeout(promise, ms, label) {
+  if (!ms) return promise;
+  return new Promise(function (resolve, reject) {
+    var done = false;
+    var t = setTimeout(function () { if (!done) { done = true; reject(new Error('weld.fetch: timeout after ' + ms + 'ms' + (label ? ' (' + label + ')' : ''))); } }, ms);
+    Promise.resolve(promise).then(
+      function (v) { if (!done) { done = true; clearTimeout(t); resolve(v); } },
+      function (e) { if (!done) { done = true; clearTimeout(t); reject(e); } });
+  });
+}
+
+// Core request. opts: { method, headers, body, json, direct, timeoutMs,
+// retries, retryDelayMs }. Resolves a normalized response, NOT a raw
+// Response, so callers don't have to remember .text()/.json() or the
+// proxy's boxed quirks.
+function request(url, opts) {
+  opts = opts || {};
+  url = String(url || '');
+  if (!url) return Promise.reject(new Error('weld.fetch: empty URL'));
+
+  var method = (opts.method || 'GET').toUpperCase();
+  var direct = opts.direct === true || (opts.direct !== false && isDirectHost(url));
+  var sf = getSF();
+  if (!sf && !direct) {
+    // No proxy available and not a known-direct host: try direct anyway,
+    // but warn via the error if CORS then blocks it.
+    direct = true;
+  }
+  var fetcher = direct ? (typeof fetch === 'function' ? fetch : null) : sf;
+  if (!fetcher) return Promise.reject(new Error('weld.fetch: no fetch available (superFetch missing and no global fetch)'));
+
+  var init = { method: method };
+  if (opts.headers) init.headers = opts.headers; // note: proxy strips these
+  if (opts.body != null) {
+    init.body = (opts.json && typeof opts.body !== 'string') ? JSON.stringify(opts.body) : opts.body;
+    if (opts.json && !direct) { init.headers = Object.assign({ 'content-type': 'application/json' }, init.headers || {}); }
+  }
+
+  var timeoutMs = opts.timeoutMs != null ? opts.timeoutMs : 15000;
+  var retries = opts.retries || 0;
+  var retryDelay = opts.retryDelayMs || 600;
+
+  function attempt(n) {
+    return withTimeout(Promise.resolve(fetcher(url, init)), timeoutMs, method + ' ' + url)
+      .then(function (res) { return normalize(res, url, direct); })
+      .catch(function (err) {
+        if (n < retries) {
+          return new Promise(function (r) { setTimeout(r, retryDelay * (n + 1)); }).then(function () { return attempt(n + 1); });
+        }
+        throw err;
+      });
+  }
+  return attempt(0);
+}
+
+// Normalize a fetch Response (or superFetch result) into a plain object.
+function normalize(res, url, direct) {
+  if (res == null) return { ok: false, status: 0, url: url, via: direct ? 'direct' : 'proxy', text: function () { return Promise.resolve(''); } };
+  var status = (typeof res.status === 'number') ? res.status : 200;
+  var ok = (typeof res.ok === 'boolean') ? res.ok : (status >= 200 && status < 300);
+  var headers = res.headers || null;
+  var bodyText = null;
+  function text() {
+    if (bodyText != null) return Promise.resolve(bodyText);
+    if (typeof res.text === 'function') return Promise.resolve(res.text()).then(function (t) { bodyText = String(t); return bodyText; });
+    bodyText = String(res); return Promise.resolve(bodyText);
+  }
+  function json() { return text().then(function (t) { try { return JSON.parse(t); } catch (e) { throw new Error('weld.fetch: response is not JSON (' + t.slice(0, 60) + ')'); } }); }
+  return { ok: ok, status: status, url: url, via: direct ? 'direct' : 'proxy', headers: headers, text: text, json: json, raw: res };
+}
+
+// Convenience verbs.
+function get(url, opts) { return request(url, Object.assign({}, opts, { method: 'GET' })); }
+function post(url, opts) { return request(url, Object.assign({}, opts, { method: 'POST' })); }
+function del(url, opts) { return request(url, Object.assign({}, opts, { method: 'DELETE' })); }
+
+// GET (or any method) and parse JSON in one step -> the parsed value.
+function json(url, opts) {
+  opts = opts || {};
+  return request(url, opts).then(function (res) {
+    if (!res.ok) throw new Error('weld.fetch: ' + res.status + ' from ' + url);
+    return res.json();
+  });
+}
+// GET and return text in one step.
+function text(url, opts) { return request(url, opts || {}).then(function (res) { return res.text(); }); }
+
+function available() { return !!getSF(); }
+
+window.weld.fetch = {
+  request: request,
+  get: get,
+  post: post,
+  del: del,
+  json: json,
+  text: text,
+  attach: attach,
+  available: available,
+  addDirectHost: addDirectHost,
+  directHosts: function () { return DIRECT_HOSTS.slice(); },
+  version: '1.0.0'
+};
+
+return window.weld.fetch;
+})();
+</script>
+<script>
+
+  function boot(){ if(!window.weld||!window.weld.fetch){return setTimeout(boot,100);} init(); }
+  function init(){
+    var F=window.weld.fetch, $=function(id){return document.getElementById(id);};
+    var method='GET';
+    // mock superFetch (proxy) so the demo runs without Perchance
+    F.attach({ superFetch:function(url,init){ return Promise.resolve({ status:200, ok:true, headers:{},
+      text:function(){ return Promise.resolve(JSON.stringify({ routedBy:'superFetch proxy', youSent:(init&&init.body)||null, url:url })); } }); } });
+    // mock direct fetch too
+    window.fetch=function(url,init){ return Promise.resolve({ status:200, ok:true, headers:{},
+      text:function(){ return Promise.resolve(JSON.stringify({ routedBy:'browser fetch (direct)', url:url })); } }); };
+
+    [].forEach.call(document.querySelectorAll('.mbtn'),function(b){ b.onclick=function(){ method=b.getAttribute('data-m');
+      [].forEach.call(document.querySelectorAll('.mbtn'),function(x){x.classList.toggle('ghost',x!==b);});
+      $('bodyrow').style.display=(method==='POST')?'flex':'none'; }; });
+
+    $('send').onclick=function(){
+      var url=$('url').value.trim(); if(!url){return;}
+      var opts={ method:method, direct:$('direct').checked, timeoutMs:8000 };
+      if(method==='POST'){ try{ opts.body=JSON.parse($('body').value); opts.json=true; }catch(e){ opts.body=$('body').value; } }
+      $('out').textContent='Requesting...';
+      F.request(url, opts).then(function(res){
+        $('via').textContent=res.via; $('via').className='chip k';
+        return res.json().then(function(j){ $('out').textContent=JSON.stringify(j,null,2)+'\n\nstatus: '+res.status+'  ok: '+res.ok; },
+          function(){ return res.text().then(function(t){ $('out').textContent=t; }); });
+      }).catch(function(e){ $('via').textContent='error'; $('out').textContent=e.message; });
+    };
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+
+</script>

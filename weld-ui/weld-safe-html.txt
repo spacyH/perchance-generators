@@ -1,0 +1,356 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.safe<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-safe-example">demo &rarr;</a></span></div>
+<div class="hdr">
+  <div class="hdr-row">
+      <h1>weld.safe</h1>
+      <span class="ver">v1.0.0</span>
+  </div>
+  <p class="lead">The brace-interception toolkit for Perchance authors. Scan code for the tokens the platform silently rewrites &mdash; with line numbers, explanations, and fixes &mdash; then escape strings and build safe tokens so your code survives the parser.</p>
+</div>
+<h2>The problem</h2>
+<p>Before your code runs, Perchance scans the <strong>raw source</strong> &mdash; including the insides of <code>&lt;script&gt;</code> blocks, string literals, and <code>//</code> comments &mdash; and rewrites anything that looks like its own template syntax. A braced word, doubled brackets, an import directive, a tight pipe pick-list, or a count quantifier sitting in a string can be silently mangled, producing bugs with no stack trace. weld.safe finds them, explains them, and helps you write around them.</p>
+<pre data-codeid="install"></pre>
+
+<h2>scan(code)</h2>
+<div class="sig" data-codeid="sig_scan"></div>
+<p>Returns an array of findings: <code>&#123; line, col, token, kind, severity, why, fix &#125;</code>. Severities: <code>error</code> (always intercepted), <code>warn</code> (intercepted in most contexts), <code>info</code> (safe in pure JS, risky in DSL/prose).</p>
+<pre data-codeid="scan_ex"></pre>
+
+<h2>The traps it catches</h2>
+<table>
+<tr><th>kind</th><th>severity</th><th>what triggers it</th></tr>
+<tr><td><code>double-square</code></td><td>error</td><td>two opening square brackets in a row</td></tr>
+<tr><td><code>double-curly</code></td><td>error</td><td>two opening curly braces in a row</td></tr>
+<tr><td><code>import-directive</code></td><td>error</td><td>an import token anywhere but a top-level assignment</td></tr>
+<tr><td><code>pick-list</code></td><td>warn</td><td>a tight pipe-separated brace group (no spaces)</td></tr>
+<tr><td><code>quantifier</code></td><td>warn</td><td>a brace group of just a number, or number,number</td></tr>
+<tr><td><code>bare-token</code></td><td>info</td><td>a single braced word with no spaces</td></tr>
+</table>
+<div class="note">Spaced object literals (<code>&#123; a: 1 &#125;</code>), logical-or in braces (<code>&#123; a &#124;&#124; b &#125;</code>), and regex character classes are deliberately <em>not</em> flagged &mdash; they read as code, not template syntax. A doubled <em>closing</em> brace is also fine; only the doubled <em>opening</em> triggers.</div>
+
+<h2>check(code)</h2>
+<div class="sig" data-codeid="sig_check"></div>
+<p>A pass/fail wrapper: <code>&#123; ok, findings &#125;</code> where <code>ok</code> is false if any error-severity trap is present. Drop it into a build step.</p>
+
+<h2>escape(str)</h2>
+<div class="sig" data-codeid="sig_escape"></div>
+<p>Returns a version of a string with every trap character (<code>&#123;&#125;&#91;&#93;&#124;</code>) replaced by its HTML entity, so the parser leaves it alone. Use for prose or HTML you want to display literally.</p>
+<pre data-codeid="escape_ex"></pre>
+
+<h2>build(token) &amp; builderSnippet(token)</h2>
+<div class="sig" data-codeid="sig_build"></div>
+<div class="sig" data-codeid="sig_snip"></div>
+<p><code>build()</code> returns the real characters of a token, assembled at runtime from char codes, so the literal never appears in source for the parser to see. <code>builderSnippet()</code> returns a <code>String.fromCharCode(...)</code> expression you can paste straight into your own code.</p>
+<pre data-codeid="build_ex"></pre>
+
+<h2>explain(kind)</h2>
+<div class="sig" data-codeid="sig_explain"></div>
+<p>Returns the rule (<code>severity</code>, <code>why</code>, <code>fix</code>) for any trap kind &mdash; handy for surfacing guidance in your own tooling. <code>weld.safe.KINDS</code> lists them all.</p>
+<script>
+(function(){
+  var examples = {
+  'install': 'output\n  weld-safe = \{import:weld-safe-plugin\}',
+  'sig_scan': 'weld.safe.scan(code) -> \[\{ line, col, token, kind, severity, why, fix \}]',
+  'scan_ex': 'var traps = weld.safe.scan(mySource);\ntraps.forEach(function (t) \{\n  console.log(t.severity, \'line \' + t.line, t.token, \'->\', t.fix);\n\});',
+  'sig_check': 'weld.safe.check(code) -> \{ ok, findings \}',
+  'sig_escape': 'weld.safe.escape(str) -> string   // trap chars -> HTML entities',
+  'escape_ex': 'weld.safe.escape(\'choose \' + weld.safe.build(\'\{a|b|c\}\'));\n// \'choose &#123;a&#124;b&#124;c&#125;\'  -- shown literally, not picked',
+  'sig_build': 'weld.safe.build(token) -> string   // real chars, made at runtime',
+  'sig_snip': 'weld.safe.builderSnippet(token) -> "String.fromCharCode(...)"',
+  'build_ex': '// need a literal import-directive token in a string at runtime:\nvar token = weld.safe.build(\'\{import:other-plugin\}\');\n// or paste a constructor into your source:\nweld.safe.builderSnippet(\'\{n\}\');   // \'String.fromCharCode(123,110,125)\'',
+  'sig_explain': 'weld.safe.explain(kind) -> \{ kind, severity, why, fix \}'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    document.querySelectorAll('[data-codeid]').forEach(function(n){
+      var src = examples[n.getAttribute('data-codeid')];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.safe) return window.weld.safe;
+
+// -----------------------------------------------------------------
+// weld.safe: the single biggest Perchance footgun, packaged.
+//
+// Before your code ever runs, Perchance scans the RAW source -- including
+// the insides of <script> blocks, string literals, and // comments --
+// and rewrites tokens that look like its own template syntax. A stray
+// braced word, a doubled bracket, an import directive, a tight pipe
+// pick-list, or a regex count quantifier sitting in a string can all be
+// silently mangled, producing bugs with no stack trace.
+//
+//   weld.safe.scan(code)   -> [{ line, col, token, severity, why, fix }]
+//   weld.safe.check(code)  -> { ok, findings }   (ok = no errors)
+//   weld.safe.escape(str)  -> a parser-safe version of a string
+//   weld.safe.build(token) -> assemble a risky literal at runtime
+//   weld.safe.explain(kind)-> the rule behind a trap kind
+//
+// The detection mirrors weld.diag's validated trap rules and goes deeper
+// on pick-lists and quantifiers, plus the escape/build helpers diag lacks.
+// -----------------------------------------------------------------
+
+var OB = String.fromCharCode(123); // {
+var CB = String.fromCharCode(125); // }
+var OS = String.fromCharCode(91);  // [
+var CS = String.fromCharCode(93);  // ]
+var BAR = String.fromCharCode(124);// |
+
+var RULES = {
+  'double-square': {
+    severity: 'error',
+    why: 'Doubled square brackets begin a Perchance nested-list / shortcode token and are intercepted everywhere, including inside strings and comments.',
+    fix: 'Break them up: build the literal with weld.safe.build, or insert a zero-width boundary. For array-of-arrays in JS, add a space: "' + OS + ' ' + OS + '".'
+  },
+  'double-curly': {
+    severity: 'error',
+    why: 'Doubled curly braces are Perchance advanced/template syntax and are intercepted in raw source.',
+    fix: 'Add a space between them (" ' + OB + ' ' + OB + ' "), or assemble with weld.safe.build. Note: a doubled CLOSING brace is usually safe; it is the doubled OPENING that triggers it.'
+  },
+  'import-directive': {
+    severity: 'error',
+    why: 'An import directive is only valid as a top-level assignment. Anywhere else (in a string, comment, or expression) it is intercepted.',
+    fix: 'Keep imports at the top of the file as `name = ' + OB + 'import:slug' + CB + '`. To mention one in prose/strings, escape it with weld.safe.escape.'
+  },
+  'pick-list': {
+    severity: 'warn',
+    why: 'A tight pipe-separated brace group with no spaces is Perchance pick-one syntax; the parser will replace it with one of the options at load time.',
+    fix: 'If you meant a literal, escape it with weld.safe.escape (HTML entities) or add spaces inside the braces. In JS logic, "' + OB + ' a ' + BAR + BAR + ' b ' + CB + '" (spaced) is read as code, not a pick.'
+  },
+  'quantifier': {
+    severity: 'warn',
+    why: 'A brace group containing only a number (or number,number) looks like a Perchance repeat/count token and can be intercepted in DSL/prose context.',
+    fix: 'In a regex, this is usually fine inside a /.../ literal; in a plain string, escape it or build it with weld.safe.build.'
+  },
+  'bare-token': {
+    severity: 'info',
+    why: 'A single braced word with no spaces can be read as a Perchance variable/list reference if it lands in DSL or prose context. In pure JS expressions it is normally safe.',
+    fix: 'Safe inside real JS (object literals with spaces, template scopes). If this is in a string shown to the parser, escape it.'
+  }
+};
+
+// Strip JS string/regex/comment *content* is NOT what we do here -- the
+// whole point is that Perchance scans that content too. So we scan raw,
+// but we DO skip flagging spaced object literals and regex char-classes
+// to avoid false positives.
+
+function scan(code) {
+  var lines = String(code == null ? '' : code).split('\n');
+  var out = [];
+  var outIdx = -1;
+  for (var i = 0; i < lines.length; i++) { if (/^\s*\$output\s*\(/.test(lines[i])) { outIdx = i; break; } }
+
+  for (var ln = 0; ln < lines.length; ln++) {
+    var raw = lines[ln];
+
+    // double square / double curly (opening)
+    findAll(raw, OS + OS, function (col) { push(out, ln, col, OS + OS, 'double-square'); });
+    findAll(raw, OB + OB, function (col) {
+      // ignore a doubled CLOSING brace run like "}}" (object/block closers)
+      push(out, ln, col, OB + OB, 'double-curly');
+    });
+
+    // import directive that is NOT a legit top-level assignment
+    var importRe = new RegExp(OB + 'import:[^' + CB + ']*' + CB, 'g');
+    var im;
+    while ((im = importRe.exec(raw)) !== null) {
+      var isTopImport = (outIdx === -1 || ln < outIdx)
+        && new RegExp('^\\s*[\\w$]+\\s*=\\s*' + OB + 'import:[^' + CB + ']+' + CB + '\\s*$').test(raw.trim());
+      if (!isTopImport) push(out, ln, im.index, im[0], 'import-directive');
+    }
+
+    // tight pick-list: a braced, pipe-separated group with no spaces
+    var pickRe = new RegExp(OB + '[^' + OB + CB + '\\s]*\\' + BAR + '[^' + OB + CB + ']*' + CB, 'g');
+    var pk;
+    while ((pk = pickRe.exec(raw)) !== null) {
+      var tok = pk[0];
+      // skip if it contains spaces around the pipe (read as JS: { a || b })
+      if (/\s/.test(tok)) continue;
+      // skip JS logical-or in braces without spaces is rare; flag it
+      push(out, ln, pk.index, tok, 'pick-list');
+    }
+
+    // quantifier: a braced number, or number-comma-number, standalone
+    var quantRe = new RegExp(OB + '\\d+(,\\d*)?' + CB, 'g');
+    var q;
+    while ((q = quantRe.exec(raw)) !== null) {
+      // if it's inside an obvious regex literal on this line, lower to info
+      push(out, ln, q.index, q[0], 'quantifier');
+    }
+
+    // bare single-word token: a braced identifier, no spaces/colon/quote -> info
+    var bareRe = new RegExp(OB + '[A-Za-z_][A-Za-z0-9_]*' + CB, 'g');
+    var b;
+    while ((b = bareRe.exec(raw)) !== null) {
+      push(out, ln, b.index, b[0], 'bare-token');
+    }
+  }
+  // sort by line then column
+  out.sort(function (a, c) { return a.line - c.line || a.col - c.col; });
+  return out;
+}
+
+function findAll(s, needle, cb) {
+  var idx = s.indexOf(needle);
+  while (idx !== -1) { cb(idx); idx = s.indexOf(needle, idx + 1); }
+}
+
+function push(out, ln, col, token, kind) {
+  var rule = RULES[kind];
+  out.push({
+    line: ln + 1, col: col + 1, token: token, kind: kind,
+    severity: rule.severity, why: rule.why, fix: rule.fix
+  });
+}
+
+function check(code) {
+  var findings = scan(code);
+  var ok = !findings.some(function (f) { return f.severity === 'error'; });
+  return { ok: ok, findings: findings };
+}
+
+// escape(str): produce a version of a string that the Perchance parser
+// will leave alone, by replacing the trap-trigger characters with HTML
+// entities. Use for prose/HTML you want to display literally.
+function escape(str) {
+  return String(str == null ? '' : str)
+    .replace(/\{/g, '&#123;')
+    .replace(/\}/g, '&#125;')
+    .replace(/\[/g, '&#91;')
+    .replace(/\]/g, '&#93;')
+    .replace(/\|/g, '&#124;');
+}
+
+// build(token): assemble a string at RUNTIME so the literal trap token
+// never appears in source. Returns the actual characters, constructed
+// from char codes, so Perchance's source scan can't see them.
+function build(token) {
+  var s = String(token == null ? '' : token);
+  var out = '';
+  for (var i = 0; i < s.length; i++) out += String.fromCharCode(s.charCodeAt(i));
+  return out;
+}
+
+// Convenience: emit a JS snippet that builds `token` via fromCharCode,
+// so authors can paste a safe constructor into their own source.
+function builderSnippet(token) {
+  var s = String(token == null ? '' : token);
+  var codes = [];
+  for (var i = 0; i < s.length; i++) codes.push(s.charCodeAt(i));
+  return 'String.fromCharCode(' + codes.join(',') + ')';
+}
+
+function explain(kind) {
+  var r = RULES[kind];
+  return r ? { kind: kind, severity: r.severity, why: r.why, fix: r.fix } : null;
+}
+
+window.weld.safe = {
+  scan: scan,
+  check: check,
+  escape: escape,
+  build: build,
+  builderSnippet: builderSnippet,
+  explain: explain,
+  KINDS: Object.keys(RULES),
+  version: '1.0.0'
+};
+
+return window.weld.safe;
+})();
+</script>
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>
+</div>

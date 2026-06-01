@@ -1,0 +1,303 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.kv<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-kv-example">demo &rarr;</a></span></div>
+<div class="hdr">
+  <div class="hdr-row">
+      <h1>weld.kv</h1>
+      <span class="ver">v1.0.0</span>
+  </div>
+  <p class="lead">Server-side, cross-device key-value storage wrapping kv-plugin: named folders, automatic JSON serialization, get-with-default, keys/getMany, and an offline mirror. The cross-device counterpart to weld.persist.</p>
+</div>
+<h2>Install</h2>
+<p>Import weld.kv alongside kv-plugin. It finds <code>root.kv</code> automatically; you can also <code>attach()</code> it explicitly. Stashes on <code>window.weld.kv</code>.</p>
+<pre data-codeid="install"></pre>
+
+<h2>Why this is not weld.persist</h2>
+<p>This is the storage distinction people get wrong. Browser storage &mdash; <code>localStorage</code>, IndexedDB, the Cache API, which <code>weld.persist</code> wraps &mdash; is <strong>local to one browser on one device</strong>. It does not follow a user to their phone. <code>weld.kv</code> wraps Perchance's <strong>server-side</strong> kv-plugin, so the data is <strong>cross-device</strong>. Use persist for local caches and undo stacks; use kv for save data, profiles, and anything that must survive a device change.</p>
+<div class="note">Everything in weld.kv is async &mdash; it hits the server. Values are JSON-serialized automatically, so you store objects and arrays, not just strings.</div>
+
+<h2>folder(name, opts)</h2>
+<div class="sig" data-codeid="sig_folder"></div>
+<p>A folder is a named namespace. Different folders never collide, so you can keep <code>save-data</code>, <code>settings</code>, and <code>profile</code> separate.</p>
+<pre data-codeid="folder_ex"></pre>
+
+<h2>set / get / has / delete</h2>
+<div class="sig" data-codeid="sig_set"></div>
+<div class="sig" data-codeid="sig_get"></div>
+<p><code>get()</code> takes a default returned when the key is absent (or when the server is unreachable and a mirror value exists). All four are async and return Promises.</p>
+<pre data-codeid="set_ex"></pre>
+
+<h2>keys / getMany</h2>
+<div class="sig" data-codeid="sig_keys"></div>
+<p><code>keys()</code> lists a folder's keys; <code>getMany()</code> fetches several at once and returns a key&rarr;value map &mdash; handy for loading a whole save in one call.</p>
+<pre data-codeid="many_ex"></pre>
+
+<h2>Offline mirror</h2>
+<p>By default weld.kv keeps a local mirror of the last value it saw for each key (in memory, and in IndexedDB if <code>weld.persist</code> is attached). If a server read fails &mdash; flaky connection, brief outage &mdash; <code>get()</code> returns the mirrored value instead of throwing. Pass <code>&#123; mirror: false &#125;</code> to a folder to disable it.</p>
+<div class="note">For a full offline-first setup, attach weld.persist: <code>weld.kv.attach(&#123; persist: weld.persist &#125;)</code>. Reads then survive reloads, not just the current session.</div>
+<script>
+(function(){
+  var examples = {
+  'install': 'output\n  weld-kv = \{import:weld-kv-plugin\}\n  kv      = \{import:kv-plugin\}',
+  'sig_folder': 'weld.kv.folder(name, opts) -> store',
+  'folder_ex': 'var saves = weld.kv.folder(\'save-data\');\nvar settings = weld.kv.folder(\'settings\');   // isolated namespace',
+  'sig_set': 'store.set(key, value) -> Promise<value>      // store.delete(key), store.has(key)',
+  'sig_get': 'store.get(key, default?) -> Promise<value>',
+  'set_ex': 'await saves.set(\'slot1\', \{ level: 4, gold: 120 \});   // stores JSON, server-side\nvar save = await saves.get(\'slot1\', \{ level: 1, gold: 0 \});   // get-with-default\nawait saves.delete(\'slot1\');',
+  'sig_keys': 'store.keys() -> Promise<string\[]>      // store.getMany(keys) -> Promise<map>',
+  'many_ex': 'var all = await saves.getMany(\[\'slot1\',\'slot2\',\'slot3\']);\n// \{ slot1: \{...\}, slot2: \{...\}, slot3: undefined \}'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    document.querySelectorAll('[data-codeid]').forEach(function(n){
+      var src = examples[n.getAttribute('data-codeid')];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.kv) return window.weld.kv;
+
+// -----------------------------------------------------------------
+// weld.kv: the storage layer people reach for and get wrong.
+//
+// Browser storage (localStorage, IndexedDB, the Cache API -- what
+// weld.persist wraps) is LOCAL to one browser on one device. It does not
+// follow a user to their phone. For cross-device persistence Perchance
+// exposes kv-plugin: server-side key-value reachable as root.kv. weld.kv
+// wraps it with the ergonomics browser storage has and kv lacks:
+//
+//   var store = weld.kv.folder('save-data');   // a named namespace
+//   await store.set('slot1', { level: 4, gold: 120 });   // JSON, server-side
+//   var save = await store.get('slot1', {});             // get-with-default
+//   await store.has('slot1');  await store.keys();  await store.delete('slot1');
+//
+// Everything is async (it hits the server). Values are JSON-serialized
+// automatically, so you store objects, not just strings. With a local
+// mirror enabled, the last-seen value is cached in memory/IndexedDB so a
+// read can return instantly (or survive a flaky connection) and reconcile.
+// -----------------------------------------------------------------
+
+var deps = { kv: null, persist: null };
+function getKv() {
+  if (deps.kv) return deps.kv;
+  try { if (typeof root !== 'undefined' && root.kv) return root.kv; } catch (e) {}
+  if (window.weld && window.weld.__kv) return window.weld.__kv;
+  return null;
+}
+function attach(d) {
+  if (!d) return;
+  if (d.kv) deps.kv = d.kv;
+  if (d.persist) deps.persist = d.persist;
+}
+function available() { return !!getKv(); }
+
+// Resolve a folder handle from kv-plugin. kv-plugin exposes a default
+// `folder`, and (depending on version) a way to open a named folder.
+function rawFolder(name) {
+  var kv = getKv();
+  if (!kv) return null;
+  if (name) {
+    if (typeof kv.folder === 'function') { try { return kv.folder(name); } catch (e) {} }
+    if (kv.folders && typeof kv.folders === 'function') { try { return kv.folders(name); } catch (e) {} }
+  }
+  // default folder (object or function form)
+  if (kv.folder && typeof kv.folder === 'object') return kv.folder;
+  if (typeof kv.folder === 'function') { try { return kv.folder(name || 'default'); } catch (e) {} }
+  return kv;
+}
+
+function encode(v) { return JSON.stringify({ v: v }); }
+function decode(s) {
+  if (s == null) return undefined;
+  if (typeof s !== 'string') { return s; } // already an object (some kv versions)
+  try { var o = JSON.parse(s); return (o && 'v' in o) ? o.v : o; } catch (e) { return s; }
+}
+
+// optional local mirror via weld.persist (or an in-memory map)
+function mirrorCol(folderName) {
+  var p = deps.persist || (window.weld && window.weld.persist) || null;
+  if (!p) return null;
+  try { return p.open('weld-kv').collection('mirror-' + folderName); } catch (e) { return null; }
+}
+var memMirror = {};
+
+function folder(name, opts) {
+  name = String(name || 'default');
+  opts = opts || {};
+  var useMirror = opts.mirror !== false;
+  var memKeyPrefix = name + '::';
+
+  function mset(key, value) {
+    if (!useMirror) return;
+    memMirror[memKeyPrefix + key] = value;
+    var col = mirrorCol(name);
+    if (col) { try { col.put({ id: key, value: value }); } catch (e) {} }
+  }
+  function mget(key) {
+    if (!useMirror) return undefined;
+    var k = memKeyPrefix + key;
+    if (k in memMirror) return memMirror[k];
+    return undefined;
+  }
+
+  function set(key, value) {
+    var f = rawFolder(name);
+    if (!f || typeof f.set !== 'function') return Promise.reject(new Error('weld.kv: kv-plugin not available (root.kv missing). This needs the server KV plugin imported.'));
+    mset(key, value);
+    return Promise.resolve(f.set(String(key), encode(value))).then(function () { return value; });
+  }
+
+  function get(key, dflt) {
+    var f = rawFolder(name);
+    if (!f || typeof f.get !== 'function') {
+      var m = mget(key);
+      return Promise.resolve(m !== undefined ? m : dflt);
+    }
+    return Promise.resolve(f.get(String(key))).then(function (raw) {
+      var val = decode(raw);
+      if (val === undefined) return dflt;
+      mset(key, val);
+      return val;
+    }, function () {
+      var m = mget(key);
+      return (m !== undefined) ? m : dflt; // offline / error -> mirror
+    });
+  }
+
+  function has(key) { return get(key, undefined).then(function (v) { return v !== undefined; }); }
+
+  function del(key) {
+    var f = rawFolder(name);
+    delete memMirror[memKeyPrefix + key];
+    var col = mirrorCol(name); if (col) { try { col.delete(key); } catch (e) {} }
+    if (!f || typeof f.delete !== 'function') return Promise.resolve(false);
+    return Promise.resolve(f.delete(String(key))).then(function () { return true; }, function () { return false; });
+  }
+
+  function keys() {
+    var f = rawFolder(name);
+    if (f && typeof f.keys === 'function') {
+      return Promise.resolve(f.keys()).then(function (ks) { return Array.isArray(ks) ? ks : []; }, function () { return mirrorKeys(); });
+    }
+    if (f && typeof f.getAll === 'function') {
+      return Promise.resolve(f.getAll()).then(function (all) { return all && typeof all === 'object' ? Object.keys(all) : []; }, function () { return mirrorKeys(); });
+    }
+    return Promise.resolve(mirrorKeys());
+  }
+  function mirrorKeys() {
+    return Object.keys(memMirror).filter(function (k) { return k.indexOf(memKeyPrefix) === 0; })
+      .map(function (k) { return k.slice(memKeyPrefix.length); });
+  }
+
+  function getMany(keyList) {
+    return Promise.all((keyList || []).map(function (k) { return get(k).then(function (v) { return { key: k, value: v }; }); }))
+      .then(function (rows) { var o = {}; rows.forEach(function (r) { o[r.key] = r.value; }); return o; });
+  }
+
+  return { set: set, get: get, has: has, delete: del, keys: keys, getMany: getMany, name: name };
+}
+
+window.weld.kv = {
+  folder: folder,
+  attach: attach,
+  available: available,
+  version: '1.0.0'
+};
+
+return window.weld.kv;
+})();
+</script>
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>
+</div>

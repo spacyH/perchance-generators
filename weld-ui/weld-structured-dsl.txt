@@ -99,7 +99,53 @@ $output() =>
     }
   }
 
-  // Minimal schema validation.
+  // parsePartial(text): best-effort parse of an INCOMPLETE JSON object as
+  // it streams in. Finds the first '{' or '[', closes any open string,
+  // drops a trailing partial token, and balances open brackets, so the UI
+  // can render fields the moment they arrive. Returns { value } or {} when
+  // nothing parseable yet. Never throws.
+  function parsePartial(text) {
+    var raw = stripFences(String(text == null ? '' : text));
+    var start = -1;
+    for (var a = 0; a < raw.length; a++) { var ch0 = raw.charAt(a); if (ch0 === '{' || ch0 === '[') { start = a; break; } }
+    if (start === -1) return {};
+    var s = raw.slice(start);
+
+    // Scan once to learn: open-bracket stack, whether we end inside a string,
+    // and whether we end with a dangling structural token we must drop.
+    var stack = [], inStr = false, esc = false;
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charAt(i);
+      if (inStr) {
+        if (esc) esc = false;
+        else if (c === '\\') esc = true;
+        else if (c === '"') inStr = false;
+        continue;
+      }
+      if (c === '"') inStr = true;
+      else if (c === '{' || c === '[') stack.push(c === '{' ? '}' : ']');
+      else if (c === '}' || c === ']') stack.pop();
+    }
+
+    function attempt(str) {
+      var t = str;
+      if (inStr) t += '"';                 // close an open string literal
+      t = t.replace(/\s+$/, '');
+      t = t.replace(/,\s*$/, '');          // dangling comma
+      // "key": with no value yet -> drop the key and colon entirely
+      if (/:\s*$/.test(t)) {
+        t = t.replace(/:\s*$/, '');
+        t = t.replace(/(\{|,)\s*"[^"]*"\s*$/, '$1');
+        t = t.replace(/,\s*$/, '');
+      }
+      for (var k = stack.length - 1; k >= 0; k--) t += stack[k];
+      try { return JSON.parse(looseFix(t)); } catch (e) { return undefined; }
+    }
+
+    var v = attempt(s);
+    if (v !== undefined) return { value: v };
+    return {};
+  }
   // schema = { fields: { name: { type, required, enum, of } }, allowExtra }
   //   type: 'string' | 'number' | 'integer' | 'boolean' | 'array' | 'object'
   // Returns { ok:true } or { ok:false, error }.
@@ -259,13 +305,43 @@ $output() =>
     return step(null);
   }
 
+  // generateStream(opts): like generate(), but reports the partially-parsed
+  // object as it streams via opts.onPartial(obj). Resolves to the same
+  // { ok, value, raw, error, attempts } as generate(). Requires weld.stream
+  // (which carries onChunk); without it, falls back to generate().
+  function generateStream(opts) {
+    opts = opts || {};
+    var stream = getStream();
+    if (!stream || typeof opts.onPartial !== 'function') return generate(opts);
+    var instruction = buildInstruction(opts, null);
+    var onPartial = opts.onPartial;
+    return stream.run({
+      instruction: instruction,
+      startWith: opts.startWith != null ? opts.startWith : '{',
+      stopSequences: opts.stopSequences || null,
+      onChunk: function (delta, full) {
+        var p = parsePartial(full);
+        if ('value' in p) { try { onPartial(p.value); } catch (e) {} }
+      }
+    }).then(function (res) {
+      if (res.error) return { ok: false, value: null, raw: res.text, error: res.error, attempts: 1 };
+      var parsed = parse(res.text);
+      if (parsed.error) return { ok: false, value: null, raw: res.text, error: parsed.error, attempts: 1 };
+      var check = validate(parsed.value, opts.schema);
+      if (!check.ok) return { ok: false, value: parsed.value, raw: res.text, error: check.error, attempts: 1 };
+      return { ok: true, value: parsed.value, raw: res.text, error: null, attempts: 1 };
+    });
+  }
+
   window.weld.structured = {
     generate: generate,
+    generateStream: generateStream,
     parse: parse,
+    parsePartial: parsePartial,
     validate: validate,
     extract: extractBalanced,
     describeSchema: describeSchema,
-    version: '1.0.0'
+    version: '1.1.0'
   };
 
   return window.weld.structured;

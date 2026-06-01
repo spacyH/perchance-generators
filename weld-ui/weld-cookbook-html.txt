@@ -1,0 +1,367 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+<style>
+.cb-wrap{max-width:920px;margin:0 auto;padding:34px 18px 90px;}
+.cb-hero h1{font:700 30px var(--mono);letter-spacing:-1px;margin-bottom:6px;}
+.cb-hero p{color:var(--muted);max-width:680px;}
+.cb-layout{display:flex;gap:28px;align-items:flex-start;margin-top:26px;}
+.cb-toc{position:sticky;top:18px;flex:0 0 210px;font:13px var(--font);border-right:1px solid var(--border);padding-right:16px;}
+.cb-toc h4{font:600 11px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:14px 0 8px;}
+.cb-toc a{display:block;color:var(--muted);padding:3px 0;border-left:2px solid transparent;padding-left:10px;margin-left:-12px;}
+.cb-toc a:hover{color:var(--ink);border-color:var(--accent);text-decoration:none;}
+.cb-main{flex:1;min-width:0;}
+.cb-main h2{font:700 21px var(--mono);letter-spacing:-.5px;margin:36px 0 12px;padding-top:10px;border-top:1px solid var(--border);}
+.cb-main h2:first-child{border-top:0;margin-top:0;}
+.cb-main h3{font:600 15px var(--mono);color:var(--ink);margin:22px 0 8px;}
+.cb-main p{margin:10px 0;}
+.cb-main ul,.cb-main ol{margin:10px 0 10px 22px;}
+.cb-main li{margin:5px 0;}
+.cb-code{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:13px 15px;font:12.5px/1.55 var(--mono);white-space:pre;overflow-x:auto;color:#c9d1d9;margin:12px 0;}
+.cb-main code{background:var(--faint);padding:1px 5px;border-radius:4px;font:12.5px var(--mono);color:#e3b341;}
+.cb-main pre code{background:none;padding:0;color:inherit;}
+.cb-note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:11px 15px;border-radius:0 5px 5px 0;margin:14px 0;font-size:13.5px;color:#c9d1d9;}
+.cb-note.warn{background:rgba(210,153,34,.08);border-color:var(--amber);}
+.cb-note.good{background:rgba(63,185,80,.08);border-color:var(--green);}
+.cb-table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+.cb-table th,.cb-table td{border:1px solid var(--border);padding:7px 10px;text-align:left;vertical-align:top;}
+.cb-table th{background:var(--faint);font:600 12px var(--mono);color:var(--muted);}
+.cb-table td code{font-size:12px;}
+.cb-pill{display:inline-block;font:600 10px var(--mono);padding:2px 7px;border-radius:4px;background:rgba(63,185,80,.14);color:#7ee787;border:1px solid rgba(63,185,80,.4);}
+.cb-steps{counter-reset:s;list-style:none;margin-left:0;}
+.cb-steps>li{counter-increment:s;position:relative;padding-left:34px;margin:14px 0;}
+.cb-steps>li::before{content:counter(s);position:absolute;left:0;top:0;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font:600 12px var(--mono);display:flex;align-items:center;justify-content:center;}
+@media(max-width:740px){.cb-layout{flex-direction:column;}.cb-toc{position:static;flex:1;border-right:0;border-bottom:1px solid var(--border);padding-bottom:14px;}}
+</style><div class="cb-wrap"><div class="cb-hero"><h1>The Weld Cookbook</h1><p>How to build AI generators on Perchance: the plugin pattern, how imports and exports actually work, the platform quirks that cost everyone hours, and recipes that compose the Weld suite into real apps.</p></div><div class="cb-layout"><nav class="cb-toc">
+  <h4>Start here</h4>
+  <a href="#what">What Weld is</a>
+  <a href="#anatomy">Anatomy of a plugin</a>
+  <a href="#make">Make your first plugin</a>
+  <h4>The platform</h4>
+  <a href="#import">Imports &amp; exports</a>
+  <a href="#deps">Dependency injection</a>
+  <a href="#braces">Brace interception</a>
+  <a href="#ai">AI plugin gotchas</a>
+  <a href="#t2i">Image plugin gotchas</a>
+  <h4>Ship it</h4>
+  <a href="#convention">The 4-file convention</a>
+  <a href="#recipes">Recipes</a>
+  <a href="#catalog">Plugin catalog</a>
+</nav><div class="cb-main"><h2 id="what">What Weld is</h2>
+<p>Weld is a suite of small, composable plugins for building AI generators on Perchance. Each plugin is itself a tiny Perchance generator that exposes a clean JavaScript API on a shared global, <code>window.weld</code>. Your app imports the ones it needs and calls them; they don't fight each other, and they degrade gracefully when an optional dependency is missing.</p>
+<p>This cookbook is the part that isn't on the tin: how a Perchance plugin is actually structured, how importing and exporting really work, and the platform quirks that cost every author hours the first time. If you only read one thing, read <a href="#braces">Brace interception</a>. For how the platform itself is shaped &mdash; domains, the root bridge, the sandbox, and the live Platform Monitor &mdash; see the companion <a href="https://perchance.org/weld-platform">Perchance Platform</a> reference.</p>
+<h2 id="anatomy">Anatomy of a plugin</h2>
+<p>A Perchance generator has two editable areas: a <strong>code editor</strong> (the Perchance DSL, which can contain JavaScript) and an <strong>HTML panel</strong>. A Weld plugin lives almost entirely in the code editor. It has two parts: a <code>$meta</code> block (title, description, tags) and a <code>$output()</code> function whose body runs once and installs the plugin's API.</p><pre class="cb-code">$meta
+  title       = weld.example
+  description = One sentence on what it does.
+  tags        = weld, example, plugin
+
+$output() =&gt;
+  'use strict';
+
+  // 1. ensure the shared namespace exists
+  if (!window.weld) window.weld = &#123;&#125;;
+
+  // 2. idempotent guard: if already installed, hand back the same instance
+  if (window.weld.example) return window.weld.example;
+
+  // 3. private state lives in this closure
+  var count = 0;
+  function bump() &#123; count += 1; return count; &#125;
+
+  // 4. install the API on the namespace AND return it
+  window.weld.example = &#123;
+    bump: bump,
+    value: function () &#123; return count; &#125;,
+    version: '1.0.0'
+  &#125;;
+  return window.weld.example;</pre><p>Five things make this a well-behaved plugin:</p>
+<ul>
+<li><strong><code>'use strict';</code></strong> first &mdash; catches silent mistakes.</li>
+<li><strong>The namespace check</strong> &mdash; never assume <code>window.weld</code> exists; another plugin may load first or not at all.</li>
+<li><strong>The idempotent guard</strong> &mdash; a generator can evaluate <code>$output</code> more than once. Returning the existing instance keeps state intact and avoids re-running setup.</li>
+<li><strong>A private closure</strong> &mdash; everything internal stays local; only the returned object is public.</li>
+<li><strong>A semver <code>version</code></strong> &mdash; so consumers can feature-detect.</li>
+</ul>
+<h2 id="make">Make your first plugin</h2>
+<ol class="cb-steps">
+<li>On Perchance, create a new generator. Name it with your plugin's slug, e.g. <code>weld-example-plugin</code> &mdash; the slug is how others will import it.</li>
+<li>Paste the skeleton above into the <strong>code editor</strong> (not the HTML panel). The <code>$output()</code> body is where your logic goes.</li>
+<li>Save. Your plugin is now importable by anyone as <code>&#123;import:weld-example-plugin&#125;</code>.</li>
+<li>To try it, open the HTML panel and add a tiny script that waits for the API and calls it:</li>
+</ol><pre class="cb-code">&lt;script&gt;
+  function boot()&#123;
+    if (!window.weld &#124;&#124; !window.weld.example) return setTimeout(boot, 100);
+    console.log('bumped to', window.weld.example.bump());
+  &#125;
+  boot();
+&lt;/script&gt;</pre><div class="cb-note">Plugins install asynchronously relative to your HTML, so always poll for the API (<code>setTimeout(boot, 100)</code>) rather than assuming it's ready on first paint. This is the single most common "my plugin is undefined" bug.</div>
+<h2 id="import">Imports &amp; exports &mdash; how they really work</h2>
+<h3>Importing</h3>
+<p>You pull a plugin in with an <strong>import directive</strong>, assigned to a name, at the <strong>top level</strong> of the code editor &mdash; above <code>$output()</code>:</p><pre class="cb-code">aiTextPlugin = &#123;import:ai-text-plugin&#125;
+weldStream   = &#123;import:weld-stream-plugin&#125;
+weldClean    = &#123;import:weld-clean-plugin&#125;
+
+$output() =&gt;
+  ...</pre><p>Two things matter here, and both bite newcomers:</p>
+<ul>
+<li>An import directive is <strong>only valid as a top-level assignment</strong>. Writing one inside the <code>$output()</code> body, inside a string, or inside a comment does <em>not</em> import anything &mdash; instead the parser intercepts it (see <a href="#braces">Brace interception</a>). Imports go at the top, full stop.</li>
+<li>Importing a plugin <strong>runs its <code>$output()</code></strong>, which installs its API on <code>window.weld</code>. The name you assign (<code>weldStream</code>) is mostly a formality for the platform; in practice you reach the plugin through the global, e.g. <code>window.weld.stream</code>, not through that variable.</li>
+</ul>
+<h3>Exporting</h3>
+<p>There is no special "export" keyword. A plugin "exports" simply by assigning its API object onto <code>window.weld.&lt;name&gt;</code> (and returning it). That global <em>is</em> the public surface. Any other plugin or your app's HTML can then read <code>window.weld.&lt;name&gt;</code> once it has loaded.</p>
+<div class="cb-note good">Mental model: <strong>import = "run this plugin so its global appears"</strong>; <strong>export = "put my API on the shared global."</strong> The named import variable is not the API &mdash; <code>window.weld</code> is.</div>
+<h3>Why a single shared namespace</h3>
+<p>Because every plugin attaches to one <code>window.weld</code> object, plugins can find each other at runtime without importing each other in code. <code>weld.memory</code> can use <code>weld.embed</code> if it happens to be present, and quietly fall back if not. That's the whole composition story &mdash; and it's why the idempotent guard matters: load order is not guaranteed.</p>
+<h2 id="deps">Dependency injection between plugins</h2>
+<p>If plugin A needs plugin B, it does <strong>not</strong> import B in its body (you can't &mdash; imports are top-level only, and a plugin shouldn't force its consumers to load B). Instead, A exposes an <code>attach()</code> method, and the app wires them together at boot:</p><pre class="cb-code">// inside weld.memory's body:
+var deps = &#123; embed: null &#125;;
+function attach(d) &#123; if (d &amp;&amp; d.embed) deps.embed = d.embed; &#125;
+function getEmbed() &#123; return deps.embed &#124;&#124; (window.weld &amp;&amp; window.weld.embed) &#124;&#124; null; &#125;
+
+// ...exposed as part of the API: &#123; attach: attach, ... &#125;
+
+// in your app's boot, after both plugins have loaded:
+weld.memory.attach(&#123; embed: weld.embed &#125;);</pre><p>This keeps dependencies <strong>soft</strong>: <code>weld.memory</code> works on its own (keyword recall) and gets better when <code>weld.embed</code> is attached (semantic recall). The <code>getEmbed()</code> helper even falls back to reading the global directly, so attaching is optional. Design every cross-plugin dependency this way and your plugin never hard-crashes because something wasn't loaded.</p><div class="cb-note">Rule of thumb: <strong>required</strong> building blocks (like the AI plugin a generator wraps) are imported at the top; <strong>optional</strong> enhancements are injected via <code>attach()</code> and feature-detected.</div>
+<h2 id="braces">Brace interception &mdash; the #1 footgun</h2>
+<p>Before your code runs, Perchance scans the <strong>raw source</strong> &mdash; including the insides of <code>&lt;script&gt;</code> blocks, string literals, <em>and</em> comments &mdash; and rewrites anything that looks like its own template syntax. A token sitting harmlessly in a JavaScript string can be silently mangled, producing a bug with no stack trace.</p>
+<p>These tokens are intercepted everywhere:</p>
+<table class="cb-table">
+<tr><th>Token</th><th>What the parser thinks</th><th>Safe alternative</th></tr>
+<tr><td><code>&#91;&#91;</code></td><td>nested list / shortcode</td><td>build at runtime, or add a space: <code>&#91; &#91;</code></td></tr>
+<tr><td><code>&#123;&#123;</code></td><td>advanced template syntax</td><td>space them: <code>&#123; &#123;</code> (doubled <em>closing</em> is fine)</td></tr>
+<tr><td><code>&#123;import:x&#125;</code> (not top-level)</td><td>an import directive</td><td>keep imports at the top; escape if quoting one</td></tr>
+<tr><td><code>&#123;a&#124;b&#124;c&#125;</code> (tight, no spaces)</td><td>pick one at random</td><td>add spaces, or escape with entities</td></tr>
+<tr><td><code>&#123;3&#125;</code> / <code>&#123;2,5&#125;</code></td><td>a repeat/count token</td><td>fine inside a real regex literal; else escape</td></tr>
+<tr><td><code>&#123;word&#125;</code> (bare)</td><td>a variable / list reference</td><td>safe in real JS; escape in prose/strings</td></tr>
+</table>
+<p>And these look similar but are <strong>safe</strong> &mdash; don't waste time avoiding them:</p>
+<ul>
+<li>Object literals <em>with spaces</em>: <code>&#123; name: 1 &#125;</code></li>
+<li>Logical-or in braces with spaces: <code>&#123; a &#124;&#124; b &#125;</code></li>
+<li>Regex character classes: <code>&#91;A-Z&#93;</code></li>
+<li>Single-identifier array indexing: <code>arr&#91;i&#93;</code></li>
+<li>A doubled <em>closing</em> brace from nested blocks: <code>&#125;&#125;</code></li>
+</ul>
+<h3>Three ways out</h3>
+<p>When you genuinely need a trap token, pick one:</p>
+<ol>
+<li><strong>Escape it</strong> (for prose/HTML you want shown literally) &mdash; replace the chars with HTML entities, e.g. <code>&amp;#123;a&amp;#124;b&amp;#125;</code> renders as the literal text.</li>
+<li><strong>Build it at runtime</strong> (for strings your code needs) &mdash; assemble from char codes so the literal never appears in source: <code>String.fromCharCode(123) + 'x' + String.fromCharCode(125)</code>.</li>
+<li><strong>Space it</strong> (for JS syntax) &mdash; a space inside the braces is enough for the parser to read it as code, not a template.</li>
+</ol>
+<div class="cb-note warn">The plugin <code>weld.safe</code> automates all of this: <code>scan(code)</code> reports every trap with a fix, <code>escape(str)</code> does option 1, and <code>build(token)</code> / <code>builderSnippet(token)</code> do option 2. If you write plugins regularly, keep it open.</div>
+<h2 id="ai">AI plugin gotchas</h2>
+<p>The <code>ai-text-plugin</code> is what most generators wrap. Its sharp edges:</p>
+<table class="cb-table">
+<tr><th>Gotcha</th><th>What to do</th></tr>
+<tr><td>Results are a <strong>boxed String</strong> object, not a primitive</td><td>Never compare with <code>===</code>. Coerce: <code>String(result)</code> or read <code>result.generatedText</code>.</td></tr>
+<tr><td><code>stopReason</code> is one of <code>natural</code> / <code>artificial</code> / <code>error</code> / <code>user</code></td><td>Branch on it; "artificial" means a stop-sequence/limit hit, so you may want to continue or trim.</td></tr>
+<tr><td>The broker is <strong>serial</strong> (concurrency 1)</td><td>Calls queue; don't fire dozens in parallel expecting speed. Cache repeats (see <code>weld.cache</code>).</td></tr>
+<tr><td>Context budget &asymp; <strong>6000 tokens</strong>, reserve ~800 for the reply</td><td>Pack context to a budget (see <code>weld.tokens</code> / <code>weld.prompt</code>), keep the prompt prefix stable for cache hits.</td></tr>
+<tr><td>At most <strong>20 stop sequences</strong>; output ceiling ~900 tokens</td><td>Plan long generations as multiple calls.</td></tr>
+</table>
+<div class="cb-note">Most of these are smoothed over by <code>weld.stream</code> (lifecycle + normalization), <code>weld.tokens</code> (budgeting), and <code>weld.clean</code> (trimming a truncated tail). The boxed-String trap in particular has bitten nearly every Perchance AI app at least once.</div>
+<h2 id="t2i">Image plugin gotchas</h2>
+<p>For <code>text-to-image-plugin</code>:</p>
+<ul>
+<li>The awaited result is a <strong>boxed String</strong> carrying <code>canvas</code>, <code>dataUrl</code>, and <code>inputs</code> &mdash; same coercion caution as text.</li>
+<li>Only four resolutions are supported: <code>512&times;512</code>, <code>512&times;768</code>, <code>768&times;512</code>, <code>768&times;768</code>. Anything else is rejected.</li>
+<li>An <strong>empty prompt hangs forever</strong> &mdash; guard against it before calling.</li>
+<li><code>removeBackground:true</code> runs RMBG-1.4 client-side, but <strong>only post-processes images it generated</strong>, not images you uploaded. To cut out an upload, use <code>weld.background</code>.</li>
+</ul>
+<div class="cb-note"><code>weld.image</code> wraps resolution validation and result normalization; <code>weld.background</code> does client-side cutout/replace for any image (including uploads and batches); <code>weld.promptforge</code> evolves the prompts you feed in.</div>
+<h2 id="convention">The 4-file convention</h2>
+<p>Every Weld plugin ships as four generators, by slug:</p>
+<table class="cb-table">
+<tr><th>File</th><th>Goes in</th><th>Purpose</th></tr>
+<tr><td><code>weld-&lt;slug&gt;-plugin</code></td><td>code editor</td><td>the plugin itself (<code>$meta</code> + <code>$output</code>)</td></tr>
+<tr><td><code>weld-&lt;slug&gt;-plugin</code> HTML panel</td><td>HTML panel</td><td>the docs page</td></tr>
+<tr><td><code>weld-&lt;slug&gt;-example</code></td><td>both panels</td><td>an interactive demo</td></tr>
+</table>
+<p>Import as <code>&#123;import:weld-&lt;slug&gt;-plugin&#125;</code>; docs live at <code>perchance.org/weld-&lt;slug&gt;-plugin</code> and the demo at <code>perchance.org/weld-&lt;slug&gt;-example</code>. Keeping this consistent is what lets the hub index and manifest stay in sync automatically.</p>
+<h2 id="recipes">Recipes</h2>
+<h3>A streaming chat bot</h3>
+<p>Import the AI plugin plus stream, tokens, clean, and memory. Stream the reply, budget the history, clean the output, and let memory recall facts:</p><pre class="cb-code">aiTextPlugin = &#123;import:ai-text-plugin&#125;
+weldStream   = &#123;import:weld-stream-plugin&#125;
+weldTokens   = &#123;import:weld-tokens-plugin&#125;
+weldClean    = &#123;import:weld-clean-plugin&#125;
+weldMemory   = &#123;import:weld-memory-plugin&#125;
+
+// in your send handler (HTML side):
+var context = weld.memory.inject(userText);          // relevant facts
+var kept    = weld.tokens.clamp(history, context);   // fit the budget
+weld.stream.run(&#123;
+  instruction: context + '\n' + render(kept),
+  onChunk: function (delta, full) &#123; paint(full); &#125;
+&#125;).then(function (res) &#123;
+  var reply = weld.clean.clean(res, &#123; playerName: you, roles: true &#125;);
+  show(reply);
+  weld.memory.observe(reply);                         // learn new facts
+&#125;);</pre><h3>An image generator with evolving prompts</h3><pre class="cb-code">aiTextPlugin     = &#123;import:ai-text-plugin&#125;
+textToImagePlugin = &#123;import:text-to-image-plugin&#125;
+weldStream       = &#123;import:weld-stream-plugin&#125;
+weldStructured   = &#123;import:weld-structured-plugin&#125;
+weldPromptforge  = &#123;import:weld-promptforge-plugin&#125;
+weldImage        = &#123;import:weld-image-plugin&#125;
+
+var forge = weld.promptforge.create(&#123; instruction: userIdea, mode: 'balanced' &#125;);
+var prompts = await forge.generate(4);
+for (var p of prompts) &#123;
+  forge.used(p);
+  var img = await weld.image.generate(p, &#123; resolution: '768x768' &#125;);
+  if (userLikes(img)) forge.upvote(p);
+&#125;
+var better = await forge.generate(4);   // winners bred in</pre><h3>An illustrated story with a director</h3>
+<p>Reply fast, then reconcile state and illustrate in the background &mdash; without blocking the reply:</p><pre class="cb-code">var dir = weld.director.create();
+dir.define('reply',      writeReply);
+dir.define('audit',      function (ctx) &#123; return state.reconcile(ctx.reply); &#125;, &#123; background: true, after: &#91;'reply'&#93; &#125;);
+dir.define('illustrate', paintScene,  &#123; background: true, after: &#91;'reply'&#93; &#125;);
+
+var run = dir.run(userInput);
+show((await run.foreground).reply);   // reply is ready immediately
+await run.background;                 // state + image catch up</pre>
+<h2 id="catalog">Plugin catalog</h2>
+<p>All 45 plugins, by category. Each links to its docs.</p>
+<h3>content</h3>
+<table class="cb-table"><tr><th>plugin</th><th>what it does</th></tr>
+<tr><td><a href="https://perchance.org/weld-banlist-plugin"><code>weld.banlist</code></a></td><td>List-based moderation for community apps: banned users, banned prompt and negative-prompt phrases (substring or wildcard), and a content-rating gate (g/pg/pg13/r/x).</td></tr>
+<tr><td><a href="https://perchance.org/weld-comments-plugin"><code>weld.comments</code></a></td><td>Drop a discussion thread onto anything -- a gallery image, a post, a character, a scene.</td></tr>
+<tr><td><a href="https://perchance.org/weld-image-plugin"><code>weld.image</code></a></td><td>Promise-based wrapper around text-to-image-plugin.</td></tr>
+<tr><td><a href="https://perchance.org/weld-lorebook-plugin"><code>weld.lorebook</code></a></td><td>Keyword-triggered context injection.</td></tr>
+<tr><td><a href="https://perchance.org/weld-spamguard-plugin"><code>weld.spamguard</code></a></td><td>Multi-channel chat spam detector.</td></tr>
+</table>
+<h3>data</h3>
+<table class="cb-table"><tr><th>plugin</th><th>what it does</th></tr>
+<tr><td><a href="https://perchance.org/weld-backup-plugin"><code>weld.backup</code></a></td><td>Format-versioned export/import with conflict resolution and migration.</td></tr>
+<tr><td><a href="https://perchance.org/weld-branching-plugin"><code>weld.branching</code></a></td><td>Tree-based conversation history.</td></tr>
+<tr><td><a href="https://perchance.org/weld-cache-plugin"><code>weld.cache</code></a></td><td>A response cache for AI apps: exact key/value with LRU + TTL, a wrap() that memoizes any async function, and a semantic mode (via weld.embed) that reuses a past result when a new prompt is close enough in meaning..</td></tr>
+<tr><td><a href="https://perchance.org/weld-embed-plugin"><code>weld.embed</code></a></td><td>Local semantic embeddings for search and memory.</td></tr>
+<tr><td><a href="https://perchance.org/weld-gen-plugin"><code>weld.gen</code></a></td><td>Generator introspection: read DSL source, enumerate lists, search items, dynamic-import any public generator, mutate root.* at runtime.</td></tr>
+<tr><td><a href="https://perchance.org/weld-history-plugin"><code>weld.history</code></a></td><td>Chat session manager with auto-save.</td></tr>
+<tr><td><a href="https://perchance.org/weld-migrate-plugin"><code>weld.migrate</code></a></td><td>Versioned IndexedDB schema migrations for the weld plugin suite.</td></tr>
+<tr><td><a href="https://perchance.org/weld-persist-plugin"><code>weld.persist</code></a></td><td>Collection-based CRUD over IndexedDB.</td></tr>
+<tr><td><a href="https://perchance.org/weld-quota-plugin"><code>weld.quota</code></a></td><td>Storage and rate-limit awareness for the weld plugin suite.</td></tr>
+<tr><td><a href="https://perchance.org/weld-sync-plugin"><code>weld.sync</code></a></td><td>Cross-tab BroadcastChannel + namespaced localStorage.</td></tr>
+<tr><td><a href="https://perchance.org/weld-tokens-plugin"><code>weld.tokens</code></a></td><td>Accurate tokenizer using DeepSeek-R1 (same as Perchance AI).</td></tr>
+<tr><td><a href="https://perchance.org/weld-undo-plugin"><code>weld.undo</code></a></td><td>Undo/redo with state snapshots for the weld plugin suite.</td></tr>
+</table>
+<h3>fun</h3>
+<table class="cb-table"><tr><th>plugin</th><th>what it does</th></tr>
+<tr><td><a href="https://perchance.org/weld-confetti-plugin"><code>weld.confetti</code></a></td><td>A tiny, dependency-free canvas confetti and fireworks burst for celebrating wins -- a finished generation, a saved card, a milestone.</td></tr>
+<tr><td><a href="https://perchance.org/weld-konami-plugin"><code>weld.konami</code></a></td><td>A key-sequence detector for Easter eggs.</td></tr>
+</table>
+<h3>generation</h3>
+<table class="cb-table"><tr><th>plugin</th><th>what it does</th></tr>
+<tr><td><a href="https://perchance.org/weld-clean-plugin"><code>weld.clean</code></a></td><td>Output post-processing for AI text: trim a dangling sentence after truncation, strip role-name bleed, collapse repetition loops, balance code fences, drop hidden-from-AI blocks, and apply custom regex rules.</td></tr>
+<tr><td><a href="https://perchance.org/weld-director-plugin"><code>weld.director</code></a></td><td>Multi-pass orchestration: run foreground passes (reply) and resolve immediately, then run background passes (state reconcile, fact extraction, illustration).</td></tr>
+<tr><td><a href="https://perchance.org/weld-memory-plugin"><code>weld.memory</code></a></td><td>Learned long-term memory for chat bots.</td></tr>
+<tr><td><a href="https://perchance.org/weld-persona-plugin"><code>weld.persona</code></a></td><td>A character personality model for AI roleplay.</td></tr>
+<tr><td><a href="https://perchance.org/weld-prompt-plugin"><code>weld.prompt</code></a></td><td>Structured prompt assembly with token-aware context-window packing.</td></tr>
+<tr><td><a href="https://perchance.org/weld-promptforge-plugin"><code>weld.promptforge</code></a></td><td>Evolutionary image-prompt generation.</td></tr>
+<tr><td><a href="https://perchance.org/weld-queue-plugin"><code>weld.queue</code></a></td><td>Async task pipeline with configurable concurrency, progress callbacks, retry with exponential backoff, cancel, pause/resume.</td></tr>
+<tr><td><a href="https://perchance.org/weld-regen-plugin"><code>weld.regen</code></a></td><td>Regenerate and swipe between alternate replies.</td></tr>
+<tr><td><a href="https://perchance.org/weld-state-plugin"><code>weld.state</code></a></td><td>Typed, structured story state defined by a schema and kept in sync by a background AI audit pass that reconciles the latest narrative against current state.</td></tr>
+<tr><td><a href="https://perchance.org/weld-stream-plugin"><code>weld.stream</code></a></td><td>AI text generation lifecycle: streaming with onChunk/onToken, abort via stop(), normalized stopReason, a single-broker serial queue, and token-budget helpers.</td></tr>
+<tr><td><a href="https://perchance.org/weld-structured-plugin"><code>weld.structured</code></a></td><td>Reliable structured output from a text model: prime for JSON, parse with a tolerant balanced scan, validate against a small schema, and auto-retry with a repair instruction on failure.</td></tr>
+<tr><td><a href="https://perchance.org/weld-summarize-plugin"><code>weld.summarize</code></a></td><td>Rolling and hierarchical chat-history compression.</td></tr>
+</table>
+<h3>media</h3>
+<table class="cb-table"><tr><th>plugin</th><th>what it does</th></tr>
+<tr><td><a href="https://perchance.org/weld-background-plugin"><code>weld.background</code></a></td><td>Client-side background removal and replacement for any image -- including photos and character art a user brings in from their device.</td></tr>
+<tr><td><a href="https://perchance.org/weld-cards-plugin"><code>weld.cards</code></a></td><td>Import and export character cards in the SillyTavern/TavernAI V2 PNG format.</td></tr>
+<tr><td><a href="https://perchance.org/weld-vn-plugin"><code>weld.vn</code></a></td><td>A visual-novel stage for the browser.</td></tr>
+<tr><td><a href="https://perchance.org/weld-voice-plugin"><code>weld.voice</code></a></td><td>Speech for chat bots.</td></tr>
+</table>
+<h3>tooling</h3>
+<table class="cb-table"><tr><th>plugin</th><th>what it does</th></tr>
+<tr><td><a href="https://perchance.org/weld-diag-plugin"><code>weld.diag</code></a></td><td>Diagnostic capture for the weld plugin suite -- ring-buffer log of errors, warns, and key events.</td></tr>
+<tr><td><a href="https://perchance.org/weld-safe-plugin"><code>weld.safe</code></a></td><td>The brace-interception toolkit for Perchance authors.</td></tr>
+<tr><td><a href="https://perchance.org/weld-testrig-plugin"><code>weld.testrig</code></a></td><td>Assertion framework for Perchance plugin testing.</td></tr>
+</table>
+<h3>ui</h3>
+<table class="cb-table"><tr><th>plugin</th><th>what it does</th></tr>
+<tr><td><a href="https://perchance.org/weld-chatui-plugin"><code>weld.chatui</code></a></td><td>Chat UI primitives: message bubbles with role-based styling, streaming responses, typing indicators, optional input area.</td></tr>
+<tr><td><a href="https://perchance.org/weld-gallery-plugin"><code>weld.gallery</code></a></td><td>Image grid with IndexedDB blob storage, metadata manifest, favorites, sort/filter, eviction, download, lightbox integration..</td></tr>
+<tr><td><a href="https://perchance.org/weld-markdown-plugin"><code>weld.markdown</code></a></td><td>Safe markdown renderer with built-in HTML sanitization and URL safety.</td></tr>
+<tr><td><a href="https://perchance.org/weld-settings-plugin"><code>weld.settings</code></a></td><td>Settings panels with declarative schema, reactive accessors, and persistence.</td></tr>
+<tr><td><a href="https://perchance.org/weld-toast-plugin"><code>weld.toast</code></a></td><td>Toast notifications and modal dialogs (prompt, confirm).</td></tr>
+<tr><td><a href="https://perchance.org/weld-ui-plugin"><code>weld.ui</code></a></td><td>Design system foundation: theme, components (button, input, modal, tabs, disclosure, lightbox, clipboard), icons, layout primitives..</td></tr>
+</table>
+<h3>utility</h3>
+<table class="cb-table"><tr><th>plugin</th><th>what it does</th></tr>
+<tr><td><a href="https://perchance.org/weld-dice-plugin"><code>weld.dice</code></a></td><td>Randomness toolkit for generators: dice notation (2d6+3, 4d6kh3, adv/dis), weighted tables, draw-without-replacement decks, shuffles, and a seeded RNG for reproducible runs.</td></tr>
+</table>
+<h3>Coming soon</h3><table class="cb-table"><tr><th>plugin</th><th>planned</th></tr>
+<tr><td><code>weld.audio</code></td><td>Background music, looping ambience, and event-triggered sound effects for story and VN apps.</td></tr>
+<tr><td><code>weld.import</code></td><td>Format-detecting importer for character/chat data (SillyTavern cards, FurAI, ai-character-chat, JSONL).</td></tr>
+</table>
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer></div></div></div>

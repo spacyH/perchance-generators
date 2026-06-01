@@ -1,0 +1,1039 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--amber:#d29922;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:780px;margin:0 auto;padding:34px 18px 90px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 0 16px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+.breadcrumb a{color:var(--muted);}.breadcrumb .sep{color:var(--faint);margin:0 8px;}.breadcrumb .cur{color:var(--ink);}.breadcrumb .act a{color:var(--accent);}
+.hdr{margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}.hdr h1{font:700 24px var(--mono);letter-spacing:-0.5px;}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;}
+.hdr .lead{color:var(--muted);margin-top:8px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;}
+.panel h2{font:600 13px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:8px 0;}
+.lbl{font:600 12px var(--mono);color:var(--muted);min-width:74px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 15px;font:600 13px var(--font);cursor:pointer;transition:.12s;}
+.btn:hover{filter:brightness(1.08);}.btn.ghost{background:var(--faint);color:var(--ink);}.btn.sm{padding:6px 11px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+input[type=text],textarea{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:8px 10px;font:13px var(--font);}
+input[type=text]{flex:1;min-width:120px;}textarea{width:100%;font:12.5px/1.5 var(--mono);resize:vertical;}
+.mono{font:13px var(--mono);}
+.out{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font:12.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;min-height:20px;color:#c9d1d9;}
+.chip{display:inline-block;background:var(--faint);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font:600 12px var(--mono);margin:2px;}
+.chip.k{background:rgba(63,185,80,.14);border-color:rgba(63,185,80,.4);color:#7ee787;}
+.chip.d{opacity:.4;text-decoration:line-through;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:9px 13px;border-radius:0 4px 4px 0;margin:12px 0 0;font-size:12.5px;color:#c9d1d9;}
+.note.warn{background:rgba(210,153,34,.08);border-color:var(--amber);}
+.tag{font:600 10px var(--mono);padding:2px 7px;border-radius:4px;background:rgba(63,185,80,.14);color:#7ee787;border:1px solid rgba(63,185,80,.4);}
+.tag.ai{background:rgba(210,153,34,.12);color:#e3b341;border-color:rgba(210,153,34,.4);}
+.bar{height:14px;background:var(--accent);border-radius:3px;transition:width .3s;}
+.footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);}.footer a{color:var(--muted);}
+.flex{display:flex;gap:10px;align-items:center;}.wrap{flex-wrap:wrap;}.grow{flex:1;}.mt{margin-top:10px;}
+</style>
+<div id="page">
+<div class="breadcrumb"><span><a href="https://perchance.org/weld-ui-index">weld</a><span class="sep">/</span>weld.state<span class="sep">/</span><span class="cur">demo</span></span><span class="act"><a href="https://perchance.org/weld-state-plugin">docs &rarr;</a></span></div>
+<div class="hdr"><div class="hdr-row"><h1>weld.state &mdash; demo</h1><span class="ver">v1.0.0</span></div><p class="lead">Define a typed story state, edit fields, and watch the prompt block update. The reconcile pass updates state from narrative on Perchance.</p></div>
+  <div class="panel"><h2>Schema &amp; state <span class="tag">typed</span></h2>
+    <div class="row"><span class="lbl">location</span><input id="loc" type="text" value="the tavern"></div>
+    <div class="row"><span class="lbl">time</span>
+      <span id="timeseg" class="flex wrap"></span></div>
+    <div class="row"><span class="lbl">gold</span><input id="gold" type="range" min="0" max="100" value="10"><span id="goldv" class="mono"></span></div>
+    <div class="row"><span class="lbl">present</span><input id="present" type="text" value="Mara, Kael"></div>
+    <div class="row"><span class="lbl">alarmed</span><input id="alarmed" type="checkbox"></div>
+  </div>
+  <div class="panel"><h2>Prompt block</h2>
+    <div id="block" class="out"></div>
+    <div class="note">This is exactly what <code>state.prompt()</code> emits &mdash; a compact line you prepend to the system prompt. Empty/default fields are skipped.</div>
+  </div>
+  <div class="panel"><h2>Reconcile from narrative <span class="tag ai">on Perchance</span></h2>
+    <textarea id="narr" rows="3">They flee into the dark forest as the alarm bell rings. Mara stays behind to hold the door.</textarea>
+    <div class="row mt"><button id="rec" class="btn">Reconcile</button><span id="recstatus" class="mono" style="color:var(--muted);font-size:12px;"></span></div>
+    <div class="note">On Perchance, <code>reconcile()</code> sends the current state + this narrative to the model and merges back only what changed (location &rarr; forest, alarmed &rarr; true, present &rarr; Mara stays). Here without the model it just shows the call it would make.</div>
+  </div>
+<footer class="footer"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
+</div>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.structured) return window.weld.structured;
+
+// -----------------------------------------------------------------
+// weld.structured: coax dependable JSON out of a plain text model.
+//
+// A text model will not reliably emit clean JSON on its own -- it wraps
+// it in prose, fences it, trails a comma, or stops mid-object. This
+// plugin makes the round-trip robust:
+//   1. prime    -- append an explicit "respond with only JSON" directive
+//   2. parse    -- pull the first balanced {...} / [...] out of the text,
+//                  stripping code fences, tolerating trailing commas
+//   3. validate -- check it against a tiny field schema
+//   4. repair   -- on parse/validation failure, re-ask with the error,
+//                  up to opts.repairAttempts times
+//
+// Generation goes through weld.stream (so boxed strings, stopReason,
+// and the serial queue are already handled). If weld.stream is absent
+// we fall back to window.root.aiTextPlugin directly.
+// -----------------------------------------------------------------
+
+function getStream() {
+  return (window.weld && window.weld.stream) ? window.weld.stream : null;
+}
+
+// Strip ```json fences and surrounding prose noise.
+function stripFences(text) {
+  var s = String(text == null ? '' : text);
+  var fence = String.fromCharCode(96, 96, 96);
+  var i = s.indexOf(fence);
+  if (i === -1) return s;
+  // Drop an opening fence + optional language tag, and a closing fence.
+  s = s.replace(new RegExp(fence + '[a-zA-Z0-9_-]*\\n?'), '');
+  var j = s.lastIndexOf(fence);
+  if (j !== -1) s = s.slice(0, j);
+  return s;
+}
+
+// Find the first complete balanced JSON value (object or array),
+// respecting strings and escapes so braces inside strings don't count.
+function extractBalanced(text) {
+  var s = String(text == null ? '' : text);
+  var startObj = s.indexOf('{');
+  var startArr = s.indexOf('[');
+  var start;
+  if (startObj === -1) start = startArr;
+  else if (startArr === -1) start = startObj;
+  else start = Math.min(startObj, startArr);
+  if (start === -1) return null;
+
+  var open = s.charAt(start);
+  var close = (open === '{') ? '}' : ']';
+  var depth = 0, inStr = false, esc = false;
+  for (var i = start; i < s.length; i++) {
+    var c = s.charAt(i);
+    if (inStr) {
+      if (esc) { esc = false; }
+      else if (c === '\\') { esc = true; }
+      else if (c === '"') { inStr = false; }
+      continue;
+    }
+    if (c === '"') { inStr = true; continue; }
+    if (c === open) depth += 1;
+    else if (c === close) {
+      depth -= 1;
+      if (depth === 0) return s.slice(start, i + 1);
+    }
+  }
+  return null; // never closed (likely truncated)
+}
+
+function looseFix(jsonText) {
+  var s = String(jsonText);
+  // Remove trailing commas before } or ].
+  s = s.replace(/,\s*([}\]])/g, '$1');
+  return s;
+}
+
+// Parse text -> value. Returns { value } or { error }.
+function parse(text) {
+  var candidate = extractBalanced(stripFences(text));
+  if (candidate == null) return { error: 'no JSON object or array found in the output' };
+  try {
+    return { value: JSON.parse(candidate) };
+  } catch (e1) {
+    try {
+      return { value: JSON.parse(looseFix(candidate)) };
+    } catch (e2) {
+      return { error: 'JSON parse failed: ' + String(e2.message || e2) };
+    }
+  }
+}
+
+// parsePartial(text): best-effort parse of an INCOMPLETE JSON object as
+// it streams in. Finds the first '{' or '[', closes any open string,
+// drops a trailing partial token, and balances open brackets, so the UI
+// can render fields the moment they arrive. Returns { value } or {} when
+// nothing parseable yet. Never throws.
+function parsePartial(text) {
+  var raw = stripFences(String(text == null ? '' : text));
+  var start = -1;
+  for (var a = 0; a < raw.length; a++) { var ch0 = raw.charAt(a); if (ch0 === '{' || ch0 === '[') { start = a; break; } }
+  if (start === -1) return {};
+  var s = raw.slice(start);
+
+  // Scan once to learn: open-bracket stack, whether we end inside a string,
+  // and whether we end with a dangling structural token we must drop.
+  var stack = [], inStr = false, esc = false;
+  for (var i = 0; i < s.length; i++) {
+    var c = s.charAt(i);
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === '\\') esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === '{' || c === '[') stack.push(c === '{' ? '}' : ']');
+    else if (c === '}' || c === ']') stack.pop();
+  }
+
+  function attempt(str) {
+    var t = str;
+    if (inStr) t += '"';                 // close an open string literal
+    t = t.replace(/\s+$/, '');
+    t = t.replace(/,\s*$/, '');          // dangling comma
+    // "key": with no value yet -> drop the key and colon entirely
+    if (/:\s*$/.test(t)) {
+      t = t.replace(/:\s*$/, '');
+      t = t.replace(/(\{|,)\s*"[^"]*"\s*$/, '$1');
+      t = t.replace(/,\s*$/, '');
+    }
+    for (var k = stack.length - 1; k >= 0; k--) t += stack[k];
+    try { return JSON.parse(looseFix(t)); } catch (e) { return undefined; }
+  }
+
+  var v = attempt(s);
+  if (v !== undefined) return { value: v };
+  return {};
+}
+// schema = { fields: { name: { type, required, enum, of } }, allowExtra }
+//   type: 'string' | 'number' | 'integer' | 'boolean' | 'array' | 'object'
+// Returns { ok:true } or { ok:false, error }.
+function typeOk(val, type) {
+  switch (type) {
+    case 'string':  return typeof val === 'string';
+    case 'number':  return typeof val === 'number' && !isNaN(val);
+    case 'integer': return typeof val === 'number' && !isNaN(val) && Math.floor(val) === val;
+    case 'boolean': return typeof val === 'boolean';
+    case 'array':   return Array.isArray(val);
+    case 'object':  return val !== null && typeof val === 'object' && !Array.isArray(val);
+    default:        return true;
+  }
+}
+
+function validate(value, schema) {
+  if (!schema || !schema.fields) return { ok: true };
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return { ok: false, error: 'expected a JSON object at the top level' };
+  }
+  var fields = schema.fields;
+  var names = Object.keys(fields);
+  for (var i = 0; i < names.length; i++) {
+    var key = names[i];
+    var spec = fields[key] || {};
+    var present = Object.prototype.hasOwnProperty.call(value, key);
+    if (!present) {
+      if (spec.required) return { ok: false, error: 'missing required field "' + key + '"' };
+      continue;
+    }
+    var v = value[key];
+    if (spec.type && !typeOk(v, spec.type)) {
+      return { ok: false, error: 'field "' + key + '" should be ' + spec.type };
+    }
+    if (spec.enum && spec.enum.indexOf(v) === -1) {
+      return { ok: false, error: 'field "' + key + '" must be one of: ' + spec.enum.join(', ') };
+    }
+    if (spec.type === 'array' && spec.of && Array.isArray(v)) {
+      for (var j = 0; j < v.length; j++) {
+        if (!typeOk(v[j], spec.of)) {
+          return { ok: false, error: 'every item of "' + key + '" should be ' + spec.of };
+        }
+      }
+    }
+  }
+  if (schema.allowExtra === false) {
+    var extra = Object.keys(value).filter(function (k) { return names.indexOf(k) === -1; });
+    if (extra.length) return { ok: false, error: 'unexpected field(s): ' + extra.join(', ') };
+  }
+  return { ok: true };
+}
+
+// Describe a schema in words for the priming directive.
+function describeSchema(schema) {
+  if (!schema || !schema.fields) return '';
+  var parts = Object.keys(schema.fields).map(function (k) {
+    var spec = schema.fields[k] || {};
+    var bits = [k + ' (' + (spec.type || 'any')];
+    if (spec.required) bits.push('required');
+    if (spec.enum) bits.push('one of: ' + spec.enum.join('/'));
+    return bits.join(', ') + ')';
+  });
+  return 'JSON object with fields: ' + parts.join('; ') + '.';
+}
+
+function buildInstruction(opts, repairNote) {
+  var base = String(opts.instruction || '');
+  var shape = opts.shape
+    || describeSchema(opts.schema)
+    || (opts.example ? 'JSON shaped like: ' + JSON.stringify(opts.example) : 'a single JSON value');
+  var directive = 'Respond with ONLY ' + shape
+    + ' Output strictly valid JSON and nothing else -- no prose, no markdown, no code fences.';
+  var instruction = base ? (base + '\n\n' + directive) : directive;
+  if (repairNote) {
+    instruction += '\n\nYour previous reply could not be used (' + repairNote
+      + '). Return corrected JSON only.';
+  }
+  return instruction;
+}
+
+// Run one generation through weld.stream (or the raw plugin).
+function generateOnce(instruction, opts) {
+  var stream = getStream();
+  var runOpts = {
+    instruction: instruction,
+    startWith: opts.startWith != null ? opts.startWith : '{',
+    stopSequences: opts.stopSequences || null
+  };
+  if (stream) {
+    return stream.run(runOpts).then(function (res) {
+      return { text: res.text, error: res.error, truncated: res.truncated };
+    });
+  }
+  // Fallback: call ai-text-plugin directly and normalize the boxed String.
+  var plugin = null;
+  try { if (window.root && typeof window.root.aiTextPlugin === 'function') plugin = window.root.aiTextPlugin; } catch (e) {}
+  if (!plugin) {
+    return Promise.resolve({ text: '', error: 'weld.structured: neither weld.stream nor ai-text-plugin is available' });
+  }
+  return Promise.resolve(plugin({ instruction: instruction, startWith: runOpts.startWith }))
+    .then(function (raw) {
+      var startWith = runOpts.startWith || '';
+      var body = (raw && raw.generatedText != null) ? String(raw.generatedText) : String(raw);
+      // startWith is echoed back when calling the raw plugin; re-attach it.
+      return { text: startWith + body, error: null };
+    }, function (err) {
+      return { text: '', error: String((err && err.message) || err) };
+    });
+}
+
+// -----------------------------------------------------------------
+// Public: generate(opts) -> Promise<{ ok, value, raw, error, attempts }>
+//
+// opts:
+//   instruction     (string)  your task / system prompt
+//   schema          (object)  { fields: { name: { type, required, enum, of } } }
+//   example         (object)  alternative to schema: a sample shape to mimic
+//   shape           (string)  free-text description of the desired JSON
+//   startWith       (string)  default '{' to prime an object
+//   stopSequences   (array)   passthrough to weld.stream
+//   repairAttempts  (number)  extra tries on failure (default 1)
+// -----------------------------------------------------------------
+function generate(opts) {
+  opts = opts || {};
+  var maxRepairs = (opts.repairAttempts == null) ? 1 : opts.repairAttempts;
+  var attempt = 0;
+  var lastRaw = '', lastError = null;
+
+  function step(repairNote) {
+    attempt += 1;
+    var instruction = buildInstruction(opts, repairNote);
+    return generateOnce(instruction, opts).then(function (gen) {
+      lastRaw = gen.text || '';
+      if (gen.error) {
+        lastError = gen.error;
+        return maybeRetry('generation error: ' + gen.error);
+      }
+      var parsed = parse(lastRaw);
+      if (parsed.error) {
+        lastError = parsed.error;
+        return maybeRetry(parsed.error);
+      }
+      var check = validate(parsed.value, opts.schema);
+      if (!check.ok) {
+        lastError = check.error;
+        return maybeRetry(check.error);
+      }
+      return { ok: true, value: parsed.value, raw: lastRaw, error: null, attempts: attempt };
+    });
+  }
+
+  function maybeRetry(note) {
+    if (attempt <= maxRepairs) return step(note);
+    return { ok: false, value: null, raw: lastRaw, error: lastError, attempts: attempt };
+  }
+
+  return step(null);
+}
+
+// generateStream(opts): like generate(), but reports the partially-parsed
+// object as it streams via opts.onPartial(obj). Resolves to the same
+// { ok, value, raw, error, attempts } as generate(). Requires weld.stream
+// (which carries onChunk); without it, falls back to generate().
+function generateStream(opts) {
+  opts = opts || {};
+  var stream = getStream();
+  if (!stream || typeof opts.onPartial !== 'function') return generate(opts);
+  var instruction = buildInstruction(opts, null);
+  var onPartial = opts.onPartial;
+  return stream.run({
+    instruction: instruction,
+    startWith: opts.startWith != null ? opts.startWith : '{',
+    stopSequences: opts.stopSequences || null,
+    onChunk: function (delta, full) {
+      var p = parsePartial(full);
+      if ('value' in p) { try { onPartial(p.value); } catch (e) {} }
+    }
+  }).then(function (res) {
+    if (res.error) return { ok: false, value: null, raw: res.text, error: res.error, attempts: 1 };
+    var parsed = parse(res.text);
+    if (parsed.error) return { ok: false, value: null, raw: res.text, error: parsed.error, attempts: 1 };
+    var check = validate(parsed.value, opts.schema);
+    if (!check.ok) return { ok: false, value: parsed.value, raw: res.text, error: check.error, attempts: 1 };
+    return { ok: true, value: parsed.value, raw: res.text, error: null, attempts: 1 };
+  });
+}
+
+window.weld.structured = {
+  generate: generate,
+  generateStream: generateStream,
+  parse: parse,
+  parsePartial: parsePartial,
+  validate: validate,
+  extract: extractBalanced,
+  describeSchema: describeSchema,
+  version: '1.1.0'
+};
+
+return window.weld.structured;
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.stream) {
+  window.weld.stream.attach({ aiTextPlugin: aiTextPlugin });
+  return window.weld.stream;
+}
+
+// -----------------------------------------------------------------
+// weld.stream: the generation half of an AI chat app.
+//
+// weld.prompt assembles the instruction string; weld.stream sends it
+// to ai-text-plugin and manages the call lifecycle. It exists because
+// the raw plugin has three sharp edges that every consumer re-hits:
+//
+//   1. The resolved value is a BOXED String, not a primitive, so
+//      `result === "x"` is always false. We hand back a plain string.
+//   2. stopReason is "natural" | "artificial" | "error" | "user" --
+//      NOT the "stop_sequence"/"max_tokens" the official docs claim.
+//      We translate to plain booleans: truncated / aborted / error.
+//   3. The broker accepts exactly one generation at a time. Overlapping
+//      calls don't error -- they just contend. We serialize them in an
+//      internal FIFO queue so callers can fire-and-forget.
+//
+// The plugin must be imported in the lists editor (see the import
+// directive at the top of this generator) and handed to us via
+// weld.stream.attach({ aiTextPlugin: aiTextPlugin }) -- the DSL form
+// below does this automatically. If you skip it we also try
+// window.root.aiTextPlugin as a fallback.
+// -----------------------------------------------------------------
+
+var deps = { aiTextPlugin: null };
+
+function attach(d) {
+  if (d && typeof d.aiTextPlugin === 'function') deps.aiTextPlugin = d.aiTextPlugin;
+}
+
+function grabPlugin() {
+  if (typeof deps.aiTextPlugin === 'function') return deps.aiTextPlugin;
+  try {
+    if (window.root && typeof window.root.aiTextPlugin === 'function') return window.root.aiTextPlugin;
+  } catch (e) { /* proxy miss */ }
+  return null;
+}
+
+// -----------------------------------------------------------------
+// Constants. A literal double-open-bracket sequence would be read as a
+// Perchance template by the source scanner, so we assemble it from char
+// codes instead.
+// -----------------------------------------------------------------
+var LBR = String.fromCharCode(91);            // "["
+var DOUBLE = LBR + LBR;                        // a double open bracket
+var DEFAULT_CHAT_STOPS = ['\n\n' + DOUBLE, '\n' + DOUBLE]; // the two standard chat stop sequences
+var MAX_STOP_SEQUENCES = 20;                   // hard backend limit (21+ => stopReason "error")
+
+var idSeq = 0;
+function nextId() {
+  idSeq += 1;
+  return 'weldStream' + Date.now() + '_' + idSeq;
+}
+
+// -----------------------------------------------------------------
+// Normalize the boxed-String result into a plain, predictable object.
+// -----------------------------------------------------------------
+function normalize(result) {
+  var out = {
+    text: '',
+    stopReason: 'natural',
+    truncated: false,   // "artificial": hit a stop sequence or the output ceiling
+    aborted: false,     // "user": stop() was called
+    error: null
+  };
+  if (result == null) {
+    out.stopReason = 'error';
+    out.error = 'no result returned from ai-text-plugin';
+    return out;
+  }
+  var reason = result.stopReason || 'natural';
+  out.stopReason = reason;
+  // generatedText is the full output; String(result) also works on the box.
+  out.text = (result.generatedText != null) ? String(result.generatedText) : String(result);
+  if (reason === 'artificial') out.truncated = true;
+  if (reason === 'user') out.aborted = true;
+  if (reason === 'error') {
+    out.error = 'ai-text-plugin reported a generation error';
+    out.text = '';
+  }
+  return out;
+}
+
+function clampStops(stops) {
+  if (stops == null) return null;
+  if (!Array.isArray(stops)) stops = [stops];
+  stops = stops.filter(function (s) { return s != null && String(s).length > 0; });
+  if (stops.length === 0) return null;
+  if (stops.length > MAX_STOP_SEQUENCES) stops = stops.slice(0, MAX_STOP_SEQUENCES);
+  return stops;
+}
+
+// -----------------------------------------------------------------
+// Serial queue. activeEntry is the in-flight generation; the broker
+// handles exactly one at a time, so everything else waits behind it.
+// -----------------------------------------------------------------
+var queue = [];
+var activeEntry = null;
+var pumping = false;
+
+function buildCallOpts(entry) {
+  var o = entry.opts;
+  var callOpts = { instruction: String(o.instruction) };
+
+  if (o.startWith != null) {
+    callOpts.startWith = String(o.startWith);
+    // Default to hiding the echoed prefix unless the caller opts out.
+    callOpts.hideStartWith = (o.hideStartWith !== false);
+  }
+
+  var stops = (o.stopSequences != null)
+    ? o.stopSequences
+    : (o.chat ? DEFAULT_CHAT_STOPS : null);
+  stops = clampStops(stops);
+  if (stops) callOpts.stopSequences = stops;
+
+  // Stream only when a chunk/token handler is supplied. A bare await
+  // path still resolves with the complete text either way.
+  if (typeof o.onChunk === 'function' || typeof o.onToken === 'function') {
+    callOpts.onChunk = function (c) {
+      if (!c) return;
+      if (c.isFromStartWith) return;           // skip the echoed startWith
+      var delta = c.textChunk || '';
+      entry.liveText += delta;
+      if (typeof o.onChunk === 'function') {
+        try { o.onChunk(delta, entry.liveText); } catch (e) { /* consumer error */ }
+      }
+      if (typeof o.onToken === 'function') {
+        try { o.onToken(delta); } catch (e) { /* consumer error */ }
+      }
+    };
+  }
+  return callOpts;
+}
+
+function settle(entry, norm) {
+  if (entry._settled) return;
+  entry._settled = true;
+  var o = entry.opts;
+  if (norm.error && typeof o.onError === 'function') {
+    try { o.onError(norm.error, norm); } catch (e) { /* consumer error */ }
+  }
+  if (typeof o.onDone === 'function') {
+    try { o.onDone(norm); } catch (e) { /* consumer error */ }
+  }
+  entry._resolve(norm);
+}
+
+function pump() {
+  if (pumping || activeEntry) return;
+  // Drop any entries cancelled while queued (already settled by stop()).
+  while (queue.length && queue[0]._settled) queue.shift();
+  if (queue.length === 0) return;
+
+  pumping = true;
+  var entry = queue.shift();
+  activeEntry = entry;
+  entry.started = true;
+
+  var plugin = grabPlugin();
+  if (!plugin) {
+    activeEntry = null;
+    pumping = false;
+    settle(entry, {
+      text: '', stopReason: 'error', truncated: false, aborted: false,
+      error: 'weld.stream: ai-text-plugin is not attached. Add '
+        + 'aiTextPlugin = ' + '{' + 'import:ai-text-plugin' + '}'
+        + ' to your lists and call weld.stream.attach({ aiTextPlugin }).'
+    });
+    pump();
+    return;
+  }
+
+  var instr = entry.opts.instruction;
+  if (instr == null || String(instr).trim() === '') {
+    activeEntry = null;
+    pumping = false;
+    settle(entry, {
+      text: '', stopReason: 'error', truncated: false, aborted: false,
+      error: 'weld.stream: instruction is empty.'
+    });
+    pump();
+    return;
+  }
+
+  var done = function (norm) {
+    activeEntry = null;
+    entry.inner = null;
+    pumping = false;
+    settle(entry, norm);
+    pump();
+  };
+
+  try {
+    var inner = plugin(buildCallOpts(entry));   // synchronous extended-Promise handle
+    entry.inner = inner;
+    // If stop() arrived between dequeue and here, honor it now.
+    if (entry._stopRequested && inner && typeof inner.stop === 'function') {
+      try { inner.stop(); } catch (e) { /* ignore */ }
+    }
+    Promise.resolve(inner).then(function (raw) {
+      done(normalize(raw));
+    }, function (err) {
+      done({
+        text: '', stopReason: 'error', truncated: false, aborted: false,
+        error: String((err && err.message) || err)
+      });
+    });
+  } catch (err) {
+    done({
+      text: '', stopReason: 'error', truncated: false, aborted: false,
+      error: String((err && err.message) || err)
+    });
+  }
+}
+
+// -----------------------------------------------------------------
+// Public: run(opts) -> handle. The handle is thenable and abortable.
+//
+// opts:
+//   instruction    (string, required)
+//   startWith      (string)  text the model continues from
+//   hideStartWith  (bool)    default true when startWith is set
+//   stopSequences  (string[]) clamped to 20; falls back to chat stops if chat:true
+//   chat           (bool)    use the double-bracketed Name wire-format stops
+//   onChunk(delta, fullText) stream callback (enables streaming)
+//   onToken(delta)           lighter stream callback
+//   onDone(result)           fires once on completion (any outcome)
+//   onError(message, result) fires once on error
+//
+// resolves to: { text, stopReason, truncated, aborted, error }
+// -----------------------------------------------------------------
+function run(opts) {
+  opts = opts || {};
+  var entry = {
+    id: nextId(),
+    opts: opts,
+    liveText: '',
+    started: false,
+    inner: null,
+    _settled: false,
+    _stopRequested: false,
+    _resolve: null
+  };
+  entry.promise = new Promise(function (resolve) { entry._resolve = resolve; });
+
+  function stop() {
+    entry._stopRequested = true;
+    if (entry._settled) return;
+    if (activeEntry === entry && entry.inner && typeof entry.inner.stop === 'function') {
+      // In flight: abort the broker call. It resolves with stopReason "user".
+      try { entry.inner.stop(); } catch (e) { /* ignore */ }
+    } else if (!entry.started) {
+      // Still queued: settle immediately as aborted; pump() will skip it.
+      settle(entry, {
+        text: entry.liveText, stopReason: 'user',
+        truncated: false, aborted: true, error: null
+      });
+    }
+  }
+
+  var handle = {
+    id: entry.id,
+    stop: stop,
+    promise: entry.promise,
+    then: function (a, b) { return entry.promise.then(a, b); },
+    catch: function (b) { return entry.promise.catch(b); },
+    finally: function (f) { return entry.promise.finally(f); }
+  };
+  Object.defineProperty(handle, 'liveText', { get: function () { return entry.liveText; } });
+  Object.defineProperty(handle, 'started', { get: function () { return entry.started; } });
+  Object.defineProperty(handle, 'queued', { get: function () { return !entry.started && !entry._settled; } });
+
+  queue.push(entry);
+  pump();
+  return handle;
+}
+
+// Abort the active generation and discard everything queued behind it.
+function stopAll() {
+  var pending = queue.slice();
+  if (activeEntry && activeEntry.inner && typeof activeEntry.inner.stop === 'function') {
+    try { activeEntry.inner.stop(); } catch (e) { /* ignore */ }
+  }
+  pending.forEach(function (entry) {
+    if (entry._settled || entry === activeEntry) return;
+    settle(entry, {
+      text: entry.liveText, stopReason: 'user',
+      truncated: false, aborted: true, error: null
+    });
+  });
+}
+
+function isBusy() { return !!activeEntry; }
+function pending() {
+  return queue.filter(function (e) { return !e._settled && !e.started; }).length;
+}
+
+// -----------------------------------------------------------------
+// Token helpers, surfaced from the plugin's meta object.
+//   meta()        -> { countTokens, idealMaxContextTokens } | null
+//   count(text)   -> approximate token count (bigram estimate) | null
+//   budget(slack) -> idealMaxContextTokens - slack (default 800)
+//   preload()     -> warm the broker (harmless; no measurable speedup)
+// -----------------------------------------------------------------
+function meta() {
+  var plugin = grabPlugin();
+  if (!plugin) return null;
+  try { return plugin({ getMetaObject: true }) || null; } catch (e) { return null; }
+}
+
+function count(text) {
+  var m = meta();
+  if (!m || typeof m.countTokens !== 'function') return null;
+  try { return m.countTokens(String(text || '')); } catch (e) { return null; }
+}
+
+function budget(slack) {
+  var m = meta();
+  if (!m || typeof m.idealMaxContextTokens !== 'number') return null;
+  var s = (slack == null) ? 800 : slack;
+  return m.idealMaxContextTokens - s;
+}
+
+function preload() {
+  var plugin = grabPlugin();
+  if (!plugin) return;
+  try { plugin({ preload: true }); } catch (e) { /* ignore */ }
+}
+
+window.weld.stream = {
+  attach: attach,
+  run: run,
+  stopAll: stopAll,
+  isBusy: isBusy,
+  pending: pending,
+  meta: meta,
+  count: count,
+  budget: budget,
+  preload: preload,
+  DEFAULT_CHAT_STOPS: DEFAULT_CHAT_STOPS,
+  version: '1.0.0'
+};
+
+window.weld.stream.attach({ aiTextPlugin: aiTextPlugin });
+
+return window.weld.stream;
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.state) return window.weld.state;
+
+// -----------------------------------------------------------------
+// weld.state: the structured world/character state that prose chat
+// forgets. weld.memory holds loose facts and weld.summarize holds a
+// prose synopsis; neither maintains a TYPED record you can branch logic
+// on -- current location, time of day, inventory, story flags, who is
+// present. Every serious chat app hand-rolls this "tracked info" plus a
+// background pass that updates it from the latest turn. weld.state makes
+// it a schema + a reconcile() pass:
+//
+//   var st = weld.state.create({ location:{type:'string',default:'unknown'},
+//                                time:{type:'string'}, gold:{type:'integer',default:0},
+//                                present:{type:'array'} });
+//   st.get();                       // current typed state
+//   st.set({ gold: 5 });            // manual update (type-checked)
+//   await st.reconcile(recentText); // AI updates only what changed
+//   st.prompt();                    // a compact block for the system prompt
+//
+// reconcile() goes through weld.structured (clean JSON + validation) when
+// present, else weld.stream with a tolerant parse. Updates MERGE: fields
+// the model omits keep their current value.
+// -----------------------------------------------------------------
+
+function getStructured() { return (window.weld && window.weld.structured) ? window.weld.structured : null; }
+function getStream() { return (window.weld && window.weld.stream) ? window.weld.stream : null; }
+
+function defaultFor(spec) {
+  if (spec.default !== undefined) return spec.default;
+  switch (spec.type) {
+    case 'string': return '';
+    case 'number': case 'integer': return 0;
+    case 'boolean': return false;
+    case 'array': return [];
+    case 'object': return {};
+    default: return null;
+  }
+}
+
+function coerce(val, spec) {
+  if (val == null) return null;
+  switch (spec.type) {
+    case 'string': return String(val);
+    case 'number': { var n = Number(val); return isNaN(n) ? null : n; }
+    case 'integer': { var m = Math.round(Number(val)); return isNaN(m) ? null : m; }
+    case 'boolean': return (val === true || val === 'true' || val === 1);
+    case 'array': return Array.isArray(val) ? val : (val === '' ? [] : [val]);
+    case 'object': return (val && typeof val === 'object' && !Array.isArray(val)) ? val : null;
+    default: return val;
+  }
+}
+
+function create(schema, opts) {
+  schema = schema || {};
+  opts = opts || {};
+  var fields = Object.keys(schema);
+  var values = {};
+  var listeners = [];
+  fields.forEach(function (k) { values[k] = defaultFor(schema[k] || {}); });
+
+  function emit() {
+    var snap = get();
+    listeners.forEach(function (fn) { try { fn(snap); } catch (e) {} });
+  }
+
+  function get() {
+    var out = {};
+    fields.forEach(function (k) { out[k] = values[k]; });
+    return out;
+  }
+
+  function field(name) { return values[name]; }
+
+  // set(patch): type-checked merge. Unknown fields ignored; bad-typed
+  // values dropped (state never holds a malformed field).
+  function set(patch) {
+    if (!patch || typeof patch !== 'object') return get();
+    var changed = false;
+    Object.keys(patch).forEach(function (k) {
+      if (!schema[k]) return;
+      var c = coerce(patch[k], schema[k]);
+      if (c === null && schema[k].type !== 'object' && schema[k].type !== 'array') return;
+      if (schema[k].enum && schema[k].enum.indexOf(c) === -1) return;
+      if (JSON.stringify(values[k]) !== JSON.stringify(c)) { values[k] = c; changed = true; }
+    });
+    if (changed) emit();
+    return get();
+  }
+
+  function reset() {
+    fields.forEach(function (k) { values[k] = defaultFor(schema[k] || {}); });
+    emit();
+    return get();
+  }
+
+  function onChange(fn) {
+    listeners.push(fn);
+    return function () { var i = listeners.indexOf(fn); if (i !== -1) listeners.splice(i, 1); };
+  }
+
+  function snapshot() { return { values: get() }; }
+  function load(snap) {
+    if (snap && snap.values) set(snap.values);
+    else if (snap) set(snap);
+    return get();
+  }
+
+  // Build a JSON schema for weld.structured from the state schema.
+  function structuredSchema() {
+    var f = {};
+    fields.forEach(function (k) {
+      var spec = schema[k] || {};
+      var sf = { type: spec.type || 'string' };
+      if (spec.enum) sf.enum = spec.enum;
+      f[k] = sf;
+    });
+    return { fields: f };
+  }
+
+  function describe() {
+    return fields.map(function (k) {
+      var spec = schema[k] || {};
+      var bits = k + ' (' + (spec.type || 'string');
+      if (spec.enum) bits += ', one of: ' + spec.enum.join('/');
+      bits += ')';
+      if (spec.description) bits += ' -- ' + spec.description;
+      return bits;
+    }).join('; ');
+  }
+
+  var RECONCILE_PROMPT =
+    'You maintain a structured story state. Given the CURRENT STATE and the '
+    + 'LATEST NARRATIVE, return the updated state as JSON. Only change fields '
+    + 'that the narrative clearly changed; copy the rest unchanged. Do not '
+    + 'invent values. Output ONLY the JSON object.';
+
+  // reconcile(recentText, opts) -> Promise<{ changed, state, error }>.
+  // Reads the latest narrative + current state, asks the model for an
+  // updated state, validates and merges it. opts.prompt overrides the
+  // instruction; opts.onlyFields limits which fields may change.
+  function reconcile(recentText, reconcileOpts) {
+    reconcileOpts = reconcileOpts || {};
+    var text = String(recentText == null ? '' : recentText).trim();
+    if (!text) return Promise.resolve({ changed: false, state: get(), error: null });
+
+    var instruction = (reconcileOpts.prompt || RECONCILE_PROMPT)
+      + '\n\nState fields: ' + describe()
+      + '\n\nCURRENT STATE:\n' + JSON.stringify(get())
+      + '\n\nLATEST NARRATIVE:\n' + text;
+
+    var before = JSON.stringify(get());
+    var structured = getStructured();
+    if (structured) {
+      return structured.generate({ instruction: instruction, schema: structuredSchema(), startWith: '{' })
+        .then(function (r) {
+          if (!r.ok || !r.value) return { changed: false, state: get(), error: r.error || 'reconcile failed' };
+          applyReconciled(r.value, reconcileOpts.onlyFields);
+          return { changed: JSON.stringify(get()) !== before, state: get(), error: null };
+        });
+    }
+    var stream = getStream();
+    if (!stream) return Promise.resolve({ changed: false, state: get(), error: 'weld.state: weld.stream not loaded' });
+    return stream.run({ instruction: instruction, startWith: '{' }).then(function (res) {
+      if (res.error) return { changed: false, state: get(), error: res.error };
+      var obj = null;
+      try {
+        var raw = res.text, o = raw.indexOf('{'), c = raw.lastIndexOf('}');
+        if (o !== -1 && c > o) obj = JSON.parse(raw.slice(o, c + 1));
+      } catch (e) { obj = null; }
+      if (!obj) return { changed: false, state: get(), error: 'reconcile: no JSON parsed' };
+      applyReconciled(obj, reconcileOpts.onlyFields);
+      return { changed: JSON.stringify(get()) !== before, state: get(), error: null };
+    });
+  }
+
+  function applyReconciled(obj, onlyFields) {
+    var patch = {};
+    Object.keys(obj).forEach(function (k) {
+      if (!schema[k]) return;
+      if (onlyFields && onlyFields.indexOf(k) === -1) return;
+      patch[k] = obj[k];
+    });
+    set(patch);
+  }
+
+  // prompt(opts) -> a compact state block for the system prompt.
+  // Skips empty/default fields unless opts.includeEmpty.
+  function prompt(promptOpts) {
+    promptOpts = promptOpts || {};
+    var label = promptOpts.label || 'Current state';
+    var lines = [];
+    fields.forEach(function (k) {
+      var v = values[k];
+      var spec = schema[k] || {};
+      var empty = (v == null) || (v === '') || (Array.isArray(v) && !v.length)
+        || (spec.type === 'object' && v && !Object.keys(v).length);
+      if (empty && !promptOpts.includeEmpty) return;
+      var shown = Array.isArray(v) ? v.join(', ') : (typeof v === 'object' ? JSON.stringify(v) : String(v));
+      lines.push((spec.label || k) + ': ' + shown);
+    });
+    if (!lines.length) return '';
+    return label + ' -- ' + lines.join('; ') + '.';
+  }
+
+  return {
+    get: get,
+    field: field,
+    set: set,
+    reset: reset,
+    onChange: onChange,
+    reconcile: reconcile,
+    prompt: prompt,
+    describe: describe,
+    snapshot: snapshot,
+    load: load,
+    schema: function () { return schema; }
+  };
+}
+
+window.weld.state = {
+  create: create,
+  version: '1.0.0'
+};
+
+return window.weld.state;
+})();
+</script>
+<script>
+
+  function boot(){ if(!window.weld||!window.weld.state){return setTimeout(boot,100);} init(); }
+  function init(){
+    var State=window.weld.state, $=function(id){return document.getElementById(id);};
+    var st=State.create({
+      location:{type:'string',default:'the tavern'},
+      time:{type:'string',enum:['dawn','day','dusk','night'],default:'day'},
+      gold:{type:'integer',default:10},
+      present:{type:'array'},
+      alarmed:{type:'boolean',default:false}
+    });
+    var time='day';
+    var ts=$('timeseg');
+    ['dawn','day','dusk','night'].forEach(function(t){
+      var b=document.createElement('button'); b.className='btn sm '+(t===time?'':'ghost'); b.textContent=t;
+      b.onclick=function(){ time=t; [].forEach.call(ts.children,function(x){x.classList.toggle('ghost',x!==b);}); sync(); };
+      ts.appendChild(b);
+    });
+    function sync(){
+      st.set({
+        location:$('loc').value, time:time, gold:+$('gold').value,
+        present:$('present').value.split(',').map(function(s){return s.trim();}).filter(Boolean),
+        alarmed:$('alarmed').checked
+      });
+      $('goldv').textContent=$('gold').value;
+      $('block').textContent=st.prompt()||'(all fields empty)';
+    }
+    ['loc','gold','present'].forEach(function(id){ $(id).oninput=sync; });
+    $('alarmed').onchange=sync;
+    $('rec').onclick=function(){
+      if(window.weld.structured||(window.root&&window.root.aiTextPlugin)){
+        $('recstatus').textContent='Reconciling with the model...';
+        st.reconcile($('narr').value).then(function(r){
+          $('recstatus').textContent=r.changed?'updated.':'(no change)';
+          // reflect back into the controls
+          $('loc').value=st.field('location'); $('gold').value=st.field('gold'); $('goldv').textContent=st.field('gold');
+          $('present').value=(st.field('present')||[]).join(', '); $('alarmed').checked=st.field('alarmed');
+          $('block').textContent=st.prompt();
+        }).catch(function(e){ $('recstatus').textContent='error: '+e.message; });
+      } else { $('recstatus').textContent='needs weld.structured + ai-text-plugin (live on Perchance).'; }
+    };
+    sync();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+
+</script>

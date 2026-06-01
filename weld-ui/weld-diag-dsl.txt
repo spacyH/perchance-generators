@@ -213,6 +213,106 @@ $output() =>
   // -----------------------------------------------------------------
   installHooks();
 
+  // ---- code checking: offline lint + Perchance's findBugsInCode endpoint ----
+  // lint(code) runs entirely in-page and is always available. findBugs(code)
+  // POSTs to Perchance's editor-copilot; that endpoint is host-allowlisted to
+  // the perchance.org editor origin (returns 403 "Host not in allowlist"
+  // elsewhere), so lint() is the dependable check and findBugs() is a bonus
+  // when running inside the editor.
+
+  var BUGCHECK_URL = 'https://editor-copilot.perchance.org/api/findBugsInCode';
+
+  function _lint(code) {
+    var res = [];
+    var lines = String(code == null ? '' : code).split('\n');
+    function add(line, sev, c, msg, col) { res.push({ line: line, col: col || 0, severity: sev, code: c, message: msg }); }
+    var outIdx = -1;
+    for (var k = 0; k < lines.length; k++) { if (/^\s*\$output\(\)\s*=>/.test(lines[k])) { outIdx = k; break; } }
+
+    // 1. brace-interception traps on raw source
+    for (var i = 0; i < lines.length; i++) {
+      var raw = lines[i], ln = i + 1;
+      var topImport = (outIdx === -1 || i < outIdx) && new RegExp('^\\s*[\\w$]+\\s*=\\s*\\{' + 'import:[^}]+\\}\\s*$').test(raw);
+      if (topImport) continue;
+      var clean = raw.replace(/\\[{}\[\]]/g, '');
+      var p1 = clean.indexOf('[' + '['); if (p1 !== -1) add(ln, 'error', 'brace-interception', 'literal "[' + '[" is intercepted by Perchance, even inside strings and comments', p1 + 1);
+      var p2 = clean.indexOf('{' + '{'); if (p2 !== -1) add(ln, 'error', 'brace-interception', 'literal "{' + '{" is intercepted by Perchance', p2 + 1);
+      var p3 = clean.indexOf('{' + 'import:'); if (p3 !== -1) add(ln, 'error', 'brace-interception', 'literal "{' + 'import:" outside a top-level import directive is intercepted', p3 + 1);
+    }
+
+    // regex/string/comment-aware tokenizer for balance checking
+    var bodyStart = outIdx === -1 ? 0 : outIdx + 1;
+    var bodyText = (outIdx === -1 ? lines : lines.slice(bodyStart)).join('\n');
+    var depth = { '(': 0, '[': 0, '{': 0 }, close = { ')': '(', ']': '[', '}': '{' };
+    var inStr = null, inTpl = false, inLine = false, inBlock = false, inRe = false, inCls = false, prevSig = '';
+    var line = bodyStart + 1, col = 0;
+    for (var c = 0; c < bodyText.length; c++) {
+      var ch = bodyText.charAt(c), nx = bodyText.charAt(c + 1);
+      if (ch === '\n') { line++; col = 0; inLine = false; continue; }
+      col++;
+      if (inLine) continue;
+      if (inBlock) { if (ch === '*' && nx === '/') { inBlock = false; c++; col++; } continue; }
+      if (inStr) { if (ch === '\\') { c++; col++; } else if (ch === inStr) inStr = null; continue; }
+      if (inTpl) { if (ch === '\\') { c++; col++; } else if (ch === '`') inTpl = false; else if (ch === '$' && nx === '{') { c++; col++; } continue; }
+      if (inRe) { if (ch === '\\') { c++; col++; } else if (ch === '[') inCls = true; else if (ch === ']') inCls = false; else if (ch === '/' && !inCls) inRe = false; continue; }
+      if (ch === '/' && nx === '/') { inLine = true; continue; }
+      if (ch === '/' && nx === '*') { inBlock = true; c++; col++; continue; }
+      if (ch === '"' || ch === "'") { inStr = ch; prevSig = ch; continue; }
+      if (ch === '`') { inTpl = true; prevSig = ch; continue; }
+      if (ch === '/') { if (prevSig === '' || '(,=:[!&|?{};+-*%<>~^'.indexOf(prevSig) !== -1) { inRe = true; continue; } prevSig = ch; continue; }
+      if (/\S/.test(ch)) {
+        if (ch === '(' || ch === '[' || ch === '{') depth[ch]++;
+        else if (ch === ')' || ch === ']' || ch === '}') { var o = close[ch]; if (depth[o] <= 0) add(line, 'error', 'unbalanced', 'unmatched "' + ch + '"', col); else depth[o]--; }
+        prevSig = ch;
+      }
+    }
+    var endLn = bodyStart + bodyText.split('\n').length;
+    if (depth['('] > 0) add(endLn, 'error', 'unbalanced', depth['('] + ' unclosed "("');
+    if (depth['['] > 0) add(endLn, 'error', 'unbalanced', depth['['] + ' unclosed "["');
+    if (depth['{'] > 0) add(endLn, 'error', 'unbalanced', depth['{'] + ' unclosed "{"');
+
+    // 3. weld conventions + common traps
+    if (outIdx !== -1) {
+      if (!/['"]use strict['"]/.test(bodyText.slice(0, 400))) add(outIdx + 2, 'warn', 'use-strict', "$output body should start with 'use strict';");
+      if (!/window\.weld\b/.test(bodyText)) add(outIdx + 1, 'warn', 'weld-namespace', 'plugin does not reference window.weld');
+      if (!/version\s*:\s*['"]\d+\.\d+\.\d+['"]/.test(bodyText)) add(outIdx + 1, 'warn', 'version', 'no semver version: field on the API object');
+    }
+    for (var b = 0; b < lines.length; b++) {
+      var lr = lines[b];
+      if (/===|!==/.test(lr) && /(\.generatedText\b|\.decrypt\s*\([^)]*\)\s*(===|!==)|(===|!==)\s*\w+\.decrypt)/.test(lr) && !/typeof\b/.test(lr) && !/String\s*\(/.test(lr))
+        add(b + 1, 'warn', 'boxed-string', 'comparing a possibly-boxed String with ===/!== ; wrap in String(...) first');
+      var mm = /\bif\s*\(/.exec(lr);
+      if (mm) {
+        var j = mm.index + mm[0].length, d = 1, inside = '';
+        for (; j < lr.length && d > 0; j++) { var cc = lr.charAt(j); if (cc === '(') d++; else if (cc === ')') d--; if (d > 0) inside += cc; }
+        if (d === 0) { var cond = inside.replace(/'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`/g, ''); if (/[^=!<>+\-*/%&|^]=[^=]/.test(' ' + cond)) add(b + 1, 'warn', 'assign-in-if', 'assignment (=) inside if(...) condition — did you mean == / ===?', mm.index + 1); }
+      }
+    }
+    res.sort(function (a, z) { return a.line - z.line || a.col - z.col; });
+    return res;
+  }
+
+  function lint(code) { try { return _lint(code); } catch (e) { return [{ line: 0, col: 0, severity: 'error', code: 'lint-crash', message: 'lint failed: ' + (e && e.message) }]; } }
+
+  function findBugs(code, opts) {
+    opts = opts || {};
+    var fetcher = opts.fetcher || (typeof superFetch === 'function' ? superFetch : (typeof fetch === 'function' ? fetch : null));
+    if (typeof fetcher !== 'function') return Promise.reject(new Error('weld.diag.findBugs: no fetcher available'));
+    var payload = { code: String(code == null ? '' : code), contentType: opts.contentType || 'plugin', generatorName: opts.generatorName || (window.generatorName || 'weld') };
+    return Promise.resolve(fetcher(BUGCHECK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }))
+      .then(function (r) { if (r && typeof r.text === 'function') { if (typeof r.status === 'number' && r.status === 403) throw new Error('findBugs: 403 — endpoint is host-allowlisted to the Perchance editor origin; use lint() outside it'); return r.text(); } return r; })
+      .then(function (t) { try { return JSON.parse(t); } catch (e) { return []; } });
+  }
+
+  // check(code, opts) -> { findings, ok, remote }   (remote is a Promise or null)
+  function check(code, opts) {
+    opts = opts || {};
+    var findings = lint(code);
+    var ok = !findings.some(function (f) { return f.severity === 'error'; });
+    var remote = opts.remote ? findBugs(code, opts).catch(function (e) { return { error: e.message }; }) : null;
+    return { findings: findings, ok: ok, remote: remote };
+  }
+
   window.weld.diag = {
     log:   function(msg, data) { return record('info',  'manual', msg, data); },
     info:  function(msg, data) { return record('info',  'manual', msg, data); },
@@ -233,6 +333,10 @@ $output() =>
 
     subscribe: subscribe,
 
+    lint: lint,
+    findBugs: findBugs,
+    check: check,
+
     setMaxEntries: function(n) {
       MAX_ENTRIES = Math.max(1, n | 0);
       while (entries.length > MAX_ENTRIES) entries.shift();
@@ -240,7 +344,7 @@ $output() =>
     },
     getMaxEntries: function() { return MAX_ENTRIES; },
 
-    version: '1.0.0'
+    version: '1.1.0'
   };
 
   return window.weld.diag;

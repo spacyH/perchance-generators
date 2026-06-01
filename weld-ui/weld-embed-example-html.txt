@@ -1,0 +1,455 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--amber:#d29922;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:780px;margin:0 auto;padding:34px 18px 90px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 0 16px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+.breadcrumb a{color:var(--muted);}.breadcrumb .sep{color:var(--faint);margin:0 8px;}.breadcrumb .cur{color:var(--ink);}.breadcrumb .act a{color:var(--accent);}
+.hdr{margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}.hdr h1{font:700 24px var(--mono);letter-spacing:-0.5px;}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;}
+.hdr .lead{color:var(--muted);margin-top:8px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;}
+.panel h2{font:600 13px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:8px 0;}
+.lbl{font:600 12px var(--mono);color:var(--muted);min-width:74px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 15px;font:600 13px var(--font);cursor:pointer;transition:.12s;}
+.btn:hover{filter:brightness(1.08);}.btn.ghost{background:var(--faint);color:var(--ink);}.btn.sm{padding:6px 11px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+input[type=text],textarea{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:8px 10px;font:13px var(--font);}
+input[type=text]{flex:1;min-width:120px;}textarea{width:100%;font:12.5px/1.5 var(--mono);resize:vertical;}
+.mono{font:13px var(--mono);}
+.out{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font:12.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;min-height:20px;color:#c9d1d9;}
+.chip{display:inline-block;background:var(--faint);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font:600 12px var(--mono);margin:2px;}
+.chip.k{background:rgba(63,185,80,.14);border-color:rgba(63,185,80,.4);color:#7ee787;}
+.chip.d{opacity:.4;text-decoration:line-through;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:9px 13px;border-radius:0 4px 4px 0;margin:12px 0 0;font-size:12.5px;color:#c9d1d9;}
+.note.warn{background:rgba(210,153,34,.08);border-color:var(--amber);}
+.tag{font:600 10px var(--mono);padding:2px 7px;border-radius:4px;background:rgba(63,185,80,.14);color:#7ee787;border:1px solid rgba(63,185,80,.4);}
+.tag.ai{background:rgba(210,153,34,.12);color:#e3b341;border-color:rgba(210,153,34,.4);}
+.bar{height:14px;background:var(--accent);border-radius:3px;transition:width .3s;}
+.footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);}.footer a{color:var(--muted);}
+.flex{display:flex;gap:10px;align-items:center;}.wrap{flex-wrap:wrap;}.grow{flex:1;}.mt{margin-top:10px;}
+</style>
+<div id="page">
+<div class="breadcrumb"><span><a href="https://perchance.org/weld-ui-index">weld</a><span class="sep">/</span>weld.embed<span class="sep">/</span><span class="cur">demo</span></span><span class="act"><a href="https://perchance.org/weld-embed-plugin">docs &rarr;</a></span></div>
+<div class="hdr"><div class="hdr-row"><h1>weld.embed &mdash; demo</h1><span class="ver">v1.0.0</span></div><p class="lead">Rank text by meaning, entirely in your browser. Type some candidate lines and a query; weld.embed embeds them locally and sorts by cosine similarity. No server, no sign-in.</p></div>
+  <div class="panel"><h2>Candidate texts <span class="tag">ranked locally</span></h2>
+    <textarea id="items" rows="7">The user has a dog named Max.
+The user is a teacher planning a trip to Kyoto.
+The capital of France is Paris.
+A warm bowl of ramen on a rainy night.
+The spaceship drifted past the rings of Saturn.</textarea>
+    <div class="row mt"><span class="lbl">query</span><input id="q" type="text" value="tell me about the pet"><button id="go" class="btn">Rank</button></div>
+    <div class="row"><span class="lbl">engine</span><span id="backend" class="chip">booting...</span><span id="note" class="mono" style="color:var(--muted);font-size:12px;"></span></div>
+    <div id="out" class="out mt"></div>
+    <div class="note">Embeddings run entirely in your browser. The first rank downloads the model (a few seconds) and then it's cached. If the model can't load, weld.embed falls back to a lexical engine so ranking still works &mdash; the engine badge above tells you which is live.</div>
+  </div>
+
+  <div class="panel"><h2>Pairwise similarity</h2>
+    <div class="row"><input id="a" type="text" value="a cat sat on the mat"></div>
+    <div class="row"><input id="b" type="text" value="the kitten rested on a rug"><button id="sim" class="btn ghost">Compare</button></div>
+    <div id="simout" class="out mt"></div>
+  </div>
+<footer class="footer"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
+</div>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.embed) return window.weld.embed;
+
+// -----------------------------------------------------------------
+// weld.embed: turn text into vectors, in the browser, with no server.
+//
+// Two serious community chat apps independently reached for the same
+// thing -- transformers.js feature-extraction in a Web Worker, cached
+// in IndexedDB -- to get semantic memory and lore retrieval. This packs
+// that pattern into one plugin so weld.memory and weld.lorebook can
+// rank by meaning instead of keyword overlap.
+//
+//   init(opts)          boot the worker + model (lazy; rank/embed call it)
+//   embed(text)         -> Promise<vector | null>
+//   embedBatch(texts)   -> Promise<(vector|null)[]>  (cached + batched)
+//   similarity(a, b)    cosine (vectors are L2-normalized, so a dot)
+//   rank(query, items, opts) -> Promise<[{ item, index, score }]> top-k
+//   useEmbedder(fn)     swap in your own async embedder (or for testing)
+//   clearCache/cacheSize/info/isReady
+//
+// Robustness: the real model loads from a CDN inside the Perchance
+// frame. If that fails (offline, blocked, no WASM), weld.embed falls
+// back to a deterministic lexical hash embedding -- lower quality, but
+// rank() still returns sensible keyword-overlap results instead of
+// throwing. info().backend tells you which engine is live.
+// -----------------------------------------------------------------
+
+var DEFAULTS = {
+  model: 'Xenova/all-MiniLM-L6-v2', // small, 384-dim, widely cached
+  fallbackDim: 256,
+  cdn: 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2',
+  timeoutMs: 12000,
+  dbName: 'weld-embed',
+  store: 'vectors'
+};
+
+var cfg = {};
+for (var k in DEFAULTS) cfg[k] = DEFAULTS[k];
+
+var worker = null;
+var reqId = 0;
+var pending = {};        // id -> { resolve, reject, timer }
+var ready = false;
+var booting = null;      // Promise while init is in flight
+var backend = 'none';    // 'worker' | 'fallback' | 'custom'
+var customEmbedder = null;
+var modelDim = 0;
+var db = null;
+var mem = {};            // in-memory vector cache (key -> vector)
+
+function cacheKey(text) { return (backend === 'fallback' ? 'lex' : cfg.model) + '|' + text; }
+
+// ---- IndexedDB cache (best-effort; never fatal) ----
+function openDb() {
+  return new Promise(function (resolve) {
+    if (db) { resolve(db); return; }
+    if (typeof indexedDB === 'undefined') { resolve(null); return; }
+    var req = indexedDB.open(cfg.dbName, 1);
+    req.onupgradeneeded = function (e) {
+      var d = e.target.result;
+      if (!d.objectStoreNames.contains(cfg.store)) d.createObjectStore(cfg.store, { keyPath: 'key' });
+    };
+    req.onsuccess = function (e) { db = e.target.result; resolve(db); };
+    req.onerror = function () { resolve(null); };
+  });
+}
+
+function cacheGetMany(keys) {
+  return openDb().then(function (d) {
+    if (!d) return {};
+    return new Promise(function (resolve) {
+      var out = {}, left = keys.length;
+      if (!left) { resolve(out); return; }
+      var tx = d.transaction([cfg.store], 'readonly');
+      var store = tx.objectStore(cfg.store);
+      keys.forEach(function (key) {
+        var r = store.get(key);
+        r.onsuccess = function () { if (r.result) out[key] = r.result.vector; if (--left === 0) resolve(out); };
+        r.onerror = function () { if (--left === 0) resolve(out); };
+      });
+    });
+  });
+}
+
+function cachePut(key, vector) {
+  mem[key] = vector;
+  openDb().then(function (d) {
+    if (!d) return;
+    try {
+      var tx = d.transaction([cfg.store], 'readwrite');
+      tx.objectStore(cfg.store).put({ key: key, vector: vector });
+    } catch (e) { /* ignore */ }
+  });
+}
+
+// ---- the worker source (built so the Perchance scanner sees no traps) ----
+// No doubled square or curly brackets, no import-directive token; object literals keep spaces.
+function workerSource() {
+  var L = [];
+  L.push("var pipe = null;");
+  L.push("var CDN = self.__cdn;");
+  L.push("function reply(id, ok, payload){ self.postMessage(Object.assign({ id: id, ok: ok }, payload)); }");
+  L.push("self.onmessage = async function(e){");
+  L.push("  var msg = e.data || {};");
+  L.push("  try {");
+  L.push("    if (msg.type === 'init') {");
+  L.push("      if (!pipe) {");
+  L.push("        importScripts(msg.cdn || CDN);");
+  L.push("        var T = self.transformers || self.Transformers;");
+  L.push("        if (T && T.env) { T.env.allowLocalModels = false; }");
+  L.push("        pipe = await T.pipeline('feature-extraction', msg.model);");
+  L.push("      }");
+  L.push("      reply(msg.id, true, { dim: 0 });");
+  L.push("      return;");
+  L.push("    }");
+  L.push("    if (msg.type === 'embed') {");
+  L.push("      if (!pipe) { reply(msg.id, false, { error: 'model not initialized' }); return; }");
+  L.push("      var out = await pipe(msg.texts, { pooling: 'mean', normalize: true });");
+  L.push("      var data = out.data;");
+  L.push("      var dims = out.dims || [msg.texts.length, data.length / msg.texts.length];");
+  L.push("      var dim = dims[dims.length - 1];");
+  L.push("      var vecs = [];");
+  L.push("      for (var i = 0; i < msg.texts.length; i++) {");
+  L.push("        var start = i * dim, v = new Array(dim);");
+  L.push("        for (var j = 0; j < dim; j++) { v[j] = data[start + j]; }");
+  L.push("        vecs.push(v);");
+  L.push("      }");
+  L.push("      reply(msg.id, true, { vectors: vecs, dim: dim });");
+  L.push("      return;");
+  L.push("    }");
+  L.push("  } catch (err) { reply(msg.id, false, { error: String(err && err.message || err) }); }");
+  L.push("};");
+  return L.join('\n');
+}
+
+function startWorker() {
+  if (typeof Worker === 'undefined' || typeof Blob === 'undefined') return null;
+  // Prepend the CDN as a worker global so importScripts can default to it.
+  var src = "self.__cdn=" + JSON.stringify(cfg.cdn) + ";\n" + workerSource();
+  var url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+  var w = new Worker(url);
+  w.onmessage = function (e) {
+    var m = e.data || {};
+    var p = pending[m.id];
+    if (!p) return;
+    delete pending[m.id];
+    if (p.timer) clearTimeout(p.timer);
+    if (m.ok) p.resolve(m);
+    else p.reject(new Error(m.error || 'worker error'));
+  };
+  w.onerror = function () { /* surfaced per-request via timeout */ };
+  return w;
+}
+
+function call(type, payload) {
+  return new Promise(function (resolve, reject) {
+    var id = ++reqId;
+    pending[id] = {
+      resolve: resolve, reject: reject,
+      timer: setTimeout(function () {
+        if (pending[id]) { delete pending[id]; reject(new Error('weld.embed: worker timeout')); }
+      }, cfg.timeoutMs)
+    };
+    var msg = { id: id, type: type };
+    for (var key in payload) msg[key] = payload[key];
+    worker.postMessage(msg);
+  });
+}
+
+// ---- deterministic lexical fallback (no model, no network) ----
+var STOP = { the:1,a:1,an:1,and:1,or:1,but:1,is:1,are:1,was:1,were:1,to:1,of:1,
+  in:1,on:1,at:1,for:1,with:1,it:1,this:1,that:1,as:1,by:1 };
+function tokens(text) {
+  return String(text || '').toLowerCase().replace(/[^a-z0-9\u00c0-\u024f' ]+/g, ' ')
+    .split(/\s+/).filter(function (w) { return w.length > 1 && !STOP[w]; });
+}
+function hashStr(s) {
+  var h = 2166136261 >>> 0;
+  for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+function lexEmbed(text) {
+  var dim = cfg.fallbackDim, v = new Array(dim);
+  for (var i = 0; i < dim; i++) v[i] = 0;
+  var toks = tokens(text);
+  for (var t = 0; t < toks.length; t++) {
+    var tok = toks[t];
+    // two hashed projections per token soften collisions
+    v[hashStr(tok) % dim] += 1;
+    v[hashStr('#' + tok) % dim] += 0.5;
+  }
+  // L2 normalize so cosine == dot
+  var norm = 0; for (var n = 0; n < dim; n++) norm += v[n] * v[n];
+  norm = Math.sqrt(norm) || 1;
+  for (var m2 = 0; m2 < dim; m2++) v[m2] = v[m2] / norm;
+  return v;
+}
+
+// ---- init / engine selection ----
+function init(opts) {
+  if (opts) for (var key in opts) if (opts[key] != null) cfg[key] = opts[key];
+  if (ready) return Promise.resolve(info());
+  if (booting) return booting;
+
+  if (customEmbedder) { backend = 'custom'; ready = true; return Promise.resolve(info()); }
+
+  booting = new Promise(function (resolve) {
+    worker = startWorker();
+    if (!worker) { backend = 'fallback'; ready = true; resolve(info()); return; }
+    call('init', { model: cfg.model, cdn: cfg.cdn }).then(function () {
+      backend = 'worker'; ready = true; resolve(info());
+    }, function () {
+      // Worker present but model failed to load -> lexical fallback.
+      try { worker.terminate(); } catch (e) {}
+      worker = null; backend = 'fallback'; ready = true; resolve(info());
+    });
+  });
+  return booting;
+}
+
+// ---- embedding (cache-aware, batched) ----
+function embedBatch(texts) {
+  if (!Array.isArray(texts) || !texts.length) return Promise.resolve([]);
+  return init().then(function () {
+    var keys = texts.map(cacheKey);
+    // in-memory first
+    var result = new Array(texts.length);
+    var missIdx = [], missTexts = [], missKeys = [];
+    for (var i = 0; i < texts.length; i++) {
+      if (mem[keys[i]]) result[i] = mem[keys[i]];
+      else { missIdx.push(i); missTexts.push(texts[i]); missKeys.push(keys[i]); }
+    }
+    if (!missIdx.length) return result;
+
+    return cacheGetMany(missKeys).then(function (fromDb) {
+      var stillIdx = [], stillTexts = [], stillKeys = [];
+      for (var j = 0; j < missIdx.length; j++) {
+        var key = missKeys[j];
+        if (fromDb[key]) { result[missIdx[j]] = fromDb[key]; mem[key] = fromDb[key]; }
+        else { stillIdx.push(missIdx[j]); stillTexts.push(missTexts[j]); stillKeys.push(key); }
+      }
+      if (!stillIdx.length) return result;
+
+      // compute the remainder
+      var compute;
+      if (backend === 'custom') {
+        compute = Promise.resolve(customEmbedder(stillTexts)).then(function (vs) { return { vectors: vs }; });
+      } else if (backend === 'worker') {
+        compute = call('embed', { texts: stillTexts }).then(function (m) {
+          if (m.dim) modelDim = m.dim;
+          return { vectors: m.vectors };
+        }, function () {
+          // mid-session worker failure: fall back lexically for this batch
+          backend = 'fallback';
+          return { vectors: stillTexts.map(lexEmbed) };
+        });
+      } else {
+        compute = Promise.resolve({ vectors: stillTexts.map(lexEmbed) });
+      }
+
+      return compute.then(function (r) {
+        var vs = r.vectors || [];
+        for (var z = 0; z < stillIdx.length; z++) {
+          var vec = vs[z] || null;
+          result[stillIdx[z]] = vec;
+          if (vec) cachePut(stillKeys[z], vec);
+        }
+        return result;
+      });
+    });
+  });
+}
+
+function embed(text) { return embedBatch([text]).then(function (a) { return a[0]; }); }
+
+// ---- math ----
+function similarity(a, b) {
+  if (!a || !b || a.length !== b.length) return 0;
+  var s = 0; for (var i = 0; i < a.length; i++) s += a[i] * b[i];
+  return s; // vectors are normalized at the source -> cosine
+}
+
+// rank(query, items, opts) -> top-k by similarity.
+// items: string[] | object[]; opts: { topK, minScore, key }
+function rank(query, items, opts) {
+  opts = opts || {};
+  var key = opts.key || 'text';
+  var topK = opts.topK || 5;
+  var minScore = opts.minScore != null ? opts.minScore : 0;
+  if (!items || !items.length) return Promise.resolve([]);
+  var texts = items.map(function (it) {
+    return (typeof it === 'string') ? it : String((it && it[key]) != null ? it[key] : '');
+  });
+  return embedBatch([query].concat(texts)).then(function (vecs) {
+    var qv = vecs[0];
+    if (!qv) return [];
+    var scored = [];
+    for (var i = 0; i < items.length; i++) {
+      var v = vecs[i + 1];
+      if (!v) continue;
+      var score = similarity(qv, v);
+      if (score >= minScore) scored.push({ item: items[i], index: i, score: score });
+    }
+    scored.sort(function (a, b) { return b.score - a.score; });
+    return scored.slice(0, topK);
+  });
+}
+
+function useEmbedder(fn) {
+  customEmbedder = (typeof fn === 'function') ? fn : null;
+  if (customEmbedder) { backend = 'custom'; ready = true; }
+}
+
+function clearCache() {
+  mem = {};
+  return openDb().then(function (d) {
+    if (!d) return false;
+    return new Promise(function (resolve) {
+      try {
+        var tx = d.transaction([cfg.store], 'readwrite');
+        var r = tx.objectStore(cfg.store).clear();
+        r.onsuccess = function () { resolve(true); };
+        r.onerror = function () { resolve(false); };
+      } catch (e) { resolve(false); }
+    });
+  });
+}
+
+function cacheSize() { return Object.keys(mem).length; }
+function isReady() { return ready; }
+function info() { return { model: cfg.model, backend: backend, ready: ready, dim: modelDim || cfg.fallbackDim }; }
+
+window.weld.embed = {
+  init: init,
+  embed: embed,
+  embedBatch: embedBatch,
+  similarity: similarity,
+  rank: rank,
+  search: rank,
+  useEmbedder: useEmbedder,
+  clearCache: clearCache,
+  cacheSize: cacheSize,
+  isReady: isReady,
+  info: info,
+  version: '1.0.0'
+};
+
+return window.weld.embed;
+})();
+</script>
+<script>
+
+  function boot(){ if(!window.weld||!window.weld.embed){return setTimeout(boot,100);} init(); }
+  function init(){
+    var E = window.weld.embed;
+    var $ = function(id){ return document.getElementById(id); };
+
+    // show the active engine once init resolves
+    E.init().then(function(){ var info = E.info(); $('backend').textContent = info.backend + ' (' + info.dim + 'd)'; $('backend').classList.add('k'); });
+
+    function bar(score){
+      var pct = Math.max(0, Math.min(100, Math.round(score*100)));
+      return '<div style="display:flex;align-items:center;gap:8px;margin:4px 0;">'
+        + '<div style="flex:1;background:var(--faint);border-radius:3px;overflow:hidden;"><div class="bar" style="width:'+pct+'%"></div></div>'
+        + '<span class="mono" style="min-width:46px;text-align:right;">'+score.toFixed(3)+'</span></div>';
+    }
+
+    $('go').onclick = function(){
+      var items = $('items').value.split(/\n+/).map(function(s){return s.trim();}).filter(Boolean);
+      var q = $('q').value.trim();
+      if(!q || !items.length){ $('out').textContent = 'Enter a query and at least one candidate.'; return; }
+      $('out').textContent = 'Ranking...';
+      E.rank(q, items, { topK: items.length, minScore: -1 }).then(function(ranked){
+        var info = E.info(); $('backend').textContent = info.backend + ' (' + info.dim + 'd)';
+        var html = ranked.map(function(r){ return '<div>'+escapeHtml(r.item)+'</div>'+bar(r.score); }).join('');
+        $('out').innerHTML = html || 'No results.';
+      }).catch(function(e){ $('out').textContent = 'error: ' + e.message; });
+    };
+
+    $('sim').onclick = function(){
+      var a = $('a').value, b = $('b').value;
+      $('simout').textContent = 'Comparing...';
+      E.embedBatch([a,b]).then(function(vs){
+        if(!vs[0]||!vs[1]){ $('simout').textContent = 'Could not embed.'; return; }
+        var s = E.similarity(vs[0], vs[1]);
+        $('simout').innerHTML = 'cosine similarity: <b>'+s.toFixed(4)+'</b>'+bar(s);
+      }).catch(function(e){ $('simout').textContent = 'error: ' + e.message; });
+    };
+
+    function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+
+</script>

@@ -1,0 +1,240 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--amber:#d29922;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:780px;margin:0 auto;padding:34px 18px 90px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 0 16px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+.breadcrumb a{color:var(--muted);}.breadcrumb .sep{color:var(--faint);margin:0 8px;}.breadcrumb .cur{color:var(--ink);}.breadcrumb .act a{color:var(--accent);}
+.hdr{margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}.hdr h1{font:700 24px var(--mono);letter-spacing:-0.5px;}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;}
+.hdr .lead{color:var(--muted);margin-top:8px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;}
+.panel h2{font:600 13px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:8px 0;}
+.lbl{font:600 12px var(--mono);color:var(--muted);min-width:74px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 15px;font:600 13px var(--font);cursor:pointer;transition:.12s;}
+.btn:hover{filter:brightness(1.08);}.btn.ghost{background:var(--faint);color:var(--ink);}.btn.sm{padding:6px 11px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+input[type=text],textarea{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:8px 10px;font:13px var(--font);}
+input[type=text]{flex:1;min-width:120px;}textarea{width:100%;font:12.5px/1.5 var(--mono);resize:vertical;}
+.mono{font:13px var(--mono);}
+.out{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font:12.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;min-height:20px;color:#c9d1d9;}
+.chip{display:inline-block;background:var(--faint);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font:600 12px var(--mono);margin:2px;}
+.chip.k{background:rgba(63,185,80,.14);border-color:rgba(63,185,80,.4);color:#7ee787;}
+.chip.d{opacity:.4;text-decoration:line-through;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:9px 13px;border-radius:0 4px 4px 0;margin:12px 0 0;font-size:12.5px;color:#c9d1d9;}
+.note.warn{background:rgba(210,153,34,.08);border-color:var(--amber);}
+.tag{font:600 10px var(--mono);padding:2px 7px;border-radius:4px;background:rgba(63,185,80,.14);color:#7ee787;border:1px solid rgba(63,185,80,.4);}
+.tag.ai{background:rgba(210,153,34,.12);color:#e3b341;border-color:rgba(210,153,34,.4);}
+.bar{height:14px;background:var(--accent);border-radius:3px;transition:width .3s;}
+.footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);}.footer a{color:var(--muted);}
+.flex{display:flex;gap:10px;align-items:center;}.wrap{flex-wrap:wrap;}.grow{flex:1;}.mt{margin-top:10px;}
+</style>
+<div id="page">
+<div class="breadcrumb"><span><a href="https://perchance.org/weld-ui-index">weld</a><span class="sep">/</span>weld.director<span class="sep">/</span><span class="cur">demo</span></span><span class="act"><a href="https://perchance.org/weld-director-plugin">docs &rarr;</a></span></div>
+<div class="hdr"><div class="hdr-row"><h1>weld.director &mdash; demo</h1><span class="ver">v1.0.0</span></div><p class="lead">Watch a turn orchestrate: the reply resolves immediately while audit and illustration run in the background. Toggle a failing pass to see failure isolation.</p></div>
+  <div class="panel"><h2>A turn, orchestrated</h2>
+    <p class="mono" style="font-size:12.5px;color:var(--muted);">Three passes: <b>reply</b> (foreground), then <b>audit</b> and <b>illustrate</b> (background, after reply). Watch the reply resolve first while the background work continues.</p>
+    <div class="row"><button id="run" class="btn">Run a turn</button>
+      <label class="mono" style="font-size:12px;"><input type="checkbox" id="failill"> make illustrate fail</label></div>
+    <div id="log" class="out mt" style="min-height:120px;"></div>
+  </div>
+<footer class="footer"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
+</div>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.director) return window.weld.director;
+
+// -----------------------------------------------------------------
+// weld.director: the conductor every serious chat app hand-rolls. A turn
+// is rarely one call -- it is "write the reply (fast, streamed), THEN in
+// the background reconcile state, extract memory facts, and illustrate
+// the scene." Done naively the background work blocks the reply, or a
+// failing illustrate pass takes down the whole turn.
+//
+// weld.director formalizes it:
+//   var dir = weld.director.create();
+//   dir.define('reply',      replyFn);                       // foreground
+//   dir.define('audit',      auditFn,      { background:true, after:['reply'] });
+//   dir.define('illustrate', illustrateFn, { background:true, after:['reply'] });
+//   var run = dir.run(input);
+//   var ctx = await run.foreground;   // resolves when reply is done
+//   // ... render ctx.reply immediately ...
+//   await run.background;             // optional: when audit+illustrate finish
+//
+// Each pass fn receives (ctx, input); ctx carries prior passes' results
+// by name (ctx.reply, ctx.audit, ...) plus ctx.errors. Passes run in
+// dependency order, in parallel where independent. A thrown/rejected
+// pass is caught, recorded in ctx.errors[name], and reported via onError;
+// dependents that needed it are skipped, everything else proceeds.
+// -----------------------------------------------------------------
+
+function create(createOpts) {
+  createOpts = createOpts || {};
+  var passes = {};   // name -> { fn, background, after }
+  var order = [];    // insertion order for stable scheduling
+  var hooks = { onPass: createOpts.onPass || null, onError: createOpts.onError || null };
+
+  function define(name, fn, opts) {
+    opts = opts || {};
+    if (typeof fn !== 'function') throw new Error('weld.director: pass "' + name + '" needs a function');
+    if (!passes[name]) order.push(name);
+    passes[name] = { fn: fn, background: !!opts.background, after: opts.after || [] };
+    return api;
+  }
+
+  function remove(name) {
+    delete passes[name];
+    var i = order.indexOf(name); if (i !== -1) order.splice(i, 1);
+    return api;
+  }
+
+  // Topologically schedule a set of pass-names, then run respecting
+  // dependencies and running independents concurrently. Mutates ctx.
+  function runGroup(names, ctx, input) {
+    var pending = {};
+    names.forEach(function (n) { pending[n] = true; });
+    var done = {};      // name -> true once settled (ok or skipped/failed)
+    var running = {};
+
+    function depsSatisfied(name) {
+      var after = passes[name].after || [];
+      for (var i = 0; i < after.length; i++) {
+        var dep = after[i];
+        // only wait on deps that are part of this run at all
+        if ((pending[dep] || running[dep]) && !done[dep]) return false;
+      }
+      return true;
+    }
+
+    function depFailed(name) {
+      var after = passes[name].after || [];
+      for (var i = 0; i < after.length; i++) {
+        if (ctx.errors[after[i]]) return after[i];
+      }
+      return null;
+    }
+
+    return new Promise(function (resolve) {
+      function tick() {
+        var launched = false;
+        names.forEach(function (name) {
+          if (done[name] || running[name]) return;
+          if (!depsSatisfied(name)) return;
+
+          // a required upstream pass failed -> skip this one
+          var failedDep = depFailed(name);
+          if (failedDep) {
+            ctx.errors[name] = 'skipped: dependency "' + failedDep + '" failed';
+            done[name] = true; delete pending[name];
+            if (hooks.onError) try { hooks.onError(name, ctx.errors[name], ctx); } catch (e) {}
+            launched = true; // state changed; re-evaluate
+            return;
+          }
+
+          running[name] = true; delete pending[name]; launched = true;
+          Promise.resolve().then(function () { return passes[name].fn(ctx, input); })
+            .then(function (result) {
+              ctx[name] = result;
+              if (hooks.onPass) try { hooks.onPass(name, result, ctx); } catch (e) {}
+            }, function (err) {
+              ctx.errors[name] = String((err && err.message) || err);
+              if (hooks.onError) try { hooks.onError(name, ctx.errors[name], ctx); } catch (e) {}
+            })
+            .then(function () {
+              running[name] = false; done[name] = true;
+              if (allDone()) resolve(ctx); else tick();
+            });
+        });
+        if (allDone()) resolve(ctx);
+        else if (!launched && !anyRunning()) {
+          // deadlock guard (e.g. a dependency cycle): settle the rest as errors
+          names.forEach(function (n) {
+            if (!done[n]) { ctx.errors[n] = 'unresolved dependencies (cycle?)'; done[n] = true; }
+          });
+          resolve(ctx);
+        }
+      }
+      function allDone() { return names.every(function (n) { return done[n]; }); }
+      function anyRunning() { return names.some(function (n) { return running[n]; }); }
+      if (!names.length) { resolve(ctx); return; }
+      tick();
+    });
+  }
+
+  // run(input, opts) -> { foreground, background, ctx }.
+  // foreground resolves with ctx once all non-background passes finish;
+  // background resolves once background passes finish (started after fg).
+  function run(input, runOpts) {
+    runOpts = runOpts || {};
+    var ctx = { input: input, errors: {} };
+    var fgNames = order.filter(function (n) { return !passes[n].background; });
+    var bgNames = order.filter(function (n) { return passes[n].background; });
+
+    var bgResolve;
+    var background = new Promise(function (res) { bgResolve = res; });
+
+    var foreground = runGroup(fgNames, ctx, input).then(function () {
+      // kick background work without blocking the foreground resolution
+      if (bgNames.length) {
+        runGroup(bgNames, ctx, input).then(function () { bgResolve(ctx); });
+      } else {
+        bgResolve(ctx);
+      }
+      return ctx;
+    });
+
+    return { foreground: foreground, background: background, ctx: ctx };
+  }
+
+  function onPass(fn) { hooks.onPass = fn; return api; }
+  function onError(fn) { hooks.onError = fn; return api; }
+  function list() { return order.slice(); }
+
+  var api = {
+    define: define,
+    remove: remove,
+    run: run,
+    onPass: onPass,
+    onError: onError,
+    list: list
+  };
+  return api;
+}
+
+window.weld.director = {
+  create: create,
+  version: '1.0.0'
+};
+
+return window.weld.director;
+})();
+</script>
+<script>
+
+  function boot(){ if(!window.weld||!window.weld.director){return setTimeout(boot,100);} init(); }
+  function init(){
+    var D=window.weld.director, $=function(id){return document.getElementById(id);};
+    var delay=function(ms,v){return new Promise(function(r){setTimeout(function(){r(v);},ms);});};
+    $('run').onclick=function(){
+      var log=$('log'); log.textContent=''; var t0=Date.now();
+      function line(s){ log.textContent += '['+String(Date.now()-t0).padStart(4,' ')+'ms] '+s+'\n'; }
+      var failIll=$('failill').checked;
+      var dir=D.create({ onError:function(n,e){ line('  ! '+n+' failed: '+e); } });
+      dir.define('reply', function(){ line('reply: generating...'); return delay(300).then(function(){ line('reply: done -> shown to user'); return 'Hello, traveler.'; }); });
+      dir.define('audit', function(){ return delay(500).then(function(){ line('audit: state + facts updated'); return 'ok'; }); }, { background:true, after:['reply'] });
+      dir.define('illustrate', function(){ return delay(350).then(function(){ if(failIll){ throw new Error('image service timeout'); } line('illustrate: scene painted'); return 'img'; }); }, { background:true, after:['reply'] });
+      var run=dir.run('hi');
+      run.foreground.then(function(){ line('>> foreground resolved (reply ready) <<'); });
+      run.background.then(function(ctx){ line('== background complete =='); if(ctx.errors.illustrate) line('   (illustrate error was isolated; reply was unaffected)'); });
+    };
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+
+</script>

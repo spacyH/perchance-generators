@@ -1,0 +1,208 @@
+$meta
+  title       = weld.promptforge
+  description = Evolutionary image-prompt generation. Generates candidate prompts from an instruction, scores them by how often their results get upvoted, and breeds the winners back in. Faithful/balanced/creative modes, score-weighted promotion of proven prompts, and diversity injection. Pairs with weld.stream (and weld.structured). Stash on window.weld.promptforge.
+  tags        = weld, promptforge, image, prompt, evolution, rating, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.promptforge) return window.weld.promptforge;
+
+  // -----------------------------------------------------------------
+  // weld.promptforge: stop hand-tuning image prompts; let good ones win.
+  //
+  // A community prompt optimizer cracked the loop: ask an LLM for several
+  // prompt variants, render them, let the user upvote results, score each
+  // prompt by its upvote RATE (votes / uses -- self-normalizing), and feed
+  // the proven winners back into the next round, sometimes promoting a
+  // top prompt into the instruction slot. weld.promptforge packages that:
+  //
+  //   var forge = weld.promptforge.create({ instruction, mode })
+  //   var prompts = await forge.generate(4)   // candidate prompt strings
+  //   forge.used(promptText)                  // mark it rendered
+  //   forge.upvote(promptText)                // result was good
+  //   forge.top(n) / forge.score(text) / forge.state() / forge.load(s)
+  //
+  // Generation goes through weld.stream; if weld.structured is present it
+  // is used for a clean JSON array, else a numbered-list parse is used.
+  // -----------------------------------------------------------------
+
+  function getStream() { return (window.weld && window.weld.stream) ? window.weld.stream : null; }
+  function getStructured() { return (window.weld && window.weld.structured) ? window.weld.structured : null; }
+
+  var EXTRA = [
+    'Look closely at the instruction: what is the underlying intent? Fulfill it deeply.',
+    'Explore bold variations that still obey the instruction; avoid timid small changes.',
+    'Prefer concrete, descriptive detail over generic adjectives.',
+    'Try a concise comma-separated tag style for some prompts.',
+    'Include camera language (lens, shot type, angle) only if consistent with the instruction.',
+    'For one prompt focus on mood and lighting; for another, on composition.',
+    'Vary specificity: some prompts terse, others richly detailed.'
+  ];
+
+  var MODE_DIRECTIVE = {
+    faithful: 'EXACTLY satisfy the instruction. Stay strictly on the requested subject.',
+    balanced: 'Keep the core subject and any explicit asks intact, but bring fresh angles, mood, lighting, and styling.',
+    creative: 'Build on the instruction with a creative touch; reinterpret and remix freely, including bold departures, while keeping the core idea recognizable.'
+  };
+
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  // Curly-brace variant guidance, ~60% of the time, to inject diversity.
+  // The literal characters are assembled at runtime so plugin source stays
+  // clear of the Perchance brace scanner.
+  function curlyGuidance() {
+    if (Math.random() >= 0.6) return '';
+    var ob = String.fromCharCode(123), cb = String.fromCharCode(125), bar = String.fromCharCode(124);
+    var ex = ob + 'candid' + bar + 'studio' + bar + 'cinematic' + cb + ' '
+      + ob + 'portrait' + bar + 'wide shot' + cb;
+    return '\nUse brace-variant syntax for diversity: add a few brace blocks with '
+      + 'pipe-separated options (lighting, expression, angle, styling) where every '
+      + 'variant still obeys the instruction. Example: "' + ex + ' of ..."';
+  }
+
+  function buildInstruction(forge, n, promotedPrompt) {
+    var base = promotedPrompt || forge.instruction;
+    var lines = [];
+    lines.push('You write image-generation prompts.');
+    lines.push(MODE_DIRECTIVE[forge.mode] || MODE_DIRECTIVE.balanced);
+    lines.push(pick(EXTRA));
+    var top = forge.topList(forge.exampleCount);
+    if (top.length) {
+      var intro = forge.mixAcross
+        ? 'Here are prompts the user has rated highly before. Treat them as a signal of taste, not a template; vary how much you borrow.'
+        : 'Here are highly-rated prompts. Study what works and breed their best parts into new ones.';
+      lines.push('\n' + intro + '\n<highly_rated>\n'
+        + top.map(function (p) { return '- ' + p.text; }).join('\n') + '\n</highly_rated>');
+    }
+    lines.push(curlyGuidance());
+    lines.push('\nInstruction:\n' + base);
+    lines.push('\nWrite ' + n + ' distinct prompt' + (n > 1 ? 's' : '')
+      + ', one per line, no numbering, no commentary. Each on its own line.');
+    return lines.filter(Boolean).join('\n');
+  }
+
+  function parseList(text) {
+    if (!text) return [];
+    return String(text).split(/\r?\n/).map(function (l) {
+      return l.replace(/^\s*(?:\d+[.)\-:]|[*\u2022\-\u2013])\s*/, '').replace(/^"(.*)"$/, '$1').trim();
+    }).filter(function (l) { return l.length > 0; });
+  }
+
+  function create(opts) {
+    opts = opts || {};
+    var forge = {
+      instruction: String(opts.instruction || ''),
+      mode: opts.mode || 'balanced',          // faithful | balanced | creative
+      mixAcross: !!opts.mixAcross,
+      promoteRate: opts.promoteRate != null ? opts.promoteRate : 0.6,
+      exampleCount: opts.exampleCount != null ? opts.exampleCount : 6,
+      prompts: {}        // text -> { text, used, votes, score, createdAt }
+    };
+
+    function recompute(p) { p.score = p.used > 0 ? p.votes / p.used : 0; }
+
+    function ensure(text) {
+      var key = String(text || '').trim();
+      if (!key) return null;
+      if (!forge.prompts[key]) forge.prompts[key] = { text: key, used: 0, votes: 0, score: 0, createdAt: Date.now() };
+      return forge.prompts[key];
+    }
+
+    function all() { return Object.keys(forge.prompts).map(function (k) { return forge.prompts[k]; }); }
+    function scored() { return all().filter(function (p) { return p.used > 0; }); }
+    forge.topList = function (limit) {
+      return scored().sort(function (a, b) { return b.score - a.score; }).slice(0, limit || 6);
+    };
+    function topList(limit) { return forge.topList(limit); }
+
+    // roulette selection weighted by score (proven prompts chosen more often)
+    function weightedPick(arr) {
+      if (!arr.length) return null;
+      var weights = arr.map(function (p) { return Math.max(0, p.score); });
+      var sum = weights.reduce(function (a, b) { return a + b; }, 0);
+      if (sum <= 0) return arr[Math.floor(Math.random() * arr.length)];
+      var r = Math.random() * sum, c = 0;
+      for (var i = 0; i < arr.length; i++) { c += weights[i]; if (r <= c) return arr[i]; }
+      return arr[arr.length - 1];
+    }
+
+    // generate(n) -> Promise<string[]> of candidate prompts.
+    function generate(n) {
+      n = n || 3;
+      var stream = getStream();
+      if (!stream) return Promise.resolve({ /* graceful */ }).then(function () { return []; });
+
+      // Maybe promote a proven prompt into the instruction slot.
+      var promoted = null;
+      var pool = scored();
+      if (pool.length && Math.random() < forge.promoteRate) {
+        var winner = weightedPick(pool);
+        if (winner) promoted = winner.text;
+      }
+      var instruction = buildInstruction(forge, n, promoted);
+
+      var structured = getStructured();
+      if (structured) {
+        return structured.generate({
+          instruction: instruction, startWith: '[',
+          shape: 'a JSON array of ' + n + ' image-prompt strings'
+        }).then(function (r) {
+          var list = (r.ok && Array.isArray(r.value)) ? r.value.map(String) : [];
+          if (!list.length && r.raw) list = parseList(r.raw);
+          list.forEach(ensure);
+          return list;
+        });
+      }
+      return stream.run({ instruction: instruction }).then(function (res) {
+        if (res.error) return [];
+        var list = parseList(res.text);
+        list.forEach(ensure);
+        return list;
+      });
+    }
+
+    function used(text) { var p = ensure(text); if (p) { p.used += 1; recompute(p); } return p; }
+    function upvote(text, by) { var p = ensure(text); if (p) { p.votes += (by || 1); recompute(p); } return p; }
+    function record(text, r) { r = r || {}; var p = ensure(text); if (!p) return null; if (r.used) p.used += r.used; if (r.votes) p.votes += r.votes; recompute(p); return p; }
+
+    function score(text) { var p = forge.prompts[String(text || '').trim()]; return p ? p.score : 0; }
+    function setInstruction(text) { forge.instruction = String(text || ''); }
+    function setMode(m) { if (MODE_DIRECTIVE[m]) forge.mode = m; }
+
+    function state() {
+      return { instruction: forge.instruction, mode: forge.mode, mixAcross: forge.mixAcross,
+        promoteRate: forge.promoteRate, prompts: forge.prompts };
+    }
+    function load(s) {
+      if (!s) return;
+      forge.instruction = s.instruction || forge.instruction;
+      forge.mode = s.mode || forge.mode;
+      if (s.mixAcross != null) forge.mixAcross = s.mixAcross;
+      if (s.promoteRate != null) forge.promoteRate = s.promoteRate;
+      forge.prompts = s.prompts || {};
+    }
+
+    return {
+      generate: generate,
+      used: used,
+      upvote: upvote,
+      record: record,
+      score: score,
+      top: function (n) { return topList(n); },
+      all: all,
+      setInstruction: setInstruction,
+      setMode: setMode,
+      state: state,
+      load: load
+    };
+  }
+
+  window.weld.promptforge = {
+    create: create,
+    MODES: ['faithful', 'balanced', 'creative'],
+    version: '1.0.0'
+  };
+
+  return window.weld.promptforge;

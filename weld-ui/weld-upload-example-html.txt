@@ -1,0 +1,279 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--amber:#d29922;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:780px;margin:0 auto;padding:34px 18px 90px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 0 16px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+.breadcrumb a{color:var(--muted);}.breadcrumb .sep{color:var(--faint);margin:0 8px;}.breadcrumb .cur{color:var(--ink);}.breadcrumb .act a{color:var(--accent);}
+.hdr{margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}.hdr h1{font:700 24px var(--mono);letter-spacing:-0.5px;}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;}
+.hdr .lead{color:var(--muted);margin-top:8px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;}
+.panel h2{font:600 13px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:8px 0;}
+.lbl{font:600 12px var(--mono);color:var(--muted);min-width:74px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 15px;font:600 13px var(--font);cursor:pointer;transition:.12s;}
+.btn:hover{filter:brightness(1.08);}.btn.ghost{background:var(--faint);color:var(--ink);}.btn.sm{padding:6px 11px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+input[type=text],textarea{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:8px 10px;font:13px var(--font);}
+input[type=text]{flex:1;min-width:120px;}textarea{width:100%;font:12.5px/1.5 var(--mono);resize:vertical;}
+.mono{font:13px var(--mono);}
+.out{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font:12.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;min-height:20px;color:#c9d1d9;}
+.chip{display:inline-block;background:var(--faint);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font:600 12px var(--mono);margin:2px;}
+.chip.k{background:rgba(63,185,80,.14);border-color:rgba(63,185,80,.4);color:#7ee787;}
+.chip.d{opacity:.4;text-decoration:line-through;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:9px 13px;border-radius:0 4px 4px 0;margin:12px 0 0;font-size:12.5px;color:#c9d1d9;}
+.note.warn{background:rgba(210,153,34,.08);border-color:var(--amber);}
+.tag{font:600 10px var(--mono);padding:2px 7px;border-radius:4px;background:rgba(63,185,80,.14);color:#7ee787;border:1px solid rgba(63,185,80,.4);}
+.tag.ai{background:rgba(210,153,34,.12);color:#e3b341;border-color:rgba(210,153,34,.4);}
+.bar{height:14px;background:var(--accent);border-radius:3px;transition:width .3s;}
+.footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);}.footer a{color:var(--muted);}
+.flex{display:flex;gap:10px;align-items:center;}.wrap{flex-wrap:wrap;}.grow{flex:1;}.mt{margin-top:10px;}
+</style>
+<div id="page">
+<div class="breadcrumb"><span><a href="https://perchance.org/weld-ui-index">weld</a><span class="sep">/</span>weld.upload<span class="sep">/</span><span class="cur">demo</span></span><span class="act"><a href="https://perchance.org/weld-upload-plugin">docs &rarr;</a></span></div>
+<div class="hdr"><div class="hdr-row"><h1>weld.upload &mdash; demo</h1><span class="ver">v1.0.0</span></div><p class="lead">Upload a file with validation that runs before the network, see the normalized result (plain strings, not the base plugin's boxed URL), and try size/type limits. Mock backend here; real one on Perchance.</p></div>
+  <div class="panel"><h2>Upload a file <span class="tag">validated first</span></h2>
+    <div class="row"><span class="lbl">file</span><input id="picker" type="file"></div>
+    <div class="row"><span class="lbl">accept</span>
+      <button class="btn sm abtn" data-a="image/*">image/*</button>
+      <button class="btn ghost sm abtn" data-a="">any</button></div>
+    <div class="row"><span class="lbl">max size</span>
+      <button class="btn sm sbtn" data-s="5000000">5 MB</button>
+      <button class="btn ghost sm sbtn" data-s="100000">100 KB</button>
+      <button class="btn ghost sm sbtn" data-s="0">no limit</button></div>
+    <div class="row"><button id="up" class="btn">Upload</button><span id="prog" class="mono" style="font-size:12px;color:var(--muted);"></span></div>
+    <div id="out" class="out mt"></div>
+    <div class="note">This demo uses a <b>mock</b> backend so it runs anywhere; the real one is upload.perchance.org. Validation (type + size) happens <b>before</b> any network call, so a wrong-type or too-big file fails instantly with a clear reason. Pick a file or just press Upload to use a small synthetic image.</div>
+  </div>
+  <div class="panel"><h2>The normalized result</h2>
+    <p class="mono" style="font-size:12px;color:var(--muted);">The base plugin returns the URL as a boxed String (so <code>===</code> fails). weld.upload returns plain strings:</p>
+    <div id="shape" class="out"></div>
+  </div>
+<footer class="footer"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
+</div>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.upload) return window.weld.upload;
+
+// -----------------------------------------------------------------
+// weld.upload: upload-plugin, but pleasant.
+//
+// The base plugin hands back { url, size, error, deletionUrl } where url
+// is a BOXED String (so === fails), validates filetypes opaquely
+// (text/html -> invalid_filetype, JS -> .bin, SVG/PDF kept), and dedups
+// identical blobs to the same URL. It has no validation-before-upload,
+// no progress, no batch, no typed errors. weld.upload v2 adds all of it:
+//
+//   var r = await weld.upload.file(blob, { accept:['image/*'], maxBytes: 5e6 });
+//   r.url; r.size; r.deletionUrl;            // plain strings now
+//   await weld.upload.info(r.url);           // fileInfo metadata
+//   await weld.upload.remove(r);             // delete via deletionUrl
+//   await weld.upload.batch(files, { concurrency: 2, onProgress });
+//
+// Validation runs BEFORE the network call, so a too-big or wrong-type
+// file fails instantly with a clear reason instead of an opaque server
+// rejection. Everything degrades gracefully if the base plugin is absent.
+// -----------------------------------------------------------------
+
+var deps = { uploadPlugin: null, fetch: null };
+function getUploader() {
+  return deps.uploadPlugin
+    || (window.weld && window.weld.__uploadPlugin)
+    || (typeof window !== 'undefined' && typeof window.uploadPlugin === 'function' ? window.uploadPlugin : null)
+    || (typeof uploadPlugin === 'function' ? uploadPlugin : null);
+}
+function attach(d) {
+  if (!d) return;
+  if (d.uploadPlugin) deps.uploadPlugin = d.uploadPlugin;
+  if (d.fetch) deps.fetch = d.fetch;
+}
+function available() { return !!getUploader(); }
+
+// ---- validation (before the network) ----
+function matchesAccept(type, accept) {
+  if (!accept || !accept.length) return true;
+  type = String(type || '');
+  for (var i = 0; i < accept.length; i++) {
+    var a = String(accept[i]);
+    if (a === type) return true;
+    if (a.slice(-2) === '/*' && type.indexOf(a.slice(0, -1)) === 0) return true; // image/*
+    if (a.charAt(0) === '.' && /\.[a-z0-9]+$/i.test(type)) { /* extension form handled by caller */ }
+  }
+  return false;
+}
+// filetypes the base backend rejects outright
+var BLOCKED = { 'text/html': 'invalid_filetype' };
+
+function validate(blob, opts) {
+  opts = opts || {};
+  if (blob == null) return 'no file provided';
+  var size = (typeof blob.size === 'number') ? blob.size : null;
+  var type = (blob.type != null) ? String(blob.type) : '';
+  if (opts.maxBytes && size != null && size > opts.maxBytes) {
+    return 'file is ' + size + ' bytes, over the ' + opts.maxBytes + '-byte limit';
+  }
+  if (BLOCKED[type]) return type + ' is rejected by the backend (' + BLOCKED[type] + ')';
+  if (opts.accept && type && !matchesAccept(type, opts.accept)) {
+    return 'type "' + type + '" is not in the accept list (' + opts.accept.join(', ') + ')';
+  }
+  return null; // ok
+}
+
+// ---- normalize the base plugin's boxed result ----
+function normalize(res) {
+  if (res == null) return { ok: false, url: null, size: null, deletionUrl: null, error: 'no result', raw: res };
+  var error = res.error ? String(res.error) : null;
+  var url = (res.url != null) ? String(res.url) : null; // unbox the boxed String
+  return {
+    ok: !error && !!url,
+    url: url,
+    size: (typeof res.size === 'number') ? res.size : null,
+    deletionUrl: (res.deletionUrl != null) ? String(res.deletionUrl) : null,
+    error: error,
+    raw: res
+  };
+}
+
+// file(blob, opts) -> Promise<normalized result>.
+// opts: { accept:[mime...], maxBytes, onProgress }
+function file(blob, opts) {
+  opts = opts || {};
+  var bad = validate(blob, opts);
+  if (bad) return Promise.resolve({ ok: false, url: null, size: (blob && blob.size) || null, deletionUrl: null, error: bad, raw: null });
+
+  var up = getUploader();
+  if (!up) return Promise.resolve({ ok: false, url: null, size: null, deletionUrl: null, error: 'weld.upload: upload-plugin not available', raw: null });
+
+  if (typeof opts.onProgress === 'function') { try { opts.onProgress(0, blob); } catch (e) {} }
+  var call;
+  try { call = up(blob, opts.pluginOpts || {}); }
+  catch (e) { return Promise.resolve({ ok: false, url: null, size: null, deletionUrl: null, error: String(e && e.message || e), raw: null }); }
+
+  return Promise.resolve(call).then(function (res) {
+    if (typeof opts.onProgress === 'function') { try { opts.onProgress(1, blob); } catch (e) {} }
+    return normalize(res);
+  }, function (err) {
+    return { ok: false, url: null, size: null, deletionUrl: null, error: String(err && err.message || err), raw: null };
+  });
+}
+
+// batch(files, opts) -> Promise<[normalized...]> with bounded concurrency
+// and overall progress. opts: { concurrency, onProgress, accept, maxBytes }
+function batch(files, opts) {
+  opts = opts || {};
+  var list = [].slice.call(files || []);
+  var concurrency = Math.max(1, opts.concurrency || 2);
+  var results = new Array(list.length);
+  var done = 0, next = 0;
+
+  function worker() {
+    if (next >= list.length) return Promise.resolve();
+    var i = next++;
+    return file(list[i], { accept: opts.accept, maxBytes: opts.maxBytes }).then(function (r) {
+      results[i] = r; done++;
+      if (typeof opts.onProgress === 'function') { try { opts.onProgress(done, list.length, r); } catch (e) {} }
+      return worker();
+    });
+  }
+  var workers = [];
+  for (var w = 0; w < Math.min(concurrency, list.length); w++) workers.push(worker());
+  return Promise.all(workers).then(function () { return results; });
+}
+
+// info(url) -> Promise<fileInfo metadata | null> via upload.perchance.org.
+// Uses weld.fetch if attached/available, else a direct fetch.
+function info(url) {
+  url = (url && url.url) ? String(url.url) : String(url || '');
+  if (!url) return Promise.resolve(null);
+  var endpoint = 'https://upload.perchance.org/api/fileInfo?url=' + encodeURIComponent(url);
+  var wf = deps.fetch || (window.weld && window.weld.fetch) || null;
+  if (wf && typeof wf.json === 'function') return wf.json(endpoint, { direct: false }).catch(function () { return null; });
+  if (typeof fetch === 'function') return fetch(endpoint).then(function (r) { return r.json(); }).catch(function () { return null; });
+  return Promise.resolve(null);
+}
+
+// remove(result|deletionUrl) -> Promise<boolean>. Hits the deletionUrl.
+function remove(target) {
+  var del = (target && target.deletionUrl) ? String(target.deletionUrl) : String(target || '');
+  if (!del) return Promise.resolve(false);
+  var wf = deps.fetch || (window.weld && window.weld.fetch) || null;
+  if (wf && typeof wf.get === 'function') return wf.get(del).then(function (r) { return !!r.ok; }, function () { return false; });
+  if (typeof fetch === 'function') return fetch(del).then(function (r) { return !!(r && (r.ok || r.status === 200)); }, function () { return false; });
+  return Promise.resolve(false);
+}
+
+// dataUrlToBlob: convenience for uploading a canvas/dataURL (e.g. a
+// weld.background cutout or a weld.image generation).
+function dataUrlToBlob(dataUrl) {
+  var parts = String(dataUrl).split(',');
+  var mime = (parts[0].match(/:(.*?);/) || [])[1] || 'application/octet-stream';
+  var bin = atob(parts[1] || '');
+  var arr = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+// fromDataUrl(dataUrl, opts): upload a canvas/dataURL directly.
+function fromDataUrl(dataUrl, opts) {
+  try { return file(dataUrlToBlob(dataUrl), opts); }
+  catch (e) { return Promise.resolve({ ok: false, url: null, error: 'weld.upload: bad data URL (' + (e && e.message) + ')', raw: null }); }
+}
+
+window.weld.upload = {
+  file: file,
+  batch: batch,
+  info: info,
+  remove: remove,
+  fromDataUrl: fromDataUrl,
+  dataUrlToBlob: dataUrlToBlob,
+  validate: validate,
+  normalize: normalize,
+  attach: attach,
+  available: available,
+  version: '1.0.0'
+};
+
+return window.weld.upload;
+})();
+</script>
+<script>
+
+  function boot(){ if(!window.weld||!window.weld.upload){return setTimeout(boot,100);} init(); }
+  function init(){
+    var U=window.weld.upload, $=function(id){return document.getElementById(id);};
+    var accept=['image/*'], maxBytes=5000000, picked=null;
+    // mock upload-plugin (returns a boxed-String url, dedups by size)
+    var seen={};
+    U.attach({ uploadPlugin:function(blob){ var key=blob.size+':'+blob.type; if(!seen[key]) seen[key]='https://upload.perchance.org/'+(Math.random().toString(36).slice(2,8))+'.bin';
+      var u=new String(seen[key]); return new Promise(function(res){ setTimeout(function(){ res({ url:u, size:blob.size, deletionUrl:'https://upload.perchance.org/delete/'+blob.size, error:null }); }, 300); }); } });
+
+    [].forEach.call(document.querySelectorAll('.abtn'),function(b){ b.onclick=function(){ accept=b.getAttribute('data-a')?[b.getAttribute('data-a')]:null;
+      [].forEach.call(document.querySelectorAll('.abtn'),function(x){x.classList.toggle('ghost',x!==b);}); }; });
+    [].forEach.call(document.querySelectorAll('.sbtn'),function(b){ b.onclick=function(){ maxBytes=+b.getAttribute('data-s')||0;
+      [].forEach.call(document.querySelectorAll('.sbtn'),function(x){x.classList.toggle('ghost',x!==b);}); }; });
+    $('picker').onchange=function(e){ picked=(e.target.files&&e.target.files[0])||null; };
+
+    $('up').onclick=function(){
+      var blob=picked;
+      if(!blob){ // synthetic 1x1 png-ish blob
+        blob=new Blob([new Uint8Array([137,80,78,71,13,10,26,10])],{type:'image/png'}); blob._name='synthetic.png';
+      }
+      $('prog').textContent='validating...';
+      U.file(blob,{accept:accept, maxBytes:maxBytes||undefined, onProgress:function(p){ $('prog').textContent=p<1?('uploading '+Math.round(p*100)+'%'):'done'; }})
+        .then(function(r){
+          if(!r.ok){ $('out').innerHTML='<span style="color:#ff7b72;">'+r.error+'</span>'; $('shape').textContent=''; $('prog').textContent=''; return; }
+          $('out').innerHTML='<span style="color:#7ee787;">uploaded</span> &rarr; <a href="#" onclick="return false">'+r.url+'</a>';
+          $('shape').textContent=JSON.stringify({ ok:r.ok, url:r.url, size:r.size, deletionUrl:r.deletionUrl, error:r.error }, null, 2)
+            + '\n\ntypeof r.url === "string"  (unboxed)';
+        });
+    };
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+
+</script>

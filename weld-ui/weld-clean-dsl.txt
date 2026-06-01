@@ -155,6 +155,32 @@ $output() =>
   //   hidden        (bool)    stripHidden (default true)
   //   rules         (array)   custom find/replace rules
   //   trim          (bool)    trim outer whitespace (default true)
+  // Agency Shield: stop the model from speaking or acting AS the player.
+  // Drops any line that opens with the player's name as a speaker
+  // ("Alex:" or a bracket-wrapped "Alex" speaker label), and trims a trailing block where the model
+  // begins narrating the player's own dialogue/action. Keeps the reply up
+  // to the point the impersonation starts. Inspired by multi-speaker chat
+  // engines that must protect player agency in a single-protagonist story.
+  function stripImpersonation(text, playerName) {
+    var s = String(text == null ? '' : text);
+    if (!s || !playerName) return s;
+    var name = String(playerName).trim();
+    if (!name) return s;
+    var esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // 1. Cut at the first line that starts a player speaker turn, with or
+    //    without bracket wrappers: "Name:", "[Name]:", or doubled brackets.
+    var br = '\\[+\\s*' + esc + '\\s*\\]+';
+    var boundary = new RegExp('(^|\\n)\\s*(?:' + esc + '|' + br + ')\\s*:', 'i');
+    var hit = s.search(boundary);
+    if (hit > 0) s = s.slice(0, hit);
+    else if (hit === 0) {
+      // whole reply is impersonation; drop the leading turn label only
+      s = s.replace(new RegExp('^\\s*(?:' + esc + '|' + br + ')\\s*:\\s*', 'i'), '');
+    }
+    return s.replace(/\s+$/, '');
+  }
+
   function clean(input, opts) {
     opts = opts || {};
     var text, truncated;
@@ -169,6 +195,7 @@ $output() =>
     var s = String(text == null ? '' : text);
 
     if (opts.hidden !== false) s = stripHidden(s);
+    if (opts.playerName || opts.player) s = stripImpersonation(s, opts.playerName || opts.player);
     if (opts.roles || (opts.roleNames != null)) s = stripRolePrefix(s, opts.roleNames);
     if (opts.collapse !== false) s = collapseRepeats(s, opts);
     if (truncated) s = trimPartial(s);
@@ -186,7 +213,8 @@ $output() =>
     balanceFences: balanceFences,
     stripHidden: stripHidden,
     rules: applyRules,
-    version: '1.0.0'
+    stripImpersonation: stripImpersonation,
+    version: '1.1.0'
   };
 
   return window.weld.clean;

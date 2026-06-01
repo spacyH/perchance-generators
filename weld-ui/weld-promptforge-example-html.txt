@@ -1,0 +1,949 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--amber:#d29922;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:780px;margin:0 auto;padding:34px 18px 90px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 0 16px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+.breadcrumb a{color:var(--muted);}.breadcrumb .sep{color:var(--faint);margin:0 8px;}.breadcrumb .cur{color:var(--ink);}.breadcrumb .act a{color:var(--accent);}
+.hdr{margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}.hdr h1{font:700 24px var(--mono);letter-spacing:-0.5px;}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;}
+.hdr .lead{color:var(--muted);margin-top:8px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;}
+.panel h2{font:600 13px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:8px 0;}
+.lbl{font:600 12px var(--mono);color:var(--muted);min-width:74px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 15px;font:600 13px var(--font);cursor:pointer;transition:.12s;}
+.btn:hover{filter:brightness(1.08);}.btn.ghost{background:var(--faint);color:var(--ink);}.btn.sm{padding:6px 11px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+input[type=text],textarea{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:8px 10px;font:13px var(--font);}
+input[type=text]{flex:1;min-width:120px;}textarea{width:100%;font:12.5px/1.5 var(--mono);resize:vertical;}
+.mono{font:13px var(--mono);}
+.out{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font:12.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;min-height:20px;color:#c9d1d9;}
+.chip{display:inline-block;background:var(--faint);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font:600 12px var(--mono);margin:2px;}
+.chip.k{background:rgba(63,185,80,.14);border-color:rgba(63,185,80,.4);color:#7ee787;}
+.chip.d{opacity:.4;text-decoration:line-through;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:9px 13px;border-radius:0 4px 4px 0;margin:12px 0 0;font-size:12.5px;color:#c9d1d9;}
+.note.warn{background:rgba(210,153,34,.08);border-color:var(--amber);}
+.tag{font:600 10px var(--mono);padding:2px 7px;border-radius:4px;background:rgba(63,185,80,.14);color:#7ee787;border:1px solid rgba(63,185,80,.4);}
+.tag.ai{background:rgba(210,153,34,.12);color:#e3b341;border-color:rgba(210,153,34,.4);}
+.bar{height:14px;background:var(--accent);border-radius:3px;transition:width .3s;}
+.footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);}.footer a{color:var(--muted);}
+.flex{display:flex;gap:10px;align-items:center;}.wrap{flex-wrap:wrap;}.grow{flex:1;}.mt{margin-top:10px;}
+</style>
+<div id="page">
+<div class="breadcrumb"><span><a href="https://perchance.org/weld-ui-index">weld</a><span class="sep">/</span>weld.promptforge<span class="sep">/</span><span class="cur">demo</span></span><span class="act"><a href="https://perchance.org/weld-promptforge-plugin">docs &rarr;</a></span></div>
+<div class="hdr"><div class="hdr-row"><h1>weld.promptforge &mdash; demo</h1><span class="ver">v1.0.0</span></div><p class="lead">Evolve image prompts by taste. Generate candidates from an instruction, upvote the ones whose results you like, and watch the winners breed back into the next round. Generation runs on the model on Perchance.</p></div>
+  <div class="panel"><h2>Instruction</h2>
+    <div class="row"><input id="inst" type="text" value="a knight resting in an ancient forest"></div>
+    <div class="row"><span class="lbl">mode</span>
+      <button class="btn ghost sm modebtn" data-mode="faithful">Faithful</button>
+      <button class="btn sm modebtn" data-mode="balanced">Balanced</button>
+      <button class="btn ghost sm modebtn" data-mode="creative">Creative</button>
+      <button id="gen" class="btn">Generate prompts <span class="tag ai">on Perchance</span></button></div>
+    <div id="status" class="mono" style="color:var(--muted);font-size:12px;margin-top:6px;"></div>
+  </div>
+
+  <div class="panel"><h2>Candidates <span class="tag">vote to evolve</span></h2>
+    <div id="list" class="mt"></div>
+    <div class="note">Upvote the prompts whose results you like. Score is upvotes &divide; uses, so good prompts rise. Generate again and the winners are bred back in as <code>&lt;highly_rated&gt;</code> examples &mdash; and sometimes a top prompt is promoted into the instruction slot. Watch the scores climb.</div>
+  </div>
+
+  <div class="panel"><h2>Leaderboard</h2><div id="board" class="out"></div></div>
+<footer class="footer"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
+</div>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.stream) {
+  window.weld.stream.attach({ aiTextPlugin: aiTextPlugin });
+  return window.weld.stream;
+}
+
+// -----------------------------------------------------------------
+// weld.stream: the generation half of an AI chat app.
+//
+// weld.prompt assembles the instruction string; weld.stream sends it
+// to ai-text-plugin and manages the call lifecycle. It exists because
+// the raw plugin has three sharp edges that every consumer re-hits:
+//
+//   1. The resolved value is a BOXED String, not a primitive, so
+//      `result === "x"` is always false. We hand back a plain string.
+//   2. stopReason is "natural" | "artificial" | "error" | "user" --
+//      NOT the "stop_sequence"/"max_tokens" the official docs claim.
+//      We translate to plain booleans: truncated / aborted / error.
+//   3. The broker accepts exactly one generation at a time. Overlapping
+//      calls don't error -- they just contend. We serialize them in an
+//      internal FIFO queue so callers can fire-and-forget.
+//
+// The plugin must be imported in the lists editor (see the import
+// directive at the top of this generator) and handed to us via
+// weld.stream.attach({ aiTextPlugin: aiTextPlugin }) -- the DSL form
+// below does this automatically. If you skip it we also try
+// window.root.aiTextPlugin as a fallback.
+// -----------------------------------------------------------------
+
+var deps = { aiTextPlugin: null };
+
+function attach(d) {
+  if (d && typeof d.aiTextPlugin === 'function') deps.aiTextPlugin = d.aiTextPlugin;
+}
+
+function grabPlugin() {
+  if (typeof deps.aiTextPlugin === 'function') return deps.aiTextPlugin;
+  try {
+    if (window.root && typeof window.root.aiTextPlugin === 'function') return window.root.aiTextPlugin;
+  } catch (e) { /* proxy miss */ }
+  return null;
+}
+
+// -----------------------------------------------------------------
+// Constants. A literal double-open-bracket sequence would be read as a
+// Perchance template by the source scanner, so we assemble it from char
+// codes instead.
+// -----------------------------------------------------------------
+var LBR = String.fromCharCode(91);            // "["
+var DOUBLE = LBR + LBR;                        // a double open bracket
+var DEFAULT_CHAT_STOPS = ['\n\n' + DOUBLE, '\n' + DOUBLE]; // the two standard chat stop sequences
+var MAX_STOP_SEQUENCES = 20;                   // hard backend limit (21+ => stopReason "error")
+
+var idSeq = 0;
+function nextId() {
+  idSeq += 1;
+  return 'weldStream' + Date.now() + '_' + idSeq;
+}
+
+// -----------------------------------------------------------------
+// Normalize the boxed-String result into a plain, predictable object.
+// -----------------------------------------------------------------
+function normalize(result) {
+  var out = {
+    text: '',
+    stopReason: 'natural',
+    truncated: false,   // "artificial": hit a stop sequence or the output ceiling
+    aborted: false,     // "user": stop() was called
+    error: null
+  };
+  if (result == null) {
+    out.stopReason = 'error';
+    out.error = 'no result returned from ai-text-plugin';
+    return out;
+  }
+  var reason = result.stopReason || 'natural';
+  out.stopReason = reason;
+  // generatedText is the full output; String(result) also works on the box.
+  out.text = (result.generatedText != null) ? String(result.generatedText) : String(result);
+  if (reason === 'artificial') out.truncated = true;
+  if (reason === 'user') out.aborted = true;
+  if (reason === 'error') {
+    out.error = 'ai-text-plugin reported a generation error';
+    out.text = '';
+  }
+  return out;
+}
+
+function clampStops(stops) {
+  if (stops == null) return null;
+  if (!Array.isArray(stops)) stops = [stops];
+  stops = stops.filter(function (s) { return s != null && String(s).length > 0; });
+  if (stops.length === 0) return null;
+  if (stops.length > MAX_STOP_SEQUENCES) stops = stops.slice(0, MAX_STOP_SEQUENCES);
+  return stops;
+}
+
+// -----------------------------------------------------------------
+// Serial queue. activeEntry is the in-flight generation; the broker
+// handles exactly one at a time, so everything else waits behind it.
+// -----------------------------------------------------------------
+var queue = [];
+var activeEntry = null;
+var pumping = false;
+
+function buildCallOpts(entry) {
+  var o = entry.opts;
+  var callOpts = { instruction: String(o.instruction) };
+
+  if (o.startWith != null) {
+    callOpts.startWith = String(o.startWith);
+    // Default to hiding the echoed prefix unless the caller opts out.
+    callOpts.hideStartWith = (o.hideStartWith !== false);
+  }
+
+  var stops = (o.stopSequences != null)
+    ? o.stopSequences
+    : (o.chat ? DEFAULT_CHAT_STOPS : null);
+  stops = clampStops(stops);
+  if (stops) callOpts.stopSequences = stops;
+
+  // Stream only when a chunk/token handler is supplied. A bare await
+  // path still resolves with the complete text either way.
+  if (typeof o.onChunk === 'function' || typeof o.onToken === 'function') {
+    callOpts.onChunk = function (c) {
+      if (!c) return;
+      if (c.isFromStartWith) return;           // skip the echoed startWith
+      var delta = c.textChunk || '';
+      entry.liveText += delta;
+      if (typeof o.onChunk === 'function') {
+        try { o.onChunk(delta, entry.liveText); } catch (e) { /* consumer error */ }
+      }
+      if (typeof o.onToken === 'function') {
+        try { o.onToken(delta); } catch (e) { /* consumer error */ }
+      }
+    };
+  }
+  return callOpts;
+}
+
+function settle(entry, norm) {
+  if (entry._settled) return;
+  entry._settled = true;
+  var o = entry.opts;
+  if (norm.error && typeof o.onError === 'function') {
+    try { o.onError(norm.error, norm); } catch (e) { /* consumer error */ }
+  }
+  if (typeof o.onDone === 'function') {
+    try { o.onDone(norm); } catch (e) { /* consumer error */ }
+  }
+  entry._resolve(norm);
+}
+
+function pump() {
+  if (pumping || activeEntry) return;
+  // Drop any entries cancelled while queued (already settled by stop()).
+  while (queue.length && queue[0]._settled) queue.shift();
+  if (queue.length === 0) return;
+
+  pumping = true;
+  var entry = queue.shift();
+  activeEntry = entry;
+  entry.started = true;
+
+  var plugin = grabPlugin();
+  if (!plugin) {
+    activeEntry = null;
+    pumping = false;
+    settle(entry, {
+      text: '', stopReason: 'error', truncated: false, aborted: false,
+      error: 'weld.stream: ai-text-plugin is not attached. Add '
+        + 'aiTextPlugin = ' + '{' + 'import:ai-text-plugin' + '}'
+        + ' to your lists and call weld.stream.attach({ aiTextPlugin }).'
+    });
+    pump();
+    return;
+  }
+
+  var instr = entry.opts.instruction;
+  if (instr == null || String(instr).trim() === '') {
+    activeEntry = null;
+    pumping = false;
+    settle(entry, {
+      text: '', stopReason: 'error', truncated: false, aborted: false,
+      error: 'weld.stream: instruction is empty.'
+    });
+    pump();
+    return;
+  }
+
+  var done = function (norm) {
+    activeEntry = null;
+    entry.inner = null;
+    pumping = false;
+    settle(entry, norm);
+    pump();
+  };
+
+  try {
+    var inner = plugin(buildCallOpts(entry));   // synchronous extended-Promise handle
+    entry.inner = inner;
+    // If stop() arrived between dequeue and here, honor it now.
+    if (entry._stopRequested && inner && typeof inner.stop === 'function') {
+      try { inner.stop(); } catch (e) { /* ignore */ }
+    }
+    Promise.resolve(inner).then(function (raw) {
+      done(normalize(raw));
+    }, function (err) {
+      done({
+        text: '', stopReason: 'error', truncated: false, aborted: false,
+        error: String((err && err.message) || err)
+      });
+    });
+  } catch (err) {
+    done({
+      text: '', stopReason: 'error', truncated: false, aborted: false,
+      error: String((err && err.message) || err)
+    });
+  }
+}
+
+// -----------------------------------------------------------------
+// Public: run(opts) -> handle. The handle is thenable and abortable.
+//
+// opts:
+//   instruction    (string, required)
+//   startWith      (string)  text the model continues from
+//   hideStartWith  (bool)    default true when startWith is set
+//   stopSequences  (string[]) clamped to 20; falls back to chat stops if chat:true
+//   chat           (bool)    use the double-bracketed Name wire-format stops
+//   onChunk(delta, fullText) stream callback (enables streaming)
+//   onToken(delta)           lighter stream callback
+//   onDone(result)           fires once on completion (any outcome)
+//   onError(message, result) fires once on error
+//
+// resolves to: { text, stopReason, truncated, aborted, error }
+// -----------------------------------------------------------------
+function run(opts) {
+  opts = opts || {};
+  var entry = {
+    id: nextId(),
+    opts: opts,
+    liveText: '',
+    started: false,
+    inner: null,
+    _settled: false,
+    _stopRequested: false,
+    _resolve: null
+  };
+  entry.promise = new Promise(function (resolve) { entry._resolve = resolve; });
+
+  function stop() {
+    entry._stopRequested = true;
+    if (entry._settled) return;
+    if (activeEntry === entry && entry.inner && typeof entry.inner.stop === 'function') {
+      // In flight: abort the broker call. It resolves with stopReason "user".
+      try { entry.inner.stop(); } catch (e) { /* ignore */ }
+    } else if (!entry.started) {
+      // Still queued: settle immediately as aborted; pump() will skip it.
+      settle(entry, {
+        text: entry.liveText, stopReason: 'user',
+        truncated: false, aborted: true, error: null
+      });
+    }
+  }
+
+  var handle = {
+    id: entry.id,
+    stop: stop,
+    promise: entry.promise,
+    then: function (a, b) { return entry.promise.then(a, b); },
+    catch: function (b) { return entry.promise.catch(b); },
+    finally: function (f) { return entry.promise.finally(f); }
+  };
+  Object.defineProperty(handle, 'liveText', { get: function () { return entry.liveText; } });
+  Object.defineProperty(handle, 'started', { get: function () { return entry.started; } });
+  Object.defineProperty(handle, 'queued', { get: function () { return !entry.started && !entry._settled; } });
+
+  queue.push(entry);
+  pump();
+  return handle;
+}
+
+// Abort the active generation and discard everything queued behind it.
+function stopAll() {
+  var pending = queue.slice();
+  if (activeEntry && activeEntry.inner && typeof activeEntry.inner.stop === 'function') {
+    try { activeEntry.inner.stop(); } catch (e) { /* ignore */ }
+  }
+  pending.forEach(function (entry) {
+    if (entry._settled || entry === activeEntry) return;
+    settle(entry, {
+      text: entry.liveText, stopReason: 'user',
+      truncated: false, aborted: true, error: null
+    });
+  });
+}
+
+function isBusy() { return !!activeEntry; }
+function pending() {
+  return queue.filter(function (e) { return !e._settled && !e.started; }).length;
+}
+
+// -----------------------------------------------------------------
+// Token helpers, surfaced from the plugin's meta object.
+//   meta()        -> { countTokens, idealMaxContextTokens } | null
+//   count(text)   -> approximate token count (bigram estimate) | null
+//   budget(slack) -> idealMaxContextTokens - slack (default 800)
+//   preload()     -> warm the broker (harmless; no measurable speedup)
+// -----------------------------------------------------------------
+function meta() {
+  var plugin = grabPlugin();
+  if (!plugin) return null;
+  try { return plugin({ getMetaObject: true }) || null; } catch (e) { return null; }
+}
+
+function count(text) {
+  var m = meta();
+  if (!m || typeof m.countTokens !== 'function') return null;
+  try { return m.countTokens(String(text || '')); } catch (e) { return null; }
+}
+
+function budget(slack) {
+  var m = meta();
+  if (!m || typeof m.idealMaxContextTokens !== 'number') return null;
+  var s = (slack == null) ? 800 : slack;
+  return m.idealMaxContextTokens - s;
+}
+
+function preload() {
+  var plugin = grabPlugin();
+  if (!plugin) return;
+  try { plugin({ preload: true }); } catch (e) { /* ignore */ }
+}
+
+window.weld.stream = {
+  attach: attach,
+  run: run,
+  stopAll: stopAll,
+  isBusy: isBusy,
+  pending: pending,
+  meta: meta,
+  count: count,
+  budget: budget,
+  preload: preload,
+  DEFAULT_CHAT_STOPS: DEFAULT_CHAT_STOPS,
+  version: '1.0.0'
+};
+
+window.weld.stream.attach({ aiTextPlugin: aiTextPlugin });
+
+return window.weld.stream;
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.structured) return window.weld.structured;
+
+// -----------------------------------------------------------------
+// weld.structured: coax dependable JSON out of a plain text model.
+//
+// A text model will not reliably emit clean JSON on its own -- it wraps
+// it in prose, fences it, trails a comma, or stops mid-object. This
+// plugin makes the round-trip robust:
+//   1. prime    -- append an explicit "respond with only JSON" directive
+//   2. parse    -- pull the first balanced {...} / [...] out of the text,
+//                  stripping code fences, tolerating trailing commas
+//   3. validate -- check it against a tiny field schema
+//   4. repair   -- on parse/validation failure, re-ask with the error,
+//                  up to opts.repairAttempts times
+//
+// Generation goes through weld.stream (so boxed strings, stopReason,
+// and the serial queue are already handled). If weld.stream is absent
+// we fall back to window.root.aiTextPlugin directly.
+// -----------------------------------------------------------------
+
+function getStream() {
+  return (window.weld && window.weld.stream) ? window.weld.stream : null;
+}
+
+// Strip ```json fences and surrounding prose noise.
+function stripFences(text) {
+  var s = String(text == null ? '' : text);
+  var fence = String.fromCharCode(96, 96, 96);
+  var i = s.indexOf(fence);
+  if (i === -1) return s;
+  // Drop an opening fence + optional language tag, and a closing fence.
+  s = s.replace(new RegExp(fence + '[a-zA-Z0-9_-]*\\n?'), '');
+  var j = s.lastIndexOf(fence);
+  if (j !== -1) s = s.slice(0, j);
+  return s;
+}
+
+// Find the first complete balanced JSON value (object or array),
+// respecting strings and escapes so braces inside strings don't count.
+function extractBalanced(text) {
+  var s = String(text == null ? '' : text);
+  var startObj = s.indexOf('{');
+  var startArr = s.indexOf('[');
+  var start;
+  if (startObj === -1) start = startArr;
+  else if (startArr === -1) start = startObj;
+  else start = Math.min(startObj, startArr);
+  if (start === -1) return null;
+
+  var open = s.charAt(start);
+  var close = (open === '{') ? '}' : ']';
+  var depth = 0, inStr = false, esc = false;
+  for (var i = start; i < s.length; i++) {
+    var c = s.charAt(i);
+    if (inStr) {
+      if (esc) { esc = false; }
+      else if (c === '\\') { esc = true; }
+      else if (c === '"') { inStr = false; }
+      continue;
+    }
+    if (c === '"') { inStr = true; continue; }
+    if (c === open) depth += 1;
+    else if (c === close) {
+      depth -= 1;
+      if (depth === 0) return s.slice(start, i + 1);
+    }
+  }
+  return null; // never closed (likely truncated)
+}
+
+function looseFix(jsonText) {
+  var s = String(jsonText);
+  // Remove trailing commas before } or ].
+  s = s.replace(/,\s*([}\]])/g, '$1');
+  return s;
+}
+
+// Parse text -> value. Returns { value } or { error }.
+function parse(text) {
+  var candidate = extractBalanced(stripFences(text));
+  if (candidate == null) return { error: 'no JSON object or array found in the output' };
+  try {
+    return { value: JSON.parse(candidate) };
+  } catch (e1) {
+    try {
+      return { value: JSON.parse(looseFix(candidate)) };
+    } catch (e2) {
+      return { error: 'JSON parse failed: ' + String(e2.message || e2) };
+    }
+  }
+}
+
+// Minimal schema validation.
+// schema = { fields: { name: { type, required, enum, of } }, allowExtra }
+//   type: 'string' | 'number' | 'integer' | 'boolean' | 'array' | 'object'
+// Returns { ok:true } or { ok:false, error }.
+function typeOk(val, type) {
+  switch (type) {
+    case 'string':  return typeof val === 'string';
+    case 'number':  return typeof val === 'number' && !isNaN(val);
+    case 'integer': return typeof val === 'number' && !isNaN(val) && Math.floor(val) === val;
+    case 'boolean': return typeof val === 'boolean';
+    case 'array':   return Array.isArray(val);
+    case 'object':  return val !== null && typeof val === 'object' && !Array.isArray(val);
+    default:        return true;
+  }
+}
+
+function validate(value, schema) {
+  if (!schema || !schema.fields) return { ok: true };
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return { ok: false, error: 'expected a JSON object at the top level' };
+  }
+  var fields = schema.fields;
+  var names = Object.keys(fields);
+  for (var i = 0; i < names.length; i++) {
+    var key = names[i];
+    var spec = fields[key] || {};
+    var present = Object.prototype.hasOwnProperty.call(value, key);
+    if (!present) {
+      if (spec.required) return { ok: false, error: 'missing required field "' + key + '"' };
+      continue;
+    }
+    var v = value[key];
+    if (spec.type && !typeOk(v, spec.type)) {
+      return { ok: false, error: 'field "' + key + '" should be ' + spec.type };
+    }
+    if (spec.enum && spec.enum.indexOf(v) === -1) {
+      return { ok: false, error: 'field "' + key + '" must be one of: ' + spec.enum.join(', ') };
+    }
+    if (spec.type === 'array' && spec.of && Array.isArray(v)) {
+      for (var j = 0; j < v.length; j++) {
+        if (!typeOk(v[j], spec.of)) {
+          return { ok: false, error: 'every item of "' + key + '" should be ' + spec.of };
+        }
+      }
+    }
+  }
+  if (schema.allowExtra === false) {
+    var extra = Object.keys(value).filter(function (k) { return names.indexOf(k) === -1; });
+    if (extra.length) return { ok: false, error: 'unexpected field(s): ' + extra.join(', ') };
+  }
+  return { ok: true };
+}
+
+// Describe a schema in words for the priming directive.
+function describeSchema(schema) {
+  if (!schema || !schema.fields) return '';
+  var parts = Object.keys(schema.fields).map(function (k) {
+    var spec = schema.fields[k] || {};
+    var bits = [k + ' (' + (spec.type || 'any')];
+    if (spec.required) bits.push('required');
+    if (spec.enum) bits.push('one of: ' + spec.enum.join('/'));
+    return bits.join(', ') + ')';
+  });
+  return 'JSON object with fields: ' + parts.join('; ') + '.';
+}
+
+function buildInstruction(opts, repairNote) {
+  var base = String(opts.instruction || '');
+  var shape = opts.shape
+    || describeSchema(opts.schema)
+    || (opts.example ? 'JSON shaped like: ' + JSON.stringify(opts.example) : 'a single JSON value');
+  var directive = 'Respond with ONLY ' + shape
+    + ' Output strictly valid JSON and nothing else -- no prose, no markdown, no code fences.';
+  var instruction = base ? (base + '\n\n' + directive) : directive;
+  if (repairNote) {
+    instruction += '\n\nYour previous reply could not be used (' + repairNote
+      + '). Return corrected JSON only.';
+  }
+  return instruction;
+}
+
+// Run one generation through weld.stream (or the raw plugin).
+function generateOnce(instruction, opts) {
+  var stream = getStream();
+  var runOpts = {
+    instruction: instruction,
+    startWith: opts.startWith != null ? opts.startWith : '{',
+    stopSequences: opts.stopSequences || null
+  };
+  if (stream) {
+    return stream.run(runOpts).then(function (res) {
+      return { text: res.text, error: res.error, truncated: res.truncated };
+    });
+  }
+  // Fallback: call ai-text-plugin directly and normalize the boxed String.
+  var plugin = null;
+  try { if (window.root && typeof window.root.aiTextPlugin === 'function') plugin = window.root.aiTextPlugin; } catch (e) {}
+  if (!plugin) {
+    return Promise.resolve({ text: '', error: 'weld.structured: neither weld.stream nor ai-text-plugin is available' });
+  }
+  return Promise.resolve(plugin({ instruction: instruction, startWith: runOpts.startWith }))
+    .then(function (raw) {
+      var startWith = runOpts.startWith || '';
+      var body = (raw && raw.generatedText != null) ? String(raw.generatedText) : String(raw);
+      // startWith is echoed back when calling the raw plugin; re-attach it.
+      return { text: startWith + body, error: null };
+    }, function (err) {
+      return { text: '', error: String((err && err.message) || err) };
+    });
+}
+
+// -----------------------------------------------------------------
+// Public: generate(opts) -> Promise<{ ok, value, raw, error, attempts }>
+//
+// opts:
+//   instruction     (string)  your task / system prompt
+//   schema          (object)  { fields: { name: { type, required, enum, of } } }
+//   example         (object)  alternative to schema: a sample shape to mimic
+//   shape           (string)  free-text description of the desired JSON
+//   startWith       (string)  default '{' to prime an object
+//   stopSequences   (array)   passthrough to weld.stream
+//   repairAttempts  (number)  extra tries on failure (default 1)
+// -----------------------------------------------------------------
+function generate(opts) {
+  opts = opts || {};
+  var maxRepairs = (opts.repairAttempts == null) ? 1 : opts.repairAttempts;
+  var attempt = 0;
+  var lastRaw = '', lastError = null;
+
+  function step(repairNote) {
+    attempt += 1;
+    var instruction = buildInstruction(opts, repairNote);
+    return generateOnce(instruction, opts).then(function (gen) {
+      lastRaw = gen.text || '';
+      if (gen.error) {
+        lastError = gen.error;
+        return maybeRetry('generation error: ' + gen.error);
+      }
+      var parsed = parse(lastRaw);
+      if (parsed.error) {
+        lastError = parsed.error;
+        return maybeRetry(parsed.error);
+      }
+      var check = validate(parsed.value, opts.schema);
+      if (!check.ok) {
+        lastError = check.error;
+        return maybeRetry(check.error);
+      }
+      return { ok: true, value: parsed.value, raw: lastRaw, error: null, attempts: attempt };
+    });
+  }
+
+  function maybeRetry(note) {
+    if (attempt <= maxRepairs) return step(note);
+    return { ok: false, value: null, raw: lastRaw, error: lastError, attempts: attempt };
+  }
+
+  return step(null);
+}
+
+window.weld.structured = {
+  generate: generate,
+  parse: parse,
+  validate: validate,
+  extract: extractBalanced,
+  describeSchema: describeSchema,
+  version: '1.0.0'
+};
+
+return window.weld.structured;
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.promptforge) return window.weld.promptforge;
+
+// -----------------------------------------------------------------
+// weld.promptforge: stop hand-tuning image prompts; let good ones win.
+//
+// A community prompt optimizer cracked the loop: ask an LLM for several
+// prompt variants, render them, let the user upvote results, score each
+// prompt by its upvote RATE (votes / uses -- self-normalizing), and feed
+// the proven winners back into the next round, sometimes promoting a
+// top prompt into the instruction slot. weld.promptforge packages that:
+//
+//   var forge = weld.promptforge.create({ instruction, mode })
+//   var prompts = await forge.generate(4)   // candidate prompt strings
+//   forge.used(promptText)                  // mark it rendered
+//   forge.upvote(promptText)                // result was good
+//   forge.top(n) / forge.score(text) / forge.state() / forge.load(s)
+//
+// Generation goes through weld.stream; if weld.structured is present it
+// is used for a clean JSON array, else a numbered-list parse is used.
+// -----------------------------------------------------------------
+
+function getStream() { return (window.weld && window.weld.stream) ? window.weld.stream : null; }
+function getStructured() { return (window.weld && window.weld.structured) ? window.weld.structured : null; }
+
+var EXTRA = [
+  'Look closely at the instruction: what is the underlying intent? Fulfill it deeply.',
+  'Explore bold variations that still obey the instruction; avoid timid small changes.',
+  'Prefer concrete, descriptive detail over generic adjectives.',
+  'Try a concise comma-separated tag style for some prompts.',
+  'Include camera language (lens, shot type, angle) only if consistent with the instruction.',
+  'For one prompt focus on mood and lighting; for another, on composition.',
+  'Vary specificity: some prompts terse, others richly detailed.'
+];
+
+var MODE_DIRECTIVE = {
+  faithful: 'EXACTLY satisfy the instruction. Stay strictly on the requested subject.',
+  balanced: 'Keep the core subject and any explicit asks intact, but bring fresh angles, mood, lighting, and styling.',
+  creative: 'Build on the instruction with a creative touch; reinterpret and remix freely, including bold departures, while keeping the core idea recognizable.'
+};
+
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+// Curly-brace variant guidance, ~60% of the time, to inject diversity.
+// The literal characters are assembled at runtime so plugin source stays
+// clear of the Perchance brace scanner.
+function curlyGuidance() {
+  if (Math.random() >= 0.6) return '';
+  var ob = String.fromCharCode(123), cb = String.fromCharCode(125), bar = String.fromCharCode(124);
+  var ex = ob + 'candid' + bar + 'studio' + bar + 'cinematic' + cb + ' '
+    + ob + 'portrait' + bar + 'wide shot' + cb;
+  return '\nUse brace-variant syntax for diversity: add a few brace blocks with '
+    + 'pipe-separated options (lighting, expression, angle, styling) where every '
+    + 'variant still obeys the instruction. Example: "' + ex + ' of ..."';
+}
+
+function buildInstruction(forge, n, promotedPrompt) {
+  var base = promotedPrompt || forge.instruction;
+  var lines = [];
+  lines.push('You write image-generation prompts.');
+  lines.push(MODE_DIRECTIVE[forge.mode] || MODE_DIRECTIVE.balanced);
+  lines.push(pick(EXTRA));
+  var top = forge.topList(forge.exampleCount);
+  if (top.length) {
+    var intro = forge.mixAcross
+      ? 'Here are prompts the user has rated highly before. Treat them as a signal of taste, not a template; vary how much you borrow.'
+      : 'Here are highly-rated prompts. Study what works and breed their best parts into new ones.';
+    lines.push('\n' + intro + '\n<highly_rated>\n'
+      + top.map(function (p) { return '- ' + p.text; }).join('\n') + '\n</highly_rated>');
+  }
+  lines.push(curlyGuidance());
+  lines.push('\nInstruction:\n' + base);
+  lines.push('\nWrite ' + n + ' distinct prompt' + (n > 1 ? 's' : '')
+    + ', one per line, no numbering, no commentary. Each on its own line.');
+  return lines.filter(Boolean).join('\n');
+}
+
+function parseList(text) {
+  if (!text) return [];
+  return String(text).split(/\r?\n/).map(function (l) {
+    return l.replace(/^\s*(?:\d+[.)\-:]|[*\u2022\-\u2013])\s*/, '').replace(/^"(.*)"$/, '$1').trim();
+  }).filter(function (l) { return l.length > 0; });
+}
+
+function create(opts) {
+  opts = opts || {};
+  var forge = {
+    instruction: String(opts.instruction || ''),
+    mode: opts.mode || 'balanced',          // faithful | balanced | creative
+    mixAcross: !!opts.mixAcross,
+    promoteRate: opts.promoteRate != null ? opts.promoteRate : 0.6,
+    exampleCount: opts.exampleCount != null ? opts.exampleCount : 6,
+    prompts: {}        // text -> { text, used, votes, score, createdAt }
+  };
+
+  function recompute(p) { p.score = p.used > 0 ? p.votes / p.used : 0; }
+
+  function ensure(text) {
+    var key = String(text || '').trim();
+    if (!key) return null;
+    if (!forge.prompts[key]) forge.prompts[key] = { text: key, used: 0, votes: 0, score: 0, createdAt: Date.now() };
+    return forge.prompts[key];
+  }
+
+  function all() { return Object.keys(forge.prompts).map(function (k) { return forge.prompts[k]; }); }
+  function scored() { return all().filter(function (p) { return p.used > 0; }); }
+  forge.topList = function (limit) {
+    return scored().sort(function (a, b) { return b.score - a.score; }).slice(0, limit || 6);
+  };
+  function topList(limit) { return forge.topList(limit); }
+
+  // roulette selection weighted by score (proven prompts chosen more often)
+  function weightedPick(arr) {
+    if (!arr.length) return null;
+    var weights = arr.map(function (p) { return Math.max(0, p.score); });
+    var sum = weights.reduce(function (a, b) { return a + b; }, 0);
+    if (sum <= 0) return arr[Math.floor(Math.random() * arr.length)];
+    var r = Math.random() * sum, c = 0;
+    for (var i = 0; i < arr.length; i++) { c += weights[i]; if (r <= c) return arr[i]; }
+    return arr[arr.length - 1];
+  }
+
+  // generate(n) -> Promise<string[]> of candidate prompts.
+  function generate(n) {
+    n = n || 3;
+    var stream = getStream();
+    if (!stream) return Promise.resolve({ /* graceful */ }).then(function () { return []; });
+
+    // Maybe promote a proven prompt into the instruction slot.
+    var promoted = null;
+    var pool = scored();
+    if (pool.length && Math.random() < forge.promoteRate) {
+      var winner = weightedPick(pool);
+      if (winner) promoted = winner.text;
+    }
+    var instruction = buildInstruction(forge, n, promoted);
+
+    var structured = getStructured();
+    if (structured) {
+      return structured.generate({
+        instruction: instruction, startWith: '[',
+        shape: 'a JSON array of ' + n + ' image-prompt strings'
+      }).then(function (r) {
+        var list = (r.ok && Array.isArray(r.value)) ? r.value.map(String) : [];
+        if (!list.length && r.raw) list = parseList(r.raw);
+        list.forEach(ensure);
+        return list;
+      });
+    }
+    return stream.run({ instruction: instruction }).then(function (res) {
+      if (res.error) return [];
+      var list = parseList(res.text);
+      list.forEach(ensure);
+      return list;
+    });
+  }
+
+  function used(text) { var p = ensure(text); if (p) { p.used += 1; recompute(p); } return p; }
+  function upvote(text, by) { var p = ensure(text); if (p) { p.votes += (by || 1); recompute(p); } return p; }
+  function record(text, r) { r = r || {}; var p = ensure(text); if (!p) return null; if (r.used) p.used += r.used; if (r.votes) p.votes += r.votes; recompute(p); return p; }
+
+  function score(text) { var p = forge.prompts[String(text || '').trim()]; return p ? p.score : 0; }
+  function setInstruction(text) { forge.instruction = String(text || ''); }
+  function setMode(m) { if (MODE_DIRECTIVE[m]) forge.mode = m; }
+
+  function state() {
+    return { instruction: forge.instruction, mode: forge.mode, mixAcross: forge.mixAcross,
+      promoteRate: forge.promoteRate, prompts: forge.prompts };
+  }
+  function load(s) {
+    if (!s) return;
+    forge.instruction = s.instruction || forge.instruction;
+    forge.mode = s.mode || forge.mode;
+    if (s.mixAcross != null) forge.mixAcross = s.mixAcross;
+    if (s.promoteRate != null) forge.promoteRate = s.promoteRate;
+    forge.prompts = s.prompts || {};
+  }
+
+  return {
+    generate: generate,
+    used: used,
+    upvote: upvote,
+    record: record,
+    score: score,
+    top: function (n) { return topList(n); },
+    all: all,
+    setInstruction: setInstruction,
+    setMode: setMode,
+    state: state,
+    load: load
+  };
+}
+
+window.weld.promptforge = {
+  create: create,
+  MODES: ['faithful', 'balanced', 'creative'],
+  version: '1.0.0'
+};
+
+return window.weld.promptforge;
+})();
+</script>
+<script>
+
+  function boot(){ if(!window.weld||!window.weld.promptforge||!window.weld.stream){return setTimeout(boot,100);} init(); }
+  function init(){
+    var PF = window.weld.promptforge;
+    var $ = function(id){ return document.getElementById(id); };
+    var forge = PF.create({ instruction: $('inst').value, mode: 'balanced' });
+    var mode = 'balanced';
+
+    [].forEach.call(document.querySelectorAll('.modebtn'), function(b){
+      b.onclick = function(){
+        mode = b.getAttribute('data-mode'); forge.setMode(mode);
+        [].forEach.call(document.querySelectorAll('.modebtn'), function(x){ x.classList.toggle('ghost', x !== b); });
+      };
+    });
+
+    function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    function renderBoard(){
+      var top = forge.top(8);
+      if(!top.length){ $('board').textContent = 'No scored prompts yet — generate, then upvote.'; return; }
+      $('board').innerHTML = top.map(function(p){
+        return '<div class="flex" style="justify-content:space-between;"><span>'+escapeHtml(p.text.slice(0,60))+'</span>'
+          + '<span class="mono">'+p.score.toFixed(2)+'  ('+p.votes+'/'+p.used+')</span></div>';
+      }).join('');
+    }
+
+    function renderList(prompts){
+      $('list').innerHTML = '';
+      prompts.forEach(function(text){
+        forge.used(text);   // count it as rendered/seen
+        var row = document.createElement('div');
+        row.className = 'panel'; row.style.padding = '10px 12px'; row.style.margin = '8px 0';
+        row.innerHTML = '<div class="mono" style="font-size:12.5px;margin-bottom:6px;">'+escapeHtml(text)+'</div>';
+        var btn = document.createElement('button');
+        btn.className = 'btn sm'; btn.textContent = '\u25B2 upvote';
+        var sc = document.createElement('span'); sc.className='mono'; sc.style.marginLeft='10px'; sc.style.color='var(--muted)';
+        function refresh(){ sc.textContent = 'score ' + forge.score(text).toFixed(2); }
+        refresh();
+        btn.onclick = function(){ forge.upvote(text); refresh(); renderBoard(); };
+        row.appendChild(btn); row.appendChild(sc);
+        $('list').appendChild(row);
+      });
+      renderBoard();
+    }
+
+    $('gen').onclick = function(){
+      forge.setInstruction($('inst').value);
+      $('status').textContent = 'Generating with the model...';
+      forge.generate(4).then(function(prompts){
+        if(!prompts.length){ $('status').textContent = 'No prompts came back (is ai-text-plugin available?).'; return; }
+        $('status').textContent = 'Generated ' + prompts.length + ' candidates in ' + mode + ' mode.';
+        renderList(prompts);
+      }).catch(function(e){ $('status').textContent = 'error: ' + e.message; });
+    };
+    renderBoard();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+
+</script>

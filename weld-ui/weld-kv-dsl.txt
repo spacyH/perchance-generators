@@ -1,0 +1,159 @@
+$meta
+  title       = weld.kv
+  description = Server-side, cross-device key-value storage for Perchance, wrapping kv-plugin. Named folders, automatic JSON serialization, get-with-default, has/keys/getMany, and an optional local mirror so reads still work offline. Unlike browser storage (localStorage/IndexedDB, which weld.persist uses), kv data follows the user across devices. Stash on window.weld.kv.
+  tags        = weld, kv, storage, server, cross-device, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.kv) return window.weld.kv;
+
+  // -----------------------------------------------------------------
+  // weld.kv: the storage layer people reach for and get wrong.
+  //
+  // Browser storage (localStorage, IndexedDB, the Cache API -- what
+  // weld.persist wraps) is LOCAL to one browser on one device. It does not
+  // follow a user to their phone. For cross-device persistence Perchance
+  // exposes kv-plugin: server-side key-value reachable as root.kv. weld.kv
+  // wraps it with the ergonomics browser storage has and kv lacks:
+  //
+  //   var store = weld.kv.folder('save-data');   // a named namespace
+  //   await store.set('slot1', { level: 4, gold: 120 });   // JSON, server-side
+  //   var save = await store.get('slot1', {});             // get-with-default
+  //   await store.has('slot1');  await store.keys();  await store.delete('slot1');
+  //
+  // Everything is async (it hits the server). Values are JSON-serialized
+  // automatically, so you store objects, not just strings. With a local
+  // mirror enabled, the last-seen value is cached in memory/IndexedDB so a
+  // read can return instantly (or survive a flaky connection) and reconcile.
+  // -----------------------------------------------------------------
+
+  var deps = { kv: null, persist: null };
+  function getKv() {
+    if (deps.kv) return deps.kv;
+    try { if (typeof root !== 'undefined' && root.kv) return root.kv; } catch (e) {}
+    if (window.weld && window.weld.__kv) return window.weld.__kv;
+    return null;
+  }
+  function attach(d) {
+    if (!d) return;
+    if (d.kv) deps.kv = d.kv;
+    if (d.persist) deps.persist = d.persist;
+  }
+  function available() { return !!getKv(); }
+
+  // Resolve a folder handle from kv-plugin. kv-plugin exposes a default
+  // `folder`, and (depending on version) a way to open a named folder.
+  function rawFolder(name) {
+    var kv = getKv();
+    if (!kv) return null;
+    if (name) {
+      if (typeof kv.folder === 'function') { try { return kv.folder(name); } catch (e) {} }
+      if (kv.folders && typeof kv.folders === 'function') { try { return kv.folders(name); } catch (e) {} }
+    }
+    // default folder (object or function form)
+    if (kv.folder && typeof kv.folder === 'object') return kv.folder;
+    if (typeof kv.folder === 'function') { try { return kv.folder(name || 'default'); } catch (e) {} }
+    return kv;
+  }
+
+  function encode(v) { return JSON.stringify({ v: v }); }
+  function decode(s) {
+    if (s == null) return undefined;
+    if (typeof s !== 'string') { return s; } // already an object (some kv versions)
+    try { var o = JSON.parse(s); return (o && 'v' in o) ? o.v : o; } catch (e) { return s; }
+  }
+
+  // optional local mirror via weld.persist (or an in-memory map)
+  function mirrorCol(folderName) {
+    var p = deps.persist || (window.weld && window.weld.persist) || null;
+    if (!p) return null;
+    try { return p.open('weld-kv').collection('mirror-' + folderName); } catch (e) { return null; }
+  }
+  var memMirror = {};
+
+  function folder(name, opts) {
+    name = String(name || 'default');
+    opts = opts || {};
+    var useMirror = opts.mirror !== false;
+    var memKeyPrefix = name + '::';
+
+    function mset(key, value) {
+      if (!useMirror) return;
+      memMirror[memKeyPrefix + key] = value;
+      var col = mirrorCol(name);
+      if (col) { try { col.put({ id: key, value: value }); } catch (e) {} }
+    }
+    function mget(key) {
+      if (!useMirror) return undefined;
+      var k = memKeyPrefix + key;
+      if (k in memMirror) return memMirror[k];
+      return undefined;
+    }
+
+    function set(key, value) {
+      var f = rawFolder(name);
+      if (!f || typeof f.set !== 'function') return Promise.reject(new Error('weld.kv: kv-plugin not available (root.kv missing). This needs the server KV plugin imported.'));
+      mset(key, value);
+      return Promise.resolve(f.set(String(key), encode(value))).then(function () { return value; });
+    }
+
+    function get(key, dflt) {
+      var f = rawFolder(name);
+      if (!f || typeof f.get !== 'function') {
+        var m = mget(key);
+        return Promise.resolve(m !== undefined ? m : dflt);
+      }
+      return Promise.resolve(f.get(String(key))).then(function (raw) {
+        var val = decode(raw);
+        if (val === undefined) return dflt;
+        mset(key, val);
+        return val;
+      }, function () {
+        var m = mget(key);
+        return (m !== undefined) ? m : dflt; // offline / error -> mirror
+      });
+    }
+
+    function has(key) { return get(key, undefined).then(function (v) { return v !== undefined; }); }
+
+    function del(key) {
+      var f = rawFolder(name);
+      delete memMirror[memKeyPrefix + key];
+      var col = mirrorCol(name); if (col) { try { col.delete(key); } catch (e) {} }
+      if (!f || typeof f.delete !== 'function') return Promise.resolve(false);
+      return Promise.resolve(f.delete(String(key))).then(function () { return true; }, function () { return false; });
+    }
+
+    function keys() {
+      var f = rawFolder(name);
+      if (f && typeof f.keys === 'function') {
+        return Promise.resolve(f.keys()).then(function (ks) { return Array.isArray(ks) ? ks : []; }, function () { return mirrorKeys(); });
+      }
+      if (f && typeof f.getAll === 'function') {
+        return Promise.resolve(f.getAll()).then(function (all) { return all && typeof all === 'object' ? Object.keys(all) : []; }, function () { return mirrorKeys(); });
+      }
+      return Promise.resolve(mirrorKeys());
+    }
+    function mirrorKeys() {
+      return Object.keys(memMirror).filter(function (k) { return k.indexOf(memKeyPrefix) === 0; })
+        .map(function (k) { return k.slice(memKeyPrefix.length); });
+    }
+
+    function getMany(keyList) {
+      return Promise.all((keyList || []).map(function (k) { return get(k).then(function (v) { return { key: k, value: v }; }); }))
+        .then(function (rows) { var o = {}; rows.forEach(function (r) { o[r.key] = r.value; }); return o; });
+    }
+
+    return { set: set, get: get, has: has, delete: del, keys: keys, getMany: getMany, name: name };
+  }
+
+  window.weld.kv = {
+    folder: folder,
+    attach: attach,
+    available: available,
+    version: '1.0.0'
+  };
+
+  return window.weld.kv;

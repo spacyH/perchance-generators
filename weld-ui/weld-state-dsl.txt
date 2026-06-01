@@ -1,0 +1,234 @@
+$meta
+  title       = weld.state
+  description = Typed, structured story state -- location, time, inventory, flags, relationships -- defined by a schema and kept in sync by a background AI "audit" pass that reconciles the latest narrative against the current state. Renders a compact state block for the prompt. Pairs with weld.structured and weld.stream. Stash on window.weld.state.
+  tags        = weld, state, tracking, world, audit, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.state) return window.weld.state;
+
+  // -----------------------------------------------------------------
+  // weld.state: the structured world/character state that prose chat
+  // forgets. weld.memory holds loose facts and weld.summarize holds a
+  // prose synopsis; neither maintains a TYPED record you can branch logic
+  // on -- current location, time of day, inventory, story flags, who is
+  // present. Every serious chat app hand-rolls this "tracked info" plus a
+  // background pass that updates it from the latest turn. weld.state makes
+  // it a schema + a reconcile() pass:
+  //
+  //   var st = weld.state.create({ location:{type:'string',default:'unknown'},
+  //                                time:{type:'string'}, gold:{type:'integer',default:0},
+  //                                present:{type:'array'} });
+  //   st.get();                       // current typed state
+  //   st.set({ gold: 5 });            // manual update (type-checked)
+  //   await st.reconcile(recentText); // AI updates only what changed
+  //   st.prompt();                    // a compact block for the system prompt
+  //
+  // reconcile() goes through weld.structured (clean JSON + validation) when
+  // present, else weld.stream with a tolerant parse. Updates MERGE: fields
+  // the model omits keep their current value.
+  // -----------------------------------------------------------------
+
+  function getStructured() { return (window.weld && window.weld.structured) ? window.weld.structured : null; }
+  function getStream() { return (window.weld && window.weld.stream) ? window.weld.stream : null; }
+
+  function defaultFor(spec) {
+    if (spec.default !== undefined) return spec.default;
+    switch (spec.type) {
+      case 'string': return '';
+      case 'number': case 'integer': return 0;
+      case 'boolean': return false;
+      case 'array': return [];
+      case 'object': return {};
+      default: return null;
+    }
+  }
+
+  function coerce(val, spec) {
+    if (val == null) return null;
+    switch (spec.type) {
+      case 'string': return String(val);
+      case 'number': { var n = Number(val); return isNaN(n) ? null : n; }
+      case 'integer': { var m = Math.round(Number(val)); return isNaN(m) ? null : m; }
+      case 'boolean': return (val === true || val === 'true' || val === 1);
+      case 'array': return Array.isArray(val) ? val : (val === '' ? [] : [val]);
+      case 'object': return (val && typeof val === 'object' && !Array.isArray(val)) ? val : null;
+      default: return val;
+    }
+  }
+
+  function create(schema, opts) {
+    schema = schema || {};
+    opts = opts || {};
+    var fields = Object.keys(schema);
+    var values = {};
+    var listeners = [];
+    fields.forEach(function (k) { values[k] = defaultFor(schema[k] || {}); });
+
+    function emit() {
+      var snap = get();
+      listeners.forEach(function (fn) { try { fn(snap); } catch (e) {} });
+    }
+
+    function get() {
+      var out = {};
+      fields.forEach(function (k) { out[k] = values[k]; });
+      return out;
+    }
+
+    function field(name) { return values[name]; }
+
+    // set(patch): type-checked merge. Unknown fields ignored; bad-typed
+    // values dropped (state never holds a malformed field).
+    function set(patch) {
+      if (!patch || typeof patch !== 'object') return get();
+      var changed = false;
+      Object.keys(patch).forEach(function (k) {
+        if (!schema[k]) return;
+        var c = coerce(patch[k], schema[k]);
+        if (c === null && schema[k].type !== 'object' && schema[k].type !== 'array') return;
+        if (schema[k].enum && schema[k].enum.indexOf(c) === -1) return;
+        if (JSON.stringify(values[k]) !== JSON.stringify(c)) { values[k] = c; changed = true; }
+      });
+      if (changed) emit();
+      return get();
+    }
+
+    function reset() {
+      fields.forEach(function (k) { values[k] = defaultFor(schema[k] || {}); });
+      emit();
+      return get();
+    }
+
+    function onChange(fn) {
+      listeners.push(fn);
+      return function () { var i = listeners.indexOf(fn); if (i !== -1) listeners.splice(i, 1); };
+    }
+
+    function snapshot() { return { values: get() }; }
+    function load(snap) {
+      if (snap && snap.values) set(snap.values);
+      else if (snap) set(snap);
+      return get();
+    }
+
+    // Build a JSON schema for weld.structured from the state schema.
+    function structuredSchema() {
+      var f = {};
+      fields.forEach(function (k) {
+        var spec = schema[k] || {};
+        var sf = { type: spec.type || 'string' };
+        if (spec.enum) sf.enum = spec.enum;
+        f[k] = sf;
+      });
+      return { fields: f };
+    }
+
+    function describe() {
+      return fields.map(function (k) {
+        var spec = schema[k] || {};
+        var bits = k + ' (' + (spec.type || 'string');
+        if (spec.enum) bits += ', one of: ' + spec.enum.join('/');
+        bits += ')';
+        if (spec.description) bits += ' -- ' + spec.description;
+        return bits;
+      }).join('; ');
+    }
+
+    var RECONCILE_PROMPT =
+      'You maintain a structured story state. Given the CURRENT STATE and the '
+      + 'LATEST NARRATIVE, return the updated state as JSON. Only change fields '
+      + 'that the narrative clearly changed; copy the rest unchanged. Do not '
+      + 'invent values. Output ONLY the JSON object.';
+
+    // reconcile(recentText, opts) -> Promise<{ changed, state, error }>.
+    // Reads the latest narrative + current state, asks the model for an
+    // updated state, validates and merges it. opts.prompt overrides the
+    // instruction; opts.onlyFields limits which fields may change.
+    function reconcile(recentText, reconcileOpts) {
+      reconcileOpts = reconcileOpts || {};
+      var text = String(recentText == null ? '' : recentText).trim();
+      if (!text) return Promise.resolve({ changed: false, state: get(), error: null });
+
+      var instruction = (reconcileOpts.prompt || RECONCILE_PROMPT)
+        + '\n\nState fields: ' + describe()
+        + '\n\nCURRENT STATE:\n' + JSON.stringify(get())
+        + '\n\nLATEST NARRATIVE:\n' + text;
+
+      var before = JSON.stringify(get());
+      var structured = getStructured();
+      if (structured) {
+        return structured.generate({ instruction: instruction, schema: structuredSchema(), startWith: '{' })
+          .then(function (r) {
+            if (!r.ok || !r.value) return { changed: false, state: get(), error: r.error || 'reconcile failed' };
+            applyReconciled(r.value, reconcileOpts.onlyFields);
+            return { changed: JSON.stringify(get()) !== before, state: get(), error: null };
+          });
+      }
+      var stream = getStream();
+      if (!stream) return Promise.resolve({ changed: false, state: get(), error: 'weld.state: weld.stream not loaded' });
+      return stream.run({ instruction: instruction, startWith: '{' }).then(function (res) {
+        if (res.error) return { changed: false, state: get(), error: res.error };
+        var obj = null;
+        try {
+          var raw = res.text, o = raw.indexOf('{'), c = raw.lastIndexOf('}');
+          if (o !== -1 && c > o) obj = JSON.parse(raw.slice(o, c + 1));
+        } catch (e) { obj = null; }
+        if (!obj) return { changed: false, state: get(), error: 'reconcile: no JSON parsed' };
+        applyReconciled(obj, reconcileOpts.onlyFields);
+        return { changed: JSON.stringify(get()) !== before, state: get(), error: null };
+      });
+    }
+
+    function applyReconciled(obj, onlyFields) {
+      var patch = {};
+      Object.keys(obj).forEach(function (k) {
+        if (!schema[k]) return;
+        if (onlyFields && onlyFields.indexOf(k) === -1) return;
+        patch[k] = obj[k];
+      });
+      set(patch);
+    }
+
+    // prompt(opts) -> a compact state block for the system prompt.
+    // Skips empty/default fields unless opts.includeEmpty.
+    function prompt(promptOpts) {
+      promptOpts = promptOpts || {};
+      var label = promptOpts.label || 'Current state';
+      var lines = [];
+      fields.forEach(function (k) {
+        var v = values[k];
+        var spec = schema[k] || {};
+        var empty = (v == null) || (v === '') || (Array.isArray(v) && !v.length)
+          || (spec.type === 'object' && v && !Object.keys(v).length);
+        if (empty && !promptOpts.includeEmpty) return;
+        var shown = Array.isArray(v) ? v.join(', ') : (typeof v === 'object' ? JSON.stringify(v) : String(v));
+        lines.push((spec.label || k) + ': ' + shown);
+      });
+      if (!lines.length) return '';
+      return label + ' -- ' + lines.join('; ') + '.';
+    }
+
+    return {
+      get: get,
+      field: field,
+      set: set,
+      reset: reset,
+      onChange: onChange,
+      reconcile: reconcile,
+      prompt: prompt,
+      describe: describe,
+      snapshot: snapshot,
+      load: load,
+      schema: function () { return schema; }
+    };
+  }
+
+  window.weld.state = {
+    create: create,
+    version: '1.0.0'
+  };
+
+  return window.weld.state;

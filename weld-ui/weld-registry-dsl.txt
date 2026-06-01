@@ -1,0 +1,134 @@
+$meta
+  title       = weld.registry
+  description = A client for Perchance's public generator API (perchance.org/api/*). Look up generator stats, list generators, download a generator's source, resolve a generator plus its plugin dependencies, fetch a screenshot URL, and read uploaded-file metadata -- each as a clean async method with parsed results. Routes through weld.fetch (so it inherits the proxy + direct handling) or a direct fetch. The last uncovered Perchance backend surface. Stash on window.weld.registry.
+  tags        = weld, registry, api, generator, backend, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.registry) return window.weld.registry;
+
+  // -----------------------------------------------------------------
+  // weld.registry: read the Perchance generator catalogue.
+  //
+  // Perchance exposes a public HTTP API on perchance.org/api/* that most
+  // authors never touch because the endpoints are undocumented and return
+  // mixed shapes. weld.registry wraps each one as a named method with a
+  // parsed, predictable result:
+  //
+  //   await weld.registry.stats('some-generator')      // views / likes
+  //   await weld.registry.list({ max: 20 })            // catalogue slice
+  //   await weld.registry.download('some-generator')   // full DSL source
+  //   await weld.registry.withDependencies('some-gen') // source + its plugins
+  //   weld.registry.screenshotUrl('some-generator')    // preview image URL
+  //   await weld.registry.fileInfo(uploadedUrl)        // upload metadata
+  //
+  // Because downloadGenerator returns full source, this is also how you can
+  // study how any public plugin works -- the same way the Weld suite stays
+  // compatible with the platform. All calls are read-only.
+  // -----------------------------------------------------------------
+
+  var BASE = 'https://perchance.org/api/';
+  var UPLOAD_BASE = 'https://upload.perchance.org/api/';
+
+  var deps = { fetch: null };
+  function attach(d) { if (d && d.fetch) deps.fetch = d.fetch; }
+  function wf() { return deps.fetch || (window.weld && window.weld.fetch) || null; }
+
+  // Low-level GET that returns text, preferring weld.fetch (proxy-aware),
+  // falling back to a direct browser fetch.
+  function getText(url) {
+    var f = wf();
+    if (f && typeof f.text === 'function') return f.text(url);
+    if (typeof fetch === 'function') return fetch(url).then(function (r) { return r.text(); });
+    return Promise.reject(new Error('weld.registry: no fetch available (import super-fetch / attach weld.fetch)'));
+  }
+  function getJson(url) {
+    return getText(url).then(function (t) {
+      try { return JSON.parse(t); }
+      catch (e) { throw new Error('weld.registry: expected JSON from ' + url + ' but got "' + String(t).slice(0, 60) + '"'); }
+    });
+  }
+  function enc(s) { return encodeURIComponent(String(s == null ? '' : s)); }
+  function need(name, label) {
+    if (name == null || String(name).length === 0) throw new Error('weld.registry: ' + (label || 'generatorName') + ' is required');
+    return String(name);
+  }
+
+  // --- getGeneratorStats?name= -> { views, likes, ... } ---
+  function stats(name) {
+    try { name = need(name, 'name'); } catch (e) { return Promise.reject(e); }
+    return getJson(BASE + 'getGeneratorStats?name=' + enc(name));
+  }
+
+  // --- getGeneratorList?max= -> a catalogue slice ---
+  function list(opts) {
+    opts = opts || {};
+    var max = opts.max != null ? opts.max : 20;
+    var url = BASE + 'getGeneratorList?max=' + enc(max);
+    if (opts.search) url += '&search=' + enc(opts.search);
+    if (opts.sort) url += '&sort=' + enc(opts.sort);
+    return getJson(url).then(function (data) {
+      // normalize to an array regardless of the wrapper shape the API uses
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.generators)) return data.generators;
+      if (data && Array.isArray(data.list)) return data.list;
+      return data;
+    });
+  }
+
+  // --- downloadGenerator?generatorName= -> full DSL source (text) ---
+  function download(name) {
+    try { name = need(name); } catch (e) { return Promise.reject(e); }
+    return getText(BASE + 'downloadGenerator?generatorName=' + enc(name));
+  }
+  // convenience: does the downloaded source look like a real generator?
+  function hasSource(text) { return typeof text === 'string' && text.length > 100 && text.indexOf('$output') !== -1; }
+
+  // --- getGeneratorsAndDependencies?generatorNames= -> source + imported plugins ---
+  function withDependencies(names) {
+    var joined;
+    try {
+      if (Array.isArray(names)) { if (!names.length) throw new Error('x'); joined = names.map(String).join(','); }
+      else joined = need(names, 'generatorNames');
+    } catch (e) { return Promise.reject(new Error('weld.registry: generatorNames is required')); }
+    return getJson(BASE + 'getGeneratorsAndDependencies?generatorNames=' + enc(joined));
+  }
+
+  // --- getGeneratorScreenshot?generatorName= -> a preview image URL ---
+  // Synchronous: this endpoint *is* the image, so return the URL to use in <img>.
+  function screenshotUrl(name) { return BASE + 'getGeneratorScreenshot?generatorName=' + enc(need(name)); }
+
+  // --- upload.perchance.org/api/fileInfo?url= -> metadata for an uploaded file ---
+  function fileInfo(url) {
+    var u = (url && url.url) ? String(url.url) : String(url || '');
+    if (!u) return Promise.reject(new Error('weld.registry: a file URL is required'));
+    return getJson(UPLOAD_BASE + 'fileInfo?url=' + enc(u));
+  }
+
+  // Endpoint descriptors -- useful for tooling / docs / the monitor.
+  var ENDPOINTS = [
+    { method: 'stats',            path: 'getGeneratorStats?name=',                 returns: 'json'  },
+    { method: 'list',             path: 'getGeneratorList?max=',                   returns: 'json'  },
+    { method: 'download',         path: 'downloadGenerator?generatorName=',        returns: 'text'  },
+    { method: 'withDependencies', path: 'getGeneratorsAndDependencies?generatorNames=', returns: 'json' },
+    { method: 'screenshotUrl',    path: 'getGeneratorScreenshot?generatorName=',   returns: 'url'   },
+    { method: 'fileInfo',         path: 'fileInfo?url= (upload.perchance.org)',    returns: 'json'  }
+  ];
+
+  window.weld.registry = {
+    stats: stats,
+    list: list,
+    download: download,
+    hasSource: hasSource,
+    withDependencies: withDependencies,
+    screenshotUrl: screenshotUrl,
+    fileInfo: fileInfo,
+    attach: attach,
+    endpoints: function () { return ENDPOINTS.slice(); },
+    base: BASE,
+    version: '1.0.0'
+  };
+
+  return window.weld.registry;

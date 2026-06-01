@@ -1,0 +1,155 @@
+$meta
+  title       = weld.fetch
+  description = Outbound HTTP from a Perchance generator, done right. Wraps the superFetch proxy (fetch-plugin.perchance.org) with get/post/json helpers, timeouts, retries, and sensible errors, and falls back to a direct browser fetch for hosts that already allow CORS. Knows the proxy's quirks -- stripped request headers, SSRF blocks, redirect following -- so you don't have to. Stash on window.weld.fetch.
+  tags        = weld, fetch, http, superfetch, proxy, network, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.fetch) return window.weld.fetch;
+
+  // -----------------------------------------------------------------
+  // weld.fetch: reach the outside world from inside the sandbox.
+  //
+  // A generator runs in a sandboxed iframe, so a plain fetch() to a third
+  // party is usually blocked by CORS. Perchance provides superFetch, which
+  // routes requests through fetch-plugin.perchance.org. weld.fetch wraps it
+  // with the helpers people actually want and encodes the proxy's quirks:
+  //
+  //   - request headers are STRIPPED by the proxy (don't rely on them)
+  //   - internal/SSRF targets are blocked
+  //   - redirects are followed; there is no small body cap
+  //   - identical URLs may be cached by the proxy
+  //
+  //   await weld.fetch.json('https://api.example.com/data')   // GET + parse
+  //   await weld.fetch.post(url, { body: payload, json: true })
+  //   await weld.fetch.get(url, { timeoutMs: 8000, retries: 2 })
+  //
+  // For hosts that already send permissive CORS (raw.githubusercontent,
+  // jsdelivr, ...), set { direct: true } (or call when superFetch is
+  // absent) to use the browser's own fetch and skip the proxy hop.
+  // -----------------------------------------------------------------
+
+  var deps = { superFetch: null };
+  function getSF() {
+    return deps.superFetch
+      || (window.weld && window.weld.__superFetch)
+      || (typeof window !== 'undefined' && typeof window.superFetch === 'function' ? window.superFetch : null)
+      || (typeof superFetch === 'function' ? superFetch : null);
+  }
+  function attach(d) { if (d && d.superFetch) deps.superFetch = d.superFetch; }
+
+  // Hosts known to serve permissive CORS -- safe to hit directly, skipping
+  // the proxy. Extendable via opts.direct or addDirectHost().
+  var DIRECT_HOSTS = ['raw.githubusercontent.com', 'cdn.jsdelivr.net', 'api.github.com'];
+  function isDirectHost(url) {
+    try { var h = new URL(url).hostname; return DIRECT_HOSTS.indexOf(h) !== -1; }
+    catch (e) { return false; }
+  }
+  function addDirectHost(h) { if (h && DIRECT_HOSTS.indexOf(h) === -1) DIRECT_HOSTS.push(String(h)); }
+
+  function withTimeout(promise, ms, label) {
+    if (!ms) return promise;
+    return new Promise(function (resolve, reject) {
+      var done = false;
+      var t = setTimeout(function () { if (!done) { done = true; reject(new Error('weld.fetch: timeout after ' + ms + 'ms' + (label ? ' (' + label + ')' : ''))); } }, ms);
+      Promise.resolve(promise).then(
+        function (v) { if (!done) { done = true; clearTimeout(t); resolve(v); } },
+        function (e) { if (!done) { done = true; clearTimeout(t); reject(e); } });
+    });
+  }
+
+  // Core request. opts: { method, headers, body, json, direct, timeoutMs,
+  // retries, retryDelayMs }. Resolves a normalized response, NOT a raw
+  // Response, so callers don't have to remember .text()/.json() or the
+  // proxy's boxed quirks.
+  function request(url, opts) {
+    opts = opts || {};
+    url = String(url || '');
+    if (!url) return Promise.reject(new Error('weld.fetch: empty URL'));
+
+    var method = (opts.method || 'GET').toUpperCase();
+    var direct = opts.direct === true || (opts.direct !== false && isDirectHost(url));
+    var sf = getSF();
+    if (!sf && !direct) {
+      // No proxy available and not a known-direct host: try direct anyway,
+      // but warn via the error if CORS then blocks it.
+      direct = true;
+    }
+    var fetcher = direct ? (typeof fetch === 'function' ? fetch : null) : sf;
+    if (!fetcher) return Promise.reject(new Error('weld.fetch: no fetch available (superFetch missing and no global fetch)'));
+
+    var init = { method: method };
+    if (opts.headers) init.headers = opts.headers; // note: proxy strips these
+    if (opts.body != null) {
+      init.body = (opts.json && typeof opts.body !== 'string') ? JSON.stringify(opts.body) : opts.body;
+      if (opts.json && !direct) { init.headers = Object.assign({ 'content-type': 'application/json' }, init.headers || {}); }
+    }
+
+    var timeoutMs = opts.timeoutMs != null ? opts.timeoutMs : 15000;
+    var retries = opts.retries || 0;
+    var retryDelay = opts.retryDelayMs || 600;
+
+    function attempt(n) {
+      return withTimeout(Promise.resolve(fetcher(url, init)), timeoutMs, method + ' ' + url)
+        .then(function (res) { return normalize(res, url, direct); })
+        .catch(function (err) {
+          if (n < retries) {
+            return new Promise(function (r) { setTimeout(r, retryDelay * (n + 1)); }).then(function () { return attempt(n + 1); });
+          }
+          throw err;
+        });
+    }
+    return attempt(0);
+  }
+
+  // Normalize a fetch Response (or superFetch result) into a plain object.
+  function normalize(res, url, direct) {
+    if (res == null) return { ok: false, status: 0, url: url, via: direct ? 'direct' : 'proxy', text: function () { return Promise.resolve(''); } };
+    var status = (typeof res.status === 'number') ? res.status : 200;
+    var ok = (typeof res.ok === 'boolean') ? res.ok : (status >= 200 && status < 300);
+    var headers = res.headers || null;
+    var bodyText = null;
+    function text() {
+      if (bodyText != null) return Promise.resolve(bodyText);
+      if (typeof res.text === 'function') return Promise.resolve(res.text()).then(function (t) { bodyText = String(t); return bodyText; });
+      bodyText = String(res); return Promise.resolve(bodyText);
+    }
+    function json() { return text().then(function (t) { try { return JSON.parse(t); } catch (e) { throw new Error('weld.fetch: response is not JSON (' + t.slice(0, 60) + ')'); } }); }
+    return { ok: ok, status: status, url: url, via: direct ? 'direct' : 'proxy', headers: headers, text: text, json: json, raw: res };
+  }
+
+  // Convenience verbs.
+  function get(url, opts) { return request(url, Object.assign({}, opts, { method: 'GET' })); }
+  function post(url, opts) { return request(url, Object.assign({}, opts, { method: 'POST' })); }
+  function del(url, opts) { return request(url, Object.assign({}, opts, { method: 'DELETE' })); }
+
+  // GET (or any method) and parse JSON in one step -> the parsed value.
+  function json(url, opts) {
+    opts = opts || {};
+    return request(url, opts).then(function (res) {
+      if (!res.ok) throw new Error('weld.fetch: ' + res.status + ' from ' + url);
+      return res.json();
+    });
+  }
+  // GET and return text in one step.
+  function text(url, opts) { return request(url, opts || {}).then(function (res) { return res.text(); }); }
+
+  function available() { return !!getSF(); }
+
+  window.weld.fetch = {
+    request: request,
+    get: get,
+    post: post,
+    del: del,
+    json: json,
+    text: text,
+    attach: attach,
+    available: available,
+    addDirectHost: addDirectHost,
+    directHosts: function () { return DIRECT_HOSTS.slice(); },
+    version: '1.0.0'
+  };
+
+  return window.weld.fetch;

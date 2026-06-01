@@ -230,12 +230,81 @@ $output() =>
     };
   }
 
+  // extractFacts(input, opts) -> Promise<{ ok, facts, error }>.
+  // Pulls discrete, standalone facts out of text or a set of summaries as
+  // a JSON array of strings. Prefers weld.structured (robust JSON) and
+  // falls back to weld.stream with a bracket-scan parse.
+  var FACTS_PROMPT =
+    'Extract all unique, discrete facts from the text below as a JSON array '
+    + 'of strings. Each fact must be a complete, standalone statement; remove '
+    + 'duplicates; preserve important names and details; keep each concise. '
+    + 'Return ONLY a JSON array, e.g. ["fact one.", "fact two."]. If there is '
+    + 'nothing worth keeping, return [].';
+
+  function extractFacts(input, opts) {
+    opts = opts || {};
+    var text = Array.isArray(input) ? joinMessages(input) : String(input == null ? '' : input);
+    if (!text.trim()) return Promise.resolve({ ok: true, facts: [], error: null });
+    var instruction = (opts.prompt || FACTS_PROMPT) + '\n\nText:\n' + text;
+
+    var structured = (window.weld && window.weld.structured) ? window.weld.structured : null;
+    if (structured) {
+      return structured.generate({ instruction: instruction, startWith: '[', shape: 'a JSON array of short factual strings' })
+        .then(function (r) {
+          if (r.ok && Array.isArray(r.value)) return { ok: true, facts: r.value.map(String), error: null };
+          return { ok: false, facts: [], error: r.error || 'no facts extracted' };
+        });
+    }
+    var stream = getStream();
+    if (!stream) return Promise.resolve({ ok: false, facts: [], error: 'weld.summarize: weld.stream is not loaded' });
+    return stream.run({ instruction: instruction, startWith: '[' }).then(function (res) {
+      if (res.error) return { ok: false, facts: [], error: res.error };
+      var list = [];
+      try {
+        var raw = res.text, open = raw.indexOf('['), close = raw.lastIndexOf(']');
+        if (open !== -1 && close > open) list = JSON.parse(raw.slice(open, close + 1));
+      } catch (e) { list = []; }
+      if (!Array.isArray(list)) list = [];
+      return { ok: true, facts: list.map(String), error: null };
+    });
+  }
+
+  // consolidate(summaries, opts) -> Promise<{ ok, summary, depth, error }>.
+  // Merges several summaries (strings or { summary, depth }) into one, with
+  // a hard depth cap so repeated re-summarization can't recurse forever.
+  // opts: { maxDepth (default 3), maxWords (default 250), prompt }
+  function consolidate(summaries, opts) {
+    opts = opts || {};
+    var maxDepth = opts.maxDepth != null ? opts.maxDepth : 3;
+    var list = (summaries || []).map(function (s) {
+      return (typeof s === 'string') ? { summary: s, depth: 0 } : { summary: String(s.summary || ''), depth: s.depth || 0 };
+    }).filter(function (s) { return s.summary.trim(); });
+
+    if (!list.length) return Promise.resolve({ ok: true, summary: '', depth: 0, error: null });
+    var inDepth = list.reduce(function (m, s) { return Math.max(m, s.depth); }, 0);
+    var outDepth = inDepth + 1;
+    if (inDepth >= maxDepth) {
+      // refuse to recurse further: concatenate as-is
+      return Promise.resolve({ ok: true, summary: list.map(function (s) { return s.summary; }).join('\n\n'), depth: inDepth, error: null, capped: true });
+    }
+    var combined = list.map(function (s) { return s.summary; }).join('\n\n---\n\n');
+    return runSummary(combined, {
+      prompt: opts.prompt || 'Merge the following summaries into one coherent, non-redundant summary that preserves every important fact, name, and unresolved thread.',
+      maxWords: opts.maxWords || 250
+    }).then(function (r) {
+      if (!r.ok) return { ok: false, summary: '', depth: outDepth, error: r.error };
+      return { ok: true, summary: r.summary, depth: outDepth, error: null };
+    });
+  }
+
   window.weld.summarize = {
     summarize: summarize,
     rolling: rolling,
+    extractFacts: extractFacts,
+    consolidate: consolidate,
     estimateTokens: estimateTokens,
     joinMessages: joinMessages,
-    version: '1.0.0'
+    version: '1.1.0'
   };
 
   return window.weld.summarize;

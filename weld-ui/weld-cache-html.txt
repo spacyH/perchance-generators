@@ -1,0 +1,291 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.cache<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-cache-example">demo &rarr;</a></span></div>
+<div class="hdr">
+  <div class="hdr-row">
+      <h1>weld.cache</h1>
+      <span class="ver">v1.0.0</span>
+  </div>
+  <p class="lead">A response cache for AI apps: exact key/value with LRU + TTL, a wrap() that memoizes any async function, and a semantic mode that reuses a past answer when a new prompt is close enough in meaning.</p>
+</div>
+<h2>Install</h2>
+<p>Import once; stashes on <code>window.weld.cache</code>. Exact caching and <code>wrap()</code> need nothing. Semantic reuse needs <code>weld.embed</code> attached.</p>
+<pre data-codeid="install"></pre>
+
+<h2>create(opts)</h2>
+<div class="sig" data-codeid="sig_create"></div>
+<p>Options: <code>max</code> (LRU bound, default 200), <code>ttlMs</code> (entry lifetime, 0 = forever), <code>threshold</code> (default cosine for semantic reuse, 0.93), <code>embed</code>. Exact methods: <code>get</code>, <code>set</code>, <code>has</code>, <code>delete</code>, <code>clear</code>.</p>
+
+<h2>wrap(fn)</h2>
+<div class="sig" data-codeid="sig_wrap"></div>
+<p>Memoize any async (or sync) function by its arguments. Identical calls return the cached result without re-running the function.</p>
+<pre data-codeid="wrap_ex"></pre>
+
+<h2>memoize(text, producer, opts)</h2>
+<div class="sig" data-codeid="sig_memo"></div>
+<p>Exact match first; then, if <code>weld.embed</code> is attached, a <em>semantic</em> match &mdash; a past entry whose text is within <code>opts.threshold</code> cosine of <code>text</code> is reused. Otherwise <code>producer()</code> runs and the result is stored with its vector.</p>
+<pre data-codeid="memo_ex"></pre>
+<div class="note">The serial broker in weld.stream makes every avoided call meaningfully faster, and your model quota lasts longer. Raise the threshold (toward 1.0) for stricter reuse, lower it to reuse more aggressively. <code>stats()</code> reports hits, misses, and semanticHits.</div>
+
+<h2>attach &amp; stats</h2>
+<div class="sig" data-codeid="sig_attach"></div>
+<div class="sig" data-codeid="sig_stats"></div>
+<script>
+(function(){
+  var examples = {
+  'install': 'output\n  weld-cache = \{import:weld-cache-plugin\}\n  weld-embed = \{import:weld-embed-plugin\}',
+  'sig_create': 'weld.cache.create(opts) -> cache',
+  'sig_wrap': 'cache.wrap(fn, opts) -> memoized fn',
+  'wrap_ex': 'var lookup = cache.wrap(expensiveAsyncLookup);\nawait lookup(\'alpha\');   // runs\nawait lookup(\'alpha\');   // cached, no re-run',
+  'sig_memo': 'cache.memoize(text, producer, opts) -> Promise<value>',
+  'memo_ex': 'cache.attach(\{ embed: weld.embed \});\nvar a = await cache.memoize(prompt, () => weld.stream.run(\{instruction:prompt\}), \{ threshold: 0.93 \});\n// a near-identical prompt later returns `a` without calling the model',
+  'sig_attach': 'cache.attach(\{ embed \})',
+  'sig_stats': 'cache.stats() -> \{ size, hits, misses, semanticHits, max \}'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    document.querySelectorAll('[data-codeid]').forEach(function(n){
+      var src = examples[n.getAttribute('data-codeid')];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.cache) return window.weld.cache;
+
+// -----------------------------------------------------------------
+// weld.cache: don't pay for the same answer twice. Exact caching is the
+// floor (LRU-bounded, TTL-expiring). The interesting part is SEMANTIC
+// reuse: with weld.embed attached, a new prompt that means the same as a
+// recent one ("what's the capital of France?" vs "France's capital?")
+// can return the cached answer instead of calling the model again. The
+// serial broker in weld.stream makes every saved call meaningfully
+// faster, and quota goes further.
+//
+//   var c = weld.cache.create({ max: 200, ttlMs: 3600000 });
+//   var ask = c.wrap(myGenerate);          // memoized by arguments
+//   c.attach({ embed: weld.embed });
+//   await c.memoize(prompt, () => generate(prompt), { threshold: 0.93 });
+// -----------------------------------------------------------------
+
+function getEmbed(deps) { return (deps && deps.embed) || (window.weld && window.weld.embed) || null; }
+
+function stableKey(x) {
+  if (typeof x === 'string') return x;
+  try { return JSON.stringify(x, Object.keys(x || {}).sort()); }
+  catch (e) { return String(x); }
+}
+
+function create(createOpts) {
+  createOpts = createOpts || {};
+  var max = createOpts.max || 200;
+  var ttlMs = createOpts.ttlMs || 0;          // 0 = no expiry
+  var deps = { embed: createOpts.embed || null };
+  var defaultThreshold = createOpts.threshold != null ? createOpts.threshold : 0.93;
+
+  var store = {};        // key -> { value, at, vec? }
+  var order = [];        // LRU: most-recent at the end
+  var hits = 0, misses = 0, semanticHits = 0;
+
+  function touch(key) {
+    var i = order.indexOf(key); if (i !== -1) order.splice(i, 1);
+    order.push(key);
+  }
+  function evictIfNeeded() {
+    while (order.length > max) { var k = order.shift(); delete store[k]; }
+  }
+  function fresh(entry) { return !ttlMs || (Date.now() - entry.at) < ttlMs; }
+
+  function get(key) {
+    key = stableKey(key);
+    var e = store[key];
+    if (e && fresh(e)) { hits++; touch(key); return e.value; }
+    if (e) { delete store[key]; var i = order.indexOf(key); if (i !== -1) order.splice(i, 1); }
+    misses++;
+    return undefined;
+  }
+  function has(key) { var e = store[stableKey(key)]; return !!(e && fresh(e)); }
+
+  function set(key, value, opts) {
+    key = stableKey(key);
+    var entry = { value: value, at: Date.now() };
+    if (opts && opts.vec) entry.vec = opts.vec;
+    store[key] = entry; touch(key); evictIfNeeded();
+    return value;
+  }
+  function del(key) { key = stableKey(key); delete store[key]; var i = order.indexOf(key); if (i !== -1) order.splice(i, 1); }
+  function clear() { store = {}; order = []; }
+
+  // wrap(fn): memoize an async (or sync) function by its arguments.
+  function wrap(fn, wrapOpts) {
+    wrapOpts = wrapOpts || {};
+    var keyFn = wrapOpts.key || function () { return stableKey([].slice.call(arguments)); };
+    return function () {
+      var args = [].slice.call(arguments);
+      var key = keyFn.apply(null, args);
+      var cached = get(key);
+      if (cached !== undefined) return Promise.resolve(cached);
+      return Promise.resolve(fn.apply(this, args)).then(function (result) {
+        set(key, result);
+        return result;
+      });
+    };
+  }
+
+  // memoize(text, producer, opts): exact-first, then optional semantic.
+  // If an entry's text is within opts.threshold cosine of `text`, reuse
+  // it; otherwise run producer(), store with its vector, and return.
+  // opts: { threshold, semantic (default true if embed present) }
+  function memoize(text, producer, opts) {
+    opts = opts || {};
+    var key = String(text);
+    var exact = get(key);
+    if (exact !== undefined) return Promise.resolve(exact);
+
+    var embed = getEmbed(deps);
+    var wantSemantic = (opts.semantic !== false) && embed;
+    var threshold = opts.threshold != null ? opts.threshold : defaultThreshold;
+
+    if (!wantSemantic) {
+      return Promise.resolve(producer()).then(function (v) { set(key, v); return v; });
+    }
+    // gather entries that carry a vector
+    var keys = order.filter(function (k) { return store[k] && store[k].vec && fresh(store[k]); });
+    var lookup = wantSemanticMatch(embed, text, keys, threshold);
+    return lookup.then(function (matchKey) {
+      if (matchKey != null) { semanticHits++; touch(matchKey); return store[matchKey].value; }
+      return embed.embed(text).then(function (vec) {
+        return Promise.resolve(producer()).then(function (v) {
+          set(key, v, { vec: vec });
+          return v;
+        });
+      });
+    });
+  }
+
+  function wantSemanticMatch(embed, text, keys, threshold) {
+    if (!keys.length) return Promise.resolve(null);
+    var items = keys.map(function (k) { return { k: k, vec: store[k].vec }; });
+    // embed the query once, compare to stored vectors directly
+    return embed.embed(text).then(function (qv) {
+      if (!qv) return null;
+      var best = null, bestScore = -1;
+      for (var i = 0; i < items.length; i++) {
+        var s = embed.similarity(qv, items[i].vec);
+        if (s > bestScore) { bestScore = s; best = items[i].k; }
+      }
+      return bestScore >= threshold ? best : null;
+    }, function () { return null; });
+  }
+
+  function attach(d) { if (d && d.embed) deps.embed = d.embed; }
+  function stats() { return { size: order.length, hits: hits, misses: misses, semanticHits: semanticHits, max: max }; }
+
+  return {
+    get: get, set: set, has: has, delete: del, clear: clear,
+    wrap: wrap, memoize: memoize, attach: attach, stats: stats,
+    size: function () { return order.length; }
+  };
+}
+
+window.weld.cache = {
+  create: create,
+  version: '1.0.0'
+};
+
+return window.weld.cache;
+})();
+</script>
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>
+</div>

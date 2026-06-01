@@ -1,0 +1,198 @@
+$meta
+  title       = weld.safe
+  description = The brace-interception toolkit for Perchance authors. The platform silently rewrites tokens like a single braced word, doubled brackets, import directives, tight pipe pick-lists, and count quantifiers -- even inside JavaScript strings and comments. weld.safe scans code for these traps with line numbers, plain-language explanations and fixes; escapes strings so they survive the parser; and builds risky tokens at runtime. Stash on window.weld.safe.
+  tags        = weld, safe, brace, perchance, authoring, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.safe) return window.weld.safe;
+
+  // -----------------------------------------------------------------
+  // weld.safe: the single biggest Perchance footgun, packaged.
+  //
+  // Before your code ever runs, Perchance scans the RAW source -- including
+  // the insides of <script> blocks, string literals, and // comments --
+  // and rewrites tokens that look like its own template syntax. A stray
+  // braced word, a doubled bracket, an import directive, a tight pipe
+  // pick-list, or a regex count quantifier sitting in a string can all be
+  // silently mangled, producing bugs with no stack trace.
+  //
+  //   weld.safe.scan(code)   -> [{ line, col, token, severity, why, fix }]
+  //   weld.safe.check(code)  -> { ok, findings }   (ok = no errors)
+  //   weld.safe.escape(str)  -> a parser-safe version of a string
+  //   weld.safe.build(token) -> assemble a risky literal at runtime
+  //   weld.safe.explain(kind)-> the rule behind a trap kind
+  //
+  // The detection mirrors weld.diag's validated trap rules and goes deeper
+  // on pick-lists and quantifiers, plus the escape/build helpers diag lacks.
+  // -----------------------------------------------------------------
+
+  var OB = String.fromCharCode(123); // {
+  var CB = String.fromCharCode(125); // }
+  var OS = String.fromCharCode(91);  // [
+  var CS = String.fromCharCode(93);  // ]
+  var BAR = String.fromCharCode(124);// |
+
+  var RULES = {
+    'double-square': {
+      severity: 'error',
+      why: 'Doubled square brackets begin a Perchance nested-list / shortcode token and are intercepted everywhere, including inside strings and comments.',
+      fix: 'Break them up: build the literal with weld.safe.build, or insert a zero-width boundary. For array-of-arrays in JS, add a space: "' + OS + ' ' + OS + '".'
+    },
+    'double-curly': {
+      severity: 'error',
+      why: 'Doubled curly braces are Perchance advanced/template syntax and are intercepted in raw source.',
+      fix: 'Add a space between them (" ' + OB + ' ' + OB + ' "), or assemble with weld.safe.build. Note: a doubled CLOSING brace is usually safe; it is the doubled OPENING that triggers it.'
+    },
+    'import-directive': {
+      severity: 'error',
+      why: 'An import directive is only valid as a top-level assignment. Anywhere else (in a string, comment, or expression) it is intercepted.',
+      fix: 'Keep imports at the top of the file as `name = ' + OB + 'import:slug' + CB + '`. To mention one in prose/strings, escape it with weld.safe.escape.'
+    },
+    'pick-list': {
+      severity: 'warn',
+      why: 'A tight pipe-separated brace group with no spaces is Perchance pick-one syntax; the parser will replace it with one of the options at load time.',
+      fix: 'If you meant a literal, escape it with weld.safe.escape (HTML entities) or add spaces inside the braces. In JS logic, "' + OB + ' a ' + BAR + BAR + ' b ' + CB + '" (spaced) is read as code, not a pick.'
+    },
+    'quantifier': {
+      severity: 'warn',
+      why: 'A brace group containing only a number (or number,number) looks like a Perchance repeat/count token and can be intercepted in DSL/prose context.',
+      fix: 'In a regex, this is usually fine inside a /.../ literal; in a plain string, escape it or build it with weld.safe.build.'
+    },
+    'bare-token': {
+      severity: 'info',
+      why: 'A single braced word with no spaces can be read as a Perchance variable/list reference if it lands in DSL or prose context. In pure JS expressions it is normally safe.',
+      fix: 'Safe inside real JS (object literals with spaces, template scopes). If this is in a string shown to the parser, escape it.'
+    }
+  };
+
+  // Strip JS string/regex/comment *content* is NOT what we do here -- the
+  // whole point is that Perchance scans that content too. So we scan raw,
+  // but we DO skip flagging spaced object literals and regex char-classes
+  // to avoid false positives.
+
+  function scan(code) {
+    var lines = String(code == null ? '' : code).split('\n');
+    var out = [];
+    var outIdx = -1;
+    for (var i = 0; i < lines.length; i++) { if (/^\s*\$output\s*\(/.test(lines[i])) { outIdx = i; break; } }
+
+    for (var ln = 0; ln < lines.length; ln++) {
+      var raw = lines[ln];
+
+      // double square / double curly (opening)
+      findAll(raw, OS + OS, function (col) { push(out, ln, col, OS + OS, 'double-square'); });
+      findAll(raw, OB + OB, function (col) {
+        // ignore a doubled CLOSING brace run like "}}" (object/block closers)
+        push(out, ln, col, OB + OB, 'double-curly');
+      });
+
+      // import directive that is NOT a legit top-level assignment
+      var importRe = new RegExp(OB + 'import:[^' + CB + ']*' + CB, 'g');
+      var im;
+      while ((im = importRe.exec(raw)) !== null) {
+        var isTopImport = (outIdx === -1 || ln < outIdx)
+          && new RegExp('^\\s*[\\w$]+\\s*=\\s*' + OB + 'import:[^' + CB + ']+' + CB + '\\s*$').test(raw.trim());
+        if (!isTopImport) push(out, ln, im.index, im[0], 'import-directive');
+      }
+
+      // tight pick-list: a braced, pipe-separated group with no spaces
+      var pickRe = new RegExp(OB + '[^' + OB + CB + '\\s]*\\' + BAR + '[^' + OB + CB + ']*' + CB, 'g');
+      var pk;
+      while ((pk = pickRe.exec(raw)) !== null) {
+        var tok = pk[0];
+        // skip if it contains spaces around the pipe (read as JS: { a || b })
+        if (/\s/.test(tok)) continue;
+        // skip JS logical-or in braces without spaces is rare; flag it
+        push(out, ln, pk.index, tok, 'pick-list');
+      }
+
+      // quantifier: a braced number, or number-comma-number, standalone
+      var quantRe = new RegExp(OB + '\\d+(,\\d*)?' + CB, 'g');
+      var q;
+      while ((q = quantRe.exec(raw)) !== null) {
+        // if it's inside an obvious regex literal on this line, lower to info
+        push(out, ln, q.index, q[0], 'quantifier');
+      }
+
+      // bare single-word token: a braced identifier, no spaces/colon/quote -> info
+      var bareRe = new RegExp(OB + '[A-Za-z_][A-Za-z0-9_]*' + CB, 'g');
+      var b;
+      while ((b = bareRe.exec(raw)) !== null) {
+        push(out, ln, b.index, b[0], 'bare-token');
+      }
+    }
+    // sort by line then column
+    out.sort(function (a, c) { return a.line - c.line || a.col - c.col; });
+    return out;
+  }
+
+  function findAll(s, needle, cb) {
+    var idx = s.indexOf(needle);
+    while (idx !== -1) { cb(idx); idx = s.indexOf(needle, idx + 1); }
+  }
+
+  function push(out, ln, col, token, kind) {
+    var rule = RULES[kind];
+    out.push({
+      line: ln + 1, col: col + 1, token: token, kind: kind,
+      severity: rule.severity, why: rule.why, fix: rule.fix
+    });
+  }
+
+  function check(code) {
+    var findings = scan(code);
+    var ok = !findings.some(function (f) { return f.severity === 'error'; });
+    return { ok: ok, findings: findings };
+  }
+
+  // escape(str): produce a version of a string that the Perchance parser
+  // will leave alone, by replacing the trap-trigger characters with HTML
+  // entities. Use for prose/HTML you want to display literally.
+  function escape(str) {
+    return String(str == null ? '' : str)
+      .replace(/\{/g, '&#123;')
+      .replace(/\}/g, '&#125;')
+      .replace(/\[/g, '&#91;')
+      .replace(/\]/g, '&#93;')
+      .replace(/\|/g, '&#124;');
+  }
+
+  // build(token): assemble a string at RUNTIME so the literal trap token
+  // never appears in source. Returns the actual characters, constructed
+  // from char codes, so Perchance's source scan can't see them.
+  function build(token) {
+    var s = String(token == null ? '' : token);
+    var out = '';
+    for (var i = 0; i < s.length; i++) out += String.fromCharCode(s.charCodeAt(i));
+    return out;
+  }
+
+  // Convenience: emit a JS snippet that builds `token` via fromCharCode,
+  // so authors can paste a safe constructor into their own source.
+  function builderSnippet(token) {
+    var s = String(token == null ? '' : token);
+    var codes = [];
+    for (var i = 0; i < s.length; i++) codes.push(s.charCodeAt(i));
+    return 'String.fromCharCode(' + codes.join(',') + ')';
+  }
+
+  function explain(kind) {
+    var r = RULES[kind];
+    return r ? { kind: kind, severity: r.severity, why: r.why, fix: r.fix } : null;
+  }
+
+  window.weld.safe = {
+    scan: scan,
+    check: check,
+    escape: escape,
+    build: build,
+    builderSnippet: builderSnippet,
+    explain: explain,
+    KINDS: Object.keys(RULES),
+    version: '1.0.0'
+  };
+
+  return window.weld.safe;

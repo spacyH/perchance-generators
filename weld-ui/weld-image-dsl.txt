@@ -72,6 +72,41 @@ $output() =>
     return Object.assign({}, opts, { width: parseInt(parts[0], 10), height: parseInt(parts[1], 10) });
   }
 
+  // --- truth-layer helpers (text-to-image-plugin's sharp edges) ---
+  // Only four resolutions are accepted by the backend; anything else is
+  // rejected. Validate up front with a clear error instead of a silent fail.
+  var VALID_WH = { '512x512': 1, '512x768': 1, '768x512': 1, '768x768': 1 };
+  function resolutionOf(opts) {
+    if (!opts) return null;
+    if (opts.resolution && VALID_WH[opts.resolution]) return opts.resolution;
+    if (opts.width && opts.height) return opts.width + 'x' + opts.height;
+    return null;
+  }
+  function validateResolution(opts) {
+    var wh = resolutionOf(opts);
+    if (wh && !VALID_WH[wh]) {
+      throw new Error('weld.image: unsupported resolution "' + wh + '". Use one of 512x512, 512x768, 768x512, 768x768 (or a preset: ' + resolutionNames().join('/') + ').');
+    }
+  }
+  function promptText(opts) { return String((opts && (opts.prompt != null ? opts.prompt : opts.text)) || '').trim(); }
+
+  // The awaited t2i result is a BOXED String carrying canvas/dataUrl/inputs.
+  // Comparing it with === fails and reading it as text needs coercion.
+  // normalizeResult turns it into a plain, predictable object.
+  function normalizeResult(data) {
+    if (data == null) return { dataUrl: null, canvas: null, inputs: null, text: '' };
+    var text = '';
+    try { text = String(data); } catch (e) { text = ''; }
+    return {
+      dataUrl: (data.dataUrl != null) ? String(data.dataUrl) : (/^data:/.test(text) ? text : null),
+      canvas: data.canvas || null,
+      inputs: data.inputs || null,
+      seed: (data.inputs && data.inputs.seed != null) ? data.inputs.seed : (data.seed != null ? data.seed : null),
+      text: text,
+      raw: data
+    };
+  }
+
   // Synchronous embed -- returns the iframe HTML for direct insertion
   function embed(opts) {
     return String(getT2i()(opts));
@@ -80,13 +115,21 @@ $output() =>
   // Async single generation -- resolves with the result data
   function generate(opts) {
     return new Promise(function(resolve, reject) {
+      // Guard the two silent failure modes up front.
+      try {
+        validateResolution(opts);
+      } catch (e) { reject(e); return; }
+      if (!promptText(opts)) {
+        reject(new Error('weld.image: empty prompt. text-to-image hangs forever on an empty prompt, so it is rejected here.'));
+        return;
+      }
       var settled = false;
       var fn = getT2i();
       var enriched = Object.assign({}, opts, {
         onFinish: function(data) {
           if (settled) return;
           settled = true;
-          resolve(data);
+          resolve(normalizeResult(data));
         }
       });
       var html;
@@ -186,6 +229,19 @@ $output() =>
     });
   }
 
+  // regenerate(opts): reproduce or vary an image deterministically. With an
+  // explicit opts.seed, the same prompt+seed reproduces the same image (the
+  // "regenerate at full quality from a saved thumbnail" pattern). Pass
+  // opts.vary:true to roll a fresh seed for an alternate take.
+  function regenerate(opts) {
+    opts = opts || {};
+    var next = Object.assign({}, opts);
+    if (opts.vary || next.seed == null || next.seed === -1) {
+      next.seed = Math.floor(Math.random() * 1000000);
+    }
+    return generate(next).then(function (r) { r.seed = (next.seed != null ? next.seed : r.seed); return r; });
+  }
+
   window.weld.image = {
     setT2i: setT2i,
     withStyle: withStyle,
@@ -194,12 +250,15 @@ $output() =>
     resolutionNames: resolutionNames,
     styles: STYLES,
     resolutions: RESOLUTIONS,
+    validResolution: function (wh) { return !!VALID_WH[wh]; },
+    normalizeResult: normalizeResult,
     embed: embed,
     generate: generate,
+    regenerate: regenerate,
     batch: batch,
     variations: variations,
     generateWithRetry: generateWithRetry,
-    version: '1.0.0'
+    version: '1.1.0'
   };
 
   window.weld.image.setT2i(t2iSource);

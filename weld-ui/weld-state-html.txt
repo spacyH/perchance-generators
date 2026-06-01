@@ -1,0 +1,381 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.state<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-state-example">demo &rarr;</a></span></div>
+<div class="hdr">
+  <div class="hdr-row">
+      <h1>weld.state</h1>
+      <span class="ver">v1.0.0</span>
+  </div>
+  <p class="lead">Typed, schema-defined story state kept in sync by a background AI audit pass. Tracks location, time, inventory, flags, and who is present, and renders a compact state block for the prompt.</p>
+</div>
+<h2>Install</h2>
+<p>Import once; stashes on <code>window.weld.state</code>. The reconcile pass uses <code>weld.structured</code> when present (clean JSON + validation) and falls back to <code>weld.stream</code>; manual <code>set()</code>/<code>prompt()</code> need no dependencies.</p>
+<pre data-codeid="install"></pre>
+
+<h2>create(schema, opts)</h2>
+<div class="sig" data-codeid="sig_create"></div>
+<p>Each schema field is <code>{ type, default, enum, label, description }</code>. Types: string, number, integer, boolean, array, object. Returns an instance whose state always holds well-typed values.</p>
+<pre data-codeid="create_ex"></pre>
+
+<h2>get / set / field / reset</h2>
+<div class="sig" data-codeid="sig_set"></div>
+<p><code>set()</code> is a type-checked merge: unknown fields are ignored, mistyped values are dropped (so the state never holds garbage), and <code>enum</code> violations are rejected. Only real changes fire <code>onChange</code>.</p>
+<pre data-codeid="set_ex"></pre>
+
+<h2>reconcile(narrative, opts)</h2>
+<div class="sig" data-codeid="sig_rec"></div>
+<p>The audit pass: it sends the current state plus the latest narrative to the model and merges back an updated state &mdash; changing only what the story changed, copying the rest. Returns <code>{ changed, state, error }</code>. Use <code>opts.onlyFields</code> to restrict which fields a single pass may touch.</p>
+<pre data-codeid="rec_ex"></pre>
+<div class="note">Run reconcile as a background pass (see weld.director) so it never blocks the reply. Updates always merge, so a field the model forgets to mention keeps its current value.</div>
+
+<h2>prompt(opts)</h2>
+<div class="sig" data-codeid="sig_prompt"></div>
+<p>Renders a compact one-line state block for the system prompt, skipping empty/default fields. Pass <code>opts.includeEmpty</code> to show everything, or per-field <code>label</code> in the schema for nicer names.</p>
+<pre data-codeid="prompt_ex"></pre>
+
+<h2>Persistence</h2>
+<div class="sig" data-codeid="sig_snap"></div>
+<p><code>snapshot()</code> returns a plain object; <code>load()</code> restores it. Pair with weld.persist to carry state across sessions.</p>
+<script>
+(function(){
+  var examples = {
+  'install': 'output\n  weld-state      = \{import:weld-state-plugin\}\n  weld-structured = \{import:weld-structured-plugin\}\n  weld-stream     = \{import:weld-stream-plugin\}\n  aiTextPlugin    = \{import:ai-text-plugin\}',
+  'sig_create': 'weld.state.create(schema, opts) -> state',
+  'create_ex': 'var st = weld.state.create(\{\n  location: \{ type:\'string\', default:\'the tavern\' \},\n  time:     \{ type:\'string\', enum:\[\'dawn\',\'day\',\'dusk\',\'night\'], default:\'day\' \},\n  gold:     \{ type:\'integer\', default:0 \},\n  present:  \{ type:\'array\' \}\n\});',
+  'sig_set': 'st.set(patch) -> state   //  st.get(), st.field(name), st.reset()',
+  'set_ex': 'st.set(\{ gold: 25, present: \[\'Mara\',\'Kael\'], time:\'dusk\' \});\nst.field(\'gold\');   // 25\nst.set(\{ time:\'midnight\' \});   // rejected: not in enum',
+  'sig_rec': 'st.reconcile(narrative, opts) -> Promise<\{ changed, state, error \}>',
+  'rec_ex': 'var r = await st.reconcile(latestSceneText);\nif (r.changed) updateUI(r.state);   // location, present, etc. now current',
+  'sig_prompt': 'st.prompt(opts) -> string',
+  'prompt_ex': 'st.prompt();\n// \'Current state -- location: the forest; time: night; present: Kael.\'',
+  'sig_snap': 'st.snapshot() -> object   //  st.load(snapshot)'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    document.querySelectorAll('[data-codeid]').forEach(function(n){
+      var src = examples[n.getAttribute('data-codeid')];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.state) return window.weld.state;
+
+// -----------------------------------------------------------------
+// weld.state: the structured world/character state that prose chat
+// forgets. weld.memory holds loose facts and weld.summarize holds a
+// prose synopsis; neither maintains a TYPED record you can branch logic
+// on -- current location, time of day, inventory, story flags, who is
+// present. Every serious chat app hand-rolls this "tracked info" plus a
+// background pass that updates it from the latest turn. weld.state makes
+// it a schema + a reconcile() pass:
+//
+//   var st = weld.state.create({ location:{type:'string',default:'unknown'},
+//                                time:{type:'string'}, gold:{type:'integer',default:0},
+//                                present:{type:'array'} });
+//   st.get();                       // current typed state
+//   st.set({ gold: 5 });            // manual update (type-checked)
+//   await st.reconcile(recentText); // AI updates only what changed
+//   st.prompt();                    // a compact block for the system prompt
+//
+// reconcile() goes through weld.structured (clean JSON + validation) when
+// present, else weld.stream with a tolerant parse. Updates MERGE: fields
+// the model omits keep their current value.
+// -----------------------------------------------------------------
+
+function getStructured() { return (window.weld && window.weld.structured) ? window.weld.structured : null; }
+function getStream() { return (window.weld && window.weld.stream) ? window.weld.stream : null; }
+
+function defaultFor(spec) {
+  if (spec.default !== undefined) return spec.default;
+  switch (spec.type) {
+    case 'string': return '';
+    case 'number': case 'integer': return 0;
+    case 'boolean': return false;
+    case 'array': return [];
+    case 'object': return {};
+    default: return null;
+  }
+}
+
+function coerce(val, spec) {
+  if (val == null) return null;
+  switch (spec.type) {
+    case 'string': return String(val);
+    case 'number': { var n = Number(val); return isNaN(n) ? null : n; }
+    case 'integer': { var m = Math.round(Number(val)); return isNaN(m) ? null : m; }
+    case 'boolean': return (val === true || val === 'true' || val === 1);
+    case 'array': return Array.isArray(val) ? val : (val === '' ? [] : [val]);
+    case 'object': return (val && typeof val === 'object' && !Array.isArray(val)) ? val : null;
+    default: return val;
+  }
+}
+
+function create(schema, opts) {
+  schema = schema || {};
+  opts = opts || {};
+  var fields = Object.keys(schema);
+  var values = {};
+  var listeners = [];
+  fields.forEach(function (k) { values[k] = defaultFor(schema[k] || {}); });
+
+  function emit() {
+    var snap = get();
+    listeners.forEach(function (fn) { try { fn(snap); } catch (e) {} });
+  }
+
+  function get() {
+    var out = {};
+    fields.forEach(function (k) { out[k] = values[k]; });
+    return out;
+  }
+
+  function field(name) { return values[name]; }
+
+  // set(patch): type-checked merge. Unknown fields ignored; bad-typed
+  // values dropped (state never holds a malformed field).
+  function set(patch) {
+    if (!patch || typeof patch !== 'object') return get();
+    var changed = false;
+    Object.keys(patch).forEach(function (k) {
+      if (!schema[k]) return;
+      var c = coerce(patch[k], schema[k]);
+      if (c === null && schema[k].type !== 'object' && schema[k].type !== 'array') return;
+      if (schema[k].enum && schema[k].enum.indexOf(c) === -1) return;
+      if (JSON.stringify(values[k]) !== JSON.stringify(c)) { values[k] = c; changed = true; }
+    });
+    if (changed) emit();
+    return get();
+  }
+
+  function reset() {
+    fields.forEach(function (k) { values[k] = defaultFor(schema[k] || {}); });
+    emit();
+    return get();
+  }
+
+  function onChange(fn) {
+    listeners.push(fn);
+    return function () { var i = listeners.indexOf(fn); if (i !== -1) listeners.splice(i, 1); };
+  }
+
+  function snapshot() { return { values: get() }; }
+  function load(snap) {
+    if (snap && snap.values) set(snap.values);
+    else if (snap) set(snap);
+    return get();
+  }
+
+  // Build a JSON schema for weld.structured from the state schema.
+  function structuredSchema() {
+    var f = {};
+    fields.forEach(function (k) {
+      var spec = schema[k] || {};
+      var sf = { type: spec.type || 'string' };
+      if (spec.enum) sf.enum = spec.enum;
+      f[k] = sf;
+    });
+    return { fields: f };
+  }
+
+  function describe() {
+    return fields.map(function (k) {
+      var spec = schema[k] || {};
+      var bits = k + ' (' + (spec.type || 'string');
+      if (spec.enum) bits += ', one of: ' + spec.enum.join('/');
+      bits += ')';
+      if (spec.description) bits += ' -- ' + spec.description;
+      return bits;
+    }).join('; ');
+  }
+
+  var RECONCILE_PROMPT =
+    'You maintain a structured story state. Given the CURRENT STATE and the '
+    + 'LATEST NARRATIVE, return the updated state as JSON. Only change fields '
+    + 'that the narrative clearly changed; copy the rest unchanged. Do not '
+    + 'invent values. Output ONLY the JSON object.';
+
+  // reconcile(recentText, opts) -> Promise<{ changed, state, error }>.
+  // Reads the latest narrative + current state, asks the model for an
+  // updated state, validates and merges it. opts.prompt overrides the
+  // instruction; opts.onlyFields limits which fields may change.
+  function reconcile(recentText, reconcileOpts) {
+    reconcileOpts = reconcileOpts || {};
+    var text = String(recentText == null ? '' : recentText).trim();
+    if (!text) return Promise.resolve({ changed: false, state: get(), error: null });
+
+    var instruction = (reconcileOpts.prompt || RECONCILE_PROMPT)
+      + '\n\nState fields: ' + describe()
+      + '\n\nCURRENT STATE:\n' + JSON.stringify(get())
+      + '\n\nLATEST NARRATIVE:\n' + text;
+
+    var before = JSON.stringify(get());
+    var structured = getStructured();
+    if (structured) {
+      return structured.generate({ instruction: instruction, schema: structuredSchema(), startWith: '{' })
+        .then(function (r) {
+          if (!r.ok || !r.value) return { changed: false, state: get(), error: r.error || 'reconcile failed' };
+          applyReconciled(r.value, reconcileOpts.onlyFields);
+          return { changed: JSON.stringify(get()) !== before, state: get(), error: null };
+        });
+    }
+    var stream = getStream();
+    if (!stream) return Promise.resolve({ changed: false, state: get(), error: 'weld.state: weld.stream not loaded' });
+    return stream.run({ instruction: instruction, startWith: '{' }).then(function (res) {
+      if (res.error) return { changed: false, state: get(), error: res.error };
+      var obj = null;
+      try {
+        var raw = res.text, o = raw.indexOf('{'), c = raw.lastIndexOf('}');
+        if (o !== -1 && c > o) obj = JSON.parse(raw.slice(o, c + 1));
+      } catch (e) { obj = null; }
+      if (!obj) return { changed: false, state: get(), error: 'reconcile: no JSON parsed' };
+      applyReconciled(obj, reconcileOpts.onlyFields);
+      return { changed: JSON.stringify(get()) !== before, state: get(), error: null };
+    });
+  }
+
+  function applyReconciled(obj, onlyFields) {
+    var patch = {};
+    Object.keys(obj).forEach(function (k) {
+      if (!schema[k]) return;
+      if (onlyFields && onlyFields.indexOf(k) === -1) return;
+      patch[k] = obj[k];
+    });
+    set(patch);
+  }
+
+  // prompt(opts) -> a compact state block for the system prompt.
+  // Skips empty/default fields unless opts.includeEmpty.
+  function prompt(promptOpts) {
+    promptOpts = promptOpts || {};
+    var label = promptOpts.label || 'Current state';
+    var lines = [];
+    fields.forEach(function (k) {
+      var v = values[k];
+      var spec = schema[k] || {};
+      var empty = (v == null) || (v === '') || (Array.isArray(v) && !v.length)
+        || (spec.type === 'object' && v && !Object.keys(v).length);
+      if (empty && !promptOpts.includeEmpty) return;
+      var shown = Array.isArray(v) ? v.join(', ') : (typeof v === 'object' ? JSON.stringify(v) : String(v));
+      lines.push((spec.label || k) + ': ' + shown);
+    });
+    if (!lines.length) return '';
+    return label + ' -- ' + lines.join('; ') + '.';
+  }
+
+  return {
+    get: get,
+    field: field,
+    set: set,
+    reset: reset,
+    onChange: onChange,
+    reconcile: reconcile,
+    prompt: prompt,
+    describe: describe,
+    snapshot: snapshot,
+    load: load,
+    schema: function () { return schema; }
+  };
+}
+
+window.weld.state = {
+  create: create,
+  version: '1.0.0'
+};
+
+return window.weld.state;
+})();
+</script>
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>
+</div>

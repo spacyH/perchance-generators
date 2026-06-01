@@ -1,0 +1,174 @@
+$meta
+  title       = weld.director
+  description = Multi-pass orchestration for AI apps. Define named passes (reply, audit, illustrate...) with dependencies; the director runs foreground passes first and resolves as soon as they finish, then runs background passes (state reconcile, fact extraction, illustration) without blocking the reply. Failure-isolated -- one failing pass never sinks the others. Stash on window.weld.director.
+  tags        = weld, director, orchestration, pipeline, passes, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.director) return window.weld.director;
+
+  // -----------------------------------------------------------------
+  // weld.director: the conductor every serious chat app hand-rolls. A turn
+  // is rarely one call -- it is "write the reply (fast, streamed), THEN in
+  // the background reconcile state, extract memory facts, and illustrate
+  // the scene." Done naively the background work blocks the reply, or a
+  // failing illustrate pass takes down the whole turn.
+  //
+  // weld.director formalizes it:
+  //   var dir = weld.director.create();
+  //   dir.define('reply',      replyFn);                       // foreground
+  //   dir.define('audit',      auditFn,      { background:true, after:['reply'] });
+  //   dir.define('illustrate', illustrateFn, { background:true, after:['reply'] });
+  //   var run = dir.run(input);
+  //   var ctx = await run.foreground;   // resolves when reply is done
+  //   // ... render ctx.reply immediately ...
+  //   await run.background;             // optional: when audit+illustrate finish
+  //
+  // Each pass fn receives (ctx, input); ctx carries prior passes' results
+  // by name (ctx.reply, ctx.audit, ...) plus ctx.errors. Passes run in
+  // dependency order, in parallel where independent. A thrown/rejected
+  // pass is caught, recorded in ctx.errors[name], and reported via onError;
+  // dependents that needed it are skipped, everything else proceeds.
+  // -----------------------------------------------------------------
+
+  function create(createOpts) {
+    createOpts = createOpts || {};
+    var passes = {};   // name -> { fn, background, after }
+    var order = [];    // insertion order for stable scheduling
+    var hooks = { onPass: createOpts.onPass || null, onError: createOpts.onError || null };
+
+    function define(name, fn, opts) {
+      opts = opts || {};
+      if (typeof fn !== 'function') throw new Error('weld.director: pass "' + name + '" needs a function');
+      if (!passes[name]) order.push(name);
+      passes[name] = { fn: fn, background: !!opts.background, after: opts.after || [] };
+      return api;
+    }
+
+    function remove(name) {
+      delete passes[name];
+      var i = order.indexOf(name); if (i !== -1) order.splice(i, 1);
+      return api;
+    }
+
+    // Topologically schedule a set of pass-names, then run respecting
+    // dependencies and running independents concurrently. Mutates ctx.
+    function runGroup(names, ctx, input) {
+      var pending = {};
+      names.forEach(function (n) { pending[n] = true; });
+      var done = {};      // name -> true once settled (ok or skipped/failed)
+      var running = {};
+
+      function depsSatisfied(name) {
+        var after = passes[name].after || [];
+        for (var i = 0; i < after.length; i++) {
+          var dep = after[i];
+          // only wait on deps that are part of this run at all
+          if ((pending[dep] || running[dep]) && !done[dep]) return false;
+        }
+        return true;
+      }
+
+      function depFailed(name) {
+        var after = passes[name].after || [];
+        for (var i = 0; i < after.length; i++) {
+          if (ctx.errors[after[i]]) return after[i];
+        }
+        return null;
+      }
+
+      return new Promise(function (resolve) {
+        function tick() {
+          var launched = false;
+          names.forEach(function (name) {
+            if (done[name] || running[name]) return;
+            if (!depsSatisfied(name)) return;
+
+            // a required upstream pass failed -> skip this one
+            var failedDep = depFailed(name);
+            if (failedDep) {
+              ctx.errors[name] = 'skipped: dependency "' + failedDep + '" failed';
+              done[name] = true; delete pending[name];
+              if (hooks.onError) try { hooks.onError(name, ctx.errors[name], ctx); } catch (e) {}
+              launched = true; // state changed; re-evaluate
+              return;
+            }
+
+            running[name] = true; delete pending[name]; launched = true;
+            Promise.resolve().then(function () { return passes[name].fn(ctx, input); })
+              .then(function (result) {
+                ctx[name] = result;
+                if (hooks.onPass) try { hooks.onPass(name, result, ctx); } catch (e) {}
+              }, function (err) {
+                ctx.errors[name] = String((err && err.message) || err);
+                if (hooks.onError) try { hooks.onError(name, ctx.errors[name], ctx); } catch (e) {}
+              })
+              .then(function () {
+                running[name] = false; done[name] = true;
+                if (allDone()) resolve(ctx); else tick();
+              });
+          });
+          if (allDone()) resolve(ctx);
+          else if (!launched && !anyRunning()) {
+            // deadlock guard (e.g. a dependency cycle): settle the rest as errors
+            names.forEach(function (n) {
+              if (!done[n]) { ctx.errors[n] = 'unresolved dependencies (cycle?)'; done[n] = true; }
+            });
+            resolve(ctx);
+          }
+        }
+        function allDone() { return names.every(function (n) { return done[n]; }); }
+        function anyRunning() { return names.some(function (n) { return running[n]; }); }
+        if (!names.length) { resolve(ctx); return; }
+        tick();
+      });
+    }
+
+    // run(input, opts) -> { foreground, background, ctx }.
+    // foreground resolves with ctx once all non-background passes finish;
+    // background resolves once background passes finish (started after fg).
+    function run(input, runOpts) {
+      runOpts = runOpts || {};
+      var ctx = { input: input, errors: {} };
+      var fgNames = order.filter(function (n) { return !passes[n].background; });
+      var bgNames = order.filter(function (n) { return passes[n].background; });
+
+      var bgResolve;
+      var background = new Promise(function (res) { bgResolve = res; });
+
+      var foreground = runGroup(fgNames, ctx, input).then(function () {
+        // kick background work without blocking the foreground resolution
+        if (bgNames.length) {
+          runGroup(bgNames, ctx, input).then(function () { bgResolve(ctx); });
+        } else {
+          bgResolve(ctx);
+        }
+        return ctx;
+      });
+
+      return { foreground: foreground, background: background, ctx: ctx };
+    }
+
+    function onPass(fn) { hooks.onPass = fn; return api; }
+    function onError(fn) { hooks.onError = fn; return api; }
+    function list() { return order.slice(); }
+
+    var api = {
+      define: define,
+      remove: remove,
+      run: run,
+      onPass: onPass,
+      onError: onError,
+      list: list
+    };
+    return api;
+  }
+
+  window.weld.director = {
+    create: create,
+    version: '1.0.0'
+  };
+
+  return window.weld.director;

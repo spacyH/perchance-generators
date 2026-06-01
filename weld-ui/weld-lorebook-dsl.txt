@@ -9,6 +9,11 @@ $output() =>
   if (!window.weld) window.weld = {};
   if (window.weld.lorebook) return window.weld.lorebook;
 
+  // Optional semantic dependency. Attached via attach({embed}) or read
+  // from window.weld.embed; absence simply means keyword-only scanning.
+  var deps = { embed: null };
+  function getEmbed() { return deps.embed || (window.weld && window.weld.embed) || null; }
+
   // -----------------------------------------------------------------
   // Token estimation -- rough char/N ratio
   // -----------------------------------------------------------------
@@ -227,6 +232,68 @@ $output() =>
       return estimateTokens(text, charsPerToken);
     }
 
+    // Hybrid scan: keyword matches (the fast gate, always) UNIONed with
+    // semantic matches from weld.embed when an embedder is attached. This
+    // catches paraphrases the keyword scan misses ("the old king" finding a
+    // "King Aldric" entry) while never losing an exact keyword hit.
+    // scanOpts adds: { semantic (default true if embed present), minScore
+    // (cosine, default 0.55), maxSemantic (default 4) }.
+    function scanAsync(text, scanOpts) {
+      scanOpts = scanOpts || {};
+      var keyword = scan(text, scanOpts);
+      var embed = getEmbed();
+      var wantSemantic = (scanOpts.semantic !== false) && embed && entries.length > 0 && typeof text === 'string' && text.trim();
+      if (!wantSemantic) return Promise.resolve(keyword);
+
+      var minScore = scanOpts.minScore != null ? scanOpts.minScore : 0.55;
+      var maxSemantic = scanOpts.maxSemantic != null ? scanOpts.maxSemantic : 4;
+      var matchedIds = {};
+      keyword.forEach(function (m) { matchedIds[m.entry.id] = true; });
+
+      // Rank enabled, not-yet-matched entries by meaning. Embed the entry's
+      // keys + content so a query close to either triggers it.
+      var candidates = entries.filter(function (e) { return e.enabled && !matchedIds[e.id]; });
+      if (!candidates.length) return Promise.resolve(keyword);
+      var docs = candidates.map(function (e) { return { e: e, text: e.keys.join(', ') + '. ' + e.content }; });
+
+      return embed.rank(text, docs, { key: 'text', topK: maxSemantic, minScore: minScore })
+        .then(function (ranked) {
+          var combined = keyword.slice();
+          (ranked || []).forEach(function (r) {
+            combined.push({ entry: Object.assign({}, r.item.e), matchedKey: '(semantic)', position: 0, score: r.score, semantic: true });
+          });
+          combined.sort(function (a, b) {
+            if (b.entry.priority !== a.entry.priority) return b.entry.priority - a.entry.priority;
+            return a.position - b.position;
+          });
+          // re-apply budgets across the combined set
+          var maxEntries = scanOpts.maxEntries == null ? Infinity : scanOpts.maxEntries;
+          var maxTokens = scanOpts.maxTokens == null ? Infinity : scanOpts.maxTokens;
+          var out = [], tokens = 0;
+          for (var i = 0; i < combined.length && out.length < maxEntries; i++) {
+            var t = estimateTokens(combined[i].entry.content, charsPerToken);
+            if (tokens + t > maxTokens) continue;
+            tokens += t; out.push(combined[i]);
+          }
+          return out;
+        }, function () { return keyword; });
+    }
+
+    function injectAsync(text, injectOpts) {
+      injectOpts = injectOpts || {};
+      var format = injectOpts.format || 'list';
+      var header = injectOpts.header || ('[' + 'Lore' + ']');
+      return scanAsync(text, injectOpts).then(function (matches) {
+        if (!matches.length) return '';
+        if (typeof format === 'function') return format(matches);
+        var lines = [header];
+        if (format === 'list') matches.forEach(function (m) { lines.push('- ' + m.entry.content); });
+        else if (format === 'paragraph') lines.push(matches.map(function (m) { return m.entry.content; }).join('\n\n'));
+        else if (format === 'plain') { lines.length = 0; matches.forEach(function (m) { lines.push(m.entry.content); }); }
+        return lines.join('\n');
+      });
+    }
+
     return {
       add: add,
       update: update,
@@ -235,7 +302,9 @@ $output() =>
       getAll: getAll,
       clear: clear,
       scan: scan,
+      scanAsync: scanAsync,
       inject: inject,
+      injectAsync: injectAsync,
       estimateTokens: estimate,
       size: function() { return entries.length; }
     };
@@ -244,7 +313,9 @@ $output() =>
   window.weld.lorebook = {
     create: createLorebook,
     estimateTokens: estimateTokens,
-    version: '1.0.0'
+    attach: function (d) { if (d && d.embed) deps.embed = d.embed; },
+    useEmbedder: function (e) { if (e) deps.embed = e; },
+    version: '1.1.0'
   };
 
   return window.weld.lorebook;
