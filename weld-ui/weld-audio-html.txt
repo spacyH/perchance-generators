@@ -1,0 +1,343 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.audio<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-audio-example">demo &rarr;</a></span></div>
+<div class="hdr">
+  <div class="hdr-row">
+      <h1>weld.audio</h1>
+      <span class="ver">v1.0.0</span>
+  </div>
+  <p class="lead">Background music, looping ambience, and event-triggered sound effects on the Web Audio API: independent crossfading channels, a pooled SFX player, a master mixer, and a one-gesture unlock. No dependencies.</p>
+</div>
+<h2>Install</h2>
+<p>Pure Web Audio, no dependencies. Import it and it stashes on <code>window.weld.audio</code>. Because browsers block audio until a user gesture, call <code>unlock()</code> once from a click before playing anything.</p>
+<pre data-codeid="install"></pre>
+
+<h2>Channels: music &amp; ambience</h2>
+<div class="sig" data-codeid="sig_music"></div>
+<p>Music and ambience are independent looping channels on a shared mixer. Calling <code>play()</code> on a channel that's already playing <strong>crossfades</strong> to the new track over <code>fade</code> seconds &mdash; perfect for a mood change when the scene shifts.</p>
+<pre data-codeid="music_ex"></pre>
+
+<h2>SFX: pooled one-shots</h2>
+<div class="sig" data-codeid="sig_sfx"></div>
+<p>Each <code>sfx.play()</code> spins up its own short-lived source, so firing the same sound rapidly never cuts itself off. Buffers are decoded once and cached, so repeat plays are instant.</p>
+<pre data-codeid="sfx_ex"></pre>
+
+<h2>Mixer</h2>
+<div class="sig" data-codeid="sig_mix"></div>
+<p>Per-channel and master volume, with a short ramp so changes don't click. Add your own channels with <code>weld.audio.channel(name)</code> for things like UI sounds or voice.</p>
+
+<h2>Preloading</h2>
+<div class="sig" data-codeid="sig_pre"></div>
+<p>Decode a scene's sounds ahead of time so the first play is gap-free. Everything is a quiet no-op if Web Audio isn't available, so calls are always safe.</p>
+<div class="note">Pairs naturally with a story app: call <code>music.play()</code> when a scene loads, <code>ambience.play()</code> for the setting, and <code>sfx.play()</code> from event handlers. Use <code>weld.director</code> to sequence audio cues alongside text and images.</div>
+<script>
+(function(){
+  var examples = {
+  'install': 'output\n  weld-audio = \{import:weld-audio-plugin\}\n\n// once, from a click/tap:\nawait weld.audio.unlock();',
+  'sig_music': 'weld.audio.music.play(url, \{ fade, volume \}) -> Promise   //  .stop(fade), .setVolume(v), .current()',
+  'music_ex': 'weld.audio.music.play(\'https://.../calm-theme.mp3\', \{ fade: 1.5, volume: 0.6 \});\n// later, when a fight starts — crossfades automatically:\nweld.audio.music.play(\'https://.../battle.mp3\', \{ fade: 2 \});\nweld.audio.ambience.play(\'https://.../rain-loop.mp3\', \{ volume: 0.4 \});',
+  'sig_sfx': 'weld.audio.sfx.play(url, \{ volume, rate \}) -> Promise<bool>',
+  'sfx_ex': 'button.onclick = () => weld.audio.sfx.play(\'https://.../click.mp3\');\n// rapid fire is fine — each is its own voice:\nfor (const hit of combo) weld.audio.sfx.play(hit.url, \{ rate: 1 + Math.random()*0.1 \});',
+  'sig_mix': 'weld.audio.setChannelVolume(name, v)   //  setMasterVolume(v), masterVolume(), stopAll(fade)',
+  'sig_pre': 'weld.audio.preload(\[url, url, ...]) -> Promise<bool\[]>   //  unlock(), supported(), isUnlocked()'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    document.querySelectorAll('[data-codeid]').forEach(function(n){
+      var src = examples[n.getAttribute('data-codeid')];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.audio) return window.weld.audio;
+
+// -----------------------------------------------------------------
+// weld.audio: sound for story apps, without the Web Audio boilerplate.
+//
+// Three things every illustrated-chat / VN wants and none of the base
+// plugins provide: looping background MUSIC that crossfades when the mood
+// changes, looping AMBIENCE that layers under it (rain, a tavern, wind),
+// and one-shot SFX fired on events (a door, a sword, a notification).
+// weld.audio gives each its own channel on a shared mixer:
+//
+//   await weld.audio.unlock();                 // call once from a click
+//   weld.audio.music.play('https://.../theme.mp3', { fade: 1.5 });
+//   weld.audio.ambience.play('https://.../rain.mp3', { volume: 0.5 });
+//   weld.audio.sfx.play('https://.../door.mp3'); // pooled, no stutter
+//   weld.audio.setChannelVolume('music', 0.4);
+//
+// Browsers block audio until a user gesture; unlock() resumes the context
+// and is safe to call repeatedly. Everything degrades to a quiet no-op if
+// Web Audio is unavailable (so it never throws in a headless sandbox).
+// -----------------------------------------------------------------
+
+var AC = (typeof AudioContext !== 'undefined') ? AudioContext
+       : (typeof webkitAudioContext !== 'undefined') ? webkitAudioContext : null;
+
+var ctx = null;
+var master = null;
+var channels = {};            // name -> { gain, volume }
+var buffers = {};             // url -> AudioBuffer (decoded, cached)
+var loops = {};               // channel -> { src, gain, url }
+var unlocked = false;
+
+function supported() { return !!AC; }
+
+function ensureCtx() {
+  if (!AC) return null;
+  if (!ctx) {
+    try {
+      ctx = new AC();
+      master = ctx.createGain();
+      master.gain.value = 1;
+      master.connect(ctx.destination);
+      // standard channels
+      ['music', 'ambience', 'sfx'].forEach(function (name) { ensureChannel(name); });
+    } catch (e) { ctx = null; }
+  }
+  return ctx;
+}
+
+function ensureChannel(name) {
+  ensureCtx();
+  if (!ctx) return null;
+  if (!channels[name]) {
+    var g = ctx.createGain();
+    g.gain.value = 1;
+    g.connect(master);
+    channels[name] = { gain: g, volume: 1 };
+  }
+  return channels[name];
+}
+
+// Resume the audio context from a user gesture. Returns a Promise<bool>.
+function unlock() {
+  if (!ensureCtx()) return Promise.resolve(false);
+  var p = (ctx.state === 'suspended' && ctx.resume) ? ctx.resume() : Promise.resolve();
+  return Promise.resolve(p).then(function () { unlocked = (ctx.state === 'running'); return unlocked; }, function () { return false; });
+}
+
+// Load + decode a URL into an AudioBuffer (cached). Uses fetch/superFetch.
+function load(url) {
+  url = String(url || '');
+  if (!url) return Promise.reject(new Error('weld.audio: empty url'));
+  if (!ensureCtx()) return Promise.reject(new Error('weld.audio: Web Audio not available'));
+  if (buffers[url]) return Promise.resolve(buffers[url]);
+  var fetcher = (typeof fetch === 'function') ? fetch : null;
+  if (!fetcher) return Promise.reject(new Error('weld.audio: no fetch to load audio'));
+  return fetcher(url).then(function (r) { return r.arrayBuffer(); }).then(function (ab) {
+    return new Promise(function (resolve, reject) {
+      // decodeAudioData has both callback and promise forms; support both.
+      var ret = ctx.decodeAudioData(ab, function (buf) { buffers[url] = buf; resolve(buf); }, reject);
+      if (ret && typeof ret.then === 'function') ret.then(function (buf) { buffers[url] = buf; resolve(buf); }, reject);
+    });
+  });
+}
+
+function rampGain(gainNode, to, seconds) {
+  if (!ctx) return;
+  var now = ctx.currentTime;
+  try {
+    gainNode.gain.cancelScheduledValues(now);
+    gainNode.gain.setValueAtTime(gainNode.gain.value, now);
+    gainNode.gain.linearRampToValueAtTime(to, now + Math.max(0.001, seconds || 0));
+  } catch (e) { gainNode.gain.value = to; }
+}
+
+// Start (or crossfade to) a looping source on a channel.
+function playLoop(channelName, url, opts) {
+  opts = opts || {};
+  if (!ensureChannel(channelName)) return Promise.resolve(null);
+  var fade = opts.fade != null ? opts.fade : 0.8;
+  var vol = opts.volume != null ? opts.volume : 1;
+  return load(url).then(function (buf) {
+    var ch = channels[channelName];
+    // fade out the previous loop on this channel
+    var prev = loops[channelName];
+    if (prev) {
+      rampGain(prev.gain, 0, fade);
+      (function (p) { setTimeout(function () { try { p.src.stop(); } catch (e) {} }, (fade * 1000) + 60); })(prev);
+    }
+    var src = ctx.createBufferSource();
+    src.buffer = buf; src.loop = true;
+    var g = ctx.createGain();
+    g.gain.value = prev ? 0 : vol;      // start silent if crossfading in
+    src.connect(g); g.connect(ch.gain);
+    try { src.start(0); } catch (e) {}
+    if (prev) rampGain(g, vol, fade);
+    loops[channelName] = { src: src, gain: g, url: url };
+    return loops[channelName];
+  });
+}
+
+function stopLoop(channelName, fade) {
+  var prev = loops[channelName];
+  if (!prev) return;
+  fade = fade != null ? fade : 0.6;
+  rampGain(prev.gain, 0, fade);
+  setTimeout(function () { try { prev.src.stop(); } catch (e) {} }, (fade * 1000) + 60);
+  loops[channelName] = null;
+}
+
+// One-shot SFX: each call spins up its own short-lived source, so rapid
+// fire never cuts itself off (the "pool" is implicit — sources are cheap
+// and self-cleaning via onended).
+function playSfx(url, opts) {
+  opts = opts || {};
+  if (!ensureChannel('sfx')) return Promise.resolve(false);
+  var vol = opts.volume != null ? opts.volume : 1;
+  return load(url).then(function (buf) {
+    var src = ctx.createBufferSource();
+    src.buffer = buf;
+    var g = ctx.createGain(); g.gain.value = vol;
+    src.connect(g); g.connect(channels.sfx.gain);
+    if (opts.rate) { try { src.playbackRate.value = opts.rate; } catch (e) {} }
+    src.onended = function () { try { src.disconnect(); g.disconnect(); } catch (e) {} };
+    try { src.start(0); } catch (e) {}
+    return true;
+  }, function () { return false; });
+}
+
+function setChannelVolume(name, v) {
+  var ch = ensureChannel(name);
+  if (!ch) return;
+  ch.volume = v;
+  rampGain(ch.gain, v, 0.15);
+}
+function setMasterVolume(v) { if (ensureCtx()) rampGain(master, v, 0.15); }
+function masterVolume() { return master ? master.gain.value : 0; }
+
+// Preload a set of URLs (e.g. a scene's SFX) so first play is instant.
+function preload(urls) {
+  if (!Array.isArray(urls)) urls = [urls];
+  return Promise.all(urls.map(function (u) { return load(u).then(function () { return true; }, function () { return false; }); }));
+}
+
+function stopAll(fade) {
+  Object.keys(loops).forEach(function (c) { stopLoop(c, fade); });
+}
+
+// Per-channel facade so the API reads naturally (music.play / .stop).
+function channelFacade(name) {
+  return {
+    play: function (url, opts) { return playLoop(name, url, opts); },
+    stop: function (fade) { return stopLoop(name, fade); },
+    setVolume: function (v) { return setChannelVolume(name, v); },
+    current: function () { return loops[name] ? loops[name].url : null; }
+  };
+}
+
+window.weld.audio = {
+  unlock: unlock,
+  supported: supported,
+  load: load,
+  preload: preload,
+  music: channelFacade('music'),
+  ambience: channelFacade('ambience'),
+  sfx: { play: playSfx, setVolume: function (v) { return setChannelVolume('sfx', v); } },
+  channel: function (name) { ensureChannel(name); return channelFacade(name); },
+  setChannelVolume: setChannelVolume,
+  setMasterVolume: setMasterVolume,
+  masterVolume: masterVolume,
+  stopAll: stopAll,
+  isUnlocked: function () { return unlocked; },
+  version: '1.0.0'
+};
+
+return window.weld.audio;
+})();
+</script>
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>
+</div>

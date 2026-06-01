@@ -1,0 +1,288 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--amber:#d29922;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:780px;margin:0 auto;padding:34px 18px 90px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 0 16px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+.breadcrumb a{color:var(--muted);}.breadcrumb .sep{color:var(--faint);margin:0 8px;}.breadcrumb .cur{color:var(--ink);}.breadcrumb .act a{color:var(--accent);}
+.hdr{margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}.hdr h1{font:700 24px var(--mono);letter-spacing:-0.5px;}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;}
+.hdr .lead{color:var(--muted);margin-top:8px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;}
+.panel h2{font:600 13px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:8px 0;}
+.lbl{font:600 12px var(--mono);color:var(--muted);min-width:74px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 15px;font:600 13px var(--font);cursor:pointer;transition:.12s;}
+.btn:hover{filter:brightness(1.08);}.btn.ghost{background:var(--faint);color:var(--ink);}.btn.sm{padding:6px 11px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+input[type=text],textarea{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:8px 10px;font:13px var(--font);}
+input[type=text]{flex:1;min-width:120px;}textarea{width:100%;font:12.5px/1.5 var(--mono);resize:vertical;}
+.mono{font:13px var(--mono);}
+.out{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font:12.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;min-height:20px;color:#c9d1d9;}
+.chip{display:inline-block;background:var(--faint);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font:600 12px var(--mono);margin:2px;}
+.chip.k{background:rgba(63,185,80,.14);border-color:rgba(63,185,80,.4);color:#7ee787;}
+.chip.d{opacity:.4;text-decoration:line-through;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:9px 13px;border-radius:0 4px 4px 0;margin:12px 0 0;font-size:12.5px;color:#c9d1d9;}
+.note.warn{background:rgba(210,153,34,.08);border-color:var(--amber);}
+.tag{font:600 10px var(--mono);padding:2px 7px;border-radius:4px;background:rgba(63,185,80,.14);color:#7ee787;border:1px solid rgba(63,185,80,.4);}
+.tag.ai{background:rgba(210,153,34,.12);color:#e3b341;border-color:rgba(210,153,34,.4);}
+.bar{height:14px;background:var(--accent);border-radius:3px;transition:width .3s;}
+.footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);}.footer a{color:var(--muted);}
+.flex{display:flex;gap:10px;align-items:center;}.wrap{flex-wrap:wrap;}.grow{flex:1;}.mt{margin-top:10px;}
+</style>
+<div id="page">
+<div class="breadcrumb"><span><a href="https://perchance.org/weld-ui-index">weld</a><span class="sep">/</span>weld.import<span class="sep">/</span><span class="cur">demo</span></span><span class="act"><a href="https://perchance.org/weld-import-plugin">docs &rarr;</a></span></div>
+<div class="hdr"><div class="hdr-row"><h1>weld.import &mdash; demo</h1><span class="ver">v1.0.0</span></div><p class="lead">Paste a character card or chat export and watch weld.import detect the format and normalize it to a common shape. Includes Tavern, FurAI, and JSONL samples.</p></div>
+  <div class="panel"><h2>Paste character or chat data <span class="tag">auto-detected</span></h2>
+    <div class="row"><button class="btn sm exb" data-k="v2">Tavern v2 sample</button><button class="btn ghost sm exb" data-k="furai">FurAI sample</button><button class="btn ghost sm exb" data-k="jsonl">JSONL chat sample</button></div>
+    <textarea id="in" rows="7" placeholder="Paste a character card (JSON) or chat export here…" style="width:100%;"></textarea>
+    <div class="row"><button id="go" class="btn">Detect &amp; parse</button><span id="det" class="chip">—</span></div>
+    <div id="out" class="out mt"></div>
+    <div class="note">weld.import sniffs the format and normalizes it to one shape: a <b>character</b> (name/description/first_message/…) or a <b>chat</b> (messages with role/name/content). PNG character cards route through <code>weld.cards</code>. Try the samples or paste your own export.</div>
+  </div>
+<footer class="footer"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
+</div>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.import) return window.weld.import;
+
+// -----------------------------------------------------------------
+// weld.import: one front door for "here's a character/chat from
+// somewhere else, load it." Every community tool has its own export
+// shape; this detects which one you handed it and returns a normalized
+// result so the rest of your app never branches on format:
+//
+//   var r = weld.import.detect(pastedText);     // { format, kind, confidence }
+//   var out = await weld.import.parse(input);   // { format, character?, chat?, warnings }
+//   var out = await weld.import.parseFile(file);// same, for an uploaded File/Blob
+//
+// kind is 'character' | 'chat' | 'unknown'. A character normalizes to the
+// same fields weld.cards.toCharacter produces; a chat normalizes to
+// { messages:[{ role, name, content }], title }. PNG character cards are
+// delegated to weld.cards when it's present.
+// -----------------------------------------------------------------
+
+var deps = { cards: null };
+function attach(d) { if (d && d.cards) deps.cards = d.cards; }
+function cards() { return deps.cards || (window.weld && window.weld.cards) || null; }
+
+// ---- helpers ----
+function asObj(input) {
+  if (input && typeof input === 'object') return input;
+  if (typeof input === 'string') { try { return JSON.parse(input); } catch (e) { return null; } }
+  return null;
+}
+function has(o) { for (var i = 1; i < arguments.length; i++) { if (o && o[arguments[i]] !== undefined) return true; } return false; }
+function str(v) { return v == null ? '' : String(v); }
+
+// ---- format detection -------------------------------------------------
+// Returns { format, kind, confidence } without fully parsing.
+function detect(input) {
+  // PNG bytes (character card embedded in image)
+  if (looksLikePng(input)) return { format: 'tavern-png', kind: 'character', confidence: 0.95 };
+
+  var text = (typeof input === 'string') ? input : null;
+  var o = asObj(input);
+
+  // JSONL: multiple lines, each a JSON object (chat log)
+  if (text && isJsonl(text)) return { format: 'jsonl-chat', kind: 'chat', confidence: 0.8 };
+
+  if (!o) return { format: 'unknown', kind: 'unknown', confidence: 0 };
+
+  // TavernAI / SillyTavern character card v2/v3 (spec + data envelope)
+  if (o.spec === 'chara_card_v3' || (o.spec_version && /3/.test(str(o.spec_version)) && o.data)) {
+    return { format: 'tavern-v3', kind: 'character', confidence: 0.95 };
+  }
+  if (o.spec === 'chara_card_v2' || (o.spec_version && o.data)) {
+    return { format: 'tavern-v2', kind: 'character', confidence: 0.95 };
+  }
+  // ai-character-chat export (its own envelope)
+  if (has(o, 'addCharacter', 'characterName') || (o.characters && o.messages && o.threadName !== undefined)) {
+    return { format: 'ai-character-chat', kind: (o.messages ? 'chat' : 'character'), confidence: 0.7 };
+  }
+  // FurAI character (flat fields, FurAI-specific keys)
+  if (has(o, 'persona', 'greeting') && (o.char_name || o.name)) {
+    return { format: 'furai-character', kind: 'character', confidence: 0.6 };
+  }
+  // FurAI / generic chat dump (array of messages or {messages:[...]})
+  if (Array.isArray(o) && o.length && (o[0].role || o[0].is_user !== undefined || o[0].mes !== undefined)) {
+    return { format: 'furai-chat', kind: 'chat', confidence: 0.6 };
+  }
+  if (Array.isArray(o.messages) && o.messages.length) {
+    return { format: 'generic-chat', kind: 'chat', confidence: 0.55 };
+  }
+  // TavernAI v1 / generic flat character card
+  if (has(o, 'name', 'char_name') && has(o, 'description', 'personality', 'first_mes', 'persona')) {
+    return { format: 'tavern-v1', kind: 'character', confidence: 0.55 };
+  }
+  return { format: 'unknown', kind: 'unknown', confidence: 0 };
+}
+
+function looksLikePng(input) {
+  var c = cards();
+  if (c && typeof c.isPng === 'function') { try { return c.isPng(input); } catch (e) {} }
+  // fallback signature check on a byte-ish input
+  try {
+    var b = input;
+    if (b && b.length >= 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47) return true;
+  } catch (e) {}
+  return false;
+}
+function isJsonl(text) {
+  var lines = text.split(/\r?\n/).filter(function (l) { return l.trim(); });
+  if (lines.length < 2) return false;
+  var okCount = 0, checked = 0;
+  for (var i = 0; i < lines.length && checked < 6; i++) {
+    checked++;
+    try { var o = JSON.parse(lines[i]); if (o && typeof o === 'object') okCount++; } catch (e) { /* tolerate a bad line */ }
+  }
+  // It's JSONL if most sampled lines parse as objects (allows a stray bad line).
+  return okCount >= 2 && okCount >= (checked - 1);
+}
+
+// ---- normalizers ------------------------------------------------------
+function normCharacterFlat(d) {
+  return {
+    name: str(d.name || d.char_name),
+    description: str(d.description || d.persona),
+    personality: str(d.personality),
+    scenario: str(d.scenario || d.world_scenario),
+    first_message: str(d.first_mes || d.first_message || d.greeting),
+    example_dialogue: str(d.mes_example || d.example_dialogue),
+    system_prompt: str(d.system_prompt),
+    creator_notes: str(d.creator_notes),
+    tags: Array.isArray(d.tags) ? d.tags : [],
+    creator: str(d.creator)
+  };
+}
+function normMessage(m, idx) {
+  // map the many "who said it" conventions to role/name/content
+  var role, name = '', content = '';
+  if (m.role) role = (m.role === 'assistant' || m.role === 'char') ? 'assistant' : (m.role === 'user' ? 'user' : m.role);
+  else if (m.is_user !== undefined) role = m.is_user ? 'user' : 'assistant';
+  else if (m.name && /you|user/i.test(m.name)) role = 'user';
+  else role = 'assistant';
+  name = str(m.name || m.author || m.speaker);
+  content = str(m.content || m.mes || m.text || m.message);
+  return { role: role, name: name, content: content };
+}
+function normChatMessages(arr) {
+  return (arr || []).map(normMessage).filter(function (m) { return m.content; });
+}
+
+// ---- parse ------------------------------------------------------------
+// parse(input) -> Promise<{ format, kind, character?, chat?, warnings }>
+function parse(input) {
+  var det = detect(input);
+  var warnings = [];
+  try {
+    switch (det.format) {
+      case 'tavern-png': {
+        var c = cards();
+        if (!c || typeof c.read !== 'function') return Promise.reject(new Error('weld.import: PNG card needs weld.cards (import it / attach it)'));
+        var spec = c.read(input);
+        if (!spec) { warnings.push('PNG had no embedded character data'); return Promise.resolve({ format: det.format, kind: 'unknown', warnings: warnings }); }
+        return Promise.resolve({ format: det.format, kind: 'character', character: c.toCharacter(spec.spec || spec), warnings: warnings });
+      }
+      case 'tavern-v3':
+      case 'tavern-v2': {
+        var o = asObj(input);
+        var d = (o && o.data) ? o.data : o;
+        // prefer weld.cards.toCharacter when present (handles spec quirks)
+        var c2 = cards();
+        var ch = (c2 && c2.toCharacter) ? c2.toCharacter(o) : normCharacterFlat(d);
+        return Promise.resolve({ format: det.format, kind: 'character', character: ch, warnings: warnings });
+      }
+      case 'tavern-v1':
+      case 'furai-character': {
+        return Promise.resolve({ format: det.format, kind: 'character', character: normCharacterFlat(asObj(input)), warnings: warnings });
+      }
+      case 'ai-character-chat': {
+        var acc = asObj(input);
+        if (acc && Array.isArray(acc.messages)) {
+          return Promise.resolve({ format: det.format, kind: 'chat', chat: { title: str(acc.threadName || acc.title), messages: normChatMessages(acc.messages) }, warnings: warnings });
+        }
+        return Promise.resolve({ format: det.format, kind: 'character', character: normCharacterFlat(acc.character || acc), warnings: warnings });
+      }
+      case 'furai-chat':
+      case 'generic-chat': {
+        var go = asObj(input);
+        var arr = Array.isArray(go) ? go : go.messages;
+        return Promise.resolve({ format: det.format, kind: 'chat', chat: { title: str(go.title || go.threadName), messages: normChatMessages(arr) }, warnings: warnings });
+      }
+      case 'jsonl-chat': {
+        var lines = String(input).split(/\r?\n/).filter(function (l) { return l.trim(); });
+        var msgs = [];
+        for (var i = 0; i < lines.length; i++) { try { msgs.push(JSON.parse(lines[i])); } catch (e) { warnings.push('skipped malformed line ' + (i + 1)); } }
+        return Promise.resolve({ format: det.format, kind: 'chat', chat: { title: '', messages: normChatMessages(msgs) }, warnings: warnings });
+      }
+      default:
+        return Promise.resolve({ format: 'unknown', kind: 'unknown', warnings: ['weld.import: unrecognized format'] });
+    }
+  } catch (e) {
+    return Promise.reject(new Error('weld.import: parse failed (' + (e && e.message) + ')'));
+  }
+}
+
+// parseFile(file) -> reads a File/Blob then parses (PNG as bytes, else text).
+function parseFile(file) {
+  if (!file) return Promise.reject(new Error('weld.import: no file'));
+  var isPngName = /\.png$/i.test(file.name || '') || (file.type === 'image/png');
+  return new Promise(function (resolve, reject) {
+    if (typeof FileReader === 'undefined') { reject(new Error('weld.import: FileReader unavailable')); return; }
+    var fr = new FileReader();
+    fr.onload = function () { resolve(fr.result); };
+    fr.onerror = function () { reject(new Error('weld.import: file read failed')); };
+    if (isPngName) fr.readAsArrayBuffer(file); else fr.readAsText(file);
+  }).then(function (data) {
+    if (isPngName) return parse(new Uint8Array(data));
+    return parse(data);
+  });
+}
+
+function formats() {
+  return ['tavern-png', 'tavern-v3', 'tavern-v2', 'tavern-v1', 'furai-character', 'furai-chat', 'ai-character-chat', 'generic-chat', 'jsonl-chat'];
+}
+
+window.weld.import = {
+  detect: detect,
+  parse: parse,
+  parseFile: parseFile,
+  attach: attach,
+  formats: formats,
+  version: '1.0.0'
+};
+
+return window.weld.import;
+})();
+</script>
+<script>
+
+  function boot(){ if(!window.weld||!window.weld.import){return setTimeout(boot,100);} init(); }
+  function init(){
+    var I=window.weld.import, $=function(id){return document.getElementById(id);};
+    var SAMPLES={
+      v2: JSON.stringify({ spec:'chara_card_v2', spec_version:'2.0', data:{ name:'Lyra', description:'A wandering cartographer.', personality:'curious, dry wit', first_mes:'You again. Lost?', mes_example:'' } }, null, 2),
+      furai: JSON.stringify({ char_name:'Rusk', persona:'A grizzled airship mechanic.', greeting:'*wipes grease off a wrench* Need somethin\'?' }, null, 2),
+      jsonl: '{"role":"user","content":"Where are we headed?"}\n{"role":"assistant","name":"Lyra","content":"North. Past the salt flats."}\n{"role":"user","content":"And after that?"}'
+    };
+    [].forEach.call(document.querySelectorAll('.exb'),function(b){ b.onclick=function(){ $('in').value=SAMPLES[b.getAttribute('data-k')]||''; }; });
+    $('go').onclick=function(){
+      var text=$('in').value.trim(); if(!text){return;}
+      var det=I.detect(text);
+      $('det').textContent=det.format+' ('+det.kind+', '+Math.round(det.confidence*100)+'%)';
+      $('det').className='chip '+(det.format==='unknown'?'':'k');
+      I.parse(text).then(function(r){
+        $('out').textContent=JSON.stringify(r, null, 2);
+      }).catch(function(e){ $('out').textContent='Error: '+e.message; });
+    };
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+
+</script>

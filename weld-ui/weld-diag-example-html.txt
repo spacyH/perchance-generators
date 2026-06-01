@@ -1,0 +1,424 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--amber:#d29922;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:780px;margin:0 auto;padding:34px 18px 90px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 0 16px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+.breadcrumb a{color:var(--muted);}.breadcrumb .sep{color:var(--faint);margin:0 8px;}.breadcrumb .cur{color:var(--ink);}.breadcrumb .act a{color:var(--accent);}
+.hdr{margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}.hdr h1{font:700 24px var(--mono);letter-spacing:-0.5px;}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;}
+.hdr .lead{color:var(--muted);margin-top:8px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;}
+.panel h2{font:600 13px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:8px 0;}
+.lbl{font:600 12px var(--mono);color:var(--muted);min-width:74px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 15px;font:600 13px var(--font);cursor:pointer;transition:.12s;}
+.btn:hover{filter:brightness(1.08);}.btn.ghost{background:var(--faint);color:var(--ink);}.btn.sm{padding:6px 11px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+input[type=text],textarea{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:8px 10px;font:13px var(--font);}
+input[type=text]{flex:1;min-width:120px;}textarea{width:100%;font:12.5px/1.5 var(--mono);resize:vertical;}
+.mono{font:13px var(--mono);}
+.out{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font:12.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;min-height:20px;color:#c9d1d9;}
+.chip{display:inline-block;background:var(--faint);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font:600 12px var(--mono);margin:2px;}
+.chip.k{background:rgba(63,185,80,.14);border-color:rgba(63,185,80,.4);color:#7ee787;}
+.chip.d{opacity:.4;text-decoration:line-through;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:9px 13px;border-radius:0 4px 4px 0;margin:12px 0 0;font-size:12.5px;color:#c9d1d9;}
+.note.warn{background:rgba(210,153,34,.08);border-color:var(--amber);}
+.tag{font:600 10px var(--mono);padding:2px 7px;border-radius:4px;background:rgba(63,185,80,.14);color:#7ee787;border:1px solid rgba(63,185,80,.4);}
+.tag.ai{background:rgba(210,153,34,.12);color:#e3b341;border-color:rgba(210,153,34,.4);}
+.bar{height:14px;background:var(--accent);border-radius:3px;transition:width .3s;}
+.footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);}.footer a{color:var(--muted);}
+.flex{display:flex;gap:10px;align-items:center;}.wrap{flex-wrap:wrap;}.grow{flex:1;}.mt{margin-top:10px;}
+</style>
+<div id="page">
+<div class="breadcrumb"><span><a href="https://perchance.org/weld-ui-index">weld</a><span class="sep">/</span>weld.diag<span class="sep">/</span><span class="cur">demo</span></span><span class="act"><a href="https://perchance.org/weld-diag-plugin">docs &rarr;</a></span></div>
+<div class="hdr"><div class="hdr-row"><h1>weld.diag &mdash; demo</h1><span class="ver">v1.1.0</span></div><p class="lead">Paste plugin code and lint it for Perchance brace-interception traps and common bugs — the same gate the Weld suite runs on itself. Includes trap, clean, and bug samples.</p></div>
+  <div class="panel"><h2>Lint some code <span class="tag">brace-trap + bug scan</span></h2>
+    <div class="row"><button class="btn sm exb" data-k="traps">trap sample</button><button class="btn ghost sm exb" data-k="clean">clean sample</button><button class="btn ghost sm exb" data-k="bugs">bug sample</button></div>
+    <textarea id="code" rows="9" spellcheck="false" style="width:100%;font:12px/1.5 var(--mono);" placeholder="Paste plugin DSL or JS here…"></textarea>
+    <div class="row"><button id="lint" class="btn">Lint</button><span id="summary" class="chip">—</span></div>
+    <div id="out" class="out mt"></div>
+    <div class="note">weld.diag.lint() scans for Perchance brace-interception traps (the tokens the platform rewrites in your source) and common bugs, returning findings with severity, line, and a short code. It's the same linter the Weld suite's own quality gate runs. weld.diag is also a structured logger — log/warn/error into a buffer you can bundle and download for support.</div>
+  </div>
+<footer class="footer"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
+</div>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.diag) return window.weld.diag;
+
+// -----------------------------------------------------------------
+// STATE
+// -----------------------------------------------------------------
+var MAX_ENTRIES = 200;
+var entries = [];
+var subscribers = [];
+var hooksInstalled = false;
+
+// -----------------------------------------------------------------
+// CORE LOGGING
+// -----------------------------------------------------------------
+function nowIso() { return new Date().toISOString(); }
+
+function safeStr(v) {
+  if (v == null) return String(v);
+  if (typeof v === 'string') return v;
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  if (v instanceof Error) return v.message + (v.stack ? '\n' + v.stack : '');
+  try { return JSON.stringify(v); } catch (e) { return '\[unserializable\]'; }
+}
+
+function record(level, source, message, data) {
+  var entry = {
+    timestamp: nowIso(),
+    level: level,    // debug | info | warn | error
+    source: source,  // manual | console | window | promise | <custom>
+    message: String(message),
+    data: data == null ? null : data
+  };
+  entries.push(entry);
+  while (entries.length > MAX_ENTRIES) entries.shift();
+  for (var i = 0; i < subscribers.length; i++) {
+    try { subscribers[i](entry); } catch (e) { /* swallow */ }
+  }
+  return entry;
+}
+
+// -----------------------------------------------------------------
+// AUTO-CAPTURE HOOKS
+// -----------------------------------------------------------------
+function installHooks() {
+  if (hooksInstalled) return;
+  hooksInstalled = true;
+
+  // Wrap console.error / console.warn (preserve originals)
+  if (console && typeof console.error === 'function' && !console.error.__weldHooked) {
+    var origError = console.error.bind(console);
+    var hookedError = function() {
+      var args = Array.prototype.slice.call(arguments);
+      record('error', 'console', args.map(safeStr).join(' '), null);
+      return origError.apply(console, arguments);
+    };
+    hookedError.__weldHooked = true;
+    console.error = hookedError;
+  }
+  if (console && typeof console.warn === 'function' && !console.warn.__weldHooked) {
+    var origWarn = console.warn.bind(console);
+    var hookedWarn = function() {
+      var args = Array.prototype.slice.call(arguments);
+      record('warn', 'console', args.map(safeStr).join(' '), null);
+      return origWarn.apply(console, arguments);
+    };
+    hookedWarn.__weldHooked = true;
+    console.warn = hookedWarn;
+  }
+
+  // window.onerror
+  window.addEventListener('error', function(e) {
+    record('error', 'window', e.message || 'unknown error', {
+      filename: e.filename,
+      line: e.lineno,
+      col: e.colno,
+      stack: e.error && e.error.stack
+    });
+  });
+
+  // unhandled promise rejections
+  window.addEventListener('unhandledrejection', function(e) {
+    var reason = e.reason;
+    var msg = (reason && reason.message) || safeStr(reason);
+    record('error', 'promise', 'Unhandled rejection: ' + msg, {
+      stack: reason && reason.stack
+    });
+  });
+}
+
+// -----------------------------------------------------------------
+// BUNDLE GENERATION
+// -----------------------------------------------------------------
+function detectPluginVersions() {
+  var versions = {};
+  if (!window.weld) return versions;
+  var names = ['ui', 'migrate', 'backup', 'diag', 'quota', 'undo', 'settings', 'toast', 'markdown', 'chatui', 'lorebook', 'branching'];
+  for (var i = 0; i < names.length; i++) {
+    var n = names[i];
+    if (window.weld[n] && window.weld[n].version) versions[n] = window.weld[n].version;
+  }
+  return versions;
+}
+
+function bundle(opts) {
+  opts = opts || {};
+  var b = {
+    generatedAt: nowIso(),
+    generator: opts.generator || (typeof generatorName !== 'undefined' ? generatorName : 'unknown'),
+    url: location.href,
+    userAgent: navigator.userAgent,
+    platform: navigator.platform,
+    language: navigator.language,
+    viewport: { w: window.innerWidth, h: window.innerHeight },
+    pluginVersions: detectPluginVersions(),
+    entryCount: entries.length,
+    maxEntries: MAX_ENTRIES,
+    entries: entries.slice()
+  };
+  if (opts.extra) b.extra = opts.extra;
+  return b;
+}
+
+function bundleAsText(opts) {
+  return JSON.stringify(bundle(opts), null, 2);
+}
+
+function copyBundle(opts) {
+  var text = bundleAsText(opts);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).then(function() {
+      return { success: true, size: text.length };
+    });
+  }
+  // Fallback for non-secure contexts
+  return new Promise(function(resolve, reject) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    ta.style.top = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try {
+      var ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (ok) resolve({ success: true, size: text.length });
+      else reject(new Error('copy command failed'));
+    } catch (e) {
+      document.body.removeChild(ta);
+      reject(e);
+    }
+  });
+}
+
+function downloadBundle(opts) {
+  opts = opts || {};
+  var text = bundleAsText(opts);
+  var blob = new Blob([text], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = opts.filename || ('weld-diag-' + Date.now() + '.json');
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function() {
+    if (a.parentNode) a.parentNode.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 100);
+  return { success: true, filename: a.download, size: text.length };
+}
+
+// -----------------------------------------------------------------
+// SUBSCRIPTIONS
+// -----------------------------------------------------------------
+function subscribe(fn) {
+  if (typeof fn !== 'function') throw new Error('subscribe requires a function');
+  subscribers.push(fn);
+  return function unsubscribe() {
+    var i = subscribers.indexOf(fn);
+    if (i !== -1) subscribers.splice(i, 1);
+  };
+}
+
+// -----------------------------------------------------------------
+// QUERY
+// -----------------------------------------------------------------
+function filter(predicate) {
+  if (typeof predicate === 'string') {
+    var level = predicate;
+    return entries.filter(function(e) { return e.level === level; });
+  }
+  if (typeof predicate === 'function') return entries.filter(predicate);
+  return entries.slice();
+}
+
+function clear() {
+  var n = entries.length;
+  entries.length = 0;
+  return n;
+}
+
+// -----------------------------------------------------------------
+// INIT
+// -----------------------------------------------------------------
+installHooks();
+
+// ---- code checking: offline lint + Perchance's findBugsInCode endpoint ----
+// lint(code) runs entirely in-page and is always available. findBugs(code)
+// POSTs to Perchance's editor-copilot; that endpoint is host-allowlisted to
+// the perchance.org editor origin (returns 403 "Host not in allowlist"
+// elsewhere), so lint() is the dependable check and findBugs() is a bonus
+// when running inside the editor.
+
+var BUGCHECK_URL = 'https://editor-copilot.perchance.org/api/findBugsInCode';
+
+function _lint(code) {
+  var res = [];
+  var lines = String(code == null ? '' : code).split('\n');
+  function add(line, sev, c, msg, col) { res.push({ line: line, col: col || 0, severity: sev, code: c, message: msg }); }
+  var outIdx = -1;
+  for (var k = 0; k < lines.length; k++) { if (/^\s*\$output\(\)\s*=>/.test(lines[k])) { outIdx = k; break; } }
+
+  // 1. brace-interception traps on raw source
+  for (var i = 0; i < lines.length; i++) {
+    var raw = lines[i], ln = i + 1;
+    var topImport = (outIdx === -1 || i < outIdx) && new RegExp('^\\s*[\\w$]+\\s*=\\s*\\{' + 'import:[^}]+\\}\\s*$').test(raw);
+    if (topImport) continue;
+    var clean = raw.replace(/\\[{}\[\]]/g, '');
+    var p1 = clean.indexOf('[' + '['); if (p1 !== -1) add(ln, 'error', 'brace-interception', 'literal "[' + '[" is intercepted by Perchance, even inside strings and comments', p1 + 1);
+    var p2 = clean.indexOf('{' + '{'); if (p2 !== -1) add(ln, 'error', 'brace-interception', 'literal "{' + '{" is intercepted by Perchance', p2 + 1);
+    var p3 = clean.indexOf('{' + 'import:'); if (p3 !== -1) add(ln, 'error', 'brace-interception', 'literal "{' + 'import:" outside a top-level import directive is intercepted', p3 + 1);
+  }
+
+  // regex/string/comment-aware tokenizer for balance checking
+  var bodyStart = outIdx === -1 ? 0 : outIdx + 1;
+  var bodyText = (outIdx === -1 ? lines : lines.slice(bodyStart)).join('\n');
+  var depth = { '(': 0, '[': 0, '{': 0 }, close = { ')': '(', ']': '[', '}': '{' };
+  var inStr = null, inTpl = false, inLine = false, inBlock = false, inRe = false, inCls = false, prevSig = '';
+  var line = bodyStart + 1, col = 0;
+  for (var c = 0; c < bodyText.length; c++) {
+    var ch = bodyText.charAt(c), nx = bodyText.charAt(c + 1);
+    if (ch === '\n') { line++; col = 0; inLine = false; continue; }
+    col++;
+    if (inLine) continue;
+    if (inBlock) { if (ch === '*' && nx === '/') { inBlock = false; c++; col++; } continue; }
+    if (inStr) { if (ch === '\\') { c++; col++; } else if (ch === inStr) inStr = null; continue; }
+    if (inTpl) { if (ch === '\\') { c++; col++; } else if (ch === '`') inTpl = false; else if (ch === '$' && nx === '{') { c++; col++; } continue; }
+    if (inRe) { if (ch === '\\') { c++; col++; } else if (ch === '[') inCls = true; else if (ch === ']') inCls = false; else if (ch === '/' && !inCls) inRe = false; continue; }
+    if (ch === '/' && nx === '/') { inLine = true; continue; }
+    if (ch === '/' && nx === '*') { inBlock = true; c++; col++; continue; }
+    if (ch === '"' || ch === "'") { inStr = ch; prevSig = ch; continue; }
+    if (ch === '`') { inTpl = true; prevSig = ch; continue; }
+    if (ch === '/') { if (prevSig === '' || '(,=:[!&|?{};+-*%<>~^'.indexOf(prevSig) !== -1) { inRe = true; continue; } prevSig = ch; continue; }
+    if (/\S/.test(ch)) {
+      if (ch === '(' || ch === '[' || ch === '{') depth[ch]++;
+      else if (ch === ')' || ch === ']' || ch === '}') { var o = close[ch]; if (depth[o] <= 0) add(line, 'error', 'unbalanced', 'unmatched "' + ch + '"', col); else depth[o]--; }
+      prevSig = ch;
+    }
+  }
+  var endLn = bodyStart + bodyText.split('\n').length;
+  if (depth['('] > 0) add(endLn, 'error', 'unbalanced', depth['('] + ' unclosed "("');
+  if (depth['['] > 0) add(endLn, 'error', 'unbalanced', depth['['] + ' unclosed "["');
+  if (depth['{'] > 0) add(endLn, 'error', 'unbalanced', depth['{'] + ' unclosed "{"');
+
+  // 3. weld conventions + common traps
+  if (outIdx !== -1) {
+    if (!/['"]use strict['"]/.test(bodyText.slice(0, 400))) add(outIdx + 2, 'warn', 'use-strict', "$output body should start with 'use strict';");
+    if (!/window\.weld\b/.test(bodyText)) add(outIdx + 1, 'warn', 'weld-namespace', 'plugin does not reference window.weld');
+    if (!/version\s*:\s*['"]\d+\.\d+\.\d+['"]/.test(bodyText)) add(outIdx + 1, 'warn', 'version', 'no semver version: field on the API object');
+  }
+  for (var b = 0; b < lines.length; b++) {
+    var lr = lines[b];
+    if (/===|!==/.test(lr) && /(\.generatedText\b|\.decrypt\s*\([^)]*\)\s*(===|!==)|(===|!==)\s*\w+\.decrypt)/.test(lr) && !/typeof\b/.test(lr) && !/String\s*\(/.test(lr))
+      add(b + 1, 'warn', 'boxed-string', 'comparing a possibly-boxed String with ===/!== ; wrap in String(...) first');
+    var mm = /\bif\s*\(/.exec(lr);
+    if (mm) {
+      var j = mm.index + mm[0].length, d = 1, inside = '';
+      for (; j < lr.length && d > 0; j++) { var cc = lr.charAt(j); if (cc === '(') d++; else if (cc === ')') d--; if (d > 0) inside += cc; }
+      if (d === 0) { var cond = inside.replace(/'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`/g, ''); if (/[^=!<>+\-*/%&|^]=[^=]/.test(' ' + cond)) add(b + 1, 'warn', 'assign-in-if', 'assignment (=) inside if(...) condition — did you mean == / ===?', mm.index + 1); }
+    }
+  }
+  res.sort(function (a, z) { return a.line - z.line || a.col - z.col; });
+  return res;
+}
+
+function lint(code) { try { return _lint(code); } catch (e) { return [{ line: 0, col: 0, severity: 'error', code: 'lint-crash', message: 'lint failed: ' + (e && e.message) }]; } }
+
+function findBugs(code, opts) {
+  opts = opts || {};
+  var fetcher = opts.fetcher || (typeof superFetch === 'function' ? superFetch : (typeof fetch === 'function' ? fetch : null));
+  if (typeof fetcher !== 'function') return Promise.reject(new Error('weld.diag.findBugs: no fetcher available'));
+  var payload = { code: String(code == null ? '' : code), contentType: opts.contentType || 'plugin', generatorName: opts.generatorName || (window.generatorName || 'weld') };
+  return Promise.resolve(fetcher(BUGCHECK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }))
+    .then(function (r) { if (r && typeof r.text === 'function') { if (typeof r.status === 'number' && r.status === 403) throw new Error('findBugs: 403 — endpoint is host-allowlisted to the Perchance editor origin; use lint() outside it'); return r.text(); } return r; })
+    .then(function (t) { try { return JSON.parse(t); } catch (e) { return []; } });
+}
+
+// check(code, opts) -> { findings, ok, remote }   (remote is a Promise or null)
+function check(code, opts) {
+  opts = opts || {};
+  var findings = lint(code);
+  var ok = !findings.some(function (f) { return f.severity === 'error'; });
+  var remote = opts.remote ? findBugs(code, opts).catch(function (e) { return { error: e.message }; }) : null;
+  return { findings: findings, ok: ok, remote: remote };
+}
+
+window.weld.diag = {
+  log:   function(msg, data) { return record('info',  'manual', msg, data); },
+  info:  function(msg, data) { return record('info',  'manual', msg, data); },
+  warn:  function(msg, data) { return record('warn',  'manual', msg, data); },
+  error: function(msg, data) { return record('error', 'manual', msg, data); },
+  debug: function(msg, data) { return record('debug', 'manual', msg, data); },
+
+  record: record,    // for custom sources: weld.diag.record('info', 'api', 'fetched', { url: '/foo' })
+  entries: function() { return entries.slice(); },
+  filter: filter,
+  count: function() { return entries.length; },
+  clear: clear,
+
+  bundle: bundle,
+  bundleAsText: bundleAsText,
+  copyBundle: copyBundle,
+  downloadBundle: downloadBundle,
+
+  subscribe: subscribe,
+
+  lint: lint,
+  findBugs: findBugs,
+  check: check,
+
+  setMaxEntries: function(n) {
+    MAX_ENTRIES = Math.max(1, n | 0);
+    while (entries.length > MAX_ENTRIES) entries.shift();
+    return MAX_ENTRIES;
+  },
+  getMaxEntries: function() { return MAX_ENTRIES; },
+
+  version: '1.1.0'
+};
+
+return window.weld.diag;
+})();
+</script>
+<script>
+
+  function boot(){ if(!window.weld||!window.weld.diag){return setTimeout(boot,100);} init(); }
+  function init(){
+    var D=window.weld.diag, $=function(id){return document.getElementById(id);};
+    var LB=String.fromCharCode(123), RB=String.fromCharCode(125), BR=String.fromCharCode(91);
+    var SAMPLES={
+      traps: "$output() =>\n  'use strict';\n  // these tokens get rewritten by Perchance:\n  var pick = '"+LB+"a|b|c"+RB+"';\n  var nested = arr"+BR+BR+"0]];\n  var quant = /x"+LB+"3"+RB+"/;\n  return "+LB+" pick: pick "+RB+";",
+      clean: "$output() =>\n  'use strict';\n  if(!window.weld) window.weld = {};\n  if(window.weld.demo) return window.weld.demo;\n  var n = 0;\n  window.weld.demo = { bump: function(){ return ++n; }, version: '1.0.0' };\n  return window.weld.demo;",
+      bugs:  "$output() =>\n  'use strict';\n  var result = aiText('hi');\n  if (result === 'done') finish();   // boxed-String compare bug\n  for (var i=0;i<items.length;i++){ setTimeout(function(){ use(items[i]); },10); }  // loop var capture\n  return result;"
+    };
+    [].forEach.call(document.querySelectorAll('.exb'),function(b){ b.onclick=function(){ $('code').value=SAMPLES[b.getAttribute('data-k')]||''; }; });
+    var SEVCOLOR={error:'#ff7b72',warn:'#e3b341',info:'var(--accent)',debug:'var(--muted)'};
+    $('lint').onclick=function(){
+      var code=$('code').value; if(!code.trim()){ return; }
+      var findings=D.lint(code)||[];
+      var errs=findings.filter(function(f){return f.severity==='error';}).length;
+      var warns=findings.filter(function(f){return f.severity==='warn';}).length;
+      $('summary').textContent=findings.length===0?'clean — 0 findings':(errs+' error, '+warns+' warn, '+(findings.length-errs-warns)+' info');
+      $('summary').className='chip '+(errs?'':(findings.length?'':'k'));
+      if(!findings.length){ $('out').innerHTML='<span style="color:#7ee787;">No findings — this code is parser-safe.</span>'; return; }
+      $('out').innerHTML=findings.map(function(f){
+        return '<div style="padding:5px 0;border-top:1px solid var(--border);font-size:12.5px;"><span class="mono" style="color:'+(SEVCOLOR[f.severity]||'var(--ink)')+';font-weight:600;">'+f.severity+'</span> <span class="mono" style="color:var(--muted);">L'+f.line+(f.col?':'+f.col:'')+'</span> <span class="mono" style="color:var(--muted);">['+f.code+']</span> '+f.message.replace(/</g,'&lt;')+'</div>';
+      }).join('');
+    };
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+
+</script>

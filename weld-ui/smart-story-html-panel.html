@@ -2523,6 +2523,7 @@
   function clearChatPanel() {
     $("messages").innerHTML = "";
     currentMessages = [];
+    if (typeof branchTrees !== "undefined" && branchTrees.clear) branchTrees.clear();
   }
   function scrollChatToBottom() {
     const c = $("chatPanel");
@@ -2899,18 +2900,50 @@
   // =====================================================================
   // BRANCHING (swipe between regenerated takes)
   // ---------------------------------------------------------------------
-  // weld.regen owns this UX, but it drives a weld.branching TREE. Smart-
-  // story persists a flat message list in Dexie, so rather than refactor
-  // the whole store we keep a local "sibling" model ON the message that
-  // mirrors weld.regen's variants/swipe semantics exactly: each assistant
-  // message can hold `branches: [{ content, characterId, speakerName,
-  // createdAt }]` plus `branchIndex`. When weld.regen is present we route
-  // navigation bookkeeping through it (variants/swipe) so the behavior is
-  // identical to a tree-backed app and we can adopt the tree later; when
-  // it isn't, the local helpers below are the fallback. Either way the
-  // user gets character.ai-style swipe between alternatives instead of the
-  // old destroy-and-reroll.
+  // The durable store is the per-message `branches: [{ content, characterId,
+  // speakerName, createdAt }]` array plus `branchIndex` (persisted in Dexie,
+  // survives reload). When weld.branching + weld.regen are present we ALSO
+  // build a real branching TREE per message — the takes become sibling nodes
+  // under a shared parent — and route navigation through weld.regen.swipe /
+  // weld.branching.siblings against that tree. The array and the tree are
+  // kept in lock-step (the tree is authoritative for navigation when present,
+  // the array is authoritative for persistence), so the behavior is a true
+  // tree-backed swipe deck, degrading to array math when the plugins are
+  // absent. This is the full conversion of the earlier local-only model.
   // =====================================================================
+
+  // Per-message tree cache: msgId -> { tree, parentId, nodeIds:[] } mirroring
+  // the branches[] order. Lazily built; null when weld.branching is absent.
+  const branchTrees = new Map();
+  function weldTree() {
+    const w = window.weld;
+    return (w && w.branching && typeof w.branching.create === "function") ? w.branching : null;
+  }
+  // Build (or fetch) the tree for a message from its branches[] array.
+  function treeFor(msg) {
+    const wb = weldTree();
+    if (!wb || !msg) return null;
+    let entry = branchTrees.get(msg.id);
+    if (entry) return entry;
+    ensureBranchSeed(msg);
+    const tree = wb.create();
+    // A synthetic parent node anchors the takes (the "prompt" they answer).
+    const parentId = tree.append({ role: "parent", content: "" });
+    // The FIRST take is a child of the parent (append under it); each
+    // subsequent take is a SIBLING of the first (branch makes a sibling of
+    // the node you pass, sharing its parent). This is the correct
+    // weld.branching idiom — branch(node) != "child of node".
+    const nodeIds = [];
+    msg.branches.forEach(function (b, i) {
+      const data = { role: "assistant", content: b.content, characterId: b.characterId || null, speakerName: b.speakerName || "" };
+      const id = (i === 0) ? tree.append(data, parentId) : tree.branch(nodeIds[0], data);
+      nodeIds.push(id);
+    });
+    if (nodeIds[msg.branchIndex]) tree.setActive(nodeIds[msg.branchIndex]);
+    entry = { tree: tree, parentId: parentId, nodeIds: nodeIds };
+    branchTrees.set(msg.id, entry);
+    return entry;
+  }
 
   // Snapshot a message's current text as branch 0 if it has no branches yet.
   function ensureBranchSeed(msg) {
@@ -2926,9 +2959,13 @@
     }
   }
 
-  // Append a fresh take as a new sibling and make it active.
+  // Append a fresh take as a new sibling and make it active. Updates both the
+  // durable array and (when present) the branching tree.
   function addBranch(msg, take) {
     ensureBranchSeed(msg);
+    // Build/fetch the tree from the EXISTING takes first, so the lazy build
+    // doesn't double-count the take we're about to push.
+    const entry = treeFor(msg);
     msg.branches.push({
       content: take.content,
       characterId: take.characterId || null,
@@ -2936,6 +2973,20 @@
       createdAt: Date.now(),
     });
     msg.branchIndex = msg.branches.length - 1;
+    // Mirror the single new take into the tree as a real sibling node.
+    if (entry) {
+      // branch(firstTake) creates a sibling sharing the parent; if somehow
+      // there's no first node yet, append under the parent instead.
+      const data = {
+        role: "assistant", content: take.content,
+        characterId: take.characterId || null, speakerName: take.speakerName || "",
+      };
+      const nodeId = entry.nodeIds.length
+        ? entry.tree.branch(entry.nodeIds[0], data)
+        : entry.tree.append(data, entry.parentId);
+      entry.nodeIds.push(nodeId);
+      entry.tree.setActive(nodeId);
+    }
     applyActiveBranch(msg);
   }
 
@@ -2950,16 +3001,37 @@
   }
 
   // Move between siblings. dir = +1 / -1. Returns true if it moved.
+  // Routes through weld.regen.swipe against the real tree when present;
+  // falls back to array index math otherwise. Smart-story CLAMPS at the
+  // ends (no wraparound), so we reject a regen.swipe result that wrapped.
   function swipeBranch(msg, dir) {
     if (!msg || !Array.isArray(msg.branches) || msg.branches.length < 2) return false;
-    // Prefer weld.regen.variants/swipe bookkeeping when present — we mirror
-    // its index math so the two never disagree.
+    const cur = (typeof msg.branchIndex === "number") ? msg.branchIndex : 0;
     const n = msg.branches.length;
-    let next = (typeof msg.branchIndex === "number" ? msg.branchIndex : 0) + (dir < 0 ? -1 : 1);
-    if (next < 0) next = 0;
-    if (next > n - 1) next = n - 1;
-    if (next === msg.branchIndex) return false;
-    msg.branchIndex = next;
+    // Intended clamped destination — used to veto regen's wraparound.
+    let want = cur + (dir < 0 ? -1 : 1);
+    if (want < 0 || want > n - 1) return false;   // at an end: clamp, no move
+
+    const w = window.weld;
+    const entry = treeFor(msg);
+    if (entry && w && w.regen && typeof w.regen.swipe === "function") {
+      const moved = w.regen.swipe(entry.tree, entry.nodeIds[cur], dir < 0 ? -1 : 1);
+      if (moved && moved.id) {
+        const newIdx = entry.nodeIds.indexOf(moved.id);
+        if (newIdx === want) {           // matches the clamped intent → accept
+          msg.branchIndex = newIdx;
+          applyActiveBranch(msg);
+          return true;
+        }
+        // regen wrapped around (e.g. -1 at index 0 → last). Undo: restore
+        // the active node to where we actually want to be (no move).
+        if (entry.nodeIds[cur]) entry.tree.setActive(entry.nodeIds[cur]);
+        return false;
+      }
+    }
+    // Fallback: array math (also clamped).
+    msg.branchIndex = want;
+    if (entry && entry.nodeIds[want]) entry.tree.setActive(entry.nodeIds[want]);
     applyActiveBranch(msg);
     return true;
   }
@@ -7159,7 +7231,7 @@
       // weld.regen's swipe semantics back the branching regen; the local
       // sibling model mirrors it when the plugin isn't present.
       console.log("[weld] wired:", Object.keys(w).filter(k => k !== "version"),
-        "| branching regen:", !!(w.regen || true),
+        "| branching regen:", !!(w.regen && w.branching ? "tree-backed" : "array-fallback"),
         "| evolved cutscenes:", !!w.promptforge,
         "| truncation-aware:", !!w.stream);
     } catch (e) { console.warn("[weld] wireWeld failed (non-fatal):", e); }
