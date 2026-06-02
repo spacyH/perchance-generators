@@ -24480,7 +24480,7 @@ Use this template for your response:
     border: 1px solid rgba(255,255,255,0.12);
     border-radius: 8px;
     padding: 4px;
-    z-index: 9999;
+    z-index: 10020; /* above the passive token HUD (10010) */
     display: flex;
     flex-direction: column;
     gap: 2px;
@@ -24539,6 +24539,9 @@ Use this template for your response:
   .pf-tok-danger .pf-tok-text { color: var(--pf-palette-danger, #e06060); opacity: 1; }
 
   /* Floating pill — fixed, on top of everything, never blocks clicks. */
+  /* Host thread-options menu carries no z-index of its own; lift it above the
+     passive token HUD (10010) so the menu is never covered. */
+  #threadOptionsPopup { z-index: 10020; }
   .pf-tok-pill {
     position: fixed;
     z-index: 10010;
@@ -24876,7 +24879,7 @@ Use this template for your response:
     border-radius: 12px;
     box-shadow: 0 12px 32px -8px rgba(0,0,0,0.7);
     padding: 10px;
-    z-index: 9999;
+    z-index: 10020; /* above the passive token HUD (10010) */
     animation: pf-tools-in 0.15s ease-out;
   }
   @keyframes pf-tools-in {
@@ -34228,8 +34231,11 @@ Use this template for your response:
       const out = [];
       const nodes = chatEl.querySelectorAll('.message');
       for (const node of nodes) {
-        const content = node.querySelector('.content');
-        out.push({ id: node.id || '', text: content ? (content.innerText || '') : '' });
+        // This host renders message text in .messageText (not .content) and keeps
+        // the message id in data-id (not id). Read both so the count isn't stuck at 0.
+        const content = node.querySelector('.messageText') || node.querySelector('.content');
+        const id = (node.dataset && node.dataset.id) ? node.dataset.id : (node.id || '');
+        out.push({ id: id, text: content ? (content.innerText || '') : '' });
       }
       return out;
     }
