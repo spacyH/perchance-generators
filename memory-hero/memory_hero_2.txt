@@ -20770,24 +20770,33 @@ Use this template for your response:
   }
   @media (max-width: 760px) { .pf-overlay-sections-grid { column-count: 1; } }
 
+  .pf-overlay-titlebar {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    background: color-mix(in srgb, var(--pf-theme-primary, #0d1b2e) 98%, transparent);
+    border-bottom: 1px solid rgba(var(--pf-accent-rgb, var(--pf-palette-amber-rgb)), 0.10);
+  }
   .pf-overlay-close {
-    position: fixed;
-    top: 12px;
-    right: max(12px, calc(50% - 400px - 44px));
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
     border: 1px solid rgba(var(--pf-accent-rgb, var(--pf-palette-amber-rgb)), 0.2);
-    background: linear-gradient(180deg, var(--pf-theme-secondary, #142847) 0%, var(--pf-theme-primary, #0d1b2e) 100%);
+    background: rgba(255, 255, 255, 0.04);
     color: var(--pf-vellum, #e8dcc4);
-    font-size: 28px;
+    font-size: 20px;
     line-height: 1;
     cursor: pointer;
-    z-index: 10001;
     display: flex;
     align-items: center;
     justify-content: center;
     font-family: inherit;
+    flex-shrink: 0;
   }
   .pf-overlay-close:hover { background: var(--box-color-hover, var(--box-color)); }
   .pf-overlay-close:focus-visible {
@@ -20991,37 +21000,45 @@ Use this template for your response:
   }
 
   /* Share button — top-right corner */
-  .pf-splash-share {
+  /* Action buttons in the top-right of the profile box: Settings, Share, Close. */
+  .pf-splash-actions {
     position: absolute;
     top: 10px;
     right: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    z-index: 2;
+  }
+  .pf-splash-action {
     width: 30px;
     height: 30px;
     padding: 0;
-    border-radius: 50%;
-    background: transparent;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(var(--pf-accent-rgb, var(--pf-palette-amber-rgb)), 0.25);
     color: var(--pf-vellum, #e8dcc4);
     cursor: pointer;
     font-family: inherit;
-    font-size: 14px;
+    font-size: 16px;
+    line-height: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    opacity: 0.5;
+    opacity: 0.85;
     transition: opacity 0.15s, border-color 0.15s, transform 0.15s;
-    z-index: 2;
   }
-  .pf-splash-share:hover {
+  .pf-splash-action:hover {
     opacity: 1;
     border-color: rgba(var(--pf-accent-rgb, var(--pf-palette-amber-rgb)), 0.55);
     transform: scale(1.05);
   }
-  .pf-splash-share:focus-visible {
+  .pf-splash-action:focus-visible {
     outline: 2px solid rgba(var(--pf-accent-rgb, var(--pf-palette-amber-rgb)), 0.55);
     outline-offset: 1px;
     opacity: 1;
   }
+  .pf-splash-close { font-size: 20px; }
   .pf-splash-card-btn {
     right: auto;
     left: auto;
@@ -21222,7 +21239,7 @@ Use this template for your response:
   /* Hide the close × and the share button in focus mode — keep it clean
      for the screenshot. Exit is via tap or Esc, hinted at bottom. */
   .pf-overlay-focused .pf-overlay-close,
-  .pf-overlay-focused .pf-splash-share {
+  .pf-overlay-focused .pf-splash-actions {
     display: none;
   }
 
@@ -24524,8 +24541,6 @@ Use this template for your response:
   /* Floating pill — fixed, on top of everything, never blocks clicks. */
   .pf-tok-pill {
     position: fixed;
-    right: 14px;
-    bottom: 88px;
     z-index: 10010;
     pointer-events: none;
     display: flex;
@@ -24548,6 +24563,9 @@ Use this template for your response:
   body:has(.pf-overlay:not([hidden])) .pf-tok-pill,
   body:has(.pf-settings-modal-backdrop) .pf-tok-pill { display: none; }
   .pf-tok-pill[hidden], .pf-tok-chip[hidden] { display: none; }
+  .pf-tok-pill--tr { top: 12px; right: 14px; }
+  .pf-tok-pill--tl { top: 12px; left: 14px; }
+  .pf-tok-pill--br { bottom: 88px; right: 14px; }
 
   .pf-tok-chip {
     display: flex;
@@ -24579,7 +24597,10 @@ Use this template for your response:
   .pf-preset-active .pf-tok-check { opacity: 0.9; color: var(--accent, #d8a040); }
 
   @media (max-width: 600px) {
-    .pf-tok-pill { bottom: 76px; right: 10px; min-width: 84px; padding: 5px 8px; }
+    .pf-tok-pill { min-width: 84px; padding: 5px 8px; }
+    .pf-tok-pill--tr { top: 8px; right: 10px; }
+    .pf-tok-pill--tl { top: 8px; left: 10px; }
+    .pf-tok-pill--br { bottom: 76px; right: 10px; }
   }
 
   /* ---- Settings menu (consolidated) ---- */
@@ -24629,12 +24650,12 @@ Use this template for your response:
 
   /* ---- Settings launcher + modal (layered above the profile overlay) ---- */
   .pf-overlay-settings-btn {
-    position: fixed; top: 64px; right: max(12px, calc(50% - 400px - 44px));
-    width: 44px; height: 44px; border-radius: 50%;
+    width: 30px; height: 30px; border-radius: 6px;
     border: 1px solid rgba(var(--pf-accent-rgb, var(--pf-palette-amber-rgb)), 0.2);
-    background: linear-gradient(180deg, var(--pf-theme-secondary, #142847) 0%, var(--pf-theme-primary, #0d1b2e) 100%);
-    color: var(--pf-vellum, #e8dcc4); font-size: 22px; line-height: 1; cursor: pointer;
-    z-index: 10001; display: flex; align-items: center; justify-content: center; font-family: inherit;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--pf-vellum, #e8dcc4); font-size: 16px; line-height: 1; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-family: inherit;
+    flex-shrink: 0;
   }
   .pf-overlay-settings-btn:hover { background: var(--box-color-hover, var(--box-color)); }
   .pf-settings-modal-backdrop {
@@ -29355,15 +29376,21 @@ Use this template for your response:
    *   setFocused: (focused: boolean) => void,
    * }}
    */
-  function createOverlay({ ariaLabel = 'Overlay', children = [], onClose } = {}) {
-    const closeBtn = h('button', {
+  function createOverlay({ ariaLabel = 'Overlay', children = [], onClose, showClose = true } = {}) {
+    // Default chrome: a close button in a sticky titlebar. Callers that render
+    // their own close affordance pass showClose:false — the profile does, since
+    // its action buttons are hard-coded into the splash box instead.
+    const closeBtn = showClose ? h('button', {
       class: 'pf-overlay-close',
       type: 'button',
       'aria-label': 'Close',
       onClick: () => dismiss(),
-    }, ['×']);
+    }, ['×']) : null;
 
-    const contentCol = h('div', { class: 'pf-overlay-content' }, children);
+    const titlebar = closeBtn ? h('div', { class: 'pf-overlay-titlebar' }, [closeBtn]) : null;
+
+    const contentCol = h('div', { class: 'pf-overlay-content' }, titlebar ? [titlebar, ...children] : children);
+
 
     // Hint that shows up only in focus mode to tell the user how to get out.
     // Fades itself after a moment so it doesn't clutter their screenshot
@@ -29386,7 +29413,6 @@ Use this template for your response:
         if (ev.target === scroll) dismiss();
       },
     }, [
-      closeBtn,
       contentCol,
       focusHint,
     ]);
@@ -29440,11 +29466,12 @@ Use this template for your response:
       }
     }
 
+    root.titlebar = titlebar;
     root.show = function show() {
       if (!root.parentNode) document.body.appendChild(root);
       root.hidden = false;
       document.addEventListener('keydown', onKeydown);
-      setTimeout(() => { closeBtn.focus(); }, 0);
+      setTimeout(() => { if (closeBtn) closeBtn.focus(); }, 0);
     };
 
     // hide() does the full teardown — fires onClose so callers' cleanup
@@ -34108,14 +34135,18 @@ Use this template for your response:
   //
   // Bootstrap: call initTokenMeter() from start(). Idempotent.
 
-  const TM_MODES = ['off', 'float', 'sidebar', 'both'];
-  const TM_MODE_LABELS = { off: 'Off', float: 'Floating', sidebar: 'Sidebar', both: 'Floating + Sidebar' };
-  const TM_DEFAULT_MODE = 'float';
+  // Float placement is per-corner; the sidebar chip is an independent toggle.
+  const TM_FLOAT_POS = ['tr', 'tl', 'br', 'off'];
+  const TM_FLOAT_LABELS = { tr: 'Top-right', tl: 'Top-left', br: 'Bottom-right', off: 'Off' };
+  const TM_DEFAULT_FLOAT = 'tr';
 
   // ---- pure helpers (unit-tested) ----
-  function tmResolveMode(raw) {
-    return TM_MODES.indexOf(raw) !== -1 ? raw : TM_DEFAULT_MODE;
+  function tmResolveFloat(raw) {
+    return TM_FLOAT_POS.indexOf(raw) !== -1 ? raw : TM_DEFAULT_FLOAT;
   }
+  // Legacy single 'tokenCounter' (off|float|sidebar|both) -> split values.
+  function tmLegacyFloat(legacy) { return (legacy === 'float' || legacy === 'both') ? 'br' : 'off'; }
+  function tmLegacySidebar(legacy) { return legacy === 'sidebar' || legacy === 'both'; }
   function tmFormat(n) {
     if (!Number.isFinite(n) || n < 0) n = 0;
     return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
@@ -34175,13 +34206,23 @@ Use this template for your response:
       return n;
     }
 
-    function readMode() {
-      try { const s = loadSettings(); return tmResolveMode(s && s.tokenCounter); }
-      catch { return TM_DEFAULT_MODE; }
+    function readFloatPos() {
+      try {
+        const s = loadSettings() || {};
+        if (s.tokenCounterFloat != null) return tmResolveFloat(s.tokenCounterFloat);
+        if (s.tokenCounter != null) return tmLegacyFloat(s.tokenCounter);
+        return TM_DEFAULT_FLOAT;
+      } catch { return TM_DEFAULT_FLOAT; }
     }
-    function writeMode(mode) {
-      try { const s = loadSettings(); s.tokenCounter = mode; saveSettings(s); } catch {}
+    function readSidebar() {
+      try {
+        const s = loadSettings() || {};
+        if (s.tokenCounterSidebar != null) return !!s.tokenCounterSidebar;
+        if (s.tokenCounter != null) return tmLegacySidebar(s.tokenCounter);
+        return false;
+      } catch { return false; }
     }
+    function isActive() { return readFloatPos() !== 'off' || readSidebar(); }
 
     function collectMessageRecords() {
       const out = [];
@@ -34261,15 +34302,15 @@ Use this template for your response:
       if (!chip.hidden) paint(chip, used, pct, tier, true);
     }
 
-    let menuSync = null;
     function applyMode() {
-      const mode = readMode();
-      const showFloat = (mode === 'float' || mode === 'both');
-      const showSide = (mode === 'sidebar' || mode === 'both');
+      const fp = readFloatPos();
+      const showFloat = fp !== 'off';
+      const showSide = readSidebar();
+      pill.classList.remove('pf-tok-pill--tr', 'pf-tok-pill--tl', 'pf-tok-pill--br');
+      if (showFloat) pill.classList.add('pf-tok-pill--' + fp);
       pill.hidden = !showFloat;
       if (showSide) { mountSidebar(); chip.hidden = false; } else { chip.hidden = true; }
-      if (mode !== 'off') render();
-      if (menuSync) menuSync(mode);
+      if (showFloat || showSide) render();
     }
 
     // initial paint + placement
@@ -34277,7 +34318,7 @@ Use this template for your response:
 
     // re-estimate on message changes (debounced — messages stream in fast)
     const observer = new MutationObserver(() => {
-      if (readMode() === 'off') return;
+      if (!isActive()) return;
       clearTimeout(render._t);
       render._t = setTimeout(render, 300);
     });
@@ -34289,62 +34330,8 @@ Use this template for your response:
     // One-shot upgrade: if window.countTokens wasn't ready at first paint,
     // the initial numbers came from the chars/4 fallback. Re-render once
     // the tokenizer has had time to load so the figures become exact.
-    setTimeout(() => { if (readMode() !== 'off') render(); }, 2500);
+    setTimeout(() => { if (isActive()) render(); }, 2500);
 
-    // ---- header dropdown (collected by the Tools menu like other controls) ----
-    (function buildControl() {
-      const container = document.createElement('div');
-      container.className = 'pf-presets-container';
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'pf-export-btn';
-      btn.textContent = '\uD83D\uDD22'; // 🔢 (surrogate pair — avoids \u{...} brace pattern)
-      btn.title = 'Token counter';
-      const dropdown = document.createElement('div');
-      dropdown.className = 'pf-presets-dropdown';
-      dropdown.hidden = true;
-      const heading = document.createElement('div');
-      heading.className = 'pf-tok-menu-heading';
-      heading.textContent = 'Token counter';
-      dropdown.appendChild(heading);
-
-      const itemByMode = {};
-      TM_MODES.forEach((mode) => {
-        const item = document.createElement('button');
-        item.type = 'button';
-        item.className = 'pf-preset-item';
-        const name = document.createElement('span');
-        name.textContent = TM_MODE_LABELS[mode];
-        const check = document.createElement('span');
-        check.className = 'pf-tok-check';
-        check.textContent = '\u2713'; // ✓
-        item.appendChild(name);
-        item.appendChild(check);
-        item.addEventListener('click', () => {
-          writeMode(mode);
-          applyMode();
-          dropdown.hidden = true;
-        });
-        dropdown.appendChild(item);
-        itemByMode[mode] = item;
-      });
-
-      menuSync = function (mode) {
-        Object.keys(itemByMode).forEach((k) => {
-          itemByMode[k].classList.toggle('pf-preset-active', k === mode);
-        });
-      };
-      menuSync(readMode());
-
-      container.appendChild(btn);
-      container.appendChild(dropdown);
-
-      const header = document.querySelector('.chat-header-right') || document.querySelector('.chat-header');
-      /* 🔢 control removed — token-counter mode now lives in the Settings menu */
-
-      btn.addEventListener('click', () => { dropdown.hidden = !dropdown.hidden; });
-      document.addEventListener('click', (e) => { if (!container.contains(e.target)) dropdown.hidden = true; });
-    })();
   }
 
   /* ──────────────────────────────────────────────────────────
@@ -34498,7 +34485,8 @@ Use this template for your response:
       themeMode:      { type: 'select',  label: 'Theme',              default: 'dark',  options: [ { value: 'dark', label: 'Dark' }, { value: 'light', label: 'Light' } ] },
       fontFamily:     { type: 'select',  label: 'Chat font',          default: '',      options: PF_FONT_FAMILIES_OPTS },
       fontSize:       { type: 'select',  label: 'Font size',          default: '',      options: PF_FONT_SIZE_OPTS },
-      tokenCounter:   { type: 'select',  label: 'Token counter',      default: 'float', options: [ { value: 'off', label: 'Off' }, { value: 'float', label: 'Floating' }, { value: 'sidebar', label: 'Sidebar' }, { value: 'both', label: 'Floating + Sidebar' } ] },
+      tokenCounterFloat:   { type: 'select',  label: 'Token counter (float)',   default: 'tr',  options: [ { value: 'tr', label: 'Top-right' }, { value: 'tl', label: 'Top-left' }, { value: 'br', label: 'Bottom-right' }, { value: 'off', label: 'Off' } ] },
+      tokenCounterSidebar: { type: 'boolean', label: 'Token counter (sidebar)', default: false },
       genTemperature: { type: 'number',  label: 'Temperature',        default: 0.8, min: 0, max: 2, step: 0.05, help: 'Higher = more creative/random.' },
       genMaxTokens:   { type: 'number',  label: 'Max tokens / reply', default: 0,   min: 0, max: 4000, step: 1, help: '0 = model default.' },
       chatBackground: { type: 'string',  label: 'Chat background URL', default: '', help: 'Image URL, or leave blank for none.' },
@@ -34512,7 +34500,7 @@ Use this template for your response:
   }
 
   // ---- adapter: map engine values onto Memory-Hero's existing keys ----
-  var PF_TOGGLE_KEYS = ['themeMode', 'fontFamily', 'fontSize', 'tokenCounter', 'genTemperature', 'genMaxTokens', 'chatBackground', 'showReasoning', 'showTimestamps'];
+  var PF_TOGGLE_KEYS = ['themeMode', 'fontFamily', 'fontSize', 'tokenCounterFloat', 'tokenCounterSidebar', 'genTemperature', 'genMaxTokens', 'chatBackground', 'showReasoning', 'showTimestamps'];
   function pfSettingsStorageAdapter() {
     return {
       getItem: function () {
@@ -34522,6 +34510,13 @@ Use this template for your response:
           for (var i = 0; i < PF_TOGGLE_KEYS.length; i++) {
             var key = PF_TOGGLE_KEYS[i];
             if (s[key] !== undefined) out[key] = s[key];
+          }
+          // migrate legacy single 'tokenCounter' -> split keys when the new ones aren't set yet
+          if (out.tokenCounterFloat === undefined && s.tokenCounter != null) {
+            out.tokenCounterFloat = (s.tokenCounter === 'float' || s.tokenCounter === 'both') ? 'br' : 'off';
+          }
+          if (out.tokenCounterSidebar === undefined && s.tokenCounter != null) {
+            out.tokenCounterSidebar = (s.tokenCounter === 'sidebar' || s.tokenCounter === 'both');
           }
           var ov = s.promptOverrides || {};
           for (var id in ov) { if (ov[id] !== undefined) out['prompt.' + id] = ov[id]; }
@@ -34556,7 +34551,7 @@ Use this template for your response:
       else if (key === 'chatBackground') { if (typeof applyBg === 'function') applyBg(engine.get('chatBackground') || ''); }
       else if (key === 'showReasoning') { if (window.pfApplyReasoning) window.pfApplyReasoning(); }
       else if (key === 'showTimestamps') { if (window.pfApplyTimestamps) window.pfApplyTimestamps(); }
-      // tokenCounter: token_meter self-applies via its own onSettingsChange.
+      // tokenCounterFloat / tokenCounterSidebar: token_meter self-applies via its own onSettingsChange.
       // genTemperature/genMaxTokens: read at generation time; nothing to apply now.
     } catch (e) { /* non-fatal */ }
   }
@@ -34653,7 +34648,8 @@ Use this template for your response:
     // ---- group: Chat ----
     var gC = document.createElement('div'); gC.className = 'pf-settings-group';
     var hC = document.createElement('h4'); hC.textContent = 'Chat'; gC.appendChild(hC);
-    gC.appendChild(row('Token counter', selectControl('tokenCounter')));
+    gC.appendChild(row('Token counter (float)', selectControl('tokenCounterFloat')));
+    gC.appendChild(row('Token counter (sidebar)', boolControl('tokenCounterSidebar')));
     gC.appendChild(row('Show AI reasoning', boolControl('showReasoning')));
     gC.appendChild(row('Message timestamps', boolControl('showTimestamps')));
 
@@ -34742,7 +34738,7 @@ Use this template for your response:
     // ---- tabbed layout (Smart-Story .settingsTabs pattern) ----
     var TABS = [
       { id: 'appearance', label: 'Appearance', group: gA, keys: ['themeMode', 'fontFamily', 'fontSize', 'chatBackground'] },
-      { id: 'chat',       label: 'Chat',       group: gC, keys: ['tokenCounter', 'showReasoning', 'showTimestamps'] },
+      { id: 'chat',       label: 'Chat',       group: gC, keys: ['tokenCounterFloat', 'tokenCounterSidebar', 'showReasoning', 'showTimestamps'] },
       { id: 'generation', label: 'Generation', group: gG, keys: ['genTemperature', 'genMaxTokens'] },
       { id: 'prompts',    label: 'Prompts',    group: gP, keys: Object.keys(PF_PROMPT_DEFAULTS).map(function (id) { return 'prompt.' + id; }) },
       { id: 'narration',  label: 'Narration',  group: gN, keys: [] },
@@ -38635,7 +38631,7 @@ Use this template for your response:
    *   onCardClick?: () => void,      // copies share link to clipboard
    * }} [opts]
    */
-  function createSplash({ onCardClick } = {}) {
+  function createSplash({ onCardClick, onSettings, onClose } = {}) {
     const avatar = h('div', { class: 'pf-splash-avatar', 'aria-hidden': 'true' });
     const nameEl = h('h1', { class: 'pf-splash-name' });
     const titleEl = h('div', { class: 'pf-splash-title' });
@@ -38650,7 +38646,7 @@ Use this template for your response:
     // buttons with a single clear action.
     const shareBtn = typeof onCardClick === 'function'
       ? h('button', {
-          class: 'pf-splash-share',
+          class: 'pf-splash-action pf-splash-share',
           type: 'button',
           title: 'Share your profile',
           'aria-label': 'Copy a shareable link to your profile card',
@@ -38661,8 +38657,34 @@ Use this template for your response:
         ])
       : null;
 
+    const settingsBtn = typeof onSettings === 'function'
+      ? h('button', {
+          class: 'pf-splash-action pf-splash-settings',
+          type: 'button',
+          title: 'Settings',
+          'aria-label': 'Settings',
+          onClick: (ev) => { ev.stopPropagation(); onSettings(); },
+        }, [
+          h('span', { 'aria-hidden': 'true' }, ['\u2699']),
+        ])
+      : null;
+
+    const splashCloseBtn = typeof onClose === 'function'
+      ? h('button', {
+          class: 'pf-splash-action pf-splash-close',
+          type: 'button',
+          title: 'Close',
+          'aria-label': 'Close',
+          onClick: (ev) => { ev.stopPropagation(); onClose(); },
+        }, ['×'])
+      : null;
+
+    // Action buttons hard-coded into the top-right of the profile box,
+    // in order: Settings, Share, Close.
+    const actions = h('div', { class: 'pf-splash-actions' }, [settingsBtn, shareBtn, splashCloseBtn]);
+
     const root = h('div', { class: 'pf-splash' }, [
-      shareBtn,
+      actions,
       h('div', { class: 'pf-splash-top' }, [
         avatar,
         h('div', { class: 'pf-splash-ident' }, [
@@ -41620,6 +41642,8 @@ Use this template for your response:
           showToast('Copy failed — try again', { ms: 2000, kind: 'info' });
         }
       },
+      onSettings: () => { try { openPfSettingsModal(); } catch (e) {} },
+      onClose: () => { if (overlay) overlay.hide(); },
     });
 
     function refreshSplashFromSettings() {
@@ -41913,14 +41937,6 @@ Use this template for your response:
     footer.appendChild(sep2);
     footer.appendChild(githubLink);
 
-    const settingsLauncher = h('button', {
-      class: 'pf-overlay-settings-btn',
-      type: 'button',
-      'aria-label': 'Settings',
-      title: 'Settings',
-      onClick: () => { try { openPfSettingsModal(); } catch (e) {} },
-    }, ['\u2699']);
-
     // ---- overlay ----
     //
     // `overlay` was declared `let overlay = null` at the top of
@@ -41929,9 +41945,9 @@ Use this template for your response:
     // without a TDZ violation. Assign exactly once, here.
     overlay = createOverlay({
       ariaLabel: 'Your profile',
+      showClose: false,
       onClose: () => { try { unsubscribe(); } catch {} },
       children: [
-        settingsLauncher,
         splash,
         focusExtras,
         h('div', { class: 'pf-overlay-sections-grid' }, [
