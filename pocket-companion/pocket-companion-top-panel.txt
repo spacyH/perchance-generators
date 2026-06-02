@@ -1,0 +1,33 @@
+$meta
+  header
+  tags = pet, virtual pet, tamagotchi, ai, companion, chat, creature, illustrated, perchance
+    mode = minimal
+  async dynamic(inputs) =>
+    return {
+      title: "Pocket Companion — AI Virtual Pet",
+      description: "Hatch, raise, and talk to your own AI creature. Feed it, play with it, keep it clean — it lives in real time and chats back in a voice that shifts with its mood. You design how it looks; the AI paints it and gives it a voice.",
+    };
+
+// Core platform plugins only — this generator is fully self-contained and
+// does NOT depend on any external plugin generators. aiTextPlugin powers the
+// pet's voice; textToImagePlugin paints the creature (with client-side
+// background removal for a clean cutout); uploadPlugin + superFetch back the
+// optional share links; fullscreenButtonPlugin is the fullscreen toggle.
+// All stat/decay/evolution logic and every helper (AI streaming, image
+// cutout, persistence, toasts, confetti, share) is inlined in the HTML panel.
+aiTextPlugin = {import:ai-text-plugin}
+textToImagePlugin = {import:text-to-image-plugin}
+uploadPlugin = {import:upload-plugin}
+superFetch = {import:super-fetch-plugin}
+fullscreenButtonPlugin = {import:fullscreen-button-plugin}
+
+// Last-resort replies if the AI broker is completely unavailable. The HTML
+// panel drains its own logic first; this list only renders if every path
+// fails, so it stays in soft, wordless creature character.
+fallbackReply
+  *blinks slowly and tilts its head*
+  *makes a soft, curious chirp*
+  *nuzzles closer, waiting*
+
+output
+  text = [fallbackReply]
