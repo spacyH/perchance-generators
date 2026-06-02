@@ -7924,7 +7924,7 @@ Use this template for your response:
         ``,
         potentiallyRelevantMemoriesAndLoreText ? "<ignore_this_if_irrelevant>\n"+potentiallyRelevantMemoriesAndLoreText+"\n</ignore_this_if_irrelevant>\n" : null,
         // NOTE: Dynamic stuff MUST be near end to prevent prefix cache thrashing.
-        /\b(images?|pics?|selfies?|pictures?|photos?|art|artwork|paintings?|drawings?|draw|paint|generator|generate|generating|ai.?artist|ai.?art)\b/i.test(allMessagesTextForImageMentionDetection) ? `Note: If you want to add an AI-generated image to a message (only when asked/relevant), use this syntax: \`<image>A photo of a cute cat wearing a hat</image>\` and an image will be generated using the description you use. But make sure your image descriptions are longer and more detailed than this example.` : null,
+        /\b(images?|pics?|selfies?|pictures?|photos?|art|artwork|paintings?|drawings?|draw|paint|generator|generate|generating|ai.?artist|ai.?art)\b/i.test(allMessagesTextForImageMentionDetection) ? (window.pfGetPrompt ? window.pfGetPrompt('image.tagHint') : (window.pfPromptDefaults || {})['image.tagHint']) : null,
         replyingCharacterName.toLowerCase() === "narrator" ? null : `Note: All story characters should speak/act for themselves only. Keep each character's actions contained within their *own* messages.`,
         replyInstruction ? `IMPORTANT: A message below (by ${replyingCharacterName}) should be a rewritten/expanded version of the following instruction/idea (creatively interpret and expand upon *all* details from this instruction in the message you write) - REPLY_INSTRUCTION: "${replyInstruction}"` : null,
         reminderMessageText ? `\nREMINDER for writing ${replyingCharacterName}'s messages: "${reminderMessageText}"` : null,
@@ -20754,13 +20754,21 @@ Use this template for your response:
   }
 
   .pf-overlay-content {
-    max-width: 800px;
+    max-width: 1140px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
     gap: 20px;
     font-family: inherit;
   }
+
+  /* Two-column section layout — fills desktop width, halves the scroll. */
+  .pf-overlay-sections-grid { column-count: 2; column-gap: 20px; }
+  .pf-overlay-sections-grid > .pf-section {
+    break-inside: avoid; -webkit-column-break-inside: avoid; page-break-inside: avoid;
+    margin: 0 0 20px;
+  }
+  @media (max-width: 760px) { .pf-overlay-sections-grid { column-count: 1; } }
 
   .pf-overlay-close {
     position: fixed;
@@ -24222,16 +24230,6 @@ Use this template for your response:
     background: rgba(220, 60, 60, 0.3);
   }
 
-  /* ---- Token count display (Batch 2) ---- */
-  .pf-token-display {
-    font-size: 11px;
-    opacity: 0.55;
-    padding: 2px 8px;
-    white-space: nowrap;
-    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-    letter-spacing: 0.02em;
-  }
-
   /* ---- Glossary editor (Batch 2) ---- */
   .pf-glossary-overlay {
     position: fixed;
@@ -24494,6 +24492,174 @@ Use this template for your response:
     cursor: pointer;
   }
   .pf-preset-del:hover { opacity: 1; color: var(--pf-palette-danger, #e06060); }
+
+  /* ---- Token meter (reworked token counter) ---- */
+  /* Shared text + progress bar used by both the floating pill and the
+     sidebar chip. Tier colors driven by the .pf-tok-ok/warn/danger class. */
+  .pf-tok-text {
+    font-size: 11px;
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    opacity: 0.85;
+  }
+  .pf-tok-bar {
+    height: 3px;
+    border-radius: 3px;
+    background: rgba(127, 127, 127, 0.25);
+    overflow: hidden;
+  }
+  .pf-tok-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 3px;
+    background: var(--accent, #d8a040);
+    transition: width 0.25s ease;
+  }
+  .pf-tok-warn .pf-tok-fill { background: var(--pf-accent, #d8a040); }
+  .pf-tok-danger .pf-tok-fill { background: var(--pf-palette-danger, #e06060); }
+  .pf-tok-warn .pf-tok-text { color: var(--pf-accent, #d8a040); opacity: 1; }
+  .pf-tok-danger .pf-tok-text { color: var(--pf-palette-danger, #e06060); opacity: 1; }
+
+  /* Floating pill — fixed, on top of everything, never blocks clicks. */
+  .pf-tok-pill {
+    position: fixed;
+    right: 14px;
+    bottom: 88px;
+    z-index: 10010;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 96px;
+    max-width: 160px;
+    padding: 6px 10px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--box-color, #1e1e1e) 92%, transparent);
+    border: 1px solid rgba(var(--pf-accent-rgb, var(--pf-palette-amber-rgb)), 0.4);
+    box-shadow: 0 3px 14px rgba(0, 0, 0, 0.38);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+
+  /* Sidebar chip — pinned in #leftColumn above the thread list. */
+  /* HUD sits above the chat UI, but hides while a profile/settings overlay
+     is open so it never floats over a takeover view. */
+  body:has(.pf-overlay:not([hidden])) .pf-tok-pill,
+  body:has(.pf-settings-modal-backdrop) .pf-tok-pill { display: none; }
+  .pf-tok-pill[hidden], .pf-tok-chip[hidden] { display: none; }
+
+  .pf-tok-chip {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0 0 6px 0;
+    padding: 6px 8px;
+    border-radius: var(--border-radius, 8px);
+    background: rgba(127, 127, 127, 0.10);
+    border: 1px solid rgba(127, 127, 127, 0.18);
+  }
+  .pf-tok-lead {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.5;
+  }
+
+  /* Menu heading + active-mode indicator inside the header dropdown. */
+  .pf-tok-menu-heading {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.5;
+    padding: 4px 8px 2px;
+  }
+  .pf-tok-check { opacity: 0; font-size: 12px; }
+  .pf-preset-active { font-weight: 600; }
+  .pf-preset-active .pf-tok-check { opacity: 0.9; color: var(--accent, #d8a040); }
+
+  @media (max-width: 600px) {
+    .pf-tok-pill { bottom: 76px; right: 10px; min-width: 84px; padding: 5px 8px; }
+  }
+
+  /* ---- Settings menu (consolidated) ---- */
+  .pf-settings-body { display: flex; flex-direction: column; gap: 18px; }
+  .pf-settings-group { display: flex; flex-direction: column; gap: 8px; }
+  .pf-settings-group h4 { margin: 0 0 2px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.6; }
+  .pf-settings-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; }
+  .pf-settings-label { font-size: 13px; }
+  .pf-settings-help { grid-column: 1 / -1; font-size: 11px; opacity: 0.5; margin-top: -2px; }
+  .pf-settings-select, .pf-settings-num, .pf-settings-text {
+    background: var(--box-color, #1e1e1e); color: var(--text-color, #ccc);
+    border: 1px solid rgba(127,127,127,0.25); border-radius: var(--border-radius, 6px);
+    padding: 4px 8px; font: inherit; font-size: 13px; max-width: 220px;
+  }
+  .pf-settings-text { width: 100%; max-width: 100%; }
+  .pf-settings-check { width: 16px; height: 16px; cursor: pointer; }
+  .pf-settings-tabs { display: flex; gap: 2px; margin-bottom: 14px; border-bottom: 1px solid rgba(127,127,127,0.18); flex-wrap: wrap; }
+  .pf-settings-tab {
+    position: relative; background: none; border: none; cursor: pointer; font: inherit; font-size: 13px;
+    color: var(--pf-vellum, #e8dcc4); opacity: 0.6; padding: 8px 12px;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .pf-settings-tab:hover { opacity: 0.85; }
+  .pf-settings-tab[aria-selected="true"] { opacity: 1; border-bottom-color: var(--pf-accent, #d8a040); font-weight: 600; }
+  .pf-settings-tab.is-dirty::after {
+    content: ''; position: absolute; top: 5px; right: 3px; width: 6px; height: 6px;
+    border-radius: 50%; background: var(--pf-accent, #d8a040);
+  }
+  .pf-settings-group h4 { display: none; }
+  .pf-prompt-block { border: 1px solid rgba(127,127,127,0.18); border-radius: var(--border-radius, 6px); padding: 8px 10px; margin-bottom: 8px; }
+  .pf-prompt-head { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+  .pf-prompt-name { font-size: 12px; font-weight: 600; }
+  .pf-prompt-dot { width: 7px; height: 7px; border-radius: 50%; background: transparent; }
+  .pf-prompt-dot.on { background: var(--accent, #d8a040); }
+  .pf-prompt-textarea {
+    width: 100%; box-sizing: border-box; resize: vertical;
+    background: var(--box-color, #1e1e1e); color: var(--text-color, #ccc);
+    border: 1px solid rgba(127,127,127,0.25); border-radius: var(--border-radius, 6px);
+    padding: 6px 8px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.45;
+  }
+  .pf-prompt-actions { display: flex; gap: 6px; margin-top: 6px; }
+  .pf-prompt-btn {
+    background: none; border: 1px solid rgba(127,127,127,0.3); color: var(--text-color, #ccc);
+    border-radius: 5px; padding: 3px 8px; font-size: 11px; cursor: pointer; opacity: 0.8;
+  }
+  .pf-prompt-btn:hover { opacity: 1; background: rgba(127,127,127,0.12); }
+
+  /* ---- Settings launcher + modal (layered above the profile overlay) ---- */
+  .pf-overlay-settings-btn {
+    position: fixed; top: 64px; right: max(12px, calc(50% - 400px - 44px));
+    width: 44px; height: 44px; border-radius: 50%;
+    border: 1px solid rgba(var(--pf-accent-rgb, var(--pf-palette-amber-rgb)), 0.2);
+    background: linear-gradient(180deg, var(--pf-theme-secondary, #142847) 0%, var(--pf-theme-primary, #0d1b2e) 100%);
+    color: var(--pf-vellum, #e8dcc4); font-size: 22px; line-height: 1; cursor: pointer;
+    z-index: 10001; display: flex; align-items: center; justify-content: center; font-family: inherit;
+  }
+  .pf-overlay-settings-btn:hover { background: var(--box-color-hover, var(--box-color)); }
+  .pf-settings-modal-backdrop {
+    position: fixed; inset: 0; z-index: 10050; background: rgba(5, 8, 12, 0.7);
+    -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+  }
+  .pf-settings-modal {
+    width: 100%; max-width: 640px; max-height: 86vh; display: flex; flex-direction: column;
+    background: var(--pf-theme-primary, #0d1b2e); color: var(--pf-vellum, #e8dcc4);
+    border: 1px solid rgba(var(--pf-accent-rgb, var(--pf-palette-amber-rgb)), 0.3);
+    border-radius: 14px; box-shadow: 0 18px 50px rgba(0,0,0,0.55); outline: none; overflow: hidden;
+  }
+  .pf-settings-modal-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; border-bottom: 1px solid rgba(127,127,127,0.18); flex: 0 0 auto;
+  }
+  .pf-settings-modal-title { font-size: 16px; font-weight: 700; letter-spacing: 0.02em; }
+  .pf-settings-modal-close {
+    width: 32px; height: 32px; border-radius: 50%; cursor: pointer; background: none; color: inherit;
+    border: 1px solid rgba(127,127,127,0.3); font-size: 22px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .pf-settings-modal-close:hover { background: rgba(127,127,127,0.15); }
+  .pf-settings-modal-body { padding: 16px; overflow-y: auto; flex: 1 1 auto; }
 
   /* ---- Bulk thread operations ---- */
   .pf-bulk-toggle {
@@ -28108,6 +28274,31 @@ Use this template for your response:
 
   const BACKUP_SCHEMA_VERSION = 2;
 
+  // Ported from weld.backup: ordered backup migrations + reject-if-newer
+  // guard. Key N upgrades data from version N-1 to N. Identity steps are
+  // safe (mergeOverDefaults backfills additive fields); register a real
+  // transform here on a schema bump.
+  const BACKUP_MIGRATIONS = {
+    // 2: function (s) { return s; },
+  };
+  function migrateBackup(settings, fromSchema) {
+    let data = settings;
+    const from = Number(fromSchema) || 1;
+    const steps = Object.keys(BACKUP_MIGRATIONS).map(Number).filter(function (n) { return !isNaN(n); }).sort(function (a, b) { return a - b; });
+    for (let i = 0; i < steps.length; i++) {
+      const v = steps[i];
+      if (v > from && v <= BACKUP_SCHEMA_VERSION) { try { data = BACKUP_MIGRATIONS[v](data) || data; } catch (e) {} }
+    }
+    return data;
+  }
+  function backupVersionError(schema) {
+    const v = Number(schema);
+    if (!isNaN(v) && v > BACKUP_SCHEMA_VERSION) {
+      return 'This backup is from a newer version (schema v' + v + ') than this build (v' + BACKUP_SCHEMA_VERSION + '). Update Memory-Hero, then re-import.';
+    }
+    return null;
+  }
+
   // ---- Deflate helpers (browser CompressionStream / Node zlib) ----
 
   async function deflateBytes(data) {
@@ -28244,6 +28435,7 @@ Use this template for your response:
   async function exportSettingsCompact() {
     const settings = loadSettings();
     const stripped = stripDefaults(settings, defaultSettings());
+    stripped.__backupSchema = BACKUP_SCHEMA_VERSION;
     const json = JSON.stringify(stripped);
 
     try {
@@ -28288,7 +28480,12 @@ Use this template for your response:
           return { success: false, error: 'Decompressed backup is not a valid object.' };
         }
 
-        const settings = mergeOverDefaults(stripped, defaultSettings());
+        const schema = (typeof stripped.__backupSchema === 'number') ? stripped.__backupSchema : 1;
+        const vErr = backupVersionError(schema);
+        if (vErr) return { success: false, error: vErr };
+        if (stripped.__backupSchema != null) { try { delete stripped.__backupSchema; } catch (e) {} }
+        const migrated = migrateBackup(stripped, schema);
+        const settings = mergeOverDefaults(migrated, defaultSettings());
         saveSettings(settings);
         try { bumpCounter('backupsImported'); } catch {}
         return { success: true, schema: BACKUP_SCHEMA_VERSION };
@@ -28333,6 +28530,10 @@ Use this template for your response:
       settings = parsed;
       schema = 0;
     }
+
+    const vErr = backupVersionError(schema);
+    if (vErr) return { success: false, error: vErr };
+    settings = migrateBackup(settings, schema);
 
     try {
       saveSettings(settings);
@@ -30732,7 +30933,7 @@ Use this template for your response:
 
     const header = document.querySelector('.chat-header-right') ||
                    document.querySelector('.chat-header');
-    if (header) header.appendChild(btn);
+    /* header button removed — moved to the Settings menu */
 
     // ---- Apply visibility ----
     function applyVisibility() {
@@ -30781,6 +30982,8 @@ Use this template for your response:
       });
       observer.observe(chatEl, { childList: true, subtree: true });
     }
+
+    window.pfApplyReasoning = function () { try { showReasoning = !!loadSettings().showReasoning; applyVisibility(); } catch (e) {} };
   }
 
   /* ──────────────────────────────────────────────────────────
@@ -30888,7 +31091,7 @@ Use this template for your response:
 
     const header = document.querySelector('.chat-header-right') ||
                    document.querySelector('.chat-header');
-    if (header) header.appendChild(container);
+    /* header button removed — moved to the Settings menu */
 
     btn.addEventListener('click', () => {
       dropdown.hidden = !dropdown.hidden;
@@ -31049,7 +31252,7 @@ Use this template for your response:
                       document.querySelector('.chat-input-container') ||
                       document.querySelector('.input-bar');
     if (inputArea) {
-      (inputArea.parentElement || inputArea).appendChild(container);
+      /* control removed — moved to the Settings menu */
     }
 
     btn.addEventListener('click', () => { popover.hidden = !popover.hidden; });
@@ -31077,7 +31280,7 @@ Use this template for your response:
       const s = loadSettings();
       return {
         temperature: s.genTemperature != null ? s.genTemperature : null,
-        maxTokens: s.genMaxTokens != null ? s.genMaxTokens : null,
+        maxTokens: s.genMaxTokens ? s.genMaxTokens : null,
       };
     } catch {
       return { temperature: null, maxTokens: null };
@@ -31127,14 +31330,7 @@ Use this template for your response:
       try {
         // Step 1: Extract a visual prompt from the message
         const promptResult = await window.root.aiTextPlugin({
-          instruction: [
-            'Extract a concise visual image prompt from this text.',
-            'Describe what should be depicted: characters, scene, mood, lighting.',
-            'Reply with ONLY the image prompt, nothing else. Keep it under 100 words.',
-            '',
-            'Text:',
-            text.substring(0, 500),
-          ].join('\n'),
+          instruction: (window.pfGetPrompt ? window.pfGetPrompt('image.extract') : ((window.pfPromptDefaults || {})['image.extract'] || '')) + '\n\nText:\n' + text.substring(0, 500),
           stopSequences: ['\n\n'],
         });
 
@@ -31145,7 +31341,7 @@ Use this template for your response:
         imgContainer.className = 'pf-gen-img-container';
         imgContainer.innerHTML = window.root.textToImagePlugin({
           prompt,
-          negativePrompt: 'low quality, worst quality, blurry',
+          negativePrompt: (window.pfGetPrompt ? window.pfGetPrompt('image.negative') : 'low quality, worst quality, blurry'),
           resolution: '512x512',
           onFinish: function(result) {
             try {
@@ -31257,7 +31453,7 @@ Use this template for your response:
 
     const header = document.querySelector('.chat-header-right') ||
                    document.querySelector('.chat-header');
-    if (header) header.appendChild(btn);
+    /* header button removed — moved to the Settings menu */
   }
 
   function applyTheme(mode) {
@@ -31370,7 +31566,7 @@ Use this template for your response:
 
     const header = document.querySelector('.chat-header-right') ||
                    document.querySelector('.chat-header');
-    if (header) header.appendChild(container);
+    /* header button removed — moved to the Settings menu */
 
     btn.addEventListener('click', () => { dropdown.hidden = !dropdown.hidden; });
     document.addEventListener('click', (e) => {
@@ -31772,12 +31968,6 @@ Use this template for your response:
         /* Character grid 2 columns on mobile */
         .pf-char-grid {
           grid-template-columns: repeat(2, 1fr) !important;
-        }
-
-        /* Token display smaller */
-        .pf-token-display {
-          font-size: 10px;
-          padding: 1px 4px;
         }
 
         /* Stop button full width */
@@ -32409,6 +32599,7 @@ Use this template for your response:
 
     function addTimestamp(messageEl, isNew) {
       if (!messageEl) return;
+      try { if (loadSettings().showTimestamps === false) return; } catch (e) {}
       if (messageEl.querySelector('.pf-timestamp')) return;
       if (messageEl.id.startsWith('typing-')) return;
       if (messageEl.id === 'personality-selector-message') return;
@@ -32451,6 +32642,14 @@ Use this template for your response:
       }
     });
     observer.observe(chatEl, { childList: true, subtree: false });
+
+    window.pfApplyTimestamps = function () {
+      try {
+        var on = loadSettings().showTimestamps !== false;
+        chatEl.querySelectorAll('.pf-timestamp').forEach(function (e) { e.style.display = on ? '' : 'none'; });
+        if (on) chatEl.querySelectorAll('.message').forEach(function (m) { addTimestamp(m, false); });
+      } catch (e) {}
+    };
   }
 
   /* ──────────────────────────────────────────────────────────
@@ -33535,40 +33734,22 @@ Use this template for your response:
         }).join('\n\n');
 
         let instruction = '';
+        const pfp = function (id) { return (window.pfGetPrompt ? window.pfGetPrompt(id) : ((window.pfPromptDefaults || {})[id] || '')); };
         switch (mode) {
           case 'impersonate':
-            instruction = [
-              'Write the next message as the USER character, continuing the conversation naturally.',
-              'Match the user\'s established voice, style, and personality.',
-              'Write in first person. Reply with ONLY the message text.',
-              '\nConversation:\n' + context,
-            ].join('\n');
+            instruction = pfp('aiwriter.impersonate') + '\n\nConversation:\n' + context;
             break;
           case 'narrate':
-            instruction = [
-              'Write a brief third-person narration describing the current scene.',
-              'Focus on atmosphere, body language, and environment.',
-              'Keep it under 80 words. Reply with ONLY the narration.',
-              '\nConversation:\n' + context,
-            ].join('\n');
+            instruction = pfp('aiwriter.narrate') + '\n\nConversation:\n' + context;
             break;
           case 'enhance':
             const draft = inputEl ? inputEl.value.trim() : '';
             if (!draft) { showToast('Type a message first, then click Enhance.'); return; }
-            instruction = [
-              'Rewrite this message with more vivid detail, better word choice, and stronger voice.',
-              'Keep the same meaning and character. Reply with ONLY the rewritten text.',
-              '\nOriginal:\n' + draft,
-            ].join('\n');
+            instruction = pfp('aiwriter.enhance') + '\n\nOriginal:\n' + draft;
             break;
           case 'recap':
             if (messages.length < 4) { showToast('Not enough conversation to recap yet.'); return; }
-            instruction = [
-              'Write a brief "Previously on..." recap of this conversation.',
-              'Summarize key events, actions, emotional beats, current situation.',
-              'Third person, present tense, under 100 words. Start with "Previously on..."',
-              '\nConversation:\n' + context,
-            ].join('\n');
+            instruction = pfp('aiwriter.recap') + '\n\nConversation:\n' + context;
             break;
         }
 
@@ -33901,97 +34082,731 @@ Use this template for your response:
   }
 
   /* ──────────────────────────────────────────────────────────
-     module: chat/token_display.js
+     module: chat/token_meter.js
      ────────────────────────────────────────────────────────── */
-  // chat/token_display.js
+  // chat/token_meter.js
   //
-  // Displays a token count estimate in the chat interface so users
-  // have awareness of how much context window they're using.
+  // Visual context-usage meter for the active chat. Reworked successor
+  // to the old token_display.js, which injected into the chat header and
+  // got visually covered by message text / images.
   //
-  // Reads window.idealMaxContextTokens (set by upstream at boot) for
-  // the max. Estimates current usage from visible messages in the DOM
-  // using a ~4 chars/token heuristic. Updates on MutationObserver
-  // events (new messages, edits, deletions).
+  // Fixes vs. the old one:
+  //   - Uses the REAL tokenizer (window.countTokens, set from the
+  //     ai-text-plugin meta object) instead of a chars/4 guess, falling
+  //     back to chars/4 only if the tokenizer isn't ready yet.
+  //   - Two non-occludable placements the user picks between:
+  //       * "float"   — a fixed, pointer-events:none pill that always
+  //                     sits on top of the conversation (never covered,
+  //                     never blocks clicks).
+  //       * "sidebar" — a chip pinned in #leftColumn above the thread
+  //                     list, where chat content can never reach it.
+  //       * "both"    — show both.
+  //       * "off"     — show neither.
+  //   - Placement is a real setting (settings.tokenCounter), changed via
+  //     a header dropdown that the Tools menu collects like every other
+  //     tool control, and it live-updates through onSettingsChange.
   //
-  // The estimate is deliberately rough — exact tokenization requires
-  // the model's tokenizer which isn't available client-side. The
-  // display is informational ("~2.1k / 8k tokens"), not precise.
-  //
-  // Bootstrap: call initTokenDisplay() from start(). Idempotent.
+  // Bootstrap: call initTokenMeter() from start(). Idempotent.
 
-  const CHARS_PER_TOKEN = 4; // rough heuristic; GPT-family models average ~3.5-4
+  const TM_MODES = ['off', 'float', 'sidebar', 'both'];
+  const TM_MODE_LABELS = { off: 'Off', float: 'Floating', sidebar: 'Sidebar', both: 'Floating + Sidebar' };
+  const TM_DEFAULT_MODE = 'float';
 
-  /**
-   * Initialize the token count display. Injects a small indicator
-   * into the chat header. Idempotent.
-   */
-  function initTokenDisplay() {
-    if (initTokenDisplay._done) return;
+  // ---- pure helpers (unit-tested) ----
+  function tmResolveMode(raw) {
+    return TM_MODES.indexOf(raw) !== -1 ? raw : TM_DEFAULT_MODE;
+  }
+  function tmFormat(n) {
+    if (!Number.isFinite(n) || n < 0) n = 0;
+    return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
+  }
+  // Tier reflects proximity to the practical prompt budget (where the
+  // app starts trimming/summarizing), not the advisory window size.
+  function tmTier(used, budget) {
+    if (used >= budget) return 'danger';
+    if (used >= budget * 0.8) return 'warn';
+    return 'ok';
+  }
+  // Sum tokens across message-like records. `tokenize` maps text->number;
+  // injected so this is testable without a real tokenizer or DOM.
+  function tmEstimate(records, tokenize) {
+    let total = 0;
+    for (const r of records) {
+      if (!r) continue;
+      if (r.id && String(r.id).indexOf('typing-') === 0) continue;
+      if (r.id === 'personality-selector-message') continue;
+      total += tokenize(r.text || '');
+    }
+    return total;
+  }
 
-    const chatEl = document.getElementById('chatMessagesEl');
+  function initTokenMeter() {
+    if (initTokenMeter._done) return;
+    // This host names the message container #messageFeed; older/other hosts
+    // use #chatMessagesEl. Resolve whichever exists so the meter actually mounts.
+    const chatEl = document.getElementById('chatMessagesEl') || document.getElementById('messageFeed');
     if (!chatEl) return;
+    initTokenMeter._done = true;
 
-    initTokenDisplay._done = true;
+    // idealMaxContextTokens is advisory (6000); the practical prompt
+    // budget is that minus an 800-token buffer that protects the backend
+    // prefix cache — and it's the threshold where the app trims/summarizes.
+    const maxTokens = Number(window.idealMaxContextTokens) || 6000;
+    const budget = Math.max(1, maxTokens - 800);
+    const tokCache = new Map(); // text -> token count
 
-    const maxTokens = Number(window.idealMaxContextTokens) || 8000;
-
-    // ---- Build the display element ----
-    const display = document.createElement('div');
-    display.className = 'pf-token-display';
-    display.title = 'Estimated token usage (approximate)';
-
-    // Try to inject into the chat header; fall back to above the chat
-    const header = document.querySelector('.chat-header') ||
-                   document.querySelector('.chat-header-right');
-    if (header) {
-      header.appendChild(display);
-    } else {
-      const parent = chatEl.parentElement;
-      if (parent) parent.insertBefore(display, chatEl);
-    }
-
-    // ---- Estimation logic ----
-    function estimateTokens() {
-      const messages = chatEl.querySelectorAll('.message');
-      let totalChars = 0;
-      for (const msg of messages) {
-        if (msg.id.startsWith('typing-')) continue;
-        if (msg.id === 'personality-selector-message') continue;
-        const content = msg.querySelector('.content');
-        if (content) totalChars += (content.innerText || '').length;
+    function tokenize(text) {
+      if (!text) return 0;
+      if (tokCache.has(text)) return tokCache.get(text);
+      let n, exact = false;
+      try {
+        if (typeof window.countTokens === 'function') {
+          n = Number(window.countTokens(text));
+          exact = Number.isFinite(n) && n > 0;
+        }
+        if (!exact) n = Math.round(text.length / 4);
+      } catch { n = Math.round(text.length / 4); exact = false; }
+      // Only cache exact counts — caching the chars/4 fallback would poison
+      // results once the real tokenizer finishes loading after first paint.
+      if (exact) {
+        if (tokCache.size > 800) tokCache.clear();
+        tokCache.set(text, n);
       }
-      return Math.round(totalChars / CHARS_PER_TOKEN);
+      return n;
     }
 
-    function formatTokens(n) {
-      if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
-      return String(n);
+    function readMode() {
+      try { const s = loadSettings(); return tmResolveMode(s && s.tokenCounter); }
+      catch { return TM_DEFAULT_MODE; }
+    }
+    function writeMode(mode) {
+      try { const s = loadSettings(); s.tokenCounter = mode; saveSettings(s); } catch {}
     }
 
-    function update() {
-      const used = estimateTokens();
+    function collectMessageRecords() {
+      const out = [];
+      const nodes = chatEl.querySelectorAll('.message');
+      for (const node of nodes) {
+        const content = node.querySelector('.content');
+        out.push({ id: node.id || '', text: content ? (content.innerText || '') : '' });
+      }
+      return out;
+    }
+
+    // ---- floating pill (fixed, never covered, never blocks clicks) ----
+    const pill = document.createElement('div');
+    pill.className = 'pf-tok-pill';
+    pill.title = 'Approximate context usage (messages + retrieved memories/lore) vs. the prompt budget. Older messages get summarized, so this is a rough ceiling.';
+    pill.hidden = true;
+    document.body.appendChild(pill);
+
+    // ---- sidebar chip ----
+    const chip = document.createElement('div');
+    chip.className = 'pf-tok-chip';
+    chip.title = 'Approximate context usage (messages + retrieved memories/lore) vs. the prompt budget. Older messages get summarized, so this is a rough ceiling.';
+    chip.hidden = true;
+
+    function mountSidebar() {
+      if (chip.isConnected) return;
+      const col = document.getElementById('leftColumn');
+      if (!col) return;
+      const threads = document.getElementById('chatThreads');
+      if (threads && threads.parentElement === col) col.insertBefore(chip, threads);
+      else col.appendChild(chip);
+    }
+
+    function paint(el, used, pct, tier, withLabel) {
+      el.classList.remove('pf-tok-ok', 'pf-tok-warn', 'pf-tok-danger');
+      el.classList.add('pf-tok-' + tier);
+      el.innerHTML = '';
+      if (withLabel) {
+        const lead = document.createElement('span');
+        lead.className = 'pf-tok-lead';
+        lead.textContent = 'Context';
+        el.appendChild(lead);
+      }
+      const txt = document.createElement('span');
+      txt.className = 'pf-tok-text';
+      txt.textContent = '~' + tmFormat(used) + ' / ' + tmFormat(maxTokens);
+      el.appendChild(txt);
+      const barWrap = document.createElement('div');
+      barWrap.className = 'pf-tok-bar';
+      const fill = document.createElement('div');
+      fill.className = 'pf-tok-fill';
+      fill.style.width = pct + '%';
+      barWrap.appendChild(fill);
+      el.appendChild(barWrap);
+    }
+
+    // Real context isn't just the visible messages: the assembled prompt
+    // also carries the retrieved memories + lore for the active thread.
+    // The app stashes that exact text per-thread, so we add its token cost
+    // to mirror what actually counts against the budget. (Role instruction
+    // is also in the real prompt but isn't exposed here; memories/lore are
+    // the large variable component.)
+    function overheadTokens() {
+      try {
+        const tid = window.activeThreadId;
+        const map = window.mostRecentPotentiallyRelevantMemoriesAndLoreTextByThreadId;
+        const text = (tid != null && map) ? map[tid] : '';
+        return text ? tokenize(text) : 0;
+      } catch { return 0; }
+    }
+
+    function render() {
+      const used = tmEstimate(collectMessageRecords(), tokenize) + overheadTokens();
       const pct = Math.min(100, Math.round((used / maxTokens) * 100));
-      display.textContent = `~${formatTokens(used)} / ${formatTokens(maxTokens)} tokens`;
-      // Tint the display based on usage level
-      if (pct > 85) {
-        display.style.color = 'var(--pf-palette-danger, #e06060)';
-      } else if (pct > 65) {
-        display.style.color = 'var(--pf-accent, #d8a040)';
-      } else {
-        display.style.color = ''; // default muted
-      }
+      const tier = tmTier(used, budget);
+      if (!pill.hidden) paint(pill, used, pct, tier, false);
+      if (!chip.hidden) paint(chip, used, pct, tier, true);
     }
 
-    // Initial update
-    update();
+    let menuSync = null;
+    function applyMode() {
+      const mode = readMode();
+      const showFloat = (mode === 'float' || mode === 'both');
+      const showSide = (mode === 'sidebar' || mode === 'both');
+      pill.hidden = !showFloat;
+      if (showSide) { mountSidebar(); chip.hidden = false; } else { chip.hidden = true; }
+      if (mode !== 'off') render();
+      if (menuSync) menuSync(mode);
+    }
 
-    // Re-estimate on message changes
+    // initial paint + placement
+    applyMode();
+
+    // re-estimate on message changes (debounced — messages stream in fast)
     const observer = new MutationObserver(() => {
-      // Debounce — messages can arrive in rapid succession during streaming
-      clearTimeout(update._timer);
-      update._timer = setTimeout(update, 300);
+      if (readMode() === 'off') return;
+      clearTimeout(render._t);
+      render._t = setTimeout(render, 300);
     });
     observer.observe(chatEl, { childList: true, subtree: true, characterData: true });
+
+    // react to settings changes from anywhere (e.g. backup restore)
+    try { onSettingsChange(applyMode); } catch {}
+
+    // One-shot upgrade: if window.countTokens wasn't ready at first paint,
+    // the initial numbers came from the chars/4 fallback. Re-render once
+    // the tokenizer has had time to load so the figures become exact.
+    setTimeout(() => { if (readMode() !== 'off') render(); }, 2500);
+
+    // ---- header dropdown (collected by the Tools menu like other controls) ----
+    (function buildControl() {
+      const container = document.createElement('div');
+      container.className = 'pf-presets-container';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'pf-export-btn';
+      btn.textContent = '\uD83D\uDD22'; // 🔢 (surrogate pair — avoids \u{...} brace pattern)
+      btn.title = 'Token counter';
+      const dropdown = document.createElement('div');
+      dropdown.className = 'pf-presets-dropdown';
+      dropdown.hidden = true;
+      const heading = document.createElement('div');
+      heading.className = 'pf-tok-menu-heading';
+      heading.textContent = 'Token counter';
+      dropdown.appendChild(heading);
+
+      const itemByMode = {};
+      TM_MODES.forEach((mode) => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'pf-preset-item';
+        const name = document.createElement('span');
+        name.textContent = TM_MODE_LABELS[mode];
+        const check = document.createElement('span');
+        check.className = 'pf-tok-check';
+        check.textContent = '\u2713'; // ✓
+        item.appendChild(name);
+        item.appendChild(check);
+        item.addEventListener('click', () => {
+          writeMode(mode);
+          applyMode();
+          dropdown.hidden = true;
+        });
+        dropdown.appendChild(item);
+        itemByMode[mode] = item;
+      });
+
+      menuSync = function (mode) {
+        Object.keys(itemByMode).forEach((k) => {
+          itemByMode[k].classList.toggle('pf-preset-active', k === mode);
+        });
+      };
+      menuSync(readMode());
+
+      container.appendChild(btn);
+      container.appendChild(dropdown);
+
+      const header = document.querySelector('.chat-header-right') || document.querySelector('.chat-header');
+      /* 🔢 control removed — token-counter mode now lives in the Settings menu */
+
+      btn.addEventListener('click', () => { dropdown.hidden = !dropdown.hidden; });
+      document.addEventListener('click', (e) => { if (!container.contains(e.target)) dropdown.hidden = true; });
+    })();
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     module: chat/settings_hub.js
+     ──────────────────────────────────────────────────────────
+     Consolidated Settings menu for the profile popup. Ported from the
+     user's weld.settings plugin (copied, NOT imported — Memory-Hero
+     stays standalone). The schema-driven engine (get/set/coerce/persist/
+     subscribe) is verbatim weld.settings v1.0.0; persistence is delegated
+     to an adapter that maps each key onto Memory-Hero's EXISTING settings
+     keys (themeMode, fontFamily, …) and prompt overrides onto
+     settings.promptOverrides — so the migrated tool modules keep reading
+     their own keys unchanged, and everything rides along with backup.
+
+     Provides: the Settings overlay section (createSettingsBody), a single
+     source of truth for the 7 migrated toggles, and window.pfGetPrompt(id)
+     for editable back-end prompts (Default == Legacy baseline + override).
+
+     Bootstrap: call initSettingsHub() from start() BEFORE the overlay can
+     open. Idempotent. */
+
+  // ---- verbatim weld.settings coercion ----
+  function pfCoerceSetting(s, value) {
+    if (s.type === 'number') {
+      var n = Number(value);
+      if (isNaN(n)) throw new Error('not a number');
+      if (s.min != null && n < s.min) n = s.min;
+      if (s.max != null && n > s.max) n = s.max;
+      return n;
+    }
+    if (s.type === 'boolean') return !!value;
+    if (s.type === 'select') {
+      var opts = s.options || [];
+      var vals = opts.map(function (o) { return typeof o === 'object' ? o.value : o; });
+      if (vals.indexOf(value) === -1) throw new Error('value not in options');
+      return value;
+    }
+    return value == null ? '' : String(value);
+  }
+
+  // ---- verbatim weld.settings engine (storage injectable) ----
+  function pfCreateSettings(opts) {
+    opts = opts || {};
+    var schema = opts.schema || {};
+    var storageKey = opts.storageKey || 'pf-prefs';
+    var storage = opts.storage;
+    if (storage === undefined) storage = (typeof localStorage !== 'undefined') ? localStorage : null;
+
+    var values = {};
+    var listeners = {};
+    listeners['*'] = [];
+
+    for (var key in schema) {
+      var def = schema[key]['default'];
+      values[key] = def !== undefined ? def : null;
+    }
+
+    if (storage) {
+      try {
+        var raw = storage.getItem(storageKey);
+        if (raw) {
+          var loaded = JSON.parse(raw);
+          for (var k in loaded) { if (schema[k] && loaded[k] !== undefined) values[k] = loaded[k]; }
+        }
+      } catch (e) {}
+    }
+
+    function save() {
+      if (!storage) return;
+      try { storage.setItem(storageKey, JSON.stringify(values)); } catch (e) {}
+    }
+    function get(key) { return values[key]; }
+    function getAll() { var out = {}; for (var k in values) out[k] = values[k]; return out; }
+    function set(key, value) {
+      if (!schema[key]) throw new Error('unknown setting: ' + key);
+      value = pfCoerceSetting(schema[key], value);
+      var old = values[key];
+      if (old === value) return false;
+      values[key] = value;
+      save();
+      fireListeners(key, value, old);
+      return true;
+    }
+    function fireListeners(key, value, old) {
+      var L = listeners[key];
+      if (L) for (var i = 0; i < L.length; i++) { try { L[i](value, old); } catch (e) {} }
+      var Lall = listeners['*'];
+      for (var j = 0; j < Lall.length; j++) { try { Lall[j](key, value, old); } catch (e) {} }
+    }
+    function reset(key) {
+      if (key) { if (schema[key]) set(key, schema[key]['default']); }
+      else { for (var k in schema) { var d = schema[k]['default']; if (d !== undefined) set(k, d); } }
+    }
+    function subscribe(key, fn) {
+      if (typeof fn !== 'function') throw new Error('subscribe requires a function');
+      if (!listeners[key]) listeners[key] = [];
+      listeners[key].push(fn);
+      return function () { var idx = listeners[key].indexOf(fn); if (idx !== -1) listeners[key].splice(idx, 1); };
+    }
+    return { get: get, set: set, getAll: getAll, reset: reset, subscribe: subscribe, schema: schema };
+  }
+
+  // ---- editable back-end prompt defaults (== legacy baseline; verified
+  //      byte-identical across backup revisions, so no fabricated original) ----
+  var PF_PROMPT_DEFAULTS = {
+    'aiwriter.impersonate':
+      'Write the next message as the USER character, continuing the conversation naturally.\n'
+      + 'Match the user\'s established voice, style, and personality.\n'
+      + 'Write in first person. Reply with ONLY the message text.',
+    'aiwriter.narrate':
+      'Write a brief third-person narration describing the current scene.\n'
+      + 'Focus on atmosphere, body language, and environment.\n'
+      + 'Keep it under 80 words. Reply with ONLY the narration.',
+    'aiwriter.enhance':
+      'Rewrite this message with more vivid detail, better word choice, and stronger voice.\n'
+      + 'Keep the same meaning and character. Reply with ONLY the rewritten text.',
+    'aiwriter.recap':
+      'Write a brief "Previously on..." recap of this conversation.\n'
+      + 'Summarize key events, actions, emotional beats, current situation.\n'
+      + 'Third person, present tense, under 100 words. Start with "Previously on..."',
+    'image.extract':
+      'Extract a concise visual image prompt from this text.\n'
+      + 'Describe what should be depicted: characters, scene, mood, lighting.\n'
+      + 'Reply with ONLY the image prompt, nothing else. Keep it under 100 words.',
+    'image.negative': 'low quality, worst quality, blurry',
+    'image.tagHint':
+      'Note: If you want to add an AI-generated image to a message (only when asked/relevant), '
+      + 'use this syntax: `<image>A photo of a cute cat wearing a hat</image>` and an image will '
+      + 'be generated using the description you use. But make sure your image descriptions are '
+      + 'longer and more detailed than this example.',
+  };
+
+  var PF_FONT_FAMILIES_OPTS = [
+    { value: '', label: 'Default' },
+    { value: 'Georgia, serif', label: 'Georgia (serif)' },
+    { value: '"Times New Roman", serif', label: 'Times' },
+    { value: 'system-ui, sans-serif', label: 'System sans' },
+    { value: '"Courier New", monospace', label: 'Monospace' },
+  ];
+  var PF_FONT_SIZE_OPTS = [
+    { value: '', label: 'Default' },
+    { value: '14px', label: 'Small' },
+    { value: '16px', label: 'Medium' },
+    { value: '18px', label: 'Large' },
+    { value: '20px', label: 'X-Large' },
+  ];
+
+  // ---- schema: 7 migrated toggles + 7 editable prompts ----
+  function pfBuildSchema() {
+    var schema = {
+      themeMode:      { type: 'select',  label: 'Theme',              default: 'dark',  options: [ { value: 'dark', label: 'Dark' }, { value: 'light', label: 'Light' } ] },
+      fontFamily:     { type: 'select',  label: 'Chat font',          default: '',      options: PF_FONT_FAMILIES_OPTS },
+      fontSize:       { type: 'select',  label: 'Font size',          default: '',      options: PF_FONT_SIZE_OPTS },
+      tokenCounter:   { type: 'select',  label: 'Token counter',      default: 'float', options: [ { value: 'off', label: 'Off' }, { value: 'float', label: 'Floating' }, { value: 'sidebar', label: 'Sidebar' }, { value: 'both', label: 'Floating + Sidebar' } ] },
+      genTemperature: { type: 'number',  label: 'Temperature',        default: 0.8, min: 0, max: 2, step: 0.05, help: 'Higher = more creative/random.' },
+      genMaxTokens:   { type: 'number',  label: 'Max tokens / reply', default: 0,   min: 0, max: 4000, step: 1, help: '0 = model default.' },
+      chatBackground: { type: 'string',  label: 'Chat background URL', default: '', help: 'Image URL, or leave blank for none.' },
+      showReasoning:  { type: 'boolean', label: 'Show AI reasoning',  default: false },
+      showTimestamps: { type: 'boolean', label: 'Message timestamps', default: true },
+    };
+    for (var id in PF_PROMPT_DEFAULTS) {
+      schema['prompt.' + id] = { type: 'textarea', rows: 5, label: id, 'default': PF_PROMPT_DEFAULTS[id] };
+    }
+    return schema;
+  }
+
+  // ---- adapter: map engine values onto Memory-Hero's existing keys ----
+  var PF_TOGGLE_KEYS = ['themeMode', 'fontFamily', 'fontSize', 'tokenCounter', 'genTemperature', 'genMaxTokens', 'chatBackground', 'showReasoning', 'showTimestamps'];
+  function pfSettingsStorageAdapter() {
+    return {
+      getItem: function () {
+        try {
+          var s = loadSettings();
+          var out = {};
+          for (var i = 0; i < PF_TOGGLE_KEYS.length; i++) {
+            var key = PF_TOGGLE_KEYS[i];
+            if (s[key] !== undefined) out[key] = s[key];
+          }
+          var ov = s.promptOverrides || {};
+          for (var id in ov) { if (ov[id] !== undefined) out['prompt.' + id] = ov[id]; }
+          return JSON.stringify(out);
+        } catch (e) { return null; }
+      },
+      setItem: function (_k, val) {
+        try {
+          var obj = JSON.parse(val);
+          var s = loadSettings();
+          if (!s.promptOverrides) s.promptOverrides = {};
+          for (var k in obj) {
+            if (k.indexOf('prompt.') === 0) {
+              var pid = k.slice('prompt.'.length);
+              if (obj[k] === PF_PROMPT_DEFAULTS[pid]) { delete s.promptOverrides[pid]; }
+              else { s.promptOverrides[pid] = obj[k]; }
+            } else {
+              s[k] = obj[k];
+            }
+          }
+          saveSettings(s);
+        } catch (e) {}
+      },
+    };
+  }
+
+  // ---- apply a single setting by calling the owning module's logic ----
+  function pfApplySetting(engine, key) {
+    try {
+      if (key === 'themeMode') { if (typeof applyTheme === 'function') applyTheme(engine.get('themeMode') === 'light' ? 'light' : 'dark'); }
+      else if (key === 'fontFamily' || key === 'fontSize') { if (typeof applyFont === 'function') applyFont(engine.get('fontFamily') || '', engine.get('fontSize') || ''); }
+      else if (key === 'chatBackground') { if (typeof applyBg === 'function') applyBg(engine.get('chatBackground') || ''); }
+      else if (key === 'showReasoning') { if (window.pfApplyReasoning) window.pfApplyReasoning(); }
+      else if (key === 'showTimestamps') { if (window.pfApplyTimestamps) window.pfApplyTimestamps(); }
+      // tokenCounter: token_meter self-applies via its own onSettingsChange.
+      // genTemperature/genMaxTokens: read at generation time; nothing to apply now.
+    } catch (e) { /* non-fatal */ }
+  }
+
+  function initSettingsHub() {
+    if (window.pfSettingsEngine) return;
+    var engine = pfCreateSettings({ schema: pfBuildSchema(), storageKey: 'pf-prefs', storage: pfSettingsStorageAdapter() });
+    window.pfSettingsEngine = engine;
+    // editable prompts: override (or default) resolved here for runtime sites
+    window.pfGetPrompt = function (id) {
+      try { var v = engine.get('prompt.' + id); return (v != null && v !== '') ? v : PF_PROMPT_DEFAULTS[id]; }
+      catch (e) { return PF_PROMPT_DEFAULTS[id]; }
+    };
+    window.pfPromptDefaults = PF_PROMPT_DEFAULTS;
+    // wire each toggle so a panel change re-applies just that control
+    for (var i = 0; i < PF_TOGGLE_KEYS.length; i++) {
+      (function (k) { engine.subscribe(k, function () { pfApplySetting(engine, k); }); })(PF_TOGGLE_KEYS[i]);
+    }
+  }
+
+  // ---- the Settings overlay section body ----
+  function createSettingsBody() {
+    if (!window.pfSettingsEngine) { try { initSettingsHub(); } catch (e) {} }
+    var engine = window.pfSettingsEngine;
+    var wrap = document.createElement('div');
+    wrap.className = 'pf-settings-body';
+    if (!engine) { wrap.textContent = 'Settings unavailable.'; return wrap; }
+
+    function row(labelText, control, help) {
+      var r = document.createElement('div');
+      r.className = 'pf-settings-row';
+      var lbl = document.createElement('label');
+      lbl.className = 'pf-settings-label';
+      lbl.textContent = labelText;
+      r.appendChild(lbl);
+      r.appendChild(control);
+      if (help) { var h = document.createElement('div'); h.className = 'pf-settings-help'; h.textContent = help; r.appendChild(h); }
+      return r;
+    }
+
+    function selectControl(key) {
+      var s = engine.schema[key];
+      var sel = document.createElement('select');
+      sel.className = 'pf-settings-select';
+      (s.options || []).forEach(function (opt) {
+        var val = typeof opt === 'object' ? opt.value : opt;
+        var lbl = typeof opt === 'object' ? opt.label : opt;
+        var o = document.createElement('option');
+        o.value = val; o.textContent = lbl;
+        if (engine.get(key) === val) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.addEventListener('change', function () { engine.set(key, sel.value); });
+      return sel;
+    }
+    function boolControl(key) {
+      var c = document.createElement('input');
+      c.type = 'checkbox';
+      c.className = 'pf-settings-check';
+      c.checked = !!engine.get(key);
+      c.addEventListener('change', function () { engine.set(key, c.checked); });
+      return c;
+    }
+    function numberControl(key) {
+      var s = engine.schema[key];
+      var c = document.createElement('input');
+      c.type = 'number';
+      c.className = 'pf-settings-num';
+      if (s.min != null) c.min = s.min;
+      if (s.max != null) c.max = s.max;
+      if (s.step != null) c.step = s.step;
+      c.value = engine.get(key);
+      c.addEventListener('change', function () { var v = parseFloat(c.value); if (!isNaN(v)) engine.set(key, v); });
+      return c;
+    }
+    function textControl(key) {
+      var c = document.createElement('input');
+      c.type = 'text';
+      c.className = 'pf-settings-text';
+      c.value = engine.get(key) || '';
+      var t = null;
+      c.addEventListener('input', function () { clearTimeout(t); t = setTimeout(function () { engine.set(key, c.value); }, 400); });
+      return c;
+    }
+
+    // ---- group: Appearance ----
+    var gA = document.createElement('div'); gA.className = 'pf-settings-group';
+    var hA = document.createElement('h4'); hA.textContent = 'Appearance'; gA.appendChild(hA);
+    gA.appendChild(row('Theme', selectControl('themeMode')));
+    gA.appendChild(row('Chat font', selectControl('fontFamily')));
+    gA.appendChild(row('Font size', selectControl('fontSize')));
+    gA.appendChild(row('Chat background URL', textControl('chatBackground'), 'Image URL, or blank for none.'));
+
+    // ---- group: Chat ----
+    var gC = document.createElement('div'); gC.className = 'pf-settings-group';
+    var hC = document.createElement('h4'); hC.textContent = 'Chat'; gC.appendChild(hC);
+    gC.appendChild(row('Token counter', selectControl('tokenCounter')));
+    gC.appendChild(row('Show AI reasoning', boolControl('showReasoning')));
+    gC.appendChild(row('Message timestamps', boolControl('showTimestamps')));
+
+    // ---- group: Generation ----
+    var gG = document.createElement('div'); gG.className = 'pf-settings-group';
+    var hG = document.createElement('h4'); hG.textContent = 'Generation'; gG.appendChild(hG);
+    gG.appendChild(row('Temperature', numberControl('genTemperature'), 'Higher = more creative/random.'));
+    gG.appendChild(row('Max tokens / reply', numberControl('genMaxTokens'), '0 = model default.'));
+
+    // ---- group: Prompts (editable back-end prompts) ----
+    var gP = document.createElement('div'); gP.className = 'pf-settings-group';
+    var hP = document.createElement('h4'); hP.textContent = 'Prompts'; gP.appendChild(hP);
+    var note = document.createElement('div');
+    note.className = 'pf-settings-help';
+    note.textContent = 'Edit the instructions behind the AI Writer modes and image generation. Legacy matches Default for these prompts; Reset/Restore returns to the shipped text.';
+    gP.appendChild(note);
+
+    var PROMPT_LABELS = {
+      'aiwriter.impersonate': 'Impersonate (✍)',
+      'aiwriter.narrate':     'Narrator (/nar + 🎬)',
+      'aiwriter.enhance':     'Enhance (✨)',
+      'aiwriter.recap':       'Recap (📜)',
+      'image.extract':        'Image prompt extraction (🖼)',
+      'image.negative':       'Image negative prompt',
+      'image.tagHint':        '<image> tag hint',
+    };
+    Object.keys(PF_PROMPT_DEFAULTS).forEach(function (id) {
+      var key = 'prompt.' + id;
+      var block = document.createElement('div');
+      block.className = 'pf-prompt-block';
+
+      var head = document.createElement('div');
+      head.className = 'pf-prompt-head';
+      var name = document.createElement('span');
+      name.className = 'pf-prompt-name';
+      name.textContent = PROMPT_LABELS[id] || id;
+      var dot = document.createElement('span');
+      dot.className = 'pf-prompt-dot';
+      dot.title = 'Modified from default';
+      head.appendChild(name);
+      head.appendChild(dot);
+      block.appendChild(head);
+
+      var ta = document.createElement('textarea');
+      ta.className = 'pf-prompt-textarea';
+      ta.rows = (id === 'image.negative') ? 2 : 5;
+      ta.value = window.pfGetPrompt(id);
+      function refreshDot() { dot.classList.toggle('on', engine.get(key) !== PF_PROMPT_DEFAULTS[id]); }
+      refreshDot();
+      var timer = null;
+      ta.addEventListener('input', function () {
+        clearTimeout(timer);
+        timer = setTimeout(function () { engine.set(key, ta.value); refreshDot(); }, 400);
+      });
+      block.appendChild(ta);
+
+      var actions = document.createElement('div');
+      actions.className = 'pf-prompt-actions';
+      var resetBtn = document.createElement('button');
+      resetBtn.type = 'button';
+      resetBtn.className = 'pf-prompt-btn';
+      resetBtn.textContent = 'Reset to Default';
+      resetBtn.addEventListener('click', function () { engine.reset(key); ta.value = window.pfGetPrompt(id); refreshDot(); });
+      var legacyBtn = document.createElement('button');
+      legacyBtn.type = 'button';
+      legacyBtn.className = 'pf-prompt-btn';
+      legacyBtn.textContent = 'Restore Legacy';
+      legacyBtn.title = 'Legacy matches Default for this prompt';
+      legacyBtn.addEventListener('click', function () { engine.set(key, PF_PROMPT_DEFAULTS[id]); ta.value = window.pfGetPrompt(id); refreshDot(); });
+      actions.appendChild(resetBtn);
+      actions.appendChild(legacyBtn);
+      block.appendChild(actions);
+
+      gP.appendChild(block);
+    });
+
+    // ---- Narration group (folds the narrator 🔊 voice settings in) ----
+    var gN = document.createElement('div');
+    gN.className = 'pf-settings-group';
+    var hN = document.createElement('h4'); hN.textContent = 'Narration'; gN.appendChild(hN);
+    try {
+      if (typeof window.pfBuildNarrationSettings === 'function') { gN.appendChild(window.pfBuildNarrationSettings()); }
+      else { var nMsg = document.createElement('div'); nMsg.className = 'pf-settings-help'; nMsg.textContent = 'Narration settings are unavailable.'; gN.appendChild(nMsg); }
+    } catch (e) {}
+
+    // ---- tabbed layout (Smart-Story .settingsTabs pattern) ----
+    var TABS = [
+      { id: 'appearance', label: 'Appearance', group: gA, keys: ['themeMode', 'fontFamily', 'fontSize', 'chatBackground'] },
+      { id: 'chat',       label: 'Chat',       group: gC, keys: ['tokenCounter', 'showReasoning', 'showTimestamps'] },
+      { id: 'generation', label: 'Generation', group: gG, keys: ['genTemperature', 'genMaxTokens'] },
+      { id: 'prompts',    label: 'Prompts',    group: gP, keys: Object.keys(PF_PROMPT_DEFAULTS).map(function (id) { return 'prompt.' + id; }) },
+      { id: 'narration',  label: 'Narration',  group: gN, keys: [] },
+    ];
+    var tabBar = document.createElement('div');
+    tabBar.className = 'pf-settings-tabs';
+    tabBar.setAttribute('role', 'tablist');
+    var panels = document.createElement('div');
+    panels.className = 'pf-settings-panels';
+    var tabBtns = {};
+    function isTabDirty(t) {
+      for (var i = 0; i < t.keys.length; i++) { var k = t.keys[i]; if (engine.get(k) !== engine.schema[k]['default']) return true; }
+      return false;
+    }
+    function refreshDirty() { TABS.forEach(function (t) { if (tabBtns[t.id]) tabBtns[t.id].classList.toggle('is-dirty', isTabDirty(t)); }); }
+    function activate(id) {
+      TABS.forEach(function (t) {
+        var on = t.id === id;
+        if (tabBtns[t.id]) tabBtns[t.id].setAttribute('aria-selected', on ? 'true' : 'false');
+        t.group.style.display = on ? '' : 'none';
+      });
+    }
+    TABS.forEach(function (t) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'pf-settings-tab';
+      btn.setAttribute('role', 'tab');
+      btn.textContent = t.label;
+      btn.addEventListener('click', function () { activate(t.id); });
+      tabBtns[t.id] = btn;
+      tabBar.appendChild(btn);
+      panels.appendChild(t.group);
+    });
+    wrap.appendChild(tabBar);
+    wrap.appendChild(panels);
+    activate('appearance');
+    refreshDirty();
+    var __unsub = null;
+    try { __unsub = engine.subscribe('*', refreshDirty); } catch (e) {}
+    wrap.__pfCleanup = function () { if (__unsub) { try { __unsub(); } catch (e) {} } };
+
+    return wrap;
+  }
+
+  // Open the Settings popup as a modal layered ABOVE the profile overlay.
+  function openPfSettingsModal() {
+    var prev = document.querySelector('.pf-settings-modal-backdrop');
+    if (prev) { try { prev.remove(); } catch (e) {} }
+    var closeBtn = h('button', { class: 'pf-settings-modal-close', type: 'button', 'aria-label': 'Close settings' }, ['\u00d7']);
+    var head = h('div', { class: 'pf-settings-modal-head' }, [
+      h('div', { class: 'pf-settings-modal-title' }, ['Settings']),
+      closeBtn,
+    ]);
+    var settingsBody = createSettingsBody();
+    var bodyWrap = h('div', { class: 'pf-settings-modal-body' }, [settingsBody]);
+    var panel = h('div', { class: 'pf-settings-modal', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Settings' }, [head, bodyWrap]);
+    var backdrop = h('div', { class: 'pf-settings-modal-backdrop' }, [panel]);
+    function close() { try { if (settingsBody.__pfCleanup) settingsBody.__pfCleanup(); } catch (e) {} try { backdrop.remove(); } catch (e) {} document.removeEventListener('keydown', onKey, true); }
+    function onKey(ev) { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopImmediatePropagation(); close(); } }
+    closeBtn.addEventListener('click', close);
+    backdrop.addEventListener('click', function (ev) { if (ev.target === backdrop) close(); });
+    document.addEventListener('keydown', onKey, true);
+    document.body.appendChild(backdrop);
+    try { panel.setAttribute('tabindex', '-1'); panel.focus(); } catch (e) {}
   }
 
   /* ──────────────────────────────────────────────────────────
@@ -41098,6 +41913,14 @@ Use this template for your response:
     footer.appendChild(sep2);
     footer.appendChild(githubLink);
 
+    const settingsLauncher = h('button', {
+      class: 'pf-overlay-settings-btn',
+      type: 'button',
+      'aria-label': 'Settings',
+      title: 'Settings',
+      onClick: () => { try { openPfSettingsModal(); } catch (e) {} },
+    }, ['\u2699']);
+
     // ---- overlay ----
     //
     // `overlay` was declared `let overlay = null` at the top of
@@ -41108,17 +41931,20 @@ Use this template for your response:
       ariaLabel: 'Your profile',
       onClose: () => { try { unsubscribe(); } catch {} },
       children: [
+        settingsLauncher,
         splash,
         focusExtras,
-        aboutSection,
-        detailsSection,
-        promptsSection,
-        archiveSection,
-        chronicleSection,
-        styleSection,
-        achievementsSection,
-        activitySection,
-        backupSection,
+        h('div', { class: 'pf-overlay-sections-grid' }, [
+          aboutSection,
+          detailsSection,
+          promptsSection,
+          archiveSection,
+          chronicleSection,
+          styleSection,
+          achievementsSection,
+          activitySection,
+          backupSection,
+        ]),
         footer,
       ],
     });
@@ -41353,6 +42179,9 @@ Use this template for your response:
 
     console.info('[pf] profile fork active — mini-card mounted');
 
+    // ---- Settings hub (consolidated Memory-Hero settings) ----
+    try { initSettingsHub(); } catch { /* non-fatal */ }
+
     // ---- Chat UX enhancements (Batch 1) ----
     // Message controls: copy, edit, delete, regen buttons on each message.
     // Waits a tick for chatMessagesEl to be in the DOM (it may not exist
@@ -41386,12 +42215,15 @@ Use this template for your response:
       }
     } catch { /* non-fatal */ }
 
-    // Token count display (Batch 2)
+    // Token meter (reworked) — floating pill and/or sidebar chip showing
+    // real context usage. Placement is settings.tokenCounter, switched via
+    // a header dropdown. Replaces the old token_display that got covered by
+    // chat content.
     try {
-      if (document.getElementById('chatMessagesEl')) {
-        initTokenDisplay();
+      if (document.getElementById('chatMessagesEl') || document.getElementById('messageFeed')) {
+        initTokenMeter();
       } else {
-        setTimeout(() => { try { initTokenDisplay(); } catch { /* non-fatal */ } }, 1500);
+        setTimeout(() => { try { initTokenMeter(); } catch { /* non-fatal */ } }, 1500);
       }
     } catch { /* non-fatal */ }
 
@@ -43955,76 +44787,7 @@ Use this template for your response:
                           + 'color:var(--pf-accent, #d8b36a);font-size:16px;';
       card.appendChild(title);
 
-      // ---- Master enable toggle ----
-      const enableRow = mkToggleRow('Show 🔊 button on messages', cfg.enabled, (v) => {
-        cfg.enabled = v;
-        saveCfg(cfg);
-        // Show / hide existing buttons live
-        document.querySelectorAll('.pf-narrate-btn').forEach((b) => {
-          b.style.display = v ? '' : 'none';
-        });
-      });
-      card.appendChild(enableRow);
-
-      // ---- Dual-mode toggle ----
-      const dualRow = mkToggleRow(
-        'Use a different voice for "quoted speech"',
-        cfg.dualMode,
-        (v) => { cfg.dualMode = v; saveCfg(cfg); refreshDualSection(); }
-      );
-      card.appendChild(dualRow);
-
-      // ---- Narrator section ----
-      const narratorHdr = mkSectionHeader('Narrator voice');
-      card.appendChild(narratorHdr);
-
-      const narratorVoiceSel = mkVoiceSelect(cfg.narratorVoiceURI, (uri) => {
-        cfg.narratorVoiceURI = uri; saveCfg(cfg);
-      });
-      card.appendChild(narratorVoiceSel.row);
-
-      const narratorRate = mkSliderRow('Rate', cfg.narratorRate, 0.5, 1.5, 0.05, (v) => {
-        cfg.narratorRate = v; saveCfg(cfg);
-      });
-      card.appendChild(narratorRate);
-
-      const narratorPitch = mkSliderRow('Pitch', cfg.narratorPitch, 0.5, 1.5, 0.05, (v) => {
-        cfg.narratorPitch = v; saveCfg(cfg);
-      });
-      card.appendChild(narratorPitch);
-
-      // ---- Character section (only meaningful when dualMode) ----
-      const characterSection = document.createElement('div');
-      characterSection.style.cssText = 'margin-top:8px;'
-                                     + 'border-top:1px solid rgba(255,255,255,0.08);'
-                                     + 'padding-top:8px;';
-
-      const characterHdr = mkSectionHeader('Character voice (for quoted speech)');
-      characterSection.appendChild(characterHdr);
-
-      const characterVoiceSel = mkVoiceSelect(cfg.characterVoiceURI, (uri) => {
-        cfg.characterVoiceURI = uri; saveCfg(cfg);
-      });
-      characterSection.appendChild(characterVoiceSel.row);
-
-      const characterRate = mkSliderRow('Rate', cfg.characterRate, 0.5, 1.5, 0.05, (v) => {
-        cfg.characterRate = v; saveCfg(cfg);
-      });
-      characterSection.appendChild(characterRate);
-
-      const characterPitch = mkSliderRow('Pitch', cfg.characterPitch, 0.5, 1.5, 0.05, (v) => {
-        cfg.characterPitch = v; saveCfg(cfg);
-      });
-      characterSection.appendChild(characterPitch);
-
-      card.appendChild(characterSection);
-
-      function refreshDualSection() {
-        const dim = !cfg.dualMode;
-        characterSection.style.opacity = dim ? '0.4' : '1';
-        characterSection.style.pointerEvents = dim ? 'none' : '';
-      }
-      refreshDualSection();
+      card.appendChild(window.pfBuildNarrationSettings());
 
       // ---- Action row (Test, Stop, Close) ----
       const actions = document.createElement('div');
@@ -44211,6 +44974,84 @@ Use this template for your response:
 
     // Public for programmatic / debug use
     if (typeof window !== 'undefined') {
+    // Shared narration-settings builder — single source used by both the
+    // standalone 🔊 modal and the unified Settings → Narration tab.
+    window.pfBuildNarrationSettings = function () {
+      refreshVoices();
+      const box = document.createElement('div');
+      // ---- Master enable toggle ----
+      const enableRow = mkToggleRow('Show 🔊 button on messages', cfg.enabled, (v) => {
+        cfg.enabled = v;
+        saveCfg(cfg);
+        // Show / hide existing buttons live
+        document.querySelectorAll('.pf-narrate-btn').forEach((b) => {
+          b.style.display = v ? '' : 'none';
+        });
+      });
+      box.appendChild(enableRow);
+
+      // ---- Dual-mode toggle ----
+      const dualRow = mkToggleRow(
+        'Use a different voice for "quoted speech"',
+        cfg.dualMode,
+        (v) => { cfg.dualMode = v; saveCfg(cfg); refreshDualSection(); }
+      );
+      box.appendChild(dualRow);
+
+      // ---- Narrator section ----
+      const narratorHdr = mkSectionHeader('Narrator voice');
+      box.appendChild(narratorHdr);
+
+      const narratorVoiceSel = mkVoiceSelect(cfg.narratorVoiceURI, (uri) => {
+        cfg.narratorVoiceURI = uri; saveCfg(cfg);
+      });
+      box.appendChild(narratorVoiceSel.row);
+
+      const narratorRate = mkSliderRow('Rate', cfg.narratorRate, 0.5, 1.5, 0.05, (v) => {
+        cfg.narratorRate = v; saveCfg(cfg);
+      });
+      box.appendChild(narratorRate);
+
+      const narratorPitch = mkSliderRow('Pitch', cfg.narratorPitch, 0.5, 1.5, 0.05, (v) => {
+        cfg.narratorPitch = v; saveCfg(cfg);
+      });
+      box.appendChild(narratorPitch);
+
+      // ---- Character section (only meaningful when dualMode) ----
+      const characterSection = document.createElement('div');
+      characterSection.style.cssText = 'margin-top:8px;'
+                                     + 'border-top:1px solid rgba(255,255,255,0.08);'
+                                     + 'padding-top:8px;';
+
+      const characterHdr = mkSectionHeader('Character voice (for quoted speech)');
+      characterSection.appendChild(characterHdr);
+
+      const characterVoiceSel = mkVoiceSelect(cfg.characterVoiceURI, (uri) => {
+        cfg.characterVoiceURI = uri; saveCfg(cfg);
+      });
+      characterSection.appendChild(characterVoiceSel.row);
+
+      const characterRate = mkSliderRow('Rate', cfg.characterRate, 0.5, 1.5, 0.05, (v) => {
+        cfg.characterRate = v; saveCfg(cfg);
+      });
+      characterSection.appendChild(characterRate);
+
+      const characterPitch = mkSliderRow('Pitch', cfg.characterPitch, 0.5, 1.5, 0.05, (v) => {
+        cfg.characterPitch = v; saveCfg(cfg);
+      });
+      characterSection.appendChild(characterPitch);
+
+      box.appendChild(characterSection);
+
+      function refreshDualSection() {
+        const dim = !cfg.dualMode;
+        characterSection.style.opacity = dim ? '0.4' : '1';
+        characterSection.style.pointerEvents = dim ? 'none' : '';
+      }
+      refreshDualSection();
+      return box;
+    };
+
       window.__memHero_narrate = {
         open:  openSettingsModal,
         stop:  stopNarration,

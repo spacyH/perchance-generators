@@ -1,0 +1,46 @@
+$meta
+  header
+  tags = pet, virtual pet, tamagotchi, ai, companion, chat, creature, illustrated, perchance
+    mode = minimal
+  async dynamic(inputs) =>
+    return {
+      title: "Pocket Companion — AI Virtual Pet",
+      description: "Hatch, raise, and talk to your own AI creature. Feed it, play with it, keep it clean — it lives in real time and chats back in a voice that shifts with its mood. You design how it looks; the AI paints it and gives it a voice.",
+    };
+
+// Core platform plugins. aiTextPlugin powers the pet's voice; the
+// text-to-image plugin paints the creature; upload backs share links.
+aiTextPlugin = {import:ai-text-plugin}
+textToImagePlugin = {import:text-to-image-plugin}
+uploadPlugin = {import:upload-plugin}
+fullscreenButtonPlugin = {import:fullscreen-button-plugin}
+
+// Weld plugins — modular building blocks shared across our generators.
+// Each stashes its API on window.weld.<name> inside its $output, which is
+// NOT auto-run on import, so the HTML panel triggers each one once at boot
+// (root.<alias>()) and then feature-detects window.weld.* with graceful
+// fallbacks. Import order does not matter; every $output is idempotent.
+weldStream     = {import:weld-stream-plugin}
+weldClean      = {import:weld-clean-plugin}
+weldPersist    = {import:weld-persist-plugin}
+weldImage      = {import:weld-image-plugin}
+weldBackground = {import:weld-background-plugin}
+weldToast      = {import:weld-toast-plugin}
+weldConfetti   = {import:weld-confetti-plugin}
+weldAudio      = {import:weld-audio-plugin}
+weldSettings   = {import:weld-settings-plugin}
+weldDice       = {import:weld-dice-plugin}
+weldPersona    = {import:weld-persona-plugin}
+weldTokens     = {import:weld-tokens-plugin}
+weldBackup     = {import:weld-backup-plugin}
+
+// Last-resort replies if the AI broker is completely unavailable. The HTML
+// panel drains its own logic first; this list only renders if every path
+// fails, so it stays in soft, wordless creature character.
+fallbackReply
+  *blinks slowly and tilts its head*
+  *makes a soft, curious chirp*
+  *nuzzles closer, waiting*
+
+output
+  text = [fallbackReply]

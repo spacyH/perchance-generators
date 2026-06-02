@@ -1,0 +1,1358 @@
+<!-- ===================================================================
+     Pocket Companion — HTML panel (app shell + logic)
+     Built on the Weld plugin suite. Every weld.* call feature-detects and
+     degrades gracefully. The pet's body is an AI cutout sprite (the user
+     authors the look); its voice is the AI chat, coloured by live stats.
+     The core stat/decay/evolution engine is injected at __PET_ENGINE__
+     (single source of truth: pet-engine.js, unit-tested in Node).
+     =================================================================== -->
+<style>
+  :root{
+    --bg:#f3eefb; --bg2:#ece3fb; --ink:#2a2440; --muted:#6f6790;
+    --surface:#ffffff; --surface2:#f6f1ff; --line:#e4daf6;
+    --accent:#7c5cff; --accent-ink:#ffffff; --good:#34c47c; --warn:#e8a13a; --bad:#e5604d;
+    --pet-bubble:#efe7ff; --user-bubble:#7c5cff; --user-ink:#fff;
+    --habitat1:#d9ecff; --habitat2:#fbe6f4; --floor:#cdeccf;
+    --radius:16px; --shadow:0 6px 24px rgba(60,40,120,.12);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171428; --bg2:#1d1836; --ink:#ece8ff; --muted:#a59cce;
+      --surface:#221d3c; --surface2:#2a2348; --line:#352c5c;
+      --accent:#9b85ff; --accent-ink:#1a1430; --good:#46d68c; --warn:#f0b257; --bad:#ff7a68;
+      --pet-bubble:#2d2552; --user-bubble:#9b85ff; --user-ink:#1a1430;
+      --habitat1:#27314d; --habitat2:#3a2742; --floor:#2c4733;
+      --shadow:0 8px 30px rgba(0,0,0,.4);
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    color:var(--ink); background:linear-gradient(160deg,var(--bg),var(--bg2));
+    -webkit-font-smoothing:antialiased;
+  }
+  #app{max-width:760px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;padding:10px;gap:10px}
+
+  /* header */
+  #bar{display:flex;align-items:center;gap:10px}
+  #bar .titles{flex:1;min-width:0}
+  #petName{font-weight:700;font-size:18px;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #petMeta{font-size:12px;color:var(--muted)}
+  .iconbtn{border:1px solid var(--line);background:var(--surface);color:var(--ink);
+    width:38px;height:38px;border-radius:12px;font-size:16px;cursor:pointer;display:grid;place-items:center}
+  .iconbtn:hover{border-color:var(--accent)}
+
+  /* habitat / pet stage */
+  #stage{position:relative;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);
+    background:linear-gradient(180deg,var(--habitat1),var(--habitat2));aspect-ratio:16/10;min-height:200px}
+  #floor{position:absolute;left:0;right:0;bottom:0;height:24%;background:var(--floor);
+    border-top-left-radius:50% 40%;border-top-right-radius:50% 40%;opacity:.85}
+  #petWrap{position:absolute;left:50%;bottom:14%;transform:translateX(-50%);width:62%;max-width:280px;
+    display:grid;place-items:center;transition:transform .3s}
+  #petImg{width:100%;height:auto;filter:drop-shadow(0 8px 10px rgba(0,0,0,.18));image-rendering:auto;
+    animation:idle 3.2s ease-in-out infinite}
+  #eggCss{width:46%;max-width:150px}
+  #poopRow{position:absolute;left:0;right:0;bottom:6%;display:flex;justify-content:center;gap:8px;font-size:26px;pointer-events:none}
+  #moodBubble{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:var(--surface);
+    color:var(--ink);border:1px solid var(--line);border-radius:20px;padding:5px 12px;font-size:12px;
+    box-shadow:var(--shadow);max-width:80%;text-align:center}
+  #genOverlay{position:absolute;inset:0;display:none;place-items:center;background:rgba(0,0,0,.28);
+    color:#fff;font-size:13px;flex-direction:column;gap:10px;backdrop-filter:blur(2px)}
+  #genOverlay.show{display:grid}
+  .spinner{width:30px;height:30px;border:3px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .9s linear infinite}
+  #repaintBtn{position:absolute;top:8px;right:8px;z-index:3}
+  @keyframes idle{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes bounce{0%,100%{transform:translateY(0)}25%{transform:translateY(-16px)}50%{transform:translateY(0)}75%{transform:translateY(-8px)}}
+  @keyframes sway{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
+  /* mood-driven sprite states */
+  #stage.m-ecstatic #petImg{animation:bounce 1s ease-in-out infinite}
+  #stage.m-sad #petImg, #stage.m-lonely #petImg{filter:drop-shadow(0 8px 10px rgba(0,0,0,.18)) saturate(.7);animation:idle 4.5s ease-in-out infinite}
+  #stage.m-dirty #petImg{filter:drop-shadow(0 8px 10px rgba(0,0,0,.18)) sepia(.25) brightness(.92)}
+  #stage.m-sick #petImg{filter:drop-shadow(0 8px 10px rgba(0,0,0,.18)) grayscale(.5) brightness(.9);animation:sway 3s ease-in-out infinite}
+  #stage.m-sleepy #petImg, #stage.asleep #petImg{filter:drop-shadow(0 8px 10px rgba(0,0,0,.18)) brightness(.82);animation:idle 5s ease-in-out infinite}
+  #stage.asleep{filter:brightness(.7)}
+  #zzz{position:absolute;top:12%;left:60%;font-size:22px;display:none;animation:idle 2.4s ease-in-out infinite}
+  #stage.asleep #zzz{display:block}
+
+  /* stat bars */
+  #stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+  .stat .lab{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:5px}
+  .stat .lab b{color:var(--ink);font-weight:600}
+  .meter{height:8px;border-radius:6px;background:var(--surface2);overflow:hidden}
+  .meter > i{display:block;height:100%;border-radius:6px;transition:width .4s ease, background .4s}
+
+  /* actions */
+  #actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px}
+  .act{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;
+    padding:10px 6px;font-size:13px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;position:relative}
+  .act:hover:not(:disabled){border-color:var(--accent);transform:translateY(-1px)}
+  .act:disabled{opacity:.5;cursor:not-allowed}
+  .act .emo{font-size:20px}
+  .act .cd{position:absolute;top:3px;right:6px;font-size:10px;color:var(--muted)}
+
+  /* chat */
+  #chat{flex:1;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--radius);overflow:hidden;min-height:220px}
+  #msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+  .msg{max-width:82%;padding:9px 12px;border-radius:14px;white-space:pre-wrap;word-wrap:break-word;font-size:14px}
+  .msg.pet{align-self:flex-start;background:var(--pet-bubble);border-bottom-left-radius:4px}
+  .msg.user{align-self:flex-end;background:var(--user-bubble);color:var(--user-ink);border-bottom-right-radius:4px}
+  .msg em{opacity:.8;font-style:italic}
+  #empty{margin:auto;text-align:center;color:var(--muted);font-size:13px;padding:20px}
+  #typing{padding:4px 14px;font-size:12px;color:var(--muted);display:none}
+  #typing.show{display:block}
+  #composer{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}
+  #input{flex:1;resize:none;border:1px solid var(--line);background:var(--surface2);color:var(--ink);
+    border-radius:12px;padding:10px 12px;font:inherit;max-height:120px}
+  #send{border:none;background:var(--accent);color:var(--accent-ink);border-radius:12px;padding:0 18px;font-weight:600;cursor:pointer}
+  #send:disabled{opacity:.5;cursor:not-allowed}
+
+  /* onboarding + modal */
+  .overlay{position:fixed;inset:0;background:rgba(20,12,40,.55);display:none;place-items:center;z-index:50;padding:16px}
+  .overlay.show{display:grid}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);
+    width:min(96vw,440px);max-height:92vh;overflow:auto;padding:20px}
+  .card h2{margin:0 0 4px;font-size:20px}
+  .card p.sub{margin:0 0 16px;color:var(--muted);font-size:13px}
+  .card label{display:block;font-size:12px;color:var(--muted);margin:12px 0 5px}
+  .card input[type=text], .card textarea, .card select{width:100%;border:1px solid var(--line);background:var(--surface2);
+    color:var(--ink);border-radius:10px;padding:10px;font:inherit}
+  .card textarea{resize:vertical;min-height:84px}
+  .primary{margin-top:18px;width:100%;border:none;background:var(--accent);color:var(--accent-ink);
+    border-radius:12px;padding:12px;font-weight:700;font-size:15px;cursor:pointer}
+  .primary:disabled{opacity:.6;cursor:wait}
+  .ghost{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:10px;padding:9px 12px;cursor:pointer;font:inherit}
+  .row{display:flex;gap:8px;align-items:center}
+  .row > *{flex:1}
+  .hint{font-size:11px;color:var(--muted);margin-top:6px}
+  .examples{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .ex{font-size:11px;border:1px solid var(--line);border-radius:20px;padding:4px 10px;cursor:pointer;background:var(--surface2)}
+  .ex:hover{border-color:var(--accent)}
+  .danger{color:var(--bad)}
+  .field{margin-bottom:10px}
+  hr{border:none;border-top:1px solid var(--line);margin:16px 0}
+</style>
+
+<div id="app" hidden>
+  <div id="bar">
+    <div class="titles">
+      <div id="petName">Pocket Companion</div>
+      <div id="petMeta">—</div>
+    </div>
+    <button id="fsBtn" class="iconbtn" title="Fullscreen">⛶</button>
+    <button id="setBtn" class="iconbtn" title="Settings">⚙</button>
+  </div>
+
+  <div id="stage">
+    <div id="moodBubble">…</div>
+    <button id="repaintBtn" class="iconbtn" title="Repaint">🎨</button>
+    <div id="floor"></div>
+    <div id="zzz">💤</div>
+    <div id="petWrap">
+      <svg id="eggCss" viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="50" cy="72" rx="42" ry="52" fill="#fff7ea" stroke="#e6d6b8" stroke-width="2"/>
+        <path d="M18 70 q10 -8 18 0 q10 8 18 0 q10 -8 18 0 q8 6 12 2" fill="none" stroke="#e6c98a" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="38" cy="60" r="3" fill="#e9d3a0"/><circle cx="64" cy="80" r="2.4" fill="#e9d3a0"/>
+      </svg>
+      <img id="petImg" alt="your companion" hidden />
+    </div>
+    <div id="poopRow"></div>
+    <div id="genOverlay"><div class="spinner"></div><div id="genMsg">Painting…</div></div>
+  </div>
+
+  <div id="stats"></div>
+  <div id="actions"></div>
+
+  <div id="chat">
+    <div id="msgs"><div id="empty">Say hello to your companion 👋</div></div>
+    <div id="typing"></div>
+    <div id="composer">
+      <textarea id="input" rows="1" placeholder="Talk to your pet…" aria-label="Message"></textarea>
+      <button id="send">Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- onboarding -->
+<div id="onboard" class="overlay">
+  <div class="card">
+    <h2>🥚 A new egg!</h2>
+    <p class="sub">Name your companion and describe how you want it to look. The AI will paint it when it hatches, and it'll grow as you care for it.</p>
+    <label for="obName">Name</label>
+    <input id="obName" type="text" maxlength="40" placeholder="e.g. Pip" />
+    <label for="obLook">How should it look?</label>
+    <textarea id="obLook" maxlength="600" placeholder="e.g. a fluffy round cloud creature with tiny wings and big sparkly eyes, pastel blue"></textarea>
+    <div class="examples" id="obExamples"></div>
+    <div class="hint">Tip: describe a species, colours, and a couple of features. Keep it wholesome and original.</div>
+    <button id="obHatch" class="primary">Start the egg 🐣</button>
+  </div>
+</div>
+
+<!-- settings -->
+<div id="settings" class="overlay">
+  <div class="card">
+    <h2>⚙ Settings</h2>
+    <div class="field">
+      <label for="setSpeed">Life speed</label>
+      <select id="setSpeed">
+        <option value="0.5">Chill — slow decay</option>
+        <option value="1" selected>Normal</option>
+        <option value="2">Lively — faster needs</option>
+        <option value="60">Demo — minutes feel like hours</option>
+      </select>
+    </div>
+    <div class="field row">
+      <label style="margin:0"><input type="checkbox" id="setSound" /> Sound effects</label>
+    </div>
+    <hr/>
+    <div class="field">
+      <label>Appearance prompt</label>
+      <textarea id="setLook" maxlength="600"></textarea>
+      <div class="hint">Changing this affects the next painting (hatch, evolution, or 🎨 Repaint).</div>
+    </div>
+    <hr/>
+    <div class="row">
+      <button class="ghost" id="setExport">Export pet</button>
+      <button class="ghost" id="setImport">Import pet</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="ghost" id="setShare">Share link</button>
+      <button class="ghost danger" id="setReset">Start over</button>
+    </div>
+    <button id="setClose" class="primary" style="background:var(--surface2);color:var(--ink)">Close</button>
+  </div>
+</div>
+
+<script>
+/* ---- Pocket Companion engine (inlined from pet-engine.js, unit-tested) ---- */
+/* =====================================================================
+ * Pocket Companion — core pet engine
+ * ---------------------------------------------------------------------
+ * Pure, framework-agnostic logic for a Tamagotchi-style virtual pet.
+ * NO DOM, NO Date.now() inside — every entry point takes an explicit
+ * `now` (ms) and a `cfg` (tunables) so it is fully deterministic and
+ * unit-testable. The Perchance HTML panel inlines this verbatim and
+ * supplies `now = Date.now()` + the user's settings at each call site.
+ *
+ * Design decisions (locked with the user):
+ *  - Companion-first: stats SHAPE the chat voice; chat is the centre.
+ *  - Gentle: stats can bottom out (misery) but the pet NEVER dies.
+ *  - Body is an AI cutout sprite; engine only produces the *prompt* and
+ *    a stable seed, the HTML layer drives weld.image + weld.background.
+ *
+ * Stats are all 0..100. Higher = better (fullness, energy, happiness,
+ * cleanliness, health, bond). "Hunger" is the inverse of fullness, etc.
+ * ===================================================================== */
+(function (root, factory) {
+  var api = factory();
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  if (typeof window !== "undefined") window.PetEngine = api;
+})(this, function () {
+  "use strict";
+
+  var STAT_KEYS = ["fullness", "energy", "happiness", "cleanliness", "health", "bond"];
+  var STAGES = ["egg", "baby", "child", "teen", "adult"];
+
+  // ---- Tunables -----------------------------------------------------
+  // Per-minute decay while awake, at timeScale 1. Health is derived
+  // (cascades from neglect) rather than decayed directly.
+  var DEFAULT_CFG = {
+    timeScale: 1,            // multiplier on elapsed real time (settings: chill .5 / normal 1 / lively 2 / demo 120)
+    maxCatchupMin: 4320,     // cap a single catch-up at 3 days of decay (gentle: a long absence won't nuke everything)
+    stepMin: 5,              // simulation granularity
+    decay: {                 // points lost per minute, awake
+      fullness: 0.110,
+      energy: 0.070,
+      happiness: 0.055,
+      cleanliness: 0.045,
+      bond: 0.015
+    },
+    sleepEnergyRegen: 0.55,  // energy gained per minute asleep
+    healthRegen: 0.040,      // health gained per minute when all is well
+    healthDrop: 0.090,       // health lost per minute under active neglect/illness
+    healthFloor: 1,          // gentle: never reaches 0
+    poopIntervalMin: 220,    // ~ how often a fed pet leaves a mess
+    poopMax: 6,
+    poopHygienePerMin: 0.030, // cleanliness lost per poop per minute
+    illnessOnsetMin: 90,     // sustained-neglect minutes before sickness sets in
+    illnessClearMin: 60,     // minutes of good care to shake off neglect pressure
+    // Stage gates in real minutes (timeScale divides these).
+    stageMinutes: { egg: 3, baby: 1440, child: 4320, teen: 10080 } // adult is terminal
+  };
+
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+  function num(v, d) { var n = Number(v); return isFinite(n) ? n : d; }
+  function mergeCfg(cfg) {
+    cfg = cfg || {};
+    var out = JSON.parse(JSON.stringify(DEFAULT_CFG));
+    for (var k in cfg) {
+      if (k === "decay" || k === "stageMinutes") {
+        out[k] = Object.assign({}, out[k], cfg[k] || {});
+      } else if (cfg[k] !== undefined) {
+        out[k] = cfg[k];
+      }
+    }
+    return out;
+  }
+
+  // ---- Construction -------------------------------------------------
+  function createPet(opts) {
+    opts = opts || {};
+    var now = num(opts.now, 0);
+    return {
+      v: 2,
+      name: String(opts.name || "Pip").slice(0, 40),
+      appearance: String(opts.appearance || "").slice(0, 600), // user-authored sprite prompt
+      spriteSeed: (opts.spriteSeed != null) ? (opts.spriteSeed | 0)
+                  : Math.floor((opts.rand ? opts.rand() : 0.5) * 1000000),
+      bornAt: now,
+      lastTick: now,
+      stage: "egg",
+      form: "bright",        // care-quality flavour baked into the sprite prompt at each evolution
+      sprites: {},           // stage -> dataURL (filled by the HTML layer)
+      stats: { fullness: 80, energy: 90, happiness: 75, cleanliness: 90, health: 92, bond: 20 },
+      flags: { sick: false, sleeping: false, poop: 0 },
+      acc: { poopTimer: 0, neglectMin: 0, careScore: 70 },
+      cooldowns: {},         // action -> ms-until-allowed (absolute timestamps)
+      stats_seenStage: "egg" // last stage the UI celebrated; lets caller detect evolutions
+    };
+  }
+
+  // ---- Time integration --------------------------------------------
+  // Advance the pet from state.lastTick to `now`, applying decay,
+  // pooping, illness onset/recovery, health cascade and sleep regen.
+  // Returns { state, events:[...] } where events are discrete things the
+  // UI may want to react to: "pooped", "fellAsleep"/"wokeUp", "gotSick",
+  // "recovered".
+  function tick(stateIn, now, cfg) {
+    cfg = mergeCfg(cfg);
+    var s = JSON.parse(JSON.stringify(stateIn));
+    now = num(now, s.lastTick);
+    var events = [];
+    var realMin = (now - s.lastTick) / 60000;
+    if (realMin <= 0) { s.lastTick = now; return { state: s, events: events }; }
+
+    var simMin = Math.min(realMin * cfg.timeScale, cfg.maxCatchupMin);
+    var remaining = simMin;
+    var step = cfg.stepMin;
+    var wasSick = !!s.flags.sick;
+
+    while (remaining > 0.0001) {
+      var dt = Math.min(step, remaining);
+      remaining -= dt;
+      integrateStep(s, dt, cfg, events);
+    }
+
+    // Auto-wake when fully rested.
+    if (s.flags.sleeping && s.stats.energy >= 99) {
+      s.flags.sleeping = false;
+      events.push("wokeUp");
+    }
+    if (!wasSick && s.flags.sick) events.push("gotSick");
+    if (wasSick && !s.flags.sick) events.push("recovered");
+
+    s.lastTick = now;
+    return { state: s, events: events };
+  }
+
+  function integrateStep(s, dt, cfg, events) {
+    var st = s.stats, fl = s.flags, ac = s.acc, d = cfg.decay;
+
+    // --- core decays
+    st.fullness   = clamp(st.fullness   - d.fullness * dt, 0, 100);
+    st.cleanliness = clamp(st.cleanliness - d.cleanliness * dt, 0, 100);
+    st.bond       = clamp(st.bond       - d.bond * dt, 0, 100);
+
+    if (fl.sleeping) {
+      st.energy = clamp(st.energy + cfg.sleepEnergyRegen * dt, 0, 100);
+    } else {
+      st.energy = clamp(st.energy - d.energy * dt, 0, 100);
+    }
+
+    // happiness decays, faster when other needs are unmet
+    var unmet = 0;
+    if (st.fullness < 25) unmet++;
+    if (st.cleanliness < 25) unmet++;
+    if (st.energy < 20) unmet++;
+    if (fl.sick) unmet++;
+    var happyDecay = d.happiness * (1 + 0.6 * unmet);
+    st.happiness = clamp(st.happiness - happyDecay * dt, 0, 100);
+
+    // --- pooping (only a hatched pet)
+    if (s.stage !== "egg") {
+      ac.poopTimer += dt;
+      while (ac.poopTimer >= cfg.poopIntervalMin && fl.poop < cfg.poopMax) {
+        ac.poopTimer -= cfg.poopIntervalMin;
+        fl.poop += 1;
+        events.push("pooped");
+      }
+      if (fl.poop >= cfg.poopMax) ac.poopTimer = 0;
+      // mess drags cleanliness down
+      if (fl.poop > 0) {
+        st.cleanliness = clamp(st.cleanliness - cfg.poopHygienePerMin * fl.poop * dt, 0, 100);
+      }
+    }
+
+    // --- neglect pressure -> illness (gentle, recoverable)
+    var neglected = (st.fullness < 15) || (st.cleanliness < 10) || (fl.poop >= 4) || (st.health < 25);
+    if (neglected) {
+      ac.neglectMin += dt;
+    } else {
+      ac.neglectMin = Math.max(0, ac.neglectMin - (dt * (cfg.illnessOnsetMin / cfg.illnessClearMin)));
+    }
+    if (!fl.sick && ac.neglectMin >= cfg.illnessOnsetMin) fl.sick = true;
+    if (fl.sick && ac.neglectMin <= 0 && !neglected) fl.sick = false;
+
+    // --- health cascade
+    var harming = fl.sick || st.fullness < 20 || st.cleanliness < 20;
+    if (harming) {
+      st.health = clamp(st.health - cfg.healthDrop * dt, cfg.healthFloor, 100);
+    } else if (st.fullness > 40 && st.cleanliness > 40 && st.energy > 25) {
+      st.health = clamp(st.health + cfg.healthRegen * dt, cfg.healthFloor, 100);
+    }
+
+    // --- care score: slow rolling average of overall wellbeing (drives evolution form)
+    var wellbeing = (st.fullness + st.energy + st.happiness + st.cleanliness + st.health) / 5;
+    var alpha = clamp(dt / 720, 0, 1); // ~12h to substantially shift
+    ac.careScore = clamp(ac.careScore + (wellbeing - ac.careScore) * alpha, 0, 100);
+  }
+
+  // ---- Stage / evolution -------------------------------------------
+  function ageMinutes(s, now) { return (num(now, s.lastTick) - s.bornAt) / 60000; }
+
+  // The stage the pet *should* be at, by scaled age.
+  function stageFor(s, now, cfg) {
+    cfg = mergeCfg(cfg);
+    var aMin = ageMinutes(s, now) * cfg.timeScale;
+    var g = cfg.stageMinutes;
+    if (aMin < g.egg) return "egg";
+    if (aMin < g.egg + g.baby) return "baby";
+    if (aMin < g.egg + g.baby + g.child) return "child";
+    if (aMin < g.egg + g.baby + g.child + g.teen) return "teen";
+    return "adult";
+  }
+
+  function formFor(careScore) {
+    if (careScore >= 78) return "radiant";
+    if (careScore >= 55) return "bright";
+    if (careScore >= 32) return "scruffy";
+    return "frazzled";
+  }
+
+  // Returns { evolved:bool, from, to, form } and MUTATES the stage/form
+  // on the returned state when an evolution is due. Caller regenerates
+  // the sprite + celebrates when evolved.
+  function checkEvolution(stateIn, now, cfg) {
+    var s = JSON.parse(JSON.stringify(stateIn));
+    var target = stageFor(s, now, cfg);
+    if (STAGES.indexOf(target) > STAGES.indexOf(s.stage)) {
+      var from = s.stage;
+      s.stage = target;
+      s.form = formFor(s.acc.careScore);
+      // hatching gives a little bond + happiness bump
+      if (from === "egg") {
+        s.stats.bond = clamp(s.stats.bond + 10, 0, 100);
+        s.stats.happiness = clamp(s.stats.happiness + 10, 0, 100);
+      }
+      return { evolved: true, from: from, to: target, form: s.form, state: s };
+    }
+    return { evolved: false, from: s.stage, to: s.stage, form: s.form, state: s };
+  }
+
+  // ---- Mood --------------------------------------------------------
+  // Single most-pressing mood + a 0..1 intensity. Drives both the chat
+  // persona and the sprite pose/expression.
+  function mood(s) {
+    var st = s.stats, fl = s.flags;
+    if (s.stage === "egg") return { key: "egg", label: "dormant", intensity: 0.2, need: null };
+    if (fl.sick) return { key: "sick", label: "sick", intensity: clamp((30 - st.health) / 30, 0.4, 1), need: "heal" };
+    if (fl.sleeping) return { key: "sleepy", label: "asleep", intensity: 0.6, need: null };
+
+    var candidates = [
+      { key: "hungry",  label: "hungry",    val: st.fullness,    need: "feed" },
+      { key: "tired",   label: "exhausted", val: st.energy,      need: "sleep" },
+      { key: "dirty",   label: "grubby",    val: st.cleanliness, need: "clean" },
+      { key: "lonely",  label: "lonely",    val: st.bond,        need: "talk" },
+      { key: "sad",     label: "down",      val: st.happiness,   need: "play" }
+    ];
+    var worst = null;
+    for (var i = 0; i < candidates.length; i++) {
+      var c = candidates[i];
+      if (c.val < 30 && (!worst || c.val < worst.val)) worst = c;
+    }
+    if (worst) return { key: worst.key, label: worst.label, intensity: clamp((30 - worst.val) / 30, 0.3, 1), need: worst.need };
+
+    var avg = (st.fullness + st.energy + st.happiness + st.cleanliness + st.health) / 5;
+    if (avg >= 85 && st.happiness >= 80) return { key: "ecstatic", label: "overjoyed", intensity: 0.9, need: null };
+    if (avg >= 65) return { key: "content", label: "content", intensity: 0.5, need: null };
+    return { key: "meh", label: "so-so", intensity: 0.4, need: null };
+  }
+
+  // Ordered list of needs worth nudging the user about (for toasts).
+  function needsAttention(s) {
+    var out = [];
+    if (s.stage === "egg") return out;
+    var st = s.stats, fl = s.flags;
+    if (fl.sick) out.push({ need: "heal", urgency: 3, msg: s.name + " is sick and needs medicine." });
+    if (st.fullness < 20) out.push({ need: "feed", urgency: fl.sick ? 2 : 3, msg: s.name + " is very hungry." });
+    if (fl.poop >= 3 || st.cleanliness < 20) out.push({ need: "clean", urgency: 2, msg: s.name + "'s space needs cleaning." });
+    if (st.energy < 15 && !fl.sleeping) out.push({ need: "sleep", urgency: 2, msg: s.name + " is worn out." });
+    if (st.bond < 20) out.push({ need: "talk", urgency: 1, msg: s.name + " misses you." });
+    if (st.happiness < 20) out.push({ need: "play", urgency: 1, msg: s.name + " is feeling low." });
+    out.sort(function (a, b) { return b.urgency - a.urgency; });
+    return out;
+  }
+
+  // ---- Actions ------------------------------------------------------
+  var ACTIONS = {
+    feed:  { cool: 90000,  apply: function (st, fl) { st.fullness = clamp(st.fullness + 35, 0, 100); st.happiness = clamp(st.happiness + 4, 0, 100); } },
+    snack: { cool: 45000,  apply: function (st, fl) { st.fullness = clamp(st.fullness + 12, 0, 100); st.happiness = clamp(st.happiness + 8, 0, 100); st.health = clamp(st.health - 1, 1, 100); } },
+    play:  { cool: 60000,  apply: function (st, fl) { st.happiness = clamp(st.happiness + 25, 0, 100); st.bond = clamp(st.bond + 8, 0, 100); st.energy = clamp(st.energy - 10, 0, 100); st.fullness = clamp(st.fullness - 4, 0, 100); } },
+    clean: { cool: 30000,  apply: function (st, fl) { st.cleanliness = 100; fl.poop = 0; st.happiness = clamp(st.happiness + 3, 0, 100); } },
+    heal:  { cool: 120000, apply: function (st, fl, ac) { fl.sick = false; ac.neglectMin = 0; st.health = clamp(st.health + 30, 1, 100); st.happiness = clamp(st.happiness - 5, 0, 100); } },
+    pet:   { cool: 20000,  apply: function (st, fl) { st.bond = clamp(st.bond + 5, 0, 100); st.happiness = clamp(st.happiness + 6, 0, 100); } }
+  };
+
+  // Toggle-style: sleep is not in ACTIONS because it flips a flag.
+  function act(stateIn, action, now, cfg) {
+    var s = JSON.parse(JSON.stringify(stateIn));
+    now = num(now, s.lastTick);
+
+    if (s.stage === "egg") return { state: s, ok: false, reason: "egg", msg: "The egg just needs a little warmth and time." };
+
+    if (action === "sleep") {
+      s.flags.sleeping = !s.flags.sleeping;
+      return { state: s, ok: true, msg: s.flags.sleeping ? (s.name + " curls up to sleep.") : (s.name + " wakes up.") };
+    }
+    if (action === "heal" && !s.flags.sick && s.stats.health > 70) {
+      return { state: s, ok: false, reason: "not-needed", msg: s.name + " is perfectly healthy right now." };
+    }
+
+    var def = ACTIONS[action];
+    if (!def) return { state: s, ok: false, reason: "unknown", msg: "Unknown action." };
+
+    var until = s.cooldowns[action] || 0;
+    if (now < until) {
+      return { state: s, ok: false, reason: "cooldown", waitMs: until - now, msg: s.name + " isn't ready for that yet." };
+    }
+    // Acting while asleep wakes the pet (except heal).
+    if (s.flags.sleeping && action !== "heal") s.flags.sleeping = false;
+
+    def.apply(s.stats, s.flags, s.acc);
+    s.cooldowns[action] = now + def.cool;
+    return { state: s, ok: true, msg: actionMsg(action, s) };
+  }
+
+  function actionMsg(action, s) {
+    var n = s.name;
+    switch (action) {
+      case "feed":  return n + " happily eats a full meal.";
+      case "snack": return n + " nibbles a treat.";
+      case "play":  return "You play with " + n + ".";
+      case "clean": return "All tidy! " + n + " looks fresh.";
+      case "heal":  return "You give " + n + " some medicine.";
+      case "pet":   return n + " leans into your hand.";
+      default:      return "";
+    }
+  }
+
+  function cooldownLeft(s, action, now) {
+    var until = (s.cooldowns && s.cooldowns[action]) || 0;
+    return Math.max(0, until - num(now, 0));
+  }
+
+  // ---- Sprite prompt -----------------------------------------------
+  // Build the text-to-image prompt for the CURRENT stage + mood, on top
+  // of the user's authored appearance. Kept free of bracket- and brace-
+  // shaped DSL tokens so it is safe to inline inside a Perchance panel.
+  var STAGE_DESC = {
+    egg: "a softly glowing speckled egg, smooth shell",
+    baby: "as a tiny wide-eyed newborn, oversized head, stubby limbs, adorable",
+    child: "as a small playful youngster, energetic, rounded features",
+    teen: "as a lanky adolescent, taller, more defined features",
+    adult: "as a fully grown adult, confident, majestic"
+  };
+  var MOOD_POSE = {
+    egg: "resting still, gentle highlight",
+    sick: "looking unwell and droopy, small sweat drop, pale",
+    sleepy: "curled up sleeping, eyes closed, peaceful",
+    hungry: "looking hungry, pleading eyes, tummy rumbling",
+    tired: "yawning, heavy eyelids, sleepy",
+    dirty: "a bit messy and dishevelled, smudges",
+    lonely: "looking up hopefully, longing expression",
+    sad: "downcast, ears lowered, melancholy",
+    content: "relaxed and content, soft smile",
+    ecstatic: "beaming with joy, sparkling eyes, mid-bounce",
+    meh: "neutral calm expression"
+  };
+  var FORM_DESC = {
+    radiant: "glowing with health, glossy, vibrant colours",
+    bright: "healthy and bright",
+    scruffy: "a little scruffy and unkempt",
+    frazzled: "worn and frazzled, tired-looking"
+  };
+
+  function spritePrompt(s, opts) {
+    opts = opts || {};
+    var m = opts.mood || mood(s);
+    var parts = [];
+    var base = String(s.appearance || "a cute round fantasy creature").trim();
+    parts.push(base);
+    parts.push(STAGE_DESC[s.stage] || "");
+    if (s.stage !== "egg") {
+      parts.push(FORM_DESC[s.form] || "");
+      parts.push(MOOD_POSE[m.key] || MOOD_POSE.content);
+    } else {
+      parts.push(MOOD_POSE.egg);
+    }
+    // Framing that makes the background removal clean.
+    parts.push("full body, centered, single subject, simple flat pastel background, soft studio lighting, cute illustrated mascot style, high detail");
+    return parts.filter(Boolean).join(", ");
+  }
+
+  // ---- Chat persona block ------------------------------------------
+  // Text injected into the chat instruction so the model's voice matches
+  // the pet's species, life stage and current state. The HTML layer may
+  // additionally fold in weld.persona.mood() cues.
+  function personaBlock(s) {
+    var m = mood(s);
+    var st = s.stats;
+    var lines = [];
+    lines.push("You ARE " + s.name + ", a living virtual pet creature the user is raising. Stay fully in character as the pet — never break character, never describe yourself as an AI.");
+    lines.push("Appearance: " + (s.appearance || "a small cute creature") + ".");
+    lines.push("Life stage: " + s.stage + (s.stage === "baby" ? " (you can only babble simple words and sounds)" :
+                s.stage === "child" ? " (you speak in short, excitable, simple sentences)" :
+                s.stage === "teen" ? " (you are chatty, a little cheeky and dramatic)" :
+                s.stage === "adult" ? " (you are articulate, warm and expressive)" : "") + ".");
+    lines.push("Right now you feel: " + m.label + ".");
+    lines.push("Your needs (0=empty, 100=full): hunger " + Math.round(st.fullness) +
+               ", energy " + Math.round(st.energy) + ", happiness " + Math.round(st.happiness) +
+               ", cleanliness " + Math.round(st.cleanliness) + ", health " + Math.round(st.health) +
+               ", bond with the user " + Math.round(st.bond) + ".");
+    if (m.need === "feed") lines.push("Let your hunger colour your reply — you might beg for food.");
+    if (m.need === "sleep") lines.push("You are drowsy; your words trail off sleepily.");
+    if (m.need === "clean") lines.push("You feel grubby and a bit grumpy about it.");
+    if (m.need === "heal") lines.push("You feel poorly and weak; be a little pitiful.");
+    if (m.need === "play") lines.push("You crave attention and fun.");
+    if (m.need === "talk" || st.bond < 25) lines.push("You have missed the user and are happy they are here.");
+    if (m.key === "ecstatic") lines.push("You are bursting with joy and affection.");
+    lines.push("Keep replies short, warm and creature-like. Show feeling through actions in *asterisks* where it fits.");
+    return lines.join("\n");
+  }
+
+  function statusLine(s) {
+    if (s.stage === "egg") return "A quiet egg, waiting to hatch…";
+    var m = mood(s);
+    if (s.flags.sleeping) return s.name + " is fast asleep 💤";
+    if (s.flags.sick) return s.name + " is feeling sick 🤒";
+    var n = needsAttention(s);
+    if (n.length) return n[0].msg;
+    return s.name + " is " + m.label + ".";
+  }
+
+  return {
+    STAT_KEYS: STAT_KEYS, STAGES: STAGES, DEFAULT_CFG: DEFAULT_CFG,
+    createPet: createPet,
+    tick: tick,
+    act: act,
+    cooldownLeft: cooldownLeft,
+    stageFor: stageFor,
+    checkEvolution: checkEvolution,
+    formFor: formFor,
+    mood: mood,
+    needsAttention: needsAttention,
+    spritePrompt: spritePrompt,
+    personaBlock: personaBlock,
+    statusLine: statusLine,
+    ageMinutes: ageMinutes,
+    _clamp: clamp, _mergeCfg: mergeCfg
+  };
+});
+
+</script>
+<script>
+(function(){
+  "use strict";
+  var PE = window.PetEngine;
+  var $ = function(id){ return document.getElementById(id); };
+
+  // ---- app state ----
+  var pet = null;
+  var chat = [];                 // [{role:'user'|'pet', content, ts}]
+  var prefs = { timeScale: 1, sound: true };
+  var store = null;
+  var busyGen = false;           // sprite generation in flight
+  var chatBusy = false;
+  var tickTimer = null;
+  var audioCtx = null;
+  var lastNeedToastAt = {};      // need -> ts
+  var lastSeenStage = "egg";
+
+  var ACTION_DEFS = [
+    { key:"feed",  emo:"🍖", label:"Feed" },
+    { key:"snack", emo:"🍬", label:"Snack" },
+    { key:"play",  emo:"🎮", label:"Play" },
+    { key:"clean", emo:"🧼", label:"Clean" },
+    { key:"sleep", emo:"💤", label:"Sleep" },
+    { key:"heal",  emo:"💊", label:"Heal" },
+    { key:"pet",   emo:"🤍", label:"Cuddle" }
+  ];
+
+  var LOOK_EXAMPLES = [
+    "a fluffy round cloud creature with tiny wings, pastel blue",
+    "a small mossy forest sprite with leaf ears and amber eyes",
+    "a chubby orange fox kit with a cream belly and big paws",
+    "a translucent jelly blob with star freckles, mint green",
+    "a tiny clockwork owl of brass and warm light"
+  ];
+
+  function weld(){ return window.weld || {}; }
+
+  // Trigger each weld plugin's $output once so it stashes window.weld.<slug>.
+  // Importing alone does not run $output; calling root.<alias>() does, and
+  // every weld $output is idempotent.
+  function bootWeld(){
+    var names = ["weldStream","weldClean","weldPersist","weldImage","weldBackground",
+                 "weldToast","weldConfetti","weldAudio","weldSettings","weldDice",
+                 "weldPersona","weldTokens","weldBackup"];
+    for (var i=0;i<names.length;i++){
+      var nm = names[i];
+      try { if (typeof root !== "undefined" && typeof root[nm] === "function") root[nm](); }
+      catch(e){ /* missing plugin: feature-detected later */ }
+    }
+    // warm the AI broker + tokenizer in the background
+    try { var w = weld(); if (w.stream && w.stream.preload) w.stream.preload(); } catch(e){}
+    try { var w2 = weld(); if (w2.tokens && w2.tokens.preload) w2.tokens.preload(); } catch(e){}
+  }
+
+  // ---- persistence: weld.persist preferred, localStorage fallback ----
+  function makeStore(){
+    var w = weld();
+    var db = null, col = null;
+    try { if (w.persist && w.persist.open){ db = w.persist.open("pocket-companion"); col = db.collection("state"); } }
+    catch(e){ col = null; }
+    var LS = "pocketCompanion.v2";
+    function lsRead(){ try { return JSON.parse(localStorage.getItem(LS) || "{}"); } catch(e){ return {}; } }
+    function lsWrite(o){ try { localStorage.setItem(LS, JSON.stringify(o)); } catch(e){} }
+    return {
+      backend: col ? "persist" : "local",
+      async loadPet(){
+        if (col){ try { var r = await col.get("pet"); return r ? r.state : null; } catch(e){ return null; } }
+        return lsRead().pet || null;
+      },
+      async savePet(state){
+        if (col){ try { await col.put({ id:"pet", state: state, savedAt: Date.now() }); return; } catch(e){} }
+        var o = lsRead(); o.pet = state; lsWrite(o);
+      },
+      async loadChat(){
+        if (col){ try { var r = await col.get("chat"); return (r && r.list) || []; } catch(e){ return []; } }
+        return lsRead().chat || [];
+      },
+      async saveChat(list){
+        var trimmed = list.slice(-80);
+        if (col){ try { await col.put({ id:"chat", list: trimmed }); return; } catch(e){} }
+        var o = lsRead(); o.chat = trimmed; lsWrite(o);
+      },
+      async loadPrefs(){
+        if (col){ try { var r = await col.get("prefs"); return (r && r.prefs) || null; } catch(e){ return null; } }
+        return lsRead().prefs || null;
+      },
+      async savePrefs(p){
+        if (col){ try { await col.put({ id:"prefs", prefs: p }); return; } catch(e){} }
+        var o = lsRead(); o.prefs = p; lsWrite(o);
+      },
+      async wipe(){
+        if (col){ try { await col.clear(); } catch(e){} }
+        try { localStorage.removeItem(LS); } catch(e){}
+      }
+    };
+  }
+
+  function cfg(){ return { timeScale: prefs.timeScale || 1 }; }
+  async function persist(){ if (pet) await store.savePet(pet); }
+
+  // ---- sound (asset-free WebAudio blips, gated on prefs.sound) ----
+  function unlockAudio(){
+    if (audioCtx) return;
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){ audioCtx = null; }
+  }
+  function blip(freq, dur, type){
+    if (!prefs.sound || !audioCtx) return;
+    try {
+      var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = type || "sine"; o.frequency.value = freq;
+      g.gain.value = 0.0001; o.connect(g); g.connect(audioCtx.destination);
+      var t = audioCtx.currentTime;
+      g.gain.exponentialRampToValueAtTime(0.18, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.start(t); o.stop(t + dur + 0.02);
+    } catch(e){}
+  }
+  function sfx(name){
+    switch(name){
+      case "happy": blip(660,0.12); setTimeout(function(){ blip(880,0.14); },90); break;
+      case "eat":   blip(420,0.10,"triangle"); break;
+      case "clean": blip(720,0.08,"square"); setTimeout(function(){ blip(900,0.08,"square"); },70); break;
+      case "evolve":blip(523,0.14); setTimeout(function(){blip(659,0.14);},120); setTimeout(function(){blip(784,0.2);},240); break;
+      case "alert": blip(330,0.18,"sawtooth"); break;
+      case "heal":  blip(560,0.12); setTimeout(function(){ blip(740,0.16); },110); break;
+      default: blip(500,0.1);
+    }
+  }
+
+  // ---- toast helper ----
+  function toast(msg, type){
+    var w = weld();
+    if (w.toast && w.toast[type || "info"]) { try { w.toast[type||"info"](msg); return; } catch(e){} }
+    setStatusEphemeral(msg);
+  }
+  var statusTimer = null;
+  function setStatusEphemeral(msg){
+    var el = $("moodBubble"); if (!el) return;
+    var prev = el.textContent; el.textContent = msg;
+    clearTimeout(statusTimer);
+    statusTimer = setTimeout(function(){ renderStatus(); }, 2600);
+  }
+
+  // ---- rendering ----
+  var STAGE_NAME = { egg:"Egg", baby:"Baby", child:"Child", teen:"Teen", adult:"Adult" };
+  function fmtAge(){
+    if (!pet) return "";
+    var mins = PE.ageMinutes(pet, Date.now());
+    if (mins < 60) return Math.max(0,Math.floor(mins)) + "m";
+    var hrs = mins/60; if (hrs < 24) return Math.floor(hrs) + "h";
+    return Math.floor(hrs/24) + "d";
+  }
+  function render(){ renderHeader(); renderStage(); renderStats(); renderActions(); renderStatus(); }
+
+  function renderHeader(){
+    $("petName").textContent = pet ? pet.name : "Pocket Companion";
+    $("petMeta").textContent = pet ? (STAGE_NAME[pet.stage] + " • " + fmtAge() + " old") : "—";
+  }
+
+  var STAT_META = {
+    fullness:{lab:"Fullness",emo:"🍽"}, energy:{lab:"Energy",emo:"⚡"}, happiness:{lab:"Happiness",emo:"😊"},
+    cleanliness:{lab:"Clean",emo:"🫧"}, health:{lab:"Health",emo:"❤"}, bond:{lab:"Bond",emo:"🔗"}
+  };
+  function meterColor(v){ return v < 25 ? "var(--bad)" : (v < 55 ? "var(--warn)" : "var(--good)"); }
+  function renderStats(){
+    if (!pet) return;
+    var host = $("stats");
+    if (!host.childNodes.length){
+      var html = "";
+      for (var k in STAT_META){
+        var m = STAT_META[k];
+        html += '<div class="stat" data-k="'+k+'"><div class="lab"><span>'+m.emo+' '+m.lab+'</span><b class="v">0</b></div><div class="meter"><i></i></div></div>';
+      }
+      host.innerHTML = html;
+    }
+    var nodes = host.querySelectorAll(".stat");
+    for (var i=0;i<nodes.length;i++){
+      var node = nodes[i], key = node.getAttribute("data-k");
+      var val = Math.round(pet.stats[key]);
+      node.querySelector(".v").textContent = val;
+      var bar = node.querySelector("i");
+      bar.style.width = val + "%";
+      bar.style.background = meterColor(val);
+    }
+  }
+
+  function renderActions(){
+    var host = $("actions");
+    if (!host.childNodes.length){
+      var html = "";
+      for (var i=0;i<ACTION_DEFS.length;i++){
+        var a = ACTION_DEFS[i];
+        html += '<button class="act" data-a="'+a.key+'"><span class="emo">'+a.emo+'</span><span class="lb">'+a.label+'</span><span class="cd"></span></button>';
+      }
+      host.innerHTML = html;
+      host.addEventListener("click", function(e){
+        var btn = e.target.closest ? e.target.closest(".act") : null;
+        if (btn) doAction(btn.getAttribute("data-a"));
+      });
+    }
+    var now = Date.now();
+    var btns = host.querySelectorAll(".act");
+    for (var j=0;j<btns.length;j++){
+      var b = btns[j], key = b.getAttribute("data-a");
+      var disabled = false, cdText = "";
+      if (!pet || pet.stage === "egg") { disabled = true; }
+      if (key === "sleep"){
+        b.querySelector(".emo").textContent = (pet && pet.flags.sleeping) ? "☀️" : "💤";
+        b.querySelector(".lb").textContent = (pet && pet.flags.sleeping) ? "Wake" : "Sleep";
+      } else if (pet) {
+        var left = PE.cooldownLeft(pet, key, now);
+        if (left > 0){ disabled = true; cdText = Math.ceil(left/1000) + "s"; }
+      }
+      if (key === "heal" && pet && !pet.flags.sick && pet.stats.health > 70) { disabled = true; }
+      b.disabled = disabled;
+      b.querySelector(".cd").textContent = cdText;
+    }
+  }
+
+  function renderStage(){
+    if (!pet) return;
+    var stage = $("stage");
+    var m = PE.mood(pet);
+    stage.className = ""; // reset
+    stage.classList.add("m-" + m.key);
+    if (pet.flags.sleeping) stage.classList.add("asleep");
+
+    var img = $("petImg"), egg = $("eggCss");
+    var url = pet.sprites && pet.sprites[pet.stage];
+    if (pet.stage === "egg" || !url){
+      // egg or not-yet-painted: show CSS egg if egg stage, else keep last/none
+      if (pet.stage === "egg"){ egg.hidden = false; img.hidden = true; }
+      else { egg.hidden = true; if (url){ img.src = url; img.hidden = false; } else { img.hidden = true; egg.hidden = false; } }
+    } else {
+      egg.hidden = true; img.src = url; img.hidden = false;
+    }
+
+    // poop
+    var pr = $("poopRow"); var poo = (pet.flags.poop||0);
+    pr.innerHTML = ""; for (var i=0;i<poo;i++){ var s=document.createElement("span"); s.textContent="💩"; pr.appendChild(s); }
+
+    $("repaintBtn").style.display = (pet.stage === "egg") ? "none" : "grid";
+  }
+
+  function renderStatus(){
+    if (!pet) return;
+    $("moodBubble").textContent = PE.statusLine(pet);
+  }
+
+  // ---- actions ----
+  async function doAction(action){
+    if (!pet || busyGen) return;
+    unlockAudio();
+    var res = PE.act(pet, action, Date.now(), cfg());
+    if (!res.ok){
+      if (res.reason === "cooldown") toast(res.msg, "warn");
+      else if (res.reason !== "egg") toast(res.msg, "info");
+      return;
+    }
+    pet = res.state;
+    if (action === "feed" || action === "snack") sfx("eat");
+    else if (action === "clean") sfx("clean");
+    else if (action === "heal") sfx("heal");
+    else if (action === "play") { sfx("happy"); confettiSmall(); }
+    else if (action === "pet") sfx("happy");
+    toast(res.msg, "success");
+    render();
+    await persist();
+  }
+
+  function confettiSmall(){
+    var w = weld();
+    if (w.confetti && w.confetti.burst){ try { w.confetti.burst({ count: 26 }); } catch(e){} }
+  }
+
+  // ---- sprite pipeline: AI image -> background cutout -> store ----
+  function setGen(on, msg){
+    busyGen = on;
+    var ov = $("genOverlay"); if (ov){ ov.classList.toggle("show", on); if (msg) $("genMsg").textContent = msg; }
+    renderActions();
+  }
+  async function paintSprite(stage){
+    var w = weld();
+    if (!w.image || !w.image.generate){
+      toast("Image plugin unavailable — your pet stays a silhouette for now.", "warn");
+      return false;
+    }
+    if (busyGen) return false;
+    setGen(true, "Painting your companion…");
+    try {
+      var moodObj = PE.mood(pet);
+      var prompt = PE.spritePrompt(pet, { mood: moodObj });
+      var opts = { prompt: prompt, resolution: "512x768", removeBackground: true, guidanceScale: 7 };
+      if (pet.spriteSeed != null) opts.seed = pet.spriteSeed; // stable identity across stages
+      var result = await w.image.generate(opts);
+      var dataUrl = result && result.dataUrl ? String(result.dataUrl) : "";
+      // optional tight crop with the cutout toolkit
+      try {
+        if (w.background && result && result.canvas && w.background.trim && w.background.toDataUrl){
+          var trimmed = w.background.trim(result.canvas, { padding: 6 });
+          var d2 = w.background.toDataUrl(trimmed);
+          if (d2) dataUrl = String(d2);
+        }
+      } catch(e){}
+      if (!dataUrl){ toast("The painting didn't come through — try 🎨 Repaint.", "error"); return false; }
+      if (!pet.sprites) pet.sprites = {};
+      pet.sprites[stage] = dataUrl;
+      render();
+      await persist();
+      return true;
+    } catch(e){
+      toast("Couldn't paint right now: " + ((e && e.message) || e), "error");
+      return false;
+    } finally {
+      setGen(false);
+    }
+  }
+
+  // ---- evolution ----
+  async function onEvolve(ev){
+    pet = ev.state;
+    lastSeenStage = pet.stage;
+    var w = weld();
+    if (w.confetti){ try { (w.confetti.fireworks || w.confetti.burst).call(w.confetti, { count: 60 }); } catch(e){} }
+    sfx("evolve");
+    var word = (ev.from === "egg") ? (pet.name + " hatched!") : (pet.name + " grew into a " + STAGE_NAME[pet.stage].toLowerCase() + "!");
+    toast("✨ " + word, "success");
+    render();
+    await persist();
+    await paintSprite(pet.stage);
+  }
+
+  // ---- chat ----
+  function escapeHtml(s){ return String(s).replace(/[&<>]/g, function(c){ return c === "&" ? "&amp;" : c === "<" ? "&lt;" : "&gt;"; }); }
+  function formatMsg(text){
+    var safe = escapeHtml(text);
+    safe = safe.replace(/\*([^*\n]+)\*/g, "<em>$1</em>");
+    return safe.replace(/\n/g, "<br>");
+  }
+  function appendBubble(role, text){
+    var empty = $("empty"); if (empty) empty.remove();
+    var div = document.createElement("div");
+    div.className = "msg " + (role === "user" ? "user" : "pet");
+    div.innerHTML = (role === "user") ? escapeHtml(text) : formatMsg(text);
+    $("msgs").appendChild(div);
+    $("msgs").scrollTop = $("msgs").scrollHeight;
+    return div;
+  }
+  function estimateTokens(s){
+    var w = weld();
+    try { if (w.tokens && w.tokens.isLoaded && w.tokens.isLoaded() && w.tokens.countSync) { var n = w.tokens.countSync(String(s||"")); if (n!=null) return n; } } catch(e){}
+    return Math.ceil(String(s||"").length / 4);
+  }
+  function budgetHistory(list, maxMsgs, budget){
+    var kept = [], used = 0, cap = Math.min(list.length, maxMsgs || 16);
+    for (var i = list.length - 1; i >= list.length - cap; i--){
+      var t = estimateTokens(list[i].content) + 6;
+      if (used + t > (budget || 3200)) break;
+      kept.unshift(list[i]); used += t;
+    }
+    return kept;
+  }
+  function buildInstruction(){
+    var lines = [];
+    lines.push(PE.personaBlock(pet));
+    var w = weld();
+    if (w.persona && w.persona.mood){
+      try {
+        var m = PE.mood(pet);
+        var cues = w.persona.mood(m.label, Math.round(m.intensity * 100), {});
+        if (cues && cues.text) lines.push("Body language and tone to convey: " + cues.text);
+      } catch(e){}
+    }
+    var hist = budgetHistory(chat, 16);
+    if (hist.length){
+      lines.push("");
+      lines.push("Recent conversation (oldest first):");
+      for (var i=0;i<hist.length;i++){
+        lines.push((hist[i].role === "user" ? "User" : pet.name) + ": " + hist[i].content);
+      }
+    }
+    lines.push("");
+    lines.push(pet.name + " responds now — stay fully in character, keep it short and creature-like:");
+    return lines.join("\n");
+  }
+  function cleanReply(result){
+    var w = weld(); var text = result.text || "";
+    if (w.clean && w.clean.clean){
+      try { text = w.clean.clean(result, { trimPartial:true, roles:true, names:[pet.name,"User"] }); } catch(e){ text = result.text || ""; }
+    }
+    text = String(text);
+    // belt-and-braces: strip any leading "Name:" or impersonated "User:" lines
+    text = text.replace(new RegExp("^\\s*" + pet.name.replace(/[.*+?^${}()|[\]\\]/g,"\\$&") + "\\s*:\\s*", "i"), "");
+    text = text.replace(/\n\s*User\s*:[\s\S]*$/i, "").trim();
+    return text || "*chirps softly*";
+  }
+
+  async function sendMessage(){
+    if (!pet || chatBusy) return;
+    if (pet.stage === "egg"){ toast("Your egg hasn't hatched yet!", "info"); return; }
+    var input = $("input");
+    var text = (input.value || "").trim();
+    if (!text) return;
+    unlockAudio();
+    input.value = ""; input.style.height = "auto";
+    chat.push({ role:"user", content:text, ts:Date.now() });
+    appendBubble("user", text);
+    await store.saveChat(chat);
+
+    var w = weld();
+    chatBusy = true; $("send").disabled = true;
+    $("typing").textContent = pet.name + " is thinking…"; $("typing").classList.add("show");
+
+    var bubble = null, acc = "";
+    function onChunk(chunk){
+      acc += chunk;
+      if (!bubble) { $("typing").classList.remove("show"); bubble = appendBubble("pet", acc); }
+      else { bubble.innerHTML = formatMsg(acc); $("msgs").scrollTop = $("msgs").scrollHeight; }
+    }
+
+    try {
+      var instruction = buildInstruction();
+      var finalText = "";
+      if (w.stream && w.stream.run){
+        var handle = w.stream.run({
+          instruction: instruction,
+          startWith: "",
+          stopSequences: ["\nUser:", "User:", pet.name + ":"],
+          onChunk: onChunk
+        });
+        var result = await handle;
+        finalText = cleanReply(result);
+      } else if (typeof root !== "undefined" && root.aiTextPlugin){
+        var r = await root.aiTextPlugin({ instruction: instruction });
+        finalText = cleanReply({ text: (r && r.generatedText != null) ? String(r.generatedText) : String(r) });
+      } else {
+        finalText = "*tilts head and chirps* (no AI connection right now)";
+      }
+      if (!bubble) bubble = appendBubble("pet", finalText);
+      else bubble.innerHTML = formatMsg(finalText);
+      chat.push({ role:"pet", content:finalText, ts:Date.now() });
+
+      // talking nourishes the bond and lifts the mood a little
+      pet.stats.bond = PE._clamp(pet.stats.bond + 2.5, 0, 100);
+      pet.stats.happiness = PE._clamp(pet.stats.happiness + 2, 0, 100);
+      sfx("happy");
+      await store.saveChat(chat);
+      await persist();
+      render();
+    } catch(e){
+      $("typing").classList.remove("show");
+      appendBubble("pet", "*looks confused* …something went wrong.");
+    } finally {
+      chatBusy = false; $("send").disabled = false;
+      $("typing").classList.remove("show");
+    }
+  }
+
+  // ---- tick loop ----
+  function maybeToastNeeds(){
+    var needs = PE.needsAttention(pet);
+    if (!needs.length) return;
+    var top = needs[0];
+    var now = Date.now();
+    var last = lastNeedToastAt[top.need] || 0;
+    if (now - last > 150000){ // at most every 2.5 min per need
+      lastNeedToastAt[top.need] = now;
+      toast(top.msg, top.urgency >= 3 ? "warn" : "info");
+      if (top.urgency >= 3) sfx("alert");
+    }
+  }
+  async function tickNow(){
+    if (!pet) return;
+    var now = Date.now();
+    var res = PE.tick(pet, now, cfg());
+    pet = res.state;
+    // discrete events
+    if (res.events.indexOf("gotSick") >= 0) { toast(pet.name + " has fallen ill — give medicine 💊", "warn"); sfx("alert"); }
+    // evolution check
+    var ev = PE.checkEvolution(pet, now, cfg());
+    if (ev.evolved){ await onEvolve(ev); }
+    else { render(); }
+    maybeToastNeeds();
+    await persist();
+  }
+  function startLoop(){
+    if (tickTimer) clearInterval(tickTimer);
+    tickTimer = setInterval(function(){ tickNow(); }, 15000);
+    // refresh cooldown countdowns more often (cheap, no persist)
+    setInterval(function(){ if (pet) renderActions(); }, 1000);
+  }
+
+  // ---- onboarding ----
+  function showOnboard(){
+    var ex = $("obExamples"); ex.innerHTML = "";
+    for (var i=0;i<LOOK_EXAMPLES.length;i++){
+      (function(text){
+        var b = document.createElement("span"); b.className="ex"; b.textContent = text.split(",")[0];
+        b.title = text;
+        b.addEventListener("click", function(){ $("obLook").value = text; });
+        ex.appendChild(b);
+      })(LOOK_EXAMPLES[i]);
+    }
+    $("onboard").classList.add("show");
+    $("obName").focus();
+  }
+  async function hatch(){
+    var name = ($("obName").value || "").trim() || "Pip";
+    var look = ($("obLook").value || "").trim();
+    if (!look){ toast("Describe how your companion should look first 🙂", "warn"); $("obLook").focus(); return; }
+    $("obHatch").disabled = true;
+    unlockAudio();
+    pet = PE.createPet({ name:name, appearance:look, now: Date.now(), rand: Math.random });
+    chat = [];
+    lastSeenStage = "egg";
+    await persist();
+    await store.saveChat(chat);
+    $("onboard").classList.remove("show");
+    $("obHatch").disabled = false;
+    render();
+    startLoop();
+    toast("Your egg is warming… keep it company 🥚", "info");
+  }
+
+  // ---- settings / export / import ----
+  function openSettings(){
+    $("setSpeed").value = String(prefs.timeScale || 1);
+    $("setSound").checked = !!prefs.sound;
+    $("setLook").value = pet ? (pet.appearance || "") : "";
+    $("settings").classList.add("show");
+  }
+  async function applySettings(){
+    prefs.timeScale = parseFloat($("setSpeed").value) || 1;
+    prefs.sound = $("setSound").checked;
+    if (pet){ var newLook = ($("setLook").value || "").trim(); if (newLook) pet.appearance = newLook; }
+    await store.savePrefs(prefs);
+    await persist();
+    render();
+  }
+  function petToJson(){ return JSON.stringify({ app:"pocket-companion", v:2, pet: pet, chat: chat.slice(-80) }); }
+  async function exportPet(){
+    var json = petToJson();
+    try {
+      var parts = []; parts.push(json);
+      var blob = new Blob(parts, { type:"application/json" });
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = (pet ? pet.name : "pet") + "-pocket-companion.json";
+      a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+      toast("Exported.", "success");
+    } catch(e){ toast("Export failed.", "error"); }
+  }
+  async function importPet(){
+    var w = weld();
+    var raw = "";
+    if (w.toast && w.toast.prompt){
+      raw = await w.toast.prompt({ title:"Import pet", message:"Paste an exported pet (JSON):", multiline:true, okLabel:"Import" });
+    } else { raw = window.prompt("Paste exported pet JSON:"); }
+    if (!raw) return;
+    try {
+      var obj = JSON.parse(raw);
+      var incoming = obj.pet || (obj.app === "pocket-companion" ? obj.pet : obj);
+      if (!incoming || !incoming.stats) throw new Error("not a Pocket Companion export");
+      pet = incoming; chat = obj.chat || [];
+      // resync the clock so a stale export doesn't dump a huge catch-up
+      pet.lastTick = Date.now();
+      await persist(); await store.saveChat(chat);
+      $("settings").classList.remove("show");
+      renderChatFromHistory(); render(); startLoop();
+      toast("Welcome back, " + pet.name + "!", "success");
+    } catch(e){ toast("That didn't look like a valid export.", "error"); }
+  }
+  async function sharePet(){
+    var w = weld();
+    if (!(w.backup && w.backup.uploadJson && typeof root !== "undefined" && root.uploadPlugin)){
+      toast("Sharing needs the upload plugin — use Export instead.", "warn"); return;
+    }
+    try {
+      toast("Creating share link…", "info");
+      var up = await w.backup.uploadJson(root.uploadPlugin, JSON.parse(petToJson()));
+      var url = "https://perchance.org/pocket-companion#import=" + (up && up.id ? up.id : "");
+      if (w.toast && w.toast.prompt){ await w.toast.prompt({ title:"Share link", message:"Anyone with this link can adopt a copy:", defaultValue:url, okLabel:"Done" }); }
+      else window.prompt("Share link:", url);
+    } catch(e){ toast("Couldn't create a share link.", "error"); }
+  }
+  async function resetPet(){
+    var w = weld(); var sure = true;
+    if (w.toast && w.toast.confirm){ sure = await w.toast.confirm({ title:"Start over?", message:"This releases your current companion and starts a brand-new egg. This cannot be undone.", okLabel:"Start over", danger:true }); }
+    else sure = window.confirm("Start over with a new egg? This cannot be undone.");
+    if (!sure) return;
+    await store.wipe();
+    pet = null; chat = [];
+    $("settings").classList.remove("show");
+    $("msgs").innerHTML = '<div id="empty">Say hello to your companion 👋</div>';
+    if (tickTimer) clearInterval(tickTimer);
+    showOnboard();
+  }
+
+  function renderChatFromHistory(){
+    var host = $("msgs"); host.innerHTML = "";
+    if (!chat.length){ host.innerHTML = '<div id="empty">Say hello to your companion 👋</div>'; return; }
+    for (var i=0;i<chat.length;i++) appendBubble(chat[i].role, chat[i].content);
+  }
+
+  // ---- theme: re-assert on OS scheme change (matches plugin init races) ----
+  function watchTheme(){
+    try {
+      var mq = window.matchMedia("(prefers-color-scheme: dark)");
+      var fn = function(){ /* CSS vars switch automatically; hook kept for future overrides */ };
+      if (mq.addEventListener) mq.addEventListener("change", fn); else if (mq.addListener) mq.addListener(fn);
+    } catch(e){}
+  }
+
+  // ---- import-from-share-link on load ----
+  async function checkShareLink(){
+    try {
+      var h = window.location.hash || "";
+      var m = h.match(/import=([a-f0-9]{8,})/i);
+      if (!m) return false;
+      var w = weld();
+      if (!(w.backup && w.backup.fetchJson)) return false;
+      var url = "https://user.uploads.dev/file/" + m[1];
+      var obj = await w.backup.fetchJson(root.superFetch ? root.superFetch : fetch, url);
+      if (obj && obj.pet && obj.pet.stats){
+        pet = obj.pet; chat = obj.chat || []; pet.lastTick = Date.now();
+        if (window.location.hash) window.location.hash = "";
+        await persist(); await store.saveChat(chat);
+        return true;
+      }
+    } catch(e){}
+    return false;
+  }
+
+  // ---- wiring ----
+  function wire(){
+    $("send").addEventListener("click", sendMessage);
+    $("input").addEventListener("keydown", function(e){ if (e.key === "Enter" && !e.shiftKey){ e.preventDefault(); sendMessage(); } });
+    $("input").addEventListener("input", function(){ this.style.height="auto"; this.style.height=Math.min(120,this.scrollHeight)+"px"; });
+    $("setBtn").addEventListener("click", openSettings);
+    $("setClose").addEventListener("click", function(){ applySettings(); $("settings").classList.remove("show"); });
+    $("setExport").addEventListener("click", exportPet);
+    $("setImport").addEventListener("click", importPet);
+    $("setShare").addEventListener("click", sharePet);
+    $("setReset").addEventListener("click", resetPet);
+    $("obHatch").addEventListener("click", hatch);
+    $("repaintBtn").addEventListener("click", function(){ if (pet && pet.stage !== "egg") paintSprite(pet.stage); });
+    $("fsBtn").addEventListener("click", function(){
+      try { if (typeof root !== "undefined" && root.fullscreenButtonPlugin) { root.fullscreenButtonPlugin(); return; } } catch(e){}
+      try { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); } catch(e){}
+    });
+    document.addEventListener("visibilitychange", function(){ if (!document.hidden && pet) tickNow(); });
+  }
+
+  async function boot(){
+    if (!PE){ document.body.innerHTML = '<p style="padding:20px">Engine failed to load.</p>'; return; }
+    bootWeld();
+    store = makeStore();
+    var p = await store.loadPrefs(); if (p) prefs = Object.assign(prefs, p);
+    watchTheme();
+    wire();
+    $("app").hidden = false;
+
+    var adopted = await checkShareLink();
+    if (!adopted) pet = await store.loadPet();
+    chat = await store.loadChat();
+
+    if (!pet){ showOnboard(); return; }
+    lastSeenStage = pet.stage;
+    renderChatFromHistory();
+    render();
+    startLoop();
+    // initial catch-up tick (handles time away) + paint any missing sprite
+    await tickNow();
+    if (pet && pet.stage !== "egg" && (!pet.sprites || !pet.sprites[pet.stage]) && !busyGen){
+      paintSprite(pet.stage);
+    }
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+})();
+</script>
