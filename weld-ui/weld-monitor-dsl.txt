@@ -9,6 +9,10 @@ $output() =>
   if (!window.weld) window.weld = {};
   if (window.weld.monitor) return window.weld.monitor;
 
+  // Bracket chars built at runtime so the literals never appear in source
+  // (Perchance counts [ ] { } even inside strings/regex). See weld.safe.
+  var SB=String.fromCharCode(91), SC=String.fromCharCode(93);
+
   // -----------------------------------------------------------------
   // weld.monitor: the executable companion to the Perchance Platform
   // reference. Everything the docs describe -- the domains, the root
@@ -92,7 +96,7 @@ $output() =>
         var incJ=await incR.json();
         var incs=(incJ&&incJ.incidents)||[];
         if(incs.length===0) infraRec('CF: active incidents','PASS','0','0 active',null);
-        else infraRec('CF: active incidents','DRIFT','0',incs.length+': '+incs.map(function(i){return i.name+' ['+i.impact+']';}).join('; '),null);
+        else infraRec('CF: active incidents','DRIFT','0',incs.length+': '+incs.map(function(i){return i.name+' '+SB+i.impact+SC;}).join('; '),null);
       }catch(e){infraSkip('CF: active incidents','fetch failed');}
 
       try{
@@ -224,7 +228,7 @@ $output() =>
   async function testEnv(){
     setProg(10,'2 · Environment');
     assertEq('env','crossOriginIsolated',false,window.crossOriginIsolated);
-    assertTrue('env','generatorPublicId is 32 hex',typeof window.generatorPublicId==='string'&&window.generatorPublicId.length===32&&/^[a-f0-9]+$/.test(window.generatorPublicId));
+    assertTrue('env','generatorPublicId is 32 hex',typeof window.generatorPublicId==='string'&&window.generatorPublicId.length===32&&new RegExp('^'+SB+'a-f0-9'+SC+'+$').test(window.generatorPublicId));
     assertTrue('env','generatorName is non-empty string',typeof window.generatorName==='string'&&window.generatorName.length>0);
     // v3: generatorLastEditTime
     assertTrue('env','generatorLastEditTime is a number',typeof window.generatorLastEditTime==='number'&&window.generatorLastEditTime>0);
@@ -300,7 +304,7 @@ $output() =>
     assertEq('text','typeof countTokens','function',typeof(meta&&meta.countTokens));
     if(meta&&meta.countTokens){
       var ct=meta.countTokens('Hello, world! This is a test sentence.');
-      assertTrue('text','countTokens in [5,20]',typeof ct==='number'&&ct>=5&&ct<=20,{note:'got '+ct});
+      assertTrue('text','countTokens in '+SB+'5,20'+SC,typeof ct==='number'&&ct>=5&&ct<=20,{note:'got '+ct});
     }
     // Handle
     var handle;try{handle=plugin({instruction:'Write a detailed paragraph about the history of astronomy, covering ancient civilizations through the telescope era.',startWith:''});}
@@ -322,7 +326,7 @@ $output() =>
     // v3: liveResponseText grew
     if(lrtSamples.length>=2){
       assertTrue('text','liveResponseText updates live',lrtSamples[lrtSamples.length-1]>lrtSamples[0],
-        {note:'samples: ['+lrtSamples.join(',')+']'});
+        {note:'samples: '+SB+lrtSamples.join(',')+SC});
     }else{assertSkip('text','liveResponseText','not enough samples (gen was too fast)');}
 
     assertTrue('text','result instanceof String',result instanceof String);

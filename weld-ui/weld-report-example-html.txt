@@ -1,0 +1,339 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--amber:#d29922;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:780px;margin:0 auto;padding:34px 18px 90px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 0 16px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+.breadcrumb a{color:var(--muted);}.breadcrumb .sep{color:var(--faint);margin:0 8px;}.breadcrumb .cur{color:var(--ink);}.breadcrumb .act a{color:var(--accent);}
+.hdr{margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}.hdr h1{font:700 24px var(--mono);letter-spacing:-0.5px;}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;}
+.hdr .lead{color:var(--muted);margin-top:8px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;}
+.panel h2{font:600 13px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:8px 0;}
+.lbl{font:600 12px var(--mono);color:var(--muted);min-width:74px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 15px;font:600 13px var(--font);cursor:pointer;transition:.12s;}
+.btn:hover{filter:brightness(1.08);}.btn.ghost{background:var(--faint);color:var(--ink);}.btn.sm{padding:6px 11px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+input[type=text],textarea{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:8px 10px;font:13px var(--font);}
+input[type=text]{flex:1;min-width:120px;}textarea{width:100%;font:12.5px/1.5 var(--mono);resize:vertical;}
+.mono{font:13px var(--mono);}
+.out{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font:12.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;min-height:20px;color:#c9d1d9;}
+.chip{display:inline-block;background:var(--faint);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font:600 12px var(--mono);margin:2px;}
+.chip.k{background:rgba(63,185,80,.14);border-color:rgba(63,185,80,.4);color:#7ee787;}
+.chip.d{opacity:.4;text-decoration:line-through;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:9px 13px;border-radius:0 4px 4px 0;margin:12px 0 0;font-size:12.5px;color:#c9d1d9;}
+.note.warn{background:rgba(210,153,34,.08);border-color:var(--amber);}
+.tag{font:600 10px var(--mono);padding:2px 7px;border-radius:4px;background:rgba(63,185,80,.14);color:#7ee787;border:1px solid rgba(63,185,80,.4);}
+.tag.ai{background:rgba(210,153,34,.12);color:#e3b341;border-color:rgba(210,153,34,.4);}
+.bar{height:14px;background:var(--accent);border-radius:3px;transition:width .3s;}
+.footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);}.footer a{color:var(--muted);}
+.flex{display:flex;gap:10px;align-items:center;}.wrap{flex-wrap:wrap;}.grow{flex:1;}.mt{margin-top:10px;}
+</style>
+<div id="page">
+<div class="breadcrumb"><span><a href="https://perchance.org/weld-ui-index">weld</a><span class="sep">/</span>weld.report<span class="sep">/</span><span class="cur">demo</span></span><span class="act"><a href="https://perchance.org/weld-report-plugin">docs &rarr;</a></span></div>
+<div class="hdr"><div class="hdr-row"><h1>weld.report &mdash; demo</h1><span class="ver">v1.0.0</span></div><p class="lead">Start capture, throw a few errors (including a duplicate), and watch the de-duplicated log and human-readable summary build. The encrypt-and-upload step uses the live Perchance plugins, so it is shown but not run in the demo.</p></div>
+  <div class="panel"><h2>Bug report builder <span class="tag">drop-in superset</span></h2>
+    <div class="row"><button id="cap" class="btn">Start error capture</button><span id="capst" class="chip">idle</span></div>
+    <div class="row"><button id="e1" class="btn sm ghost" disabled>throw TypeError</button><button id="e2" class="btn sm ghost" disabled>throw same again</button><button id="e3" class="btn sm ghost" disabled>console.error</button></div>
+    <div class="row"><button id="sum" class="btn" disabled>Show summary</button><button id="rep" class="btn ghost" disabled>Show raw report</button></div>
+    <div id="out" class="out mt"></div>
+    <div class="note">This builds the same report the official bug-report-plugin would, plus a de-duplicated error log (repeated errors collapse to one row with a count), a human-readable summary, and a slot for weld.monitor's platform fingerprint. In a real app you would call <code>weld.report.createTemporaryDebugInfoUrl</code> to encrypt and upload it; that step needs the live Perchance secret/upload plugins, so it is shown but not run here.</div>
+  </div>
+<footer class="footer"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
+</div>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.report) return window.weld.report;
+
+// -----------------------------------------------------------------
+// weld.report: bug reports that are actually fixable.
+//
+// Perchance's official bug-report-plugin captures the browser/device and
+// a flat list of the last six console errors, encrypts it with the dev's
+// public key, and uploads it as a URL that self-deletes after six months.
+// That privacy stance is exactly right (a raw report would leak the
+// reporter's browser, device, storage, etc.), so weld.report keeps it --
+// encryption is mandatory and the API is identical:
+//
+//   await weld.report.createTemporaryDebugInfoUrl({ publicKey, customData });
+//   weld.report.initAutoErrorCapture();
+//
+// What it adds, by composing the rest of the suite:
+//   * a TIMESTAMPED, DE-DUPLICATED error log (not a flat array of 6) with
+//     occurrence counts -- so a single error firing 200x reads as one row;
+//   * a HUMAN-READABLE summary (weld.report.summary()) the app can show the
+//     user or log, instead of only an opaque encrypted blob;
+//   * a weld.monitor FINGERPRINT embedded in the report, so the dev can
+//     tell "this happened during a Cloudflare-proxy outage" from a real bug.
+//
+// It reuses weld.diag's capture + environment bundle and weld.monitor's
+// fingerprint when they're loaded, and self-captures otherwise. Encryption
+// and expiring upload mirror the official plugin's platform calls exactly.
+// -----------------------------------------------------------------
+
+var META_KEY = '__weldReportMeta_b9f3';
+if (!Reflect.get(window, META_KEY)) Reflect.set(window, META_KEY, {});
+var meta = Reflect.get(window, META_KEY);
+
+var SB = String.fromCharCode(91), SC = String.fromCharCode(93); // open/close square, built at runtime
+
+var deps = { diag: null, monitor: null };
+function attach(d) {
+  if (!d) return;
+  if (d.diag) deps.diag = d.diag;
+  if (d.monitor) deps.monitor = d.monitor;
+}
+function diag() { return deps.diag || (window.weld && window.weld.diag) || null; }
+function monitor() { return deps.monitor || (window.weld && window.weld.monitor) || null; }
+
+function nowIso() { try { return new Date().toISOString(); } catch (e) { return '' + Date.now(); } }
+function safeStr(v) {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  try { return JSON.stringify(v); } catch (e) { return String(v); }
+}
+
+// ---- error log: timestamped + de-duplicated -------------------------
+// Each distinct (source + message) is one row carrying first/last seen and
+// an occurrence count, so a noisy repeated error doesn't drown the report.
+function ensureLog() {
+  if (!meta.log) meta.log = { rows: {}, order: new Array(), max: 50 };
+  return meta.log;
+}
+function logError(source, message, extra) {
+  var log = ensureLog();
+  var msg = String(message == null ? '' : message);
+  var key = source + '\u0001' + msg;
+  var row = Reflect.get(log.rows, key);
+  var t = nowIso();
+  if (row) {
+    row.count++;
+    row.lastSeen = t;
+    if (extra && !row.extra) row.extra = extra;
+  } else {
+    row = { source: source, message: msg, count: 1, firstSeen: t, lastSeen: t, extra: extra || null };
+    Reflect.set(log.rows, key, row);
+    log.order.push(key);
+    while (log.order.length > log.max) { var drop = log.order.shift(); Reflect.deleteProperty(log.rows, drop); }
+  }
+  return row;
+}
+// Snapshot the de-duplicated log, newest activity first.
+function errorLog() {
+  var log = ensureLog();
+  return log.order.map(function (k) { return Reflect.get(log.rows, k); })
+    .sort(function (a, b) { return (a.lastSeen < b.lastSeen) ? 1 : -1; });
+}
+
+// ---- auto-capture (compatible with the official initAutoErrorCapture) ---
+// If weld.diag is present it already hooks console/window/promise errors,
+// so we subscribe to its stream instead of double-hooking. Otherwise we
+// install our own minimal hooks. Either way feeds the de-duplicated log.
+function initAutoErrorCapture() {
+  if (meta.capturing) return;
+  meta.capturing = true;
+
+  var d = diag();
+  if (d && typeof d.subscribe === 'function') {
+    // reuse diag's capture; pull its existing entries first
+    if (typeof d.entries === 'function') {
+      d.entries().forEach(function (e) {
+        if (e.level === 'error' || e.level === 'warn') logError(e.source || 'diag', e.message, e.data);
+      });
+    }
+    d.subscribe(function (e) {
+      if (e && (e.level === 'error' || e.level === 'warn')) logError(e.source || 'diag', e.message, e.data);
+    });
+    meta.via = 'diag';
+    return;
+  }
+
+  // standalone hooks (mirror the official plugin's listeners)
+  try {
+    window.addEventListener('error', function (e) {
+      var msg = (e && e.message) || 'unknown error';
+      logError('window', msg, { filename: e && e.filename, line: e && e.lineno, col: e && e.colno, stack: e && e.error && e.error.stack && String(e.error.stack) });
+    });
+    window.addEventListener('unhandledrejection', function (e) {
+      var r = e && e.reason;
+      logError('promise', 'Unhandled rejection: ' + ((r && r.message) || safeStr(r)), { stack: r && r.stack && String(r.stack) });
+    });
+    if (console && typeof console.error === 'function' && !console.error.__weldReportHooked) {
+      var orig = console.error.bind(console);
+      var hooked = function () {
+        try { logError('console', Array.prototype.map.call(arguments, safeStr).join(' '), null); } catch (e) {}
+        return orig.apply(console, arguments);
+      };
+      hooked.__weldReportHooked = true;
+      console.error = hooked;
+    }
+  } catch (e) { /* sandbox without window listeners */ }
+  meta.via = 'self';
+}
+
+// ---- environment ----------------------------------------------------
+// Prefer weld.diag.bundle (richer, already collected); else gather a
+// minimal equivalent. We add the browser/device fields the official
+// plugin collects via ua-parser, best-effort from navigator.
+function environment(extra) {
+  var d = diag();
+  if (d && typeof d.bundle === 'function') {
+    try { return d.bundle({ extra: extra }); } catch (e) {}
+  }
+  var b = {
+    generatedAt: nowIso(),
+    generator: (typeof generatorName !== 'undefined' ? generatorName : 'unknown'),
+    url: (typeof location !== 'undefined' ? location.href : ''),
+    userAgent: (typeof navigator !== 'undefined' ? navigator.userAgent : ''),
+    platform: (typeof navigator !== 'undefined' ? navigator.platform : ''),
+    language: (typeof navigator !== 'undefined' ? navigator.language : ''),
+    viewport: (typeof window !== 'undefined' ? { w: window.innerWidth, h: window.innerHeight } : null)
+  };
+  if (extra) b.extra = extra;
+  return b;
+}
+
+// ---- platform fingerprint ------------------------------------------
+// A cheap, synchronous fingerprint of platform state if weld.monitor has
+// already run; we never trigger a full ~100-assertion run from here.
+function platformFingerprint() {
+  var m = monitor();
+  if (!m) return null;
+  try {
+    if (typeof m.fingerprint === 'function' && m.groups) {
+      // monitor.fingerprint expects the tests array; if a prior run cached
+      // a report, surface its fingerprint, else note that no run has happened.
+      if (meta.lastMonitorReport && meta.lastMonitorReport.fingerprint) return meta.lastMonitorReport.fingerprint;
+    }
+  } catch (e) {}
+  return null;
+}
+// Let an app hand us a monitor report so its fingerprint rides along.
+function attachMonitorReport(report) { if (report) meta.lastMonitorReport = report; }
+
+// ---- the report object ----------------------------------------------
+function buildReport(customData) {
+  var rep = {
+    generatedAt: nowIso(),
+    environment: environment(),
+    errors: errorLog(),
+    platformFingerprint: platformFingerprint()
+  };
+  if (customData) rep.customData = customData;
+  return rep;
+}
+
+// ---- human-readable summary ----------------------------------------
+// A compact digest the app can show the user or log to console -- the part
+// the official plugin never produces (it only emits an encrypted blob).
+function summary(rep) {
+  rep = rep || buildReport();
+  var env = rep.environment || {};
+  var lines = new Array();
+  lines.push('weld.report summary @ ' + rep.generatedAt);
+  lines.push('generator: ' + (env.generator || 'unknown'));
+  if (env.userAgent) lines.push('browser: ' + env.userAgent);
+  if (env.viewport) lines.push('viewport: ' + env.viewport.w + 'x' + env.viewport.h);
+  if (rep.platformFingerprint) lines.push('platform fingerprint: ' + rep.platformFingerprint);
+  var errs = rep.errors || new Array();
+  if (!errs.length) {
+    lines.push('errors: none captured');
+  } else {
+    lines.push('errors (' + errs.length + ' distinct):');
+    errs.slice(0, 8).forEach(function (e) {
+      lines.push('  ' + SB + e.source + ' x' + e.count + SC + ' ' + e.message + (e.count > 1 ? '  (last ' + e.lastSeen + ')' : ''));
+    });
+    if (errs.length > 8) lines.push('  ... and ' + (errs.length - 8) + ' more');
+  }
+  return lines.join('\n');
+}
+
+// ---- the official drop-in API --------------------------------------
+// createTemporaryDebugInfoUrl(opts): identical signature to the official
+// bug-report-plugin. Encrypts the (richer) report with opts.publicKey and
+// uploads it as a URL that self-deletes after six months. Encryption is
+// MANDATORY -- a publicKey is required, exactly as in the official plugin,
+// so a report can never leak the reporter's environment in the clear.
+function createTemporaryDebugInfoUrl(opts) {
+  opts = opts || {};
+  if (!opts.publicKey) {
+    return Promise.reject(new Error('weld.report: must provide publicKey for encrypting debug info. This is necessary to increase user privacy (i.e. prevent leaking the user\'s browser version, device model, etc.). Generate one at https://perchance.org/public-key-encryption-tool'));
+  }
+  var rep = buildReport(opts.customData);
+  var payload = safeStr(rep);
+
+  return Promise.resolve().then(function () {
+    // preload the platform plugins (no-op if already loaded), matching official
+    try { if (typeof dynamicImport === 'function') { dynamicImport('secret-plugin', 'preload'); dynamicImport('upload-plugin', 'preload'); } } catch (e) {}
+
+    if (typeof dynamicImport !== 'function') throw new Error('weld.report: dynamic-import-plugin not available');
+    return dynamicImport('secret-plugin', 'async');
+  }).then(function (secret) {
+    if (!secret || typeof secret.encrypt !== 'function') throw new Error('weld.report: secret-plugin unavailable');
+    var encrypted = secret.encrypt(payload, opts.publicKey);
+    return dynamicImport('upload-plugin', 'async').then(function (uploadPlugin) {
+      if (typeof uploadPlugin !== 'function') throw new Error('weld.report: upload-plugin unavailable');
+      // expire after six months, matching the official plugin
+      var sixMonths = 1000 * 60 * 60 * 24 * 30 * 6;
+      return Promise.resolve(uploadPlugin(encrypted, { expires: Date.now() + sixMonths }));
+    });
+  }).then(function (res) {
+    res = res || {};
+    if (res.error) throw new Error('weld.report: upload failed (' + res.error + ')');
+    return (res.url != null) ? String(res.url) : null;
+  }).catch(function (e) {
+    try { console.error(e); } catch (x) {}
+    return null;
+  });
+}
+
+window.weld.report = {
+  // official drop-in surface
+  createTemporaryDebugInfoUrl: createTemporaryDebugInfoUrl,
+  initAutoErrorCapture: initAutoErrorCapture,
+  // richer weld surface
+  report: buildReport,
+  summary: summary,
+  errorLog: errorLog,
+  logError: logError,
+  environment: environment,
+  attachMonitorReport: attachMonitorReport,
+  attach: attach,
+  version: '1.0.0'
+};
+
+window.weld.report.attach({
+  dynamicImport: (typeof dynamicImport === 'function') ? dynamicImport : null
+});
+
+return window.weld.report;
+})();
+</script>
+<script>
+
+  function boot(){ if(!window.weld||!window.weld.report){return setTimeout(boot,100);} init(); }
+  function init(){
+    var R=window.weld.report, $=function(id){return document.getElementById(id);};
+    var btns=['e1','e2','e3','sum','rep'];
+    $('cap').onclick=function(){
+      R.initAutoErrorCapture();
+      $('capst').textContent='capturing'; $('capst').className='chip k';
+      btns.forEach(function(b){$(b).disabled=false;});
+    };
+    $('e1').onclick=function(){ R.logError('window',"TypeError: Cannot read properties of undefined (reading x)"); flash('captured a TypeError'); };
+    $('e2').onclick=function(){ R.logError('window',"TypeError: Cannot read properties of undefined (reading x)"); flash('same error again -> count goes up, not a new row'); };
+    $('e3').onclick=function(){ R.logError('console','Failed to load image: avatar.png'); flash('captured a console.error'); };
+    $('sum').onclick=function(){ $('out').textContent=R.summary(); };
+    $('rep').onclick=function(){ $('out').textContent=JSON.stringify(R.report(), null, 2); };
+    function flash(m){ $('out').textContent=m+'\n\n'+R.summary(); }
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+
+</script>

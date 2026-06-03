@@ -19,8 +19,9 @@ $output() =>
   // pick-list, or a regex count quantifier sitting in a string can all be
   // silently mangled, producing bugs with no stack trace.
   //
-  //   weld.safe.scan(code)   -> [{ line, col, token, severity, why, fix }]
-  //   weld.safe.check(code)  -> { ok, findings }   (ok = no errors)
+  //   weld.safe.scan(code)   -> array of findings, each with line, col,
+  //                             token, severity, why, fix
+  //   weld.safe.check(code)  -> ok flag plus findings (ok = no errors)
   //   weld.safe.escape(str)  -> a parser-safe version of a string
   //   weld.safe.build(token) -> assemble a risky literal at runtime
   //   weld.safe.explain(kind)-> the rule behind a trap kind
@@ -90,16 +91,16 @@ $output() =>
       });
 
       // import directive that is NOT a legit top-level assignment
-      var importRe = new RegExp(OB + 'import:[^' + CB + ']*' + CB, 'g');
+      var importRe = new RegExp(OB + 'import:' + OS + '^' + CB + CS + '*' + CB, 'g');
       var im;
       while ((im = importRe.exec(raw)) !== null) {
         var isTopImport = (outIdx === -1 || ln < outIdx)
-          && new RegExp('^\\s*[\\w$]+\\s*=\\s*' + OB + 'import:[^' + CB + ']+' + CB + '\\s*$').test(raw.trim());
+          && new RegExp('^\\s*' + OS + '\\w$' + CS + '+\\s*=\\s*' + OB + 'import:' + OS + '^' + CB + CS + '+' + CB + '\\s*$').test(raw.trim());
         if (!isTopImport) push(out, ln, im.index, im[0], 'import-directive');
       }
 
       // tight pick-list: a braced, pipe-separated group with no spaces
-      var pickRe = new RegExp(OB + '[^' + OB + CB + '\\s]*\\' + BAR + '[^' + OB + CB + ']*' + CB, 'g');
+      var pickRe = new RegExp(OB + OS + '^' + OB + CB + '\\s' + CS + '*\\' + BAR + OS + '^' + OB + CB + CS + '*' + CB, 'g');
       var pk;
       while ((pk = pickRe.exec(raw)) !== null) {
         var tok = pk[0];
@@ -118,7 +119,7 @@ $output() =>
       }
 
       // bare single-word token: a braced identifier, no spaces/colon/quote -> info
-      var bareRe = new RegExp(OB + '[A-Za-z_][A-Za-z0-9_]*' + CB, 'g');
+      var bareRe = new RegExp(OB + OS + 'A-Za-z_' + CS + OS + 'A-Za-z0-9_' + CS + '*' + CB, 'g');
       var b;
       while ((b = bareRe.exec(raw)) !== null) {
         push(out, ln, b.index, b[0], 'bare-token');
@@ -151,13 +152,24 @@ $output() =>
   // escape(str): produce a version of a string that the Perchance parser
   // will leave alone, by replacing the trap-trigger characters with HTML
   // entities. Use for prose/HTML you want to display literally.
+  //
+  // The entity STRINGS themselves are assembled at runtime from char codes
+  // because Perchance decodes HTML entities and RE-SCANS the result -- so a
+  // literal numeric-entity for an opening brace, written here in source,
+  // would decode back to that brace and trip the very interception this
+  // function exists to prevent. Never write the entity (or the brace) raw.
+  var AMP = String.fromCharCode(38) + String.fromCharCode(35); // ampersand + hash
+  var SEMI = String.fromCharCode(59);                          // semicolon
+  function ent(code) { return AMP + code + SEMI; }
   function escape(str) {
+    // Search regexes are also built from char-code vars (OB/CB/OS/CS/BAR) so
+    // no literal trap character appears in this plugin's own source.
     return String(str == null ? '' : str)
-      .replace(/\{/g, '&#123;')
-      .replace(/\}/g, '&#125;')
-      .replace(/\[/g, '&#91;')
-      .replace(/\]/g, '&#93;')
-      .replace(/\|/g, '&#124;');
+      .replace(new RegExp('\\' + OB, 'g'), ent('123'))
+      .replace(new RegExp('\\' + CB, 'g'), ent('125'))
+      .replace(new RegExp('\\' + OS, 'g'), ent('91'))
+      .replace(new RegExp('\\' + CS, 'g'), ent('93'))
+      .replace(new RegExp('\\' + BAR, 'g'), ent('124'));
   }
 
   // build(token): assemble a string at RUNTIME so the literal trap token

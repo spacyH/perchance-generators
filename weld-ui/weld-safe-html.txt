@@ -80,7 +80,7 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
 
 <h2>scan(code)</h2>
 <div class="sig" data-codeid="sig_scan"></div>
-<p>Returns an array of findings: <code>&#123; line, col, token, kind, severity, why, fix &#125;</code>. Severities: <code>error</code> (always intercepted), <code>warn</code> (intercepted in most contexts), <code>info</code> (safe in pure JS, risky in DSL/prose).</p>
+<p>Returns an array of findings: <code>\&#123; line, col, token, kind, severity, why, fix \&#125;</code>. Severities: <code>error</code> (always intercepted), <code>warn</code> (intercepted in most contexts), <code>info</code> (safe in pure JS, risky in DSL/prose).</p>
 <pre data-codeid="scan_ex"></pre>
 
 <h2>The traps it catches</h2>
@@ -93,15 +93,15 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
 <tr><td><code>quantifier</code></td><td>warn</td><td>a brace group of just a number, or number,number</td></tr>
 <tr><td><code>bare-token</code></td><td>info</td><td>a single braced word with no spaces</td></tr>
 </table>
-<div class="note">Spaced object literals (<code>&#123; a: 1 &#125;</code>), logical-or in braces (<code>&#123; a &#124;&#124; b &#125;</code>), and regex character classes are deliberately <em>not</em> flagged &mdash; they read as code, not template syntax. A doubled <em>closing</em> brace is also fine; only the doubled <em>opening</em> triggers.</div>
+<div class="note">Spaced object literals (<code>\&#123; a: 1 \&#125;</code>), logical-or in braces (<code>\&#123; a &#124;&#124; b \&#125;</code>), and regex character classes are deliberately <em>not</em> flagged &mdash; they read as code, not template syntax. A doubled <em>closing</em> brace is also fine; only the doubled <em>opening</em> triggers.</div>
 
 <h2>check(code)</h2>
 <div class="sig" data-codeid="sig_check"></div>
-<p>A pass/fail wrapper: <code>&#123; ok, findings &#125;</code> where <code>ok</code> is false if any error-severity trap is present. Drop it into a build step.</p>
+<p>A pass/fail wrapper: <code>\&#123; ok, findings \&#125;</code> where <code>ok</code> is false if any error-severity trap is present. Drop it into a build step.</p>
 
 <h2>escape(str)</h2>
 <div class="sig" data-codeid="sig_escape"></div>
-<p>Returns a version of a string with every trap character (<code>&#123;&#125;&#91;&#93;&#124;</code>) replaced by its HTML entity, so the parser leaves it alone. Use for prose or HTML you want to display literally.</p>
+<p>Returns a version of a string with every trap character (<code>\&#123;\&#125;&#91;&#93;&#124;</code>) replaced by its HTML entity, so the parser leaves it alone. Use for prose or HTML you want to display literally.</p>
 <pre data-codeid="escape_ex"></pre>
 
 <h2>build(token) &amp; builderSnippet(token)</h2>
@@ -169,8 +169,8 @@ if (window.weld.safe) return window.weld.safe;
 // pick-list, or a regex count quantifier sitting in a string can all be
 // silently mangled, producing bugs with no stack trace.
 //
-//   weld.safe.scan(code)   -> [{ line, col, token, severity, why, fix }]
-//   weld.safe.check(code)  -> { ok, findings }   (ok = no errors)
+//   weld.safe.scan(code)   -> /[/{ line, col, token, severity, why, fix /}/]
+//   weld.safe.check(code)  -> /{ ok, findings /}   (ok = no errors)
 //   weld.safe.escape(str)  -> a parser-safe version of a string
 //   weld.safe.build(token) -> assemble a risky literal at runtime
 //   weld.safe.explain(kind)-> the rule behind a trap kind
@@ -179,10 +179,10 @@ if (window.weld.safe) return window.weld.safe;
 // on pick-lists and quantifiers, plus the escape/build helpers diag lacks.
 // -----------------------------------------------------------------
 
-var OB = String.fromCharCode(123); // {
-var CB = String.fromCharCode(125); // }
-var OS = String.fromCharCode(91);  // [
-var CS = String.fromCharCode(93);  // ]
+var OB = String.fromCharCode(123); // /{
+var CB = String.fromCharCode(125); // /}
+var OS = String.fromCharCode(91);  // /[
+var CS = String.fromCharCode(93);  // /]
 var BAR = String.fromCharCode(124);// |
 
 var RULES = {
