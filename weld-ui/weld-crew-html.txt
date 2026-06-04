@@ -37,46 +37,64 @@ td code{font-size:12px;}
 </style>
 <div id="page">
   <div class="hdr">
-    <div class="hdr-row"><h1>weld.crew</h1><span class="ver">v1.0.0</span></div>
-    <p class="lead">Generator-side multi-agent orchestration &mdash; the DSL companion to the orchestrator that lives in <strong>Weld Companion</strong>. A generator joins a <strong>crew</strong> with a role, peers discover each other, address messages by id or role, and the driver fans tasks out across workers <strong>in parallel</strong> with a concurrency cap, awaiting results. The same routing logic the companion uses, available client-side.</p>
-    <p class="toc">on this page: <a href="#why">concept</a> &middot; <a href="#use">quick start</a> &middot; <a href="#transport">transport</a> &middot; <a href="#api">api</a> &middot; <a href="#status">status</a></p>
+    <div class="hdr-row"><h1>weld.crew</h1><span class="ver">v1.0.1</span></div>
+    <p class="lead">A tool-using AI agent that runs <em>inside</em> a Perchance generator, on the user&rsquo;s own model, over <a href="https://perchance.org/weld-skybridge-plugin">weld.skybridge</a>. It runs a ReAct loop &mdash; reason, call a tool, read the result, repeat &mdash; and keeps its state in the companion&rsquo;s storage: a long-term <strong>memory</strong> it can write and search, a per-task <strong>scratchpad</strong> of thoughts, and named <strong>workspaces</strong> that survive reloads, so a run can be paused, resumed, or inspected later.</p>
+    <p class="toc">on this page: <a href="#why">concept</a> &middot; <a href="#use">quick start</a> &middot; <a href="#contract">output contract</a> &middot; <a href="#api">api</a> &middot; <a href="#tools">tools</a> &middot; <a href="#state">memory &amp; workspaces</a> &middot; <a href="#debug">live debug</a> &middot; <a href="#fallback">fallback</a></p>
   </div>
 
   <h2 id="why">Concept</h2>
-  <p>weld.agent makes <em>one</em> generator agentic. weld.crew makes <em>several</em> cooperate: a <strong>user</strong> peer (a chat a human drives) hands a goal to the crew, which splits it and dispatches subtasks to <strong>worker</strong> peers &mdash; each a tab running weld.agent &mdash; running them in parallel and collecting the results. The tab that calls <code>dispatch()</code> acts as the orchestrator for that exchange; the heavy lifting (a privileged cross-tab bus) is what the companion adds.</p>
+  <p>A generator can already call an AI once. An <strong>agent</strong> calls it in a loop, deciding what to do next from what it has seen so far &mdash; saving facts, calling tools, building toward a goal. weld.crew supplies that loop. Reasoning runs on the user&rsquo;s own model through skybridge (the key never crosses), and every bit of state lives in skybridge storage, so the agent&rsquo;s memory and half-finished work persist across reloads and across runs &mdash; something a sandboxed generator cannot do alone.</p>
+  <div class="warn"><strong>Trigger it once.</strong> An imported plugin&rsquo;s <code>$output</code> is a function <em>definition</em>; Perchance does not auto-run it. Call <code>root.weldCrew()</code> (and <code>root.weldSkybridge()</code>) once in your panel JS or <code>window.weld.crew</code> stays <code>undefined</code>.</div>
 
   <h2 id="use">Quick start</h2>
-  <pre><code><span class="c-c">// worker generator (also imports weld.agent):</span>
-<span class="c-k">var</span> a = window.weld.agent.<span class="c-f">create</span>(\{ workspace: <span class="c-s">'crew'</span> \});
-window.weld.crew.<span class="c-f">create</span>(\{ role: <span class="c-s">'worker'</span> \}).<span class="c-f">serve</span>(<span class="c-k">function</span> (task) \{
-  <span class="c-k">return</span> a.<span class="c-f">run</span>(task.goal);            <span class="c-c">// answer each task by running the agent</span>
+  <pre><code><span class="c-c">// generator lists: \{import:weld-skybridge-plugin\} and \{import:weld-crew-plugin\}</span>
+<span class="c-c">// panel JS:</span>
+<span class="c-k">if</span> (<span class="c-k">typeof</span> root.weldSkybridge === <span class="c-s">'function'</span>) root.<span class="c-f">weldSkybridge</span>();
+<span class="c-k">if</span> (<span class="c-k">typeof</span> root.weldCrew === <span class="c-s">'function'</span>) root.<span class="c-f">weldCrew</span>();
+
+<span class="c-k">var</span> a = window.weld.crew.<span class="c-f">create</span>(\{ workspace: <span class="c-s">'quest'</span> \});
+
+a.<span class="c-f">registerTool</span>(\{ name: <span class="c-s">'roll'</span>, description: <span class="c-s">'roll dice like 2d6'</span>,
+  args: \{ dice: <span class="c-s">'string'</span> \}, run: <span class="c-k">function</span> (x) \{ <span class="c-k">return</span> <span class="c-f">roll</span>(x.dice); \} \});
+
+<span class="c-k">var</span> out = <span class="c-k">await</span> a.<span class="c-f">run</span>(<span class="c-s">'Plan a tavern encounter, roll for initiative.'</span>, \{
+  onStep: <span class="c-k">function</span> (s) \{ <span class="c-f">render</span>(s); \}      <span class="c-c">// start/thought/action/observation/final</span>
 \});
+<span class="c-c">// out.answer, out.runId  -> resume later with a.resume(out.runId)</span></code></pre>
 
-<span class="c-c">// user / driver generator (the chat):</span>
-<span class="c-k">var</span> crew = window.weld.crew.<span class="c-f">create</span>(\{ role: <span class="c-s">'user'</span> \});
-<span class="c-k">var</span> results = <span class="c-k">await</span> crew.<span class="c-f">dispatchMany</span>(subtasks, \{ concurrency: <span class="c-n">3</span> \});</code></pre>
-
-  <h2 id="transport">Transport (auto-selected)</h2>
-  <p>The crew picks the best channel available, in order: the <strong>skybridge bus</strong> when the companion provides it (cross-generator, cross-tab); else <strong>weld.sync</strong> (same-origin tabs of one generator); else in-memory (single tab). Same generator code either way &mdash; it upgrades from same-origin to cross-generator the moment the companion bus is present.</p>
-  <div class="warn"><strong>Today vs. full vision.</strong> Over weld.sync alone, a &ldquo;crew&rdquo; means multiple tabs of <em>one</em> generator (weld.sync is same-origin). True cross-generator crews need the companion&rsquo;s bus capability. Also: trigger the plugin once with <code>root.weldCrew()</code> &mdash; imported <code>$output</code> is not auto-run.</div>
+  <h2 id="contract">Output contract</h2>
+  <p>Each step, the loop asks the model for <strong>one JSON object</strong>. To call a tool: <code>\{ "thought": "&hellip;", "tool": "&lt;name&gt;", "args": \{ &hellip; \} \}</code>. To finish: <code>\{ "thought": "&hellip;", "final": "&lt;answer&gt;" \}</code>. The parser tolerates prose around the JSON and <code>```json</code> fences, and if the model just answers in prose it is treated as the final answer. Unknown tool names come back as an observation error so the model can recover.</p>
 
   <h2 id="api">API</h2>
-  <span class="sig">window.weld.crew.create(opts) -> crew</span>
-  <p><code>opts</code>: <code>role</code> (<code>'user'</code> | <code>'worker'</code>), <code>channel</code> (bus/sync channel name), <code>concurrency</code>, <code>peerTTL</code>, <code>heartbeatMs</code>, <code>transport</code> (inject a custom one), <code>id</code>.</p>
+  <span class="sig">window.weld.crew.create(opts) -> agent</span>
+  <p><code>opts</code>: <code>workspace</code> (state namespace, default <code>'default'</code>), <code>maxSteps</code> (default <code>8</code>), <code>system</code> (extra instructions), <code>model</code> (passed to <code>sb.ai</code>), <code>tools</code> (array of specs), <code>reason</code> (custom reasoner; overrides the bridge model).</p>
   <table>
     <tr><th>Member</th><th>What it does</th></tr>
-    <tr><td><code>dispatch(workerId, task, timeoutMs?)</code></td><td>Assign one task to one worker; resolves its result (or rejects on timeout).</td></tr>
-    <tr><td><code>dispatchMany(tasks, \{concurrency, timeoutMs\})</code></td><td>Fan tasks across live workers with a concurrency cap; resolves results in order.</td></tr>
-    <tr><td><code>serve(handler)</code></td><td>Worker convenience: answer each <code>task</code> by running <code>handler(payload)</code> (typically a weld.agent run).</td></tr>
-    <tr><td><code>on(type, fn) / send(to, type, payload)</code></td><td>Low-level pub/sub. <code>to</code> = a peer id, a role, or <code>'*'</code>.</td></tr>
-    <tr><td><code>peers() / workers() / users()</code></td><td>The live registry, filtered by role (presence-pruned).</td></tr>
-    <tr><td><code>leave() / transport / id / role</code></td><td>Announce departure / which transport is active / this peer&rsquo;s identity.</td></tr>
+    <tr><td><code>run(goal, \{onStep, maxSteps, runId\})</code></td><td>Run the loop. Resolves <code>\{ ok, answer, runId, steps \}</code>. <code>onStep</code> fires per event.</td></tr>
+    <tr><td><code>resume(runId, \{maxSteps\})</code></td><td>Continue a saved run where it left off (give a larger budget than it stopped at).</td></tr>
+    <tr><td><code>registerTool(\{name, description, args, run\})</code></td><td>Add a tool the agent may call; <code>run(args)</code> may be async and returns the observation.</td></tr>
+    <tr><td><code>memory.write(text, tags?) / search(q, tags?) / list()</code></td><td>Durable long-term memory. <code>write</code> returns an id; <code>search</code> matches text and/or tags.</td></tr>
+    <tr><td><code>scratchpad.read() / write(note) / clear()</code></td><td>The agent&rsquo;s per-run thoughts, persisted every step.</td></tr>
+    <tr><td><code>runs() / getRun(id)</code></td><td>List run records / fetch one (goal, steps, status, result).</td></tr>
+    <tr><td><code>tools() / backend() / stop()</code></td><td>List tools / where state is going (<code>companion</code>/<code>persist</code>/<code>memory</code>) / abort a run.</td></tr>
   </table>
 
-  <h2 id="status">Status</h2>
-  <p>Stage 1 of the orchestrator. The routing core (registry, addressing, parallel dispatch, concurrency cap, presence, timeouts) is built and tested. Cross-generator operation depends on the companion exposing a <code>bus</code> capability (stage 2); until then weld.crew orchestrates same-origin tabs over weld.sync.</p>
+  <h2 id="tools">Tools</h2>
+  <p>Built-in (no companion capability beyond storage): <code>think</code>, <code>memory.write</code>, <code>memory.search</code>, <code>memory.list</code>, <code>time.now</code>. There is also a pluggable <code>web.fetch</code> that returns <code>\{ ok:false \}</code> unless the companion advertises a <code>fetch</code> capability. Register your own with <code>registerTool</code> &mdash; that is how the agent orchestrates the generator&rsquo;s own powers (dice, lorebook lookup, image generation, sheet edits).</p>
+
+  <h2 id="state">Memory &amp; workspaces</h2>
+  <p>State lives in skybridge storage under <code>agent:&lt;workspace&gt;:&lt;ns&gt;</code> &mdash; <code>:mem</code> (long-term memory), <code>:scratch</code> (this run&rsquo;s thoughts), <code>:run:&lt;id&gt;</code> (a run record), <code>:runs</code> (the index). Because the run record is written every step, a run survives a reload and <code>resume(runId)</code> picks it up. Switch <code>workspace</code> to keep separate bodies of work apart; with the companion present they persist across generators, else they fall back locally.</p>
+
+  <h2 id="debug">Live debug feed</h2>
+  <p>Besides <code>start/thought/action/observation/final</code>, <code>onStep</code> also emits <code>\{ type:'prompt', system, transcript, step \}</code> before each model call and <code>\{ type:'raw', reply \}</code> after &mdash; the exact prompt sent and the raw reply received &mdash; so a UI can show a live feed of the model&rsquo;s reasoning. The example page wires these into a debug console.</p>
+
+  <h2 id="fallback">Reasoner &amp; fallback</h2>
+  <p>By default reasoning uses the user&rsquo;s own model via <code>sb.ai</code>. With no model configured it returns a clear error; pass <code>opts.reason</code> (a <code>function (prompt, system)</code> returning the model text) to use any reasoner &mdash; a custom model, the broker, or a scripted one for demos. Storage degrades on its own: companion &rarr; <code>weld.persist</code> &rarr; in-memory.</p>
+  <div class="note">Design rule, inherited from skybridge: do something reasonable with no companion, something better with one. The agent still runs (in-memory state, a reasoner you supply) when nothing is installed.</div>
 
   <h2>Changelog</h2>
+  <h3>1.0.1</h3>
+  <p>The built-in <code>web.fetch</code> tool now falls back to <code>weld.fetch</code> (the superFetch CORS-free proxy) when the companion doesn't provide a <code>fetch</code> capability &mdash; so an agent can browse the web today if the host imports <code>weld-fetch-plugin</code>, with no companion broker required. Response bodies are truncated to 8&nbsp;KB to keep the agent's context manageable.</p>
   <h3>1.0.0</h3>
-  <p>Initial release. Role-based registry, message routing by id/role/broadcast, parallel <code>dispatchMany</code> with concurrency cap, <code>serve</code> for workers, presence heartbeat/prune, dispatch timeouts. Transport auto-selects skybridge bus &rarr; weld.sync &rarr; memory.</p>
+  <p>Initial release. ReAct loop on weld.skybridge; durable memory, scratchpad, and workspaces; resumable runs; pluggable tool registry with built-ins; robust JSON extraction; live <code>prompt</code>/<code>raw</code> debug events; graceful fallback to a supplied reasoner and <code>weld.persist</code>/memory.</p>
 </div>

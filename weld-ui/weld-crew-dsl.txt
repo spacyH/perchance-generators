@@ -1,7 +1,7 @@
 $meta
   title       = weld.crew
-  description = Generator-side multi-agent orchestration -- the DSL companion to the orchestrator that lives in Weld Companion. A generator joins a crew with a role (user = a Perchance chat driven by a human, or worker = a tab running weld.agent), then peers find each other, exchange messages addressed by id or role, and the driver fans tasks out across workers in parallel with a concurrency cap, awaiting results. Transport is pluggable and auto-selected: the skybridge bus when the companion provides it (cross-generator, cross-tab), else weld.sync (same-origin tabs of one generator), else in-memory. A worker turns into an agent with serve(handler) -- typically handler runs weld.agent on the task. Degrades gracefully: with only weld.sync it orchestrates same-origin tabs today, and upgrades to cross-generator when the companion bus is present. Stash on window.weld.crew.
-  tags        = weld, crew, orchestrator, agent, multiplayer, sync, skybridge, plugin
+  description = A tool-using AI agent that runs INSIDE a Perchance generator, on the user's own model, with durable memory. weld.crew runs a ReAct loop (the model reasons, calls a tool, reads the result, repeats) over weld.skybridge: it thinks with the user's own GPT/Claude/Gemini, and keeps its state in the companion's expanded storage -- a long-term MEMORY it can write and search, a per-task SCRATCHPAD of thoughts, and named WORKSPACES that survive reloads, so a run can be paused, resumed, or inspected later. Tools are pluggable: built-in memory/scratchpad/time tools need nothing extra, and a generator registers its own (dice, lorebook lookup, image gen, sheet edits) so the agent orchestrates the generator's own powers. Degrades gracefully: no companion means storage falls back to weld.persist or memory; supply your own reasoner if you have no own-model. Stash on window.weld.crew.
+  tags        = weld, crew, agent, ai, react, tools, memory, skybridge, plugin
 
 $output() =>
   'use strict';
@@ -10,149 +10,328 @@ $output() =>
   if (window.weld.crew) return window.weld.crew;
 
   // -----------------------------------------------------------------
-  // weld.crew: the generator-side half of orchestration. The heavy routing
-  // logic is shared with the companion's orchestrator core; here every peer
-  // runs it locally over a broadcast transport, so the tab that calls
-  // dispatch() acts as the orchestrator for that exchange.
+  // weld.crew: a ReAct agent that lives in the generator and thinks
+  // with the user's own model, keeping durable state in the bridge.
   //
-  //   // worker tab (a generator that imports weld.agent):
-  //   var a = weld.agent.create({ workspace: 'crew' });
-  //   weld.crew.create({ role: 'worker' }).serve(function (task) { return a.run(task.goal); });
+  //   var sb = weld.skybridge;            // trigger root.weldSkybridge() first
+  //   var a  = weld.crew.create({ workspace: 'quest' });
+  //   a.registerTool({ name:'roll', description:'roll dice like 2d6',
+  //                    args:{ dice:'string' }, run: function (x){ return roll(x.dice); } });
+  //   var out = await a.run('Plan a tavern brawl, roll for initiative.',
+  //                         { onStep: function (s){ render(s); } });
+  //   // out.answer, out.runId (resume later with a.resume(out.runId))
   //
-  //   // user/driver tab (the chat):
-  //   var crew = weld.crew.create({ role: 'user' });
-  //   var results = await crew.dispatchMany(subtasks, { concurrency: 3 });
-  //
-  // message: { id, from, to, type, payload, corr?, t }   to = peerId | role | '*'
+  // State lives at  agent:<workspace>:<ns>  in skybridge storage:
+  //   :mem      long-term memory (array of { id, text, tags, t })
+  //   :scratch  the current scratchpad (array of thought strings)
+  //   :run:<id> a run record (goal, steps, status, result)
+  //   :runs     index of run ids (most-recent-first)
   // -----------------------------------------------------------------
 
-  var BUILD = 'crew/2026-06-04.1';
+  var BUILD = 'crew/2026-06-04.2';
 
-  function uid(p) { return (p || 'm_') + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
-
-  // ---- transport: { send(msg), onMessage(fn) } -- auto-selected, or injected ----
-  function pickTransport(opts) {
-    if (opts && opts.transport) return opts.transport;
-    var channel = (opts && opts.channel) || 'weld.crew';
+  // ---- storage: lean on skybridge (companion -> persist -> memory), else our own fallback ----
+  function makeStore() {
     var sb = window.weld && window.weld.skybridge;
-    // 1) companion bus (cross-generator, cross-tab) -- present once the companion exposes it
-    if (sb && sb.bus && typeof sb.bus.publish === 'function' && typeof sb.bus.subscribe === 'function') {
-      return { kind: 'bus', send: function (m) { sb.bus.publish(channel, m); }, onMessage: function (fn) { return sb.bus.subscribe(channel, fn); } };
-    }
-    // 2) weld.sync (same-origin tabs of one generator)
-    if (window.weld && window.weld.sync && typeof window.weld.sync.create === 'function') {
-      var s = window.weld.sync.create({ namespace: channel });
-      return { kind: 'sync', send: function (m) { s.broadcast('m', m); }, onMessage: function (fn) { s.subscribe('m', fn); }, _sync: s };
-    }
-    // 3) in-memory (single tab / tests / standalone)
-    var subs = [];
-    return { kind: 'memory', send: function (m) { setTimeout(function () { subs.forEach(function (fn) { try { fn(m); } catch (e) {} }); }, 0); }, onMessage: function (fn) { subs.push(fn); } };
+    if (sb && sb.storage && typeof sb.storage.get === 'function') return sb.storage;
+    // no bridge at all: tiny in-memory store with the same async shape
+    var mem = {};
+    return {
+      get: function (k) { return Promise.resolve(k in mem ? mem[k] : null); },
+      set: function (k, v) { mem[k] = v; return Promise.resolve(true); },
+      list: function (prefix) {
+        var out = [];
+        for (var k in mem) if (mem.hasOwnProperty(k) && k.indexOf(prefix || '') === 0) out.push(k);
+        return Promise.resolve(out);
+      },
+      backend: function () { return 'memory'; }
+    };
   }
 
-  function createCrew(opts) {
-    opts = opts || {};
-    var role = opts.role || 'worker';
-    var now = opts.now || Date.now;
-    var TTL = opts.peerTTL || 8000;
-    var selfId = opts.id || uid(role + '_');
-    var transport = pickTransport(opts);
+  function uid(prefix) {
+    return (prefix || '') + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
 
-    var peers = {};            // peerId -> { peerId, role, caps, lastSeen }
-    var handlers = {};         // type -> [fn]
-    var pending = {};          // corr -> { resolve, reject, timer }
-
-    function emit(type, msg) { (handlers[type] || []).forEach(function (f) { try { f(msg); } catch (e) {} }); }
-    function on(type, fn) { (handlers[type] = handlers[type] || []).push(fn); return function () { handlers[type] = handlers[type].filter(function (f) { return f !== fn; }); }; }
-    function touch(id, r, caps) { peers[id] = { peerId: id, role: r || (peers[id] && peers[id].role), caps: caps || (peers[id] && peers[id].caps) || [], lastSeen: now() }; }
-    function livePeers(r) { var t = now(); return Object.keys(peers).map(function (k) { return peers[k]; }).filter(function (p) { return (t - p.lastSeen) < TTL && (!r || p.role === r); }); }
-
-    function handleIncoming(msg) {
-      if (!msg || !msg.type || msg.from === selfId) return;
-      if (msg.type === 'register') { touch(msg.from, msg.role, msg.payload && msg.payload.caps); emit('peer', peers[msg.from]); if (!msg._reply) raw('register', { caps: opts.caps || [] }, '*', { _reply: true }); return; }
-      if (msg.type === 'heartbeat') { touch(msg.from, msg.role); return; }
-      if (msg.type === 'bye') { delete peers[msg.from]; emit('peerleave', { peerId: msg.from }); return; }
-      if (peers[msg.from]) peers[msg.from].lastSeen = now();
-      if (msg.type === 'result' && msg.corr && pending[msg.corr]) { var p = pending[msg.corr]; clearTimeout(p.timer); delete pending[msg.corr]; p.resolve(msg.payload); return; }
-      // deliver to this peer's handlers only if addressed to it, its role, or broadcast
-      if (msg.to === selfId || msg.to === role || msg.to === '*' || msg.to == null) { emit(msg.type, msg); emit('message', msg); }
-    }
-    transport.onMessage(handleIncoming);
-
-    function raw(type, payload, to, extra) {
-      var msg = { id: uid(), from: selfId, to: to == null ? '*' : to, role: role, type: type, payload: payload, t: now() };
-      if (extra) for (var k in extra) if (extra.hasOwnProperty(k)) msg[k] = extra[k];
-      transport.send(msg);
-      return msg.id;
-    }
-    function send(to, type, payload, extra) { return raw(type, payload, to, extra); }
-
-    // request/response: assign one task to one worker, await its 'result'
-    function dispatch(workerId, task, timeoutMs) {
-      return new Promise(function (resolve, reject) {
-        var corr = uid('c_');
-        var timer = setTimeout(function () { delete pending[corr]; reject(new Error('worker timeout: ' + workerId)); }, timeoutMs || 30000);
-        pending[corr] = { resolve: resolve, reject: reject, timer: timer };
-        raw('task', task, workerId, { corr: corr });
-      });
-    }
-
-    // fan tasks out across live workers with bounded concurrency -> results in order
-    function dispatchMany(tasks, o) {
-      o = o || {};
-      var workers = livePeers('worker');
-      if (!workers.length) return Promise.reject(new Error('no workers available'));
-      var limit = o.concurrency || workers.length;
-      var results = new Array(tasks.length); var done = 0; var next = 0; var active = 0;
-      return new Promise(function (resolve) {
-        function settle(idx, val) { results[idx] = val; done++; active--; if (done === tasks.length) resolve(results); else pump(); }
-        function pump() {
-          while (active < limit && next < tasks.length) {
-            (function (idx) {
-              active++;
-              var w = workers[idx % workers.length];
-              dispatch(w.peerId, tasks[idx], o.timeoutMs).then(function (r) { settle(idx, r); }, function (e) { settle(idx, { error: String(e && e.message || e) }); });
-            })(next++);
+  // ---- robust extraction of a single JSON object from a model reply ----
+  // Models wrap JSON in prose or ```json fences. Find the first balanced {...}.
+  function extractJSON(text) {
+    if (typeof text !== 'string') return null;
+    var s = text.replace(/```json/gi, '```').replace(/```/g, '');
+    var start = s.indexOf('{');
+    while (start !== -1) {
+      var depth = 0, inStr = false, esc = false;
+      for (var i = start; i < s.length; i++) {
+        var c = s.charAt(i);
+        if (inStr) {
+          if (esc) esc = false;
+          else if (c === '\\') esc = true;
+          else if (c === '"') inStr = false;
+        } else if (c === '"') inStr = true;
+        else if (c === '{') depth++;
+        else if (c === '}') {
+          depth--;
+          if (depth === 0) {
+            var chunk = s.slice(start, i + 1);
+            try { return JSON.parse(chunk); } catch (e) { break; }  // not valid; try next {
           }
         }
-        pump();
-      });
+      }
+      start = s.indexOf('{', start + 1);
     }
+    return null;
+  }
 
-    // worker convenience: auto-answer 'task' messages by running handler(payload) -> result
-    function serve(handler) {
-      on('task', async function (msg) {
-        if (!msg.corr) return;
-        var out;
-        try { out = await handler(msg.payload, msg); } catch (e) { out = { error: String(e && e.message || e) }; }
-        raw('result', out, msg.from, { corr: msg.corr });
-      });
-      return api;
-    }
+  // ---- the agent factory ----
+  function createCrew(opts) {
+    opts = opts || {};
+    var workspace = opts.workspace || 'default';
+    var maxSteps = opts.maxSteps || 8;
+    var extraSystem = opts.system || '';
+    var aiOpts = opts.model || {};
+    var store = makeStore();
+    var tools = {};            // name -> tool spec
+    var stopped = false;
 
-    // presence: announce, heartbeat, prune
-    raw('register', { caps: opts.caps || [] }, '*');
-    var hbMs = opts.heartbeatMs || 3000;
-    var hbTimer = (opts.heartbeat === false) ? null : setInterval(function () { raw('heartbeat'); }, hbMs);
-    if (typeof window !== 'undefined' && window.addEventListener) try { window.addEventListener('beforeunload', function () { raw('bye'); }); } catch (e) {}
+    function key(ns, k) { return 'crew:' + workspace + ':' + ns + (k ? (':' + k) : ''); }
 
-    function leave() { if (hbTimer) clearInterval(hbTimer); raw('bye'); }
-
-    var api = {
-      id: selfId, role: role, transport: transport.kind,
-      on: on, send: send,
-      peers: function () { return livePeers(); },
-      workers: function () { return livePeers('worker'); },
-      users: function () { return livePeers('user'); },
-      dispatch: dispatch, dispatchMany: dispatchMany,
-      serve: serve, leave: leave,
-      _ingest: handleIncoming   // exposed for tests
+    // --- memory ---
+    var memory = {
+      list: async function () { return (await store.get(key('mem'))) || []; },
+      write: async function (text, tags) {
+        var all = await memory.list();
+        var item = { id: uid('m_'), text: String(text || ''), tags: tags || [], t: Date.now() };
+        all.push(item);
+        await store.set(key('mem'), all);
+        return item.id;
+      },
+      search: async function (query, tags) {
+        var all = await memory.list();
+        var q = String(query || '').toLowerCase();
+        return all.filter(function (m) {
+          var hitQ = !q || (m.text && m.text.toLowerCase().indexOf(q) !== -1);
+          var hitT = !tags || !tags.length || (m.tags && tags.some(function (t) { return m.tags.indexOf(t) !== -1; }));
+          return hitQ && hitT;
+        });
+      },
+      clear: async function () { await store.set(key('mem'), []); return true; }
     };
-    return api;
+
+    // --- scratchpad (the agent's durable "thoughts") ---
+    var scratchpad = {
+      read: async function () { return (await store.get(key('scratch'))) || []; },
+      write: async function (note) {
+        var sp = await scratchpad.read();
+        sp.push({ t: Date.now(), note: String(note || '') });
+        await store.set(key('scratch'), sp);
+        return sp.length;
+      },
+      clear: async function () { await store.set(key('scratch'), []); return true; }
+    };
+
+    // --- run records (resumable) ---
+    async function loadRun(id) { return await store.get(key('run', id)); }
+    async function saveRun(rec) {
+      await store.set(key('run', rec.id), rec);
+      var idx = (await store.get(key('runs'))) || [];
+      if (idx.indexOf(rec.id) === -1) { idx.unshift(rec.id); await store.set(key('runs'), idx.slice(0, 50)); }
+    }
+    async function listRuns() {
+      var idx = (await store.get(key('runs'))) || [];
+      var out = [];
+      for (var i = 0; i < idx.length; i++) { var r = await loadRun(idx[i]); if (r) out.push(r); }
+      return out;
+    }
+
+    // --- tools ---
+    function registerTool(spec) {
+      if (!spec || !spec.name || typeof spec.run !== 'function') throw new Error('tool needs { name, run }');
+      tools[spec.name] = { name: spec.name, description: spec.description || '', args: spec.args || {}, run: spec.run };
+      return this;
+    }
+    function toolList() { return Object.keys(tools).map(function (n) { return tools[n]; }); }
+
+    // built-in tools (need no companion capability beyond storage)
+    registerTool({ name: 'think', description: 'Record a private thought/plan. Use to reason before acting.', args: { note: 'string' },
+      run: async function (a) { await scratchpad.write(a.note); return 'noted'; } });
+    registerTool({ name: 'memory.write', description: 'Save a durable fact to long-term memory.', args: { text: 'string', tags: 'string[] (optional)' },
+      run: async function (a) { return { id: await memory.write(a.text, a.tags) }; } });
+    registerTool({ name: 'memory.search', description: 'Search long-term memory by text and/or tags.', args: { query: 'string (optional)', tags: 'string[] (optional)' },
+      run: async function (a) { return await memory.search(a.query, a.tags); } });
+    registerTool({ name: 'memory.list', description: 'List everything in long-term memory.', args: {},
+      run: async function () { return await memory.list(); } });
+    registerTool({ name: 'time.now', description: 'Current date and time (ISO).', args: {},
+      run: async function () { return new Date().toISOString(); } });
+    // web.fetch: companion 'fetch' capability if present, else weld.fetch (superFetch
+    // proxy, CORS-free) when the host imported it, else reports unavailable.
+    registerTool({ name: 'web.fetch', description: 'Fetch a URL. Uses the companion web-access capability if present, else weld.fetch (superFetch) if the host imported weld-fetch-plugin.', args: { url: 'string', method: 'string (optional)' },
+      run: async function (a) {
+        var sb = window.weld && window.weld.skybridge;
+        if (sb && sb.connected && typeof sb.has === 'function' && sb.has('fetch') && typeof sb.request === 'function') {
+          return await sb.request('fetch', { url: a.url, method: a.method || 'GET' });
+        }
+        var wf = window.weld && window.weld.fetch;
+        if (wf && typeof wf.request === 'function') {
+          try {
+            var res = await wf.request(a.url, { method: a.method || 'GET' });
+            var body = '';
+            try { body = await res.text(); } catch (e) {}
+            if (typeof body === 'string' && body.length > 8000) body = body.slice(0, 8000) + '\u2026[truncated]';
+            return { ok: !!res.ok, status: res.status, url: res.url, via: res.via, body: body };
+          } catch (e) {
+            return { ok: false, reason: 'weld.fetch error: ' + (e && e.message ? e.message : String(e)) };
+          }
+        }
+        return { ok: false, reason: 'web access unavailable (no companion fetch capability, and weld.fetch not imported)' };
+      } });
+
+    if (opts.tools && opts.tools.length) opts.tools.forEach(registerTool);
+
+    // --- reasoner: own model via the bridge, or a caller-supplied function ---
+    async function reason(prompt, system) {
+      if (typeof opts.reason === 'function') return await opts.reason(prompt, system);
+      var sb = window.weld && window.weld.skybridge;
+      if (sb && sb.connected && typeof sb.has === 'function' && sb.has('ai') && typeof sb.ai === 'function') {
+        var aiArgs = { system: system };
+        for (var k in aiOpts) if (aiOpts.hasOwnProperty(k)) aiArgs[k] = aiOpts[k];
+        var r = await sb.ai(prompt, aiArgs);
+        if (r && r.ok) return r.value;
+        throw new Error('model call failed: ' + (r && r.reason ? r.reason : 'unknown'));
+      }
+      throw new Error('no model available -- configure your own model in Weld Companion, or pass opts.reason');
+    }
+
+    function toolDocs() {
+      return toolList().map(function (t) {
+        var argKeys = Object.keys(t.args || {});
+        var argStr = argKeys.length ? argKeys.map(function (k) { return k + ': ' + t.args[k]; }).join(', ') : 'none';
+        return '- ' + t.name + ' -- ' + t.description + '  (args: ' + argStr + ')';
+      }).join('\n');
+    }
+
+    function systemPrompt(memText, scratchText) {
+      return [
+        'You are weld.crew, a tool-using assistant running inside a Perchance generator.',
+        extraSystem,
+        '',
+        'Work in small steps. On EACH step reply with ONE JSON object and nothing else:',
+        '  to use a tool:   { "thought": "...", "tool": "<name>", "args": { ... } }',
+        '  to finish:       { "thought": "...", "final": "<your answer to the goal>" }',
+        '',
+        'Available tools:',
+        toolDocs(),
+        '',
+        'Long-term memory (durable across runs):',
+        (memText || '(empty)'),
+        '',
+        'Scratchpad (your notes this run):',
+        (scratchText || '(empty)')
+      ].join('\n');
+    }
+
+    function stop() { stopped = true; }
+
+    // --- the ReAct loop ---
+    async function run(goal, runOpts) {
+      runOpts = runOpts || {};
+      stopped = false;
+      var onStep = typeof runOpts.onStep === 'function' ? runOpts.onStep : function () {};
+      var cap = runOpts.maxSteps || maxSteps;
+
+      var rec;
+      if (runOpts.runId) {
+        rec = await loadRun(runOpts.runId);
+        if (!rec) return { ok: false, reason: 'run-not-found', runId: runOpts.runId };
+        rec.status = 'running';
+      } else {
+        rec = { id: uid('r_'), goal: String(goal || ''), status: 'running', steps: [], result: null, t: Date.now() };
+        await scratchpad.clear();
+      }
+      await saveRun(rec);
+      onStep({ type: 'start', runId: rec.id, goal: rec.goal });
+
+      while (rec.steps.length < cap) {
+        if (stopped) { rec.status = 'stopped'; await saveRun(rec); return { ok: false, reason: 'stopped', runId: rec.id, steps: rec.steps }; }
+
+        var mem = await memory.list();
+        var memText = mem.slice(-12).map(function (m) { return '- ' + m.text + (m.tags && m.tags.length ? '  [' + m.tags.join(',') + ']' : ''); }).join('\n');
+        var sp = await scratchpad.read();
+        var scratchText = sp.slice(-12).map(function (x) { return '- ' + x.note; }).join('\n');
+
+        var transcript = 'GOAL: ' + rec.goal + '\n\n' + rec.steps.map(function (s, i) {
+          var line = '[step ' + (i + 1) + '] thought: ' + (s.thought || '');
+          if (s.tool) line += '\naction: ' + s.tool + ' ' + JSON.stringify(s.args || {}) + '\nobservation: ' + JSON.stringify(s.observation);
+          return line;
+        }).join('\n\n');
+        transcript += '\n\nReply with the next JSON step.';
+
+        var sysText = systemPrompt(memText, scratchText);
+        onStep({ type: 'prompt', system: sysText, transcript: transcript, step: rec.steps.length + 1 });
+        var reply;
+        try { reply = await reason(transcript, sysText); }
+        catch (e) { rec.status = 'error'; rec.result = String(e && e.message || e); await saveRun(rec); onStep({ type: 'error', error: rec.result }); return { ok: false, reason: 'reason-failed', error: rec.result, runId: rec.id }; }
+
+        onStep({ type: 'raw', reply: String(reply) });
+        var parsed = extractJSON(reply);
+        if (!parsed) {
+          // model answered in prose -- treat as the final answer
+          rec.status = 'done'; rec.result = String(reply).trim(); await saveRun(rec);
+          onStep({ type: 'final', answer: rec.result });
+          return { ok: true, answer: rec.result, runId: rec.id, steps: rec.steps };
+        }
+
+        var step = { thought: parsed.thought || '', tool: null, args: null, observation: null, t: Date.now() };
+        if (parsed.thought) { await scratchpad.write(parsed.thought); onStep({ type: 'thought', thought: parsed.thought }); }
+
+        if (typeof parsed.final !== 'undefined') {
+          rec.steps.push(step); rec.status = 'done'; rec.result = String(parsed.final); await saveRun(rec);
+          onStep({ type: 'final', answer: rec.result });
+          return { ok: true, answer: rec.result, runId: rec.id, steps: rec.steps };
+        }
+
+        var name = parsed.tool;
+        var tool = name && tools[name];
+        if (!tool) {
+          step.tool = name; step.observation = { error: 'unknown tool: ' + name + '. Pick from: ' + Object.keys(tools).join(', ') };
+        } else {
+          step.tool = name; step.args = parsed.args || {};
+          onStep({ type: 'action', tool: name, args: step.args });
+          try { step.observation = await tool.run(step.args || {}); }
+          catch (e) { step.observation = { error: String(e && e.message || e) }; }
+        }
+        onStep({ type: 'observation', tool: step.tool, observation: step.observation });
+        rec.steps.push(step);
+        await saveRun(rec);   // persist every step -> durable + resumable
+      }
+
+      rec.status = 'maxsteps'; await saveRun(rec);
+      onStep({ type: 'maxsteps', steps: rec.steps.length });
+      return { ok: false, reason: 'maxsteps', runId: rec.id, steps: rec.steps };
+    }
+
+    return {
+      workspace: workspace,
+      run: run,
+      resume: async function (runId, runOpts) {
+        var rec = await loadRun(runId);
+        if (!rec) return { ok: false, reason: 'run-not-found' };
+        var o = runOpts || {}; o.runId = runId;
+        return await run(rec.goal, o);
+      },
+      stop: stop,
+      registerTool: registerTool,
+      tools: toolList,
+      memory: memory,
+      scratchpad: scratchpad,
+      runs: listRuns,
+      getRun: loadRun,
+      backend: function () { return store.backend ? store.backend() : 'unknown'; }
+    };
   }
 
   window.weld.crew = {
     create: createCrew,
-    version: '1.0.0',
+    extractJSON: extractJSON,   // exported for tests / reuse
+    version: '1.0.1',
     build: BUILD
   };
 
