@@ -59,11 +59,11 @@ $output() =>
   var MSG = 'weld.skybridge';          // envelope tag, both directions
   var HELLO_TIMEOUT = 4000;            // ms to wait for the anchor to answer
   var REQUEST_TIMEOUT = 30000;         // ms before a pending request gives up
-  var BUILD = 'sb-plugin/2026-06-04.3';  // bump on every change; printed at load so a stale deploy is obvious
+  var BUILD = 'sb-plugin/2026-06-04.4';  // bump on every change; printed at load so a stale deploy is obvious
   var LOADED_AT = Date.now();
   // Early, dependency-free deployment beacon: even if a later line throws, this
   // proves WHICH build actually loaded (read it from the example or console).
-  try { window.__weldSkybridge = { build: BUILD, version: '1.0.0', at: Date.now() }; } catch (e) {}
+  try { window.__weldSkybridge = { build: BUILD, version: '1.2.0', at: Date.now() }; } catch (e) {}
   // verbose console logging toggle: add ?sbdebug to the URL, or set
   // window.WELD_SKYBRIDGE_DEBUG = true before load, or call .debug(true) at runtime.
   var DEBUG = false;
@@ -223,8 +223,10 @@ $output() =>
 
   function has(capability) { return !!Reflect.get(caps, String(capability)); }
 
-  // ---- storage: companion when available, else weld.persist, else memory ----
-  // Uniform async (Promise) API, since the companion path is a round-trip.
+  // ---- storage: companion, else weld.kv (cross-device), else weld.persist, else memory ----
+  // Uniform async (Promise) API, since the companion path is a round-trip. A single
+  // pickBackend() chooses the active tier; get/set/list dispatch on it and backend()
+  // returns it, so what backend() reports can never drift from where data actually goes.
   var mem = {};                        // session-only fallback map
   var persistColl = null;              // lazily-opened weld.persist collection
   function persistCollection() {
@@ -235,63 +237,93 @@ $output() =>
         persistColl = db.collection('kv');
         return persistColl;
       }
-    } catch (e) { /* fall through to memory */ }
+    } catch (e) { /* not available */ }
     return null;
+  }
+  var kvColl = null;                   // lazily-opened weld.kv folder (server-side, cross-device)
+  function kvHandle() {
+    if (kvColl) return kvColl;
+    try {
+      var kv = window.weld && window.weld.kv;
+      // only when the *server* kv-plugin is actually present (available()), not just kv's mirror
+      if (kv && typeof kv.folder === 'function' && typeof kv.available === 'function' && kv.available()) {
+        kvColl = kv.folder('weld-skybridge');
+        return kvColl;
+      }
+    } catch (e) { /* not available */ }
+    return null;
+  }
+  // the single source of truth for which tier is live, in priority order
+  function pickBackend() {
+    if (connected && has('storage')) return 'companion';
+    if (kvHandle()) return 'kv';
+    if (persistCollection()) return 'persist';
+    return 'memory';
   }
   function storageGet(key) {
     var k = String(key);
-    if (connected && has('storage')) {
-      return request('storage', { op: 'get', key: k }).then(function (r) { return r.ok ? r.value : null; });
+    switch (pickBackend()) {
+      case 'companion':
+        return request('storage', { op: 'get', key: k }).then(function (r) { return r.ok ? r.value : null; });
+      case 'kv':
+        return Promise.resolve(kvHandle().get(k, null)).then(function (v) { return v == null ? null : v; }, function () { return null; });
+      case 'persist':
+        return Promise.resolve(persistCollection().get(k)).then(function (rec) { return rec != null ? rec : null; }, function () { return null; });
+      default:
+        return Promise.resolve(Reflect.has(mem, k) ? Reflect.get(mem, k) : null);
     }
-    var coll = persistCollection();
-    if (coll) {
-      try { return Promise.resolve(coll.get(k)).then(function (rec) { return rec != null ? rec : null; }); }
-      catch (e) { /* fall through */ }
-    }
-    return Promise.resolve(Reflect.has(mem, k) ? Reflect.get(mem, k) : null);
   }
   function storageSet(key, value) {
     var k = String(key);
-    if (connected && has('storage')) {
-      return request('storage', { op: 'set', key: k, value: value }).then(function (r) { return !!r.ok; });
+    switch (pickBackend()) {
+      case 'companion':
+        return request('storage', { op: 'set', key: k, value: value }).then(function (r) { return !!r.ok; });
+      case 'kv':
+        return Promise.resolve(kvHandle().set(k, value)).then(function () { return true; }, function () { return false; });
+      case 'persist':
+        return Promise.resolve(persistCollection().put(k, value)).then(function () { return true; }, function () { return false; });
+      default:
+        Reflect.set(mem, k, value);
+        return Promise.resolve(true);
     }
-    var coll = persistCollection();
-    if (coll) {
-      try { return Promise.resolve(coll.put(k, value)).then(function () { return true; }); }
-      catch (e) { /* fall through */ }
-    }
-    Reflect.set(mem, k, value);
-    return Promise.resolve(true);
   }
   function storageList(prefix) {
     var pre = prefix != null ? String(prefix) : '';
-    if (connected && has('storage')) {
-      return request('storage', { op: 'list', prefix: pre }).then(function (r) { return r.ok ? r.value : new Array(); });
+    function filterKeys(ks) {
+      var out = new Array();
+      if (ks && ks.length != null) {
+        for (var i = 0; i < ks.length; i++) {
+          var key = Reflect.get(ks, i);
+          if (typeof key === 'string' && key.indexOf(pre) === 0) out.push(key);
+        }
+      }
+      return out;
     }
-    var coll = persistCollection();
-    if (coll && typeof coll.query === 'function') {
-      try {
-        return Promise.resolve(coll.query()).then(function (rows) {
-          var out = new Array();
-          if (rows && rows.length != null) {
-            for (var i = 0; i < rows.length; i++) {
-              var key = Reflect.get(Reflect.get(rows, i) || {}, 'key');
-              if (typeof key === 'string' && key.indexOf(pre) === 0) out.push(key);
-            }
-          }
-          return out;
-        });
-      } catch (e) { /* fall through */ }
+    switch (pickBackend()) {
+      case 'companion':
+        return request('storage', { op: 'list', prefix: pre }).then(function (r) { return r.ok ? r.value : new Array(); });
+      case 'kv':
+        return Promise.resolve(kvHandle().keys()).then(filterKeys, function () { return new Array(); });
+      case 'persist': {
+        var coll = persistCollection();
+        if (coll && typeof coll.query === 'function') {
+          return Promise.resolve(coll.query()).then(function (rows) {
+            var ks = new Array();
+            if (rows && rows.length != null) { for (var i = 0; i < rows.length; i++) { ks.push(Reflect.get(Reflect.get(rows, i) || {}, 'key')); } }
+            return filterKeys(ks);
+          }, function () { return new Array(); });
+        }
+        return Promise.resolve(new Array());
+      }
+      default: {
+        var keys = Object.keys(mem), res = new Array();
+        for (var j = 0; j < keys.length; j++) { var kk = Reflect.get(keys, j); if (kk.indexOf(pre) === 0) res.push(kk); }
+        return Promise.resolve(res);
+      }
     }
-    var keys = Object.keys(mem), res = new Array();
-    for (var j = 0; j < keys.length; j++) { var kk = Reflect.get(keys, j); if (kk.indexOf(pre) === 0) res.push(kk); }
-    return Promise.resolve(res);
   }
-  // where is storage actually going right now? (for honesty / debugging)
-  function storageBackend() {
-    if (connected && has('storage')) return 'companion';
-    return persistCollection() ? 'persist' : 'memory';
-  }
+  // where is storage actually going right now? (for honesty / debugging) -- same picker get/set use
+  function storageBackend() { return pickBackend(); }
 
   // ---- ai: prompt up, completion down; key never crosses ----
   // ---- bus: cross-tab / cross-generator pub/sub, relayed by the companion ----
@@ -363,7 +395,7 @@ $output() =>
     bus: { publish: busPublish, subscribe: busSubscribe },
     // protocol range this sandbox end speaks
     protocolRange: { min: PROTO_MIN, max: PROTO_MAX },
-    version: '1.0.0',
+    version: '1.2.0',
     build: BUILD,
     // verbose-logging toggle. on()/off; returns the new state.
     debug: function (on) {
@@ -374,7 +406,7 @@ $output() =>
     // a live snapshot for troubleshooting (state + recent handshake events)
     diagnostics: function () {
       return {
-        build: BUILD, version: '1.0.0', debug: DEBUG, loadedAt: LOADED_AT,
+        build: BUILD, version: '1.2.0', debug: DEBUG, loadedAt: LOADED_AT,
         connected: connected, protocol: proto, anchorVersion: anchorVersion,
         framed: (function () { try { return window.top !== window.self; } catch (e) { return null; } })(),
         origin: location.origin,

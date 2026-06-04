@@ -68,8 +68,29 @@ $output() =>
     opts = opts || {};
     url = String(url || '');
     if (!url) return Promise.reject(new Error('weld.fetch: empty URL'));
-
     var method = (opts.method || 'GET').toUpperCase();
+
+    // Tier 0: the Weld Companion's GM_xmlhttpRequest -- a TRUE cross-origin bypass
+    // with real header control (no proxy stripping), gated by the user's per-host
+    // consent. Available only when the userscript is installed and advertises
+    // 'fetch'. On denial or transport failure, fall through to the proxy/direct
+    // tiers so callers still get the best available path. Skipped when the caller
+    // forces { direct: true }.
+    var sb = window.weld && window.weld.skybridge;
+    if (opts.direct !== true && sb && sb.connected && typeof sb.has === 'function' && sb.has('fetch') && typeof sb.request === 'function') {
+      var cbody = (opts.body != null) ? ((opts.json && typeof opts.body !== 'string') ? JSON.stringify(opts.body) : opts.body) : undefined;
+      var cheaders = opts.headers || (opts.json ? { 'content-type': 'application/json' } : undefined);
+      return sb.request('fetch', { url: url, method: method, headers: cheaders, body: cbody })
+        .then(function (r) {
+          if (r && typeof r.status === 'number' && r.status > 0) return normalizeCompanion(r, url);
+          return viaProxyOrDirect(url, opts, method);   // denied / network error -> fall through
+        }, function () { return viaProxyOrDirect(url, opts, method); });
+    }
+    return viaProxyOrDirect(url, opts, method);
+  }
+
+  // Tiers 1+2: superFetch proxy (default) then direct browser fetch.
+  function viaProxyOrDirect(url, opts, method) {
     var direct = opts.direct === true || (opts.direct !== false && isDirectHost(url));
     var sf = getSF();
     if (!sf && !direct) {
@@ -107,6 +128,16 @@ $output() =>
         });
     }
     return attempt(0);
+  }
+
+  // Normalize the companion's fetch result (plain {status,headers,body}) into the
+  // same shape as a proxy/direct response, so callers can't tell the tiers apart.
+  function normalizeCompanion(r, url) {
+    var status = (typeof r.status === 'number') ? r.status : 0;
+    var bodyText = (typeof r.body === 'string') ? r.body : '';
+    function text() { return Promise.resolve(bodyText); }
+    function json() { return text().then(function (t) { try { return JSON.parse(t); } catch (e) { throw new Error('weld.fetch: response is not JSON (' + t.slice(0, 60) + ')'); } }); }
+    return { ok: !!r.ok, status: status, url: r.url || url, via: 'companion', headers: r.headers || null, text: text, json: json, truncated: !!r.truncated, raw: r };
   }
 
   // Normalize a fetch Response (or superFetch result) into a plain object.
@@ -169,7 +200,7 @@ $output() =>
     cspActive: cspActive,
     addDirectHost: addDirectHost,
     directHosts: function () { return DIRECT_HOSTS.slice(); },
-    version: '1.1.0'
+    version: '1.2.0'
   };
 
   return window.weld.fetch;

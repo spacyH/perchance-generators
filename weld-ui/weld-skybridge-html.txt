@@ -38,7 +38,7 @@ td code{font-size:12px;}
 
 <div id="page">
   <div class="hdr">
-    <div class="hdr-row"><h1>weld.skybridge</h1><span class="ver">v1.1.0</span></div>
+    <div class="hdr-row"><h1>weld.skybridge</h1><span class="ver">v1.2.0</span></div>
     <p class="lead">The bridge between a generator (sandboxed) and <strong>Weld Companion</strong> (a userscript running above the page). It lends a plugin two powers a sandbox cannot have on its own &mdash; storage that persists across every generator, and the user&rsquo;s own AI model &mdash; while never <em>requiring</em> the companion to be installed.</p>
     <p class="toc">on this page: <a href="#why">two contexts</a> &middot; <a href="#use">quick start</a> &middot; <a href="#api">api</a> &middot; <a href="#proto">protocol</a> &middot; <a href="#trust">trust</a> &middot; <a href="#fallback">fallback</a></p>
   </div>
@@ -78,7 +78,7 @@ sb.<span class="c-f">onConnect</span>(<span class="c-k">function</span> (info) \
     <tr><td><code>request(cap, payload)</code></td><td>Low-level: send a capability request up. Resolves a result object <code>\{ ok, value \}</code> or <code>\{ ok:false, reason \}</code>.</td></tr>
     <tr><td><code>ai(prompt, opts?)</code></td><td>Run a completion on the user&rsquo;s own model. <code>opts</code>: <code>system</code>, <code>maxTokens</code>, <code>temperature</code>. Resolves <code>\{ ok, value \}</code>.</td></tr>
     <tr><td><code>storage.get/set/list</code></td><td>Async key/value. Routes to the companion when present, else falls back (see below).</td></tr>
-    <tr><td><code>storage.backend()</code></td><td><code>'companion'</code>, <code>'persist'</code>, or <code>'memory'</code> &mdash; where storage is actually going right now.</td></tr>
+    <tr><td><code>storage.backend()</code></td><td><code>'companion'</code>, <code>'kv'</code>, <code>'persist'</code>, or <code>'memory'</code> <code>'companion'</code>, <code>'persist'</code>, or <code>'memory'</code> &mdash; where storage is actually going right now.mdash; where storage is actually going right now (single picker; never drifts from get/set).</td></tr>
     <tr><td><code>bus.publish(channel, message)</code></td><td>Publish a message on a named channel. The companion relays it to other subscribed generators &mdash; in this tab and (over a shared <code>BroadcastChannel</code> on the apex origin) other tabs. Resolves a result object.</td></tr>
     <tr><td><code>bus.subscribe(channel, fn)</code></td><td>Receive messages others publish on <code>channel</code> (not your own). Returns an unsubscribe function. This is the cross-generator transport <code>weld.swarm</code> rides on; needs a companion advertising <code>'bus'</code>.</td></tr>
     <tr><td><code>reconnect()</code></td><td>Re-send the handshake (e.g. if the companion mounts very late).</td></tr>
@@ -116,6 +116,8 @@ anchor: here   \{ protoMin:<span class="c-n">1</span>, protoMax:<span class="c-n
   <div class="note">Design rule: a Skybridge-backed plugin must do something reasonable with zero companion, and something <em>better</em> with one. Build for the fallback first.</div>
 
   <h2>Changelog</h2>
+  <h3>1.2.0</h3>
+  <p>Storage gained a <strong>cross-device tier</strong>: when the host imports <code>weld-kv-plugin</code> (server-side key/value), skybridge uses it ahead of the local <code>weld.persist</code> fallback, so a companion-less generator can still persist across devices. The fallback order is now companion &rarr; kv &rarr; persist &rarr; memory. Internally, all four operations and <code>storage.backend()</code> now resolve through one <code>pickBackend()</code>, so the reported backend can never drift from where data is actually written.</p>
   <h3>1.1.0</h3>
   <p>Added the <strong>bus</strong> capability: <code>bus.publish(channel, message)</code> / <code>bus.subscribe(channel, fn)</code> for cross-tab, cross-generator pub/sub. The companion relays messages between subscribed generators in a tab and, over a <code>BroadcastChannel</code> on the shared <code>perchance.org</code> apex origin, across tabs &mdash; the cross-origin reach <code>weld.sync</code> can't provide. <code>has('bus')</code> reports availability; gated by per-generator consent like storage and AI. This is the transport <code>weld.swarm</code> rides on for multi-agent orchestration.</p>
   <h3>1.0.0</h3>

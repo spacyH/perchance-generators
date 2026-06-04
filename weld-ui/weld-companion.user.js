@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Weld Companion for Perchance
 // @namespace    https://github.com/therealwestninja/weld
-// @version      1.1.0
+// @version      1.2.0
 // @description  Quality-of-life upgrades for Perchance: favorites & recently-used, theme/reading comfort, save/copy/pin results, result history (undo-reroll), resizable inputs, generator folder management & CRUD, and an AI Helper you can edit or point at your own GPT (OpenAI / Anthropic / Google). All local, account-free. Companion to the Weld plugin suite.
 // @author       therealwestninja
 // @match        https://perchance.org/*
@@ -17,6 +17,7 @@
 // @connect      api.anthropic.com
 // @connect      generativelanguage.googleapis.com
 // @connect      perchance.org
+// @connect      *
 // @run-at       document-idle
 // @noframes
 // ==/UserScript==
@@ -82,7 +83,7 @@
   }
 
   // expose a tiny namespace for debugging / other scripts
-  window.weldCompanion = { gget: gget, gset: gset, version: '1.1.0' };
+  window.weldCompanion = { gget: gget, gset: gset, version: '1.2.0' };
 
   // ---- adopt Perchance's own theme ------------------------------------------
   // Our chrome should belong to the page, not impose a foreign palette. We read
@@ -846,7 +847,7 @@
   // call here and post only the completion back down.
   var SB = 'weld.skybridge';
   var SB_PROTO_MIN = 1, SB_PROTO_MAX = 1;
-  var SB_CAPS = ['storage', 'ai', 'bus'];          // what this companion offers
+  var SB_CAPS = ['storage', 'ai', 'bus', 'fetch'];          // what this companion offers
 
   // The userscript manager runs us in a sandbox where `window` is a wrapper:
   // a 'message' listener placed on it may NOT receive the page's real
@@ -857,7 +858,7 @@
   var SB_WIN = (function () {
     try { return (typeof unsafeWindow !== 'undefined' && unsafeWindow) ? unsafeWindow : window; } catch (e) { return window; }
   })();
-  var SB_BUILD = 'sb-anchor/2026-06-04.3';   // bump on every change; printed at mount so a stale userscript is obvious
+  var SB_BUILD = 'sb-anchor/2026-06-04.4';   // bump on every change; printed at mount so a stale userscript is obvious
   // verbose-logging toggle: ?sbdebug in the URL, or window.WELD_SKYBRIDGE_DEBUG = true
   var SB_DEBUG = false;
   try {
@@ -888,7 +889,9 @@
       if (prior === true) return resolve(true);
       if (prior === false) return resolve(false);   // remembered "no"
       var labels = { storage: 'save data that persists across generators', ai: 'use your own AI model', bus: 'exchange messages with your other Weld generators and tabs' };
-      var what = labels[cap] || ('use the "' + cap + '" capability');
+      var what;
+      if (cap.indexOf('fetch:') === 0) what = 'fetch data from ' + cap.slice(6) + ' (a cross-origin web request through your browser)';
+      else what = labels[cap] || ('use the "' + cap + '" capability');
       var msg = 'This generator (' + (gen || 'unknown') + ') wants to ' + what + ' via Weld Companion.\n\nAllow it? (remembered for this generator)';
       var ok = false;
       try { ok = window.confirm(msg); } catch (e) { ok = false; }
@@ -945,6 +948,57 @@
     });
   }
 
+  // ---- fetch: true cross-origin HTTP via GM_xmlhttpRequest (companion-only power) ----
+  var SB_FETCH_MAX = 256 * 1024;   // cap response body returned across the bridge
+  function sbFetchHost(url) {
+    try {
+      var u = String(url || '');
+      var m = u.match(/^([a-z][a-z0-9+.-]*):\/\/([^/?#]+)/i);
+      if (!m) return null;
+      var scheme = m[1].toLowerCase();
+      if (scheme !== 'http' && scheme !== 'https') return null;   // http(s) only
+      var host = m[2].toLowerCase();
+      var at = host.indexOf('@'); if (at !== -1) host = host.slice(at + 1);   // strip userinfo
+      var colon = host.lastIndexOf(':'); if (colon !== -1 && host.indexOf(']') === -1) host = host.slice(0, colon);
+      return host || null;
+    } catch (e) { return null; }
+  }
+  function sbParseHeaders(raw) {
+    var out = {};
+    try {
+      String(raw || '').split(/\r?\n/).forEach(function (line) {
+        var i = line.indexOf(':'); if (i > 0) out[line.slice(0, i).trim().toLowerCase()] = line.slice(i + 1).trim();
+      });
+    } catch (e) {}
+    return out;
+  }
+  function sbServiceFetch(payload) {
+    return new Promise(function (resolve) {
+      var url = String((payload && payload.url) || '');
+      if (!sbFetchHost(url)) return resolve({ ok: false, reason: 'bad-url' });
+      var method = String((payload && payload.method) || 'GET').toUpperCase();
+      var headers = (payload && payload.headers && typeof payload.headers === 'object') ? payload.headers : {};
+      var hasBody = (payload && payload.body != null && method !== 'GET' && method !== 'HEAD');
+      try {
+        GM_xmlhttpRequest({
+          method: method, url: url, headers: headers,
+          data: hasBody ? payload.body : undefined,
+          timeout: 30000,
+          onload: function (res) {
+            var body = (res && typeof res.responseText === 'string') ? res.responseText : '';
+            var truncated = false;
+            if (body.length > SB_FETCH_MAX) { body = body.slice(0, SB_FETCH_MAX); truncated = true; }
+            resolve({ ok: res.status >= 200 && res.status < 400, status: res.status,
+                      url: res.finalUrl || url, headers: sbParseHeaders(res.responseHeaders),
+                      body: body, truncated: truncated });
+          },
+          onerror: function () { resolve({ ok: false, reason: 'network-error', status: 0 }); },
+          ontimeout: function () { resolve({ ok: false, reason: 'timeout', status: 0 }); }
+        });
+      } catch (e) { resolve({ ok: false, reason: String(e && e.message ? e.message : e).slice(0, 120) }); }
+    });
+  }
+
   function sbOriginOk(o) {
     if (typeof o !== 'string' || o === 'null') return false;
     if (o === location.origin) return true;
@@ -968,7 +1022,7 @@
       if (n !== sbLastFrameCount) { sbLastFrameCount = n; sbRec('tx', 'announce', '', n + ' child frame(s)'); sbDebug('skybridge announce: ' + n + ' child frame(s) visible'); }
     }
     if (!list || !list.length) return;
-    var msg = { channel: SB, type: 'here', version: '1.1.0', protoMin: SB_PROTO_MIN, protoMax: SB_PROTO_MAX, capabilities: SB_CAPS };
+    var msg = { channel: SB, type: 'here', version: '1.2.0', protoMin: SB_PROTO_MIN, protoMax: SB_PROTO_MAX, capabilities: SB_CAPS };
     for (var i = 0; i < list.length; i++) {
       var f = null; try { f = list[i]; } catch (e) {}
       if (!f) continue;
@@ -1027,7 +1081,7 @@
         sbDebug('skybridge: hello from', ev.origin, '\u2192 replying here');
         // negotiate: respond with our range + capabilities; the plugin picks the common max
         source.postMessage({
-          channel: SB, type: 'here', version: '1.1.0',
+          channel: SB, type: 'here', version: '1.2.0',
           protoMin: SB_PROTO_MIN, protoMax: SB_PROTO_MAX, capabilities: SB_CAPS
         }, ev.origin && ev.origin !== 'null' ? ev.origin : '*');
         return;
@@ -1038,11 +1092,19 @@
         var nonce = d.nonce;
         if (SB_CAPS.indexOf(cap) === -1) { sbReply(source, ev.origin, nonce, { ok: false, reason: 'unsupported' }); return; }
         var gen = genName() || 'unknown';
-        sbConsent(gen, cap).then(function (allowed) {
+        // consent scope: per-capability, except fetch which is per-DESTINATION-HOST
+        var scope = cap;
+        if (cap === 'fetch') {
+          var host = sbFetchHost(d.payload && d.payload.url);
+          if (!host) { sbReply(source, ev.origin, nonce, { ok: false, reason: 'bad-url' }); return; }
+          scope = 'fetch:' + host;
+        }
+        sbConsent(gen, scope).then(function (allowed) {
           if (!allowed) { sbReply(source, ev.origin, nonce, { ok: false, reason: 'denied' }); return; }
           var work = (cap === 'storage') ? sbServiceStorage(gen, d.payload || {})
                    : (cap === 'ai')      ? sbServiceAI(d.payload || {})
                    : (cap === 'bus')     ? sbServiceBus(d.payload || {}, source, ev.origin)
+                   : (cap === 'fetch')   ? sbServiceFetch(d.payload || {})
                    : Promise.resolve({ ok: false, reason: 'unsupported' });
           work.then(function (result) { sbReply(source, ev.origin, nonce, result || { ok: false, reason: 'error' }); });
         });
