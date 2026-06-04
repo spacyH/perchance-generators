@@ -143,8 +143,69 @@ a:hover{text-decoration:underline;}
     <div class="principle"><h4>DSL-SAFE</h4><p>Every plugin is audited for Perchance's parser quirks. Drop-in compatible with any generator.</p></div>
   </div>
 
-  <div class="section-head"><h2>Available</h2><span class="count">56 plugins</span></div>
+  <div class="section-head"><h2>Available</h2><span class="count">59 plugins</span></div>
 <div class="cards" id="stable-cards">
+<div class="card" data-plugin="reactions">
+  <div class="card-head">
+    <span class="card-name">weld.reactions</span>
+    <span class="card-status loading"><span class="dot"></span><span class="lbl">loading</span></span>
+  </div>
+  <div class="card-tagline">Aggregate emoji reactions on anything</div>
+  <p class="card-desc">The Discord/Twitch reaction tally, distilled to a primitive: attach emoji to any id â a chat turn, an image, a comment â and track how many of each plus whether you reacted. Idempotent per user, counts sorted by popularity, change events for re-render. Backend-agnostic: bring a user id and optionally a kv-backed store for counts shared across users. Renders nothing; you draw the bar.</p>
+  <div class="card-links">
+    <a href="https://perchance.org/weld-reactions-plugin">docs &rarr;</a>
+    <a href="https://perchance.org/weld-reactions-example">demo &rarr;</a>
+  </div>
+</div>
+<div class="card" data-plugin="skybridge">
+  <div class="card-head">
+    <span class="card-name">weld.skybridge</span>
+    <span class="card-status loading"><span class="dot"></span><span class="lbl">loading</span></span>
+  </div>
+  <div class="card-tagline">The bridge to Weld Companion</div>
+  <p class="card-desc">Lends a sandboxed generator two powers it cannot have alone &mdash; storage that persists across every generator, and the user's own AI model &mdash; over an origin-checked, nonce-matched, protocol-negotiated postMessage channel gated by per-capability consent. Degrades gracefully: with no companion installed, storage falls back to weld.persist/memory and AI reports unavailable, so a plugin built on it still runs for everyone. Secrets never cross the bridge.</p>
+  <div class="card-links">
+    <a href="https://perchance.org/weld-skybridge-plugin">docs &rarr;</a>
+    <a href="https://perchance.org/weld-skybridge-example">demo &rarr;</a>
+  </div>
+</div>
+
+<div class="card" data-plugin="agent">
+  <div class="card-head">
+    <span class="card-name">weld.agent</span>
+    <span class="card-status loading"><span class="dot"></span><span class="lbl">loading</span></span>
+  </div>
+  <div class="card-tagline">A tool-using agent inside the generator</div>
+  <p class="card-desc">Runs a ReAct loop on the user&rsquo;s own model over weld.skybridge &mdash; reason, call a tool, read the result, repeat &mdash; keeping a long-term memory, a thought scratchpad, and named workspaces in the companion&rsquo;s storage, so a run can be paused, resumed, or inspected after a reload. Tools are pluggable: built-in memory/scratchpad/time tools need nothing extra, and a generator registers its own. Degrades gracefully: no companion means storage falls back to weld.persist/memory; supply your own reasoner if you have no own-model.</p>
+  <div class="card-links">
+    <a href="https://perchance.org/weld-agent-plugin">docs &rarr;</a>
+    <a href="https://perchance.org/weld-agent-example">demo &rarr;</a>
+  </div>
+</div>
+<div class="card" data-plugin="rules">
+  <div class="card-head">
+    <span class="card-name">weld.rules</span>
+    <span class="card-status loading"><span class="dot"></span><span class="lbl">loading</span></span>
+  </div>
+  <div class="card-tagline">Declarative when-X-do-Y engine</div>
+  <p class="card-desc">Register your own metric getters and an action handler, then declare rules as plain data â when a metric crosses a threshold, fire an action. Hold-duration debounces and cooldown throttles re-fires, so rules are safe to run every tick. Backend-agnostic: it compares numbers and dispatches what you wrote. âSummarize when context gets long,â âautosave after idle.â</p>
+  <div class="card-links">
+    <a href="https://perchance.org/weld-rules-plugin">docs &rarr;</a>
+    <a href="https://perchance.org/weld-rules-example">demo &rarr;</a>
+  </div>
+</div>
+<div class="card" data-plugin="session">
+  <div class="card-head">
+    <span class="card-name">weld.session</span>
+    <span class="card-status loading"><span class="dot"></span><span class="lbl">loading</span></span>
+  </div>
+  <div class="card-tagline">Unified conversation timeline</div>
+  <p class="card-desc">One object that owns a branching tree of turns â user, assistant, and image â so apps stop hand-weaving stream + image + branching + history. addUser/addAssistant/addImage, regenerate into sibling takes, swipe between them, branch the thread, serialize. Inspired by Frosting; degrades gracefully. The plugin Smart-story wishes it had.</p>
+  <div class="card-links">
+    <a href="https://perchance.org/weld-session-plugin">docs &rarr;</a>
+    <a href="https://perchance.org/weld-session-example">demo &rarr;</a>
+  </div>
+</div>
 <div class="card" data-plugin="ephemeral">
   <div class="card-head">
     <span class="card-name">weld.ephemeral</span>
@@ -7613,7 +7674,7 @@ return window.weld.testrig;
   var REQUIRED = ['ui', 'migrate', 'backup', 'diag', 'quota', 'undo', 'settings', 'toast', 'markdown', 'chatui', 'lorebook', 'branching', 'tokens', 'sync', 'spamguard', 'image', 'gen', 'prompt', 'persist', 'history', 'queue', 'gallery', 'testrig'];
   // These also show as stable when loaded, but are kept out of REQUIRED so the
   // on-page demo gate never stalls if one of them is slow to load.
-  var ADDED = ['stream', 'clean', 'structured', 'summarize', 'regen', 'memory', 'voice', 'dice', 'cards', 'confetti', 'konami', 'background', 'comments', 'banlist', 'vn', 'embed', 'promptforge', 'persona', 'state', 'director', 'cache', 'safe', 'monitor', 'fetch', 'kv', 'upload', 'registry', 'audio', 'import', 'report', 'genparams', 'privacy', 'ephemeral'];
+  var ADDED = ['stream', 'clean', 'structured', 'summarize', 'regen', 'memory', 'voice', 'dice', 'cards', 'confetti', 'konami', 'background', 'comments', 'banlist', 'vn', 'embed', 'promptforge', 'persona', 'state', 'director', 'cache', 'safe', 'monitor', 'fetch', 'kv', 'upload', 'registry', 'audio', 'import', 'report', 'genparams', 'privacy', 'ephemeral', 'session', 'rules', 'reactions'];
   var readyState = { ui: false, migrate: false, backup: false, diag: false, quota: false, undo: false, settings: false, toast: false, markdown: false, chatui: false, lorebook: false, branching: false, tokens: false, sync: false, spamguard: false, image: false, gen: false, prompt: false, persist: false, history: false, queue: false, gallery: false, testrig: false };
 
   function triggerImports(){
@@ -7673,6 +7734,9 @@ return window.weld.testrig;
     try { if (typeof root !== 'undefined' && typeof root.weldGenparams === 'function') root.weldGenparams(); } catch(e){}
     try { if (typeof root !== 'undefined' && typeof root.weldPrivacy === 'function') root.weldPrivacy(); } catch(e){}
     try { if (typeof root !== 'undefined' && typeof root.weldEphemeral === 'function') root.weldEphemeral(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldSession === 'function') root.weldSession(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldRules === 'function') root.weldRules(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldReactions === 'function') root.weldReactions(); } catch(e){}
     // Wire image + gen optional Perchance deps from the index DSL imports, if present.
     try {
       if (window.weld && window.weld.image && typeof root !== 'undefined' && typeof root.imageT2i === 'function') {

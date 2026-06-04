@@ -1,0 +1,391 @@
+$meta
+  title       = weld.skybridge
+  description = The companion bridge. Weld Companion (a userscript) runs ABOVE the page, in the top frame, with powers a sandboxed generator cannot have: storage that persists across every generator, and the user's own AI model. weld.skybridge is the sandbox end of the link to it -- a request/response channel over window.postMessage, origin-checked to perchance.org and nonce-matched so replies cannot be spoofed. It negotiates a PROTOCOL VERSION on connect (highest the two ends share, else it stays cleanly disconnected), gates every privileged call behind the companion's own per-capability consent prompt, and -- crucially -- degrades gracefully: with no companion installed, storage falls back to weld.persist or memory and AI reports unavailable, so a plugin built on it still runs for everyone. Secrets never cross the bridge: a prompt goes up, only the completion comes back. Stash on window.weld.skybridge.
+  tags        = weld, skybridge, bridge, companion, userscript, postmessage, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.skybridge) return window.weld.skybridge;
+
+  // -----------------------------------------------------------------
+  // weld.skybridge: the sandbox half of the Weld Companion bridge.
+  //
+  // Two execution contexts, complementary powers. A PLUGIN (here, in the
+  // generator sandbox) is universal but confined. The COMPANION (a
+  // userscript, top frame) is privileged but optional. skybridge joins
+  // them -- WITHOUT ever letting a plugin require the companion.
+  //
+  //   var sb = weld.skybridge;
+  //   sb.onConnect(function (info) {                 // fires if/when linked
+  //     console.log('linked, protocol', info.protocol);
+  //   });
+  //   if (sb.has('ai')) {                            // honest capability check
+  //     var r = await sb.request('ai', { prompt: 'Name a tavern.' });
+  //     if (r.ok) use(r.value);                      // result is data, not throw
+  //   }
+  //   await sb.storage.set('slot1', state);          // works with OR without
+  //   var s = await sb.storage.get('slot1');         // the companion present
+  //
+  // PROTOCOL VERSIONING. The two halves ship independently and land in
+  // browsers at different times, so the handshake negotiates a protocol
+  // version: each side advertises a min..max range; they settle on the
+  // highest both support. No overlap -> stay disconnected (never half-speak a
+  // protocol). weld.skybridge.protocol holds the agreed integer (0 = not
+  // connected). This is separate from `version` (this plugin's own semver).
+  //
+  // TRUST. Everything inbound is untrusted. Every message, both ways, is
+  // checked: right origin (*.perchance.org), right envelope shape, and a
+  // per-request nonce the reply must echo (no spoof, no replay). The
+  // companion -- not this plugin -- owns the consent prompt, PER CAPABILITY,
+  // remembered per generator. A denied request comes back as
+  // { ok:false, reason:'denied' }: data to branch on, not an exception.
+  //
+  // SECRETS NEVER CROSS. `ai` sends a prompt up; the companion runs the
+  // keyed call itself and sends only the completion down. The API key is
+  // never placed on the bridge in either direction.
+  //
+  // GRACEFUL FALLBACK. With no companion: connected=false, has('ai')=false,
+  // but storage still works -- it routes to weld.persist if present, else an
+  // in-memory map. has('storage') always reports the truth so a plugin CAN
+  // distinguish "saved everywhere" from "saved just here" if it cares; most
+  // won't need to.
+  // -----------------------------------------------------------------
+
+  // ---- protocol the sandbox end speaks (advertise a range) ----
+  var PROTO_MIN = 1;
+  var PROTO_MAX = 1;
+  var MSG = 'weld.skybridge';          // envelope tag, both directions
+  var HELLO_TIMEOUT = 4000;            // ms to wait for the anchor to answer
+  var REQUEST_TIMEOUT = 30000;         // ms before a pending request gives up
+  var BUILD = 'sb-plugin/2026-06-04.3';  // bump on every change; printed at load so a stale deploy is obvious
+  var LOADED_AT = Date.now();
+  // Early, dependency-free deployment beacon: even if a later line throws, this
+  // proves WHICH build actually loaded (read it from the example or console).
+  try { window.__weldSkybridge = { build: BUILD, version: '1.0.0', at: Date.now() }; } catch (e) {}
+  // verbose console logging toggle: add ?sbdebug to the URL, or set
+  // window.WELD_SKYBRIDGE_DEBUG = true before load, or call .debug(true) at runtime.
+  var DEBUG = false;
+  try {
+    if (typeof window.WELD_SKYBRIDGE_DEBUG !== 'undefined') DEBUG = !!window.WELD_SKYBRIDGE_DEBUG;
+    else if (typeof location !== 'undefined') DEBUG = ((' ' + location.search + ' ' + location.hash).indexOf('sbdebug') !== -1);
+  } catch (e) {}
+
+  // ---- diagnostics: a small ring buffer of handshake events, readable live ----
+  var TRACE = new Array();             // ring of { t, dir, type, origin, note } records
+  function rec(dir, type, origin, note) {
+    try {
+      TRACE.push({ t: Date.now(), dir: dir, type: type || '', origin: origin || '', note: note || '' });
+      if (TRACE.length > 60) TRACE.shift();
+    } catch (e) {}
+  }
+
+  // ---- connection state ----
+  var connected = false;
+  var proto = 0;                       // negotiated protocol (0 = none)
+  var caps = {};                       // capability name -> true (advertised)
+  var anchorVersion = null;            // the companion's reported semver
+  var onConnectFns = new Array();
+  var pending = {};                    // nonce -> { resolve, timer }
+  var busSubs = {};                    // bus channel -> [fn, ...] (cross-tab pub/sub via companion)
+  var helloTimer = null;
+
+  function isTopFrame() { try { return window.top === window.self; } catch (e) { return false; } }
+  function originOk(o) {
+    if (typeof o !== 'string' || o === 'null') return false;
+    if (o === location.origin) return true;
+    // Parse without a regex: bracket character-classes like the ones a host
+    // pattern would need are themselves list-reference traps in Perchance, so
+    // we match "https://(...).perchance.org" with plain string ops instead.
+    var host = o;
+    var p = host.indexOf('://');
+    if (p !== -1) host = host.slice(p + 3);
+    var slash = host.indexOf('/'); if (slash !== -1) host = host.slice(0, slash);
+    var colon = host.indexOf(':'); if (colon !== -1) host = host.slice(0, colon);
+    host = host.toLowerCase();
+    return host === 'perchance.org' || (host.length > 13 && host.slice(-14) === '.perchance.org');
+  }
+  function nonce() {
+    return 'sb_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+  }
+  function sbLog() {
+    try {
+      if (!window.console) return;
+      var a = Array.of('\[skybridge\]');                 // escaped so the engine doesn't read it as a list ref
+      console.log.apply(console, a.concat(Array.prototype.slice.call(arguments)));
+    } catch (e) {}
+  }
+  function sbDebug() { if (DEBUG) sbLog.apply(null, arguments); }   // verbose; silent unless debug is on
+  // the counterpart frame(s): the companion runs in the top frame, but post to
+  // the direct parent too in case of nesting. De-dup identical window refs.
+  function peers() {
+    var out = new Array();
+    try { if (window.top && window.top !== window.self) out.push(window.top); } catch (e) {}
+    try { if (window.parent && window.parent !== window.self && out.indexOf(window.parent) === -1) out.push(window.parent); } catch (e) {}
+    if (!out.length) out.push(window);   // not framed: talk to ourselves (e.g. companion-less self-test)
+    return out;
+  }
+  function postUp(obj) {
+    var ps = peers();
+    for (var i = 0; i < ps.length; i++) { try { Reflect.get(ps, i).postMessage(obj, '*'); } catch (e) { /* cross-origin-guarded; harmless */ } }
+  }
+
+  function fireConnect() {
+    var info = { protocol: proto, version: anchorVersion, capabilities: Object.keys(caps) };
+    for (var i = 0; i < onConnectFns.length; i++) {
+      try { Reflect.get(onConnectFns, i)(info); } catch (e) { /* swallow */ }
+    }
+  }
+  function onConnect(fn) {
+    if (typeof fn !== 'function') return function () {};
+    onConnectFns.push(fn);
+    if (connected) { try { fn({ protocol: proto, version: anchorVersion, capabilities: Object.keys(caps) }); } catch (e) {} }
+    return function () { var ix = onConnectFns.indexOf(fn); if (ix !== -1) onConnectFns.splice(ix, 1); };
+  }
+
+  // ---- inbound message handling (treat everything as untrusted) ----
+  function onMessage(ev) {
+    var d = ev && ev.data;
+    var isSb = d && typeof d === 'object' && d.channel === MSG;
+    // Trace ALL skybridge-tagged traffic before any filter, so a message that
+    // gets dropped (bad origin, no common protocol) is still visible.
+    if (isSb) rec('rx', d.type, ev.origin, '');
+    if (!ev || !originOk(ev.origin)) {
+      if (isSb) { rec('drop', d.type, ev.origin, 'origin-rejected'); sbDebug('dropped ' + d.type + ' from disallowed origin ' + ev.origin); }
+      return;
+    }
+    if (!isSb) return;
+
+    if (d.type === 'here') {
+      // handshake reply: negotiate the highest protocol both ends share
+      var lo = Math.max(PROTO_MIN, (d.protoMin | 0) || 0);
+      var hi = Math.min(PROTO_MAX, (d.protoMax | 0) || 0);
+      if (hi < lo) { rec('drop', 'here', ev.origin, 'no-common-protocol'); sbDebug('here from ' + ev.origin + ' but no common protocol (' + d.protoMin + '..' + d.protoMax + ' vs ' + PROTO_MIN + '..' + PROTO_MAX + ')'); return; }
+      if (connected) return;           // already linked; ignore duplicates
+      proto = hi;
+      anchorVersion = (typeof d.version === 'string') ? d.version : null;
+      caps = {};
+      if (d.capabilities && typeof d.capabilities === 'object' && d.capabilities.length != null) {
+        for (var i = 0; i < d.capabilities.length; i++) {
+          var c = Reflect.get(d.capabilities, i);
+          if (typeof c === 'string') Reflect.set(caps, c, true);
+        }
+      }
+      connected = true;
+      if (helloTimer) { clearTimeout(helloTimer); helloTimer = null; }
+      rec('ok', 'connected', ev.origin, 'proto ' + proto);
+      sbLog('connected to companion (protocol ' + proto + ', caps: ' + Object.keys(caps).join(',') + ')');
+      fireConnect();
+      return;
+    }
+
+    if (d.type === 'reply') {
+      var p = Reflect.get(pending, String(d.nonce));
+      if (!p) return;                  // unknown / replayed / spoofed nonce -> drop
+      Reflect.deleteProperty(pending, String(d.nonce));
+      if (p.timer) clearTimeout(p.timer);
+      var result = (d.result && typeof d.result === 'object')
+        ? d.result
+        : { ok: false, reason: 'malformed' };
+      p.resolve(result);
+      return;
+    }
+
+    if (d.type === 'bus') {
+      // unsolicited push from the companion: a message on a channel we subscribed to
+      var subs = Reflect.get(busSubs, String(d.busChannel));
+      if (subs) { for (var bi = 0; bi < subs.length; bi++) { try { subs[bi](d.message); } catch (e) {} } }
+      return;
+    }
+  }
+
+  // ---- send a capability request up; resolve with a result object ----
+  function request(capability, payload) {
+    return new Promise(function (resolve) {
+      if (!connected) { resolve({ ok: false, reason: 'disconnected' }); return; }
+      if (!Reflect.get(caps, String(capability))) { resolve({ ok: false, reason: 'unsupported' }); return; }
+      var id = nonce();
+      var timer = setTimeout(function () {
+        if (Reflect.get(pending, id)) {
+          Reflect.deleteProperty(pending, id);
+          resolve({ ok: false, reason: 'timeout' });
+        }
+      }, REQUEST_TIMEOUT);
+      Reflect.set(pending, id, { resolve: resolve, timer: timer });
+      postUp({
+        channel: MSG, type: 'request', proto: proto, nonce: id,
+        cap: String(capability),
+        payload: (payload && typeof payload === 'object') ? payload : {}
+      });
+    });
+  }
+
+  function has(capability) { return !!Reflect.get(caps, String(capability)); }
+
+  // ---- storage: companion when available, else weld.persist, else memory ----
+  // Uniform async (Promise) API, since the companion path is a round-trip.
+  var mem = {};                        // session-only fallback map
+  var persistColl = null;              // lazily-opened weld.persist collection
+  function persistCollection() {
+    if (persistColl) return persistColl;
+    try {
+      if (window.weld && window.weld.persist && typeof window.weld.persist.open === 'function') {
+        var db = window.weld.persist.open('weld-skybridge');
+        persistColl = db.collection('kv');
+        return persistColl;
+      }
+    } catch (e) { /* fall through to memory */ }
+    return null;
+  }
+  function storageGet(key) {
+    var k = String(key);
+    if (connected && has('storage')) {
+      return request('storage', { op: 'get', key: k }).then(function (r) { return r.ok ? r.value : null; });
+    }
+    var coll = persistCollection();
+    if (coll) {
+      try { return Promise.resolve(coll.get(k)).then(function (rec) { return rec != null ? rec : null; }); }
+      catch (e) { /* fall through */ }
+    }
+    return Promise.resolve(Reflect.has(mem, k) ? Reflect.get(mem, k) : null);
+  }
+  function storageSet(key, value) {
+    var k = String(key);
+    if (connected && has('storage')) {
+      return request('storage', { op: 'set', key: k, value: value }).then(function (r) { return !!r.ok; });
+    }
+    var coll = persistCollection();
+    if (coll) {
+      try { return Promise.resolve(coll.put(k, value)).then(function () { return true; }); }
+      catch (e) { /* fall through */ }
+    }
+    Reflect.set(mem, k, value);
+    return Promise.resolve(true);
+  }
+  function storageList(prefix) {
+    var pre = prefix != null ? String(prefix) : '';
+    if (connected && has('storage')) {
+      return request('storage', { op: 'list', prefix: pre }).then(function (r) { return r.ok ? r.value : new Array(); });
+    }
+    var coll = persistCollection();
+    if (coll && typeof coll.query === 'function') {
+      try {
+        return Promise.resolve(coll.query()).then(function (rows) {
+          var out = new Array();
+          if (rows && rows.length != null) {
+            for (var i = 0; i < rows.length; i++) {
+              var key = Reflect.get(Reflect.get(rows, i) || {}, 'key');
+              if (typeof key === 'string' && key.indexOf(pre) === 0) out.push(key);
+            }
+          }
+          return out;
+        });
+      } catch (e) { /* fall through */ }
+    }
+    var keys = Object.keys(mem), res = new Array();
+    for (var j = 0; j < keys.length; j++) { var kk = Reflect.get(keys, j); if (kk.indexOf(pre) === 0) res.push(kk); }
+    return Promise.resolve(res);
+  }
+  // where is storage actually going right now? (for honesty / debugging)
+  function storageBackend() {
+    if (connected && has('storage')) return 'companion';
+    return persistCollection() ? 'persist' : 'memory';
+  }
+
+  // ---- ai: prompt up, completion down; key never crosses ----
+  // ---- bus: cross-tab / cross-generator pub/sub, relayed by the companion ----
+  // publish resolves a result object; subscribe registers a local handler and
+  // tells the companion to relay matching messages down. Works only with a
+  // companion that advertises 'bus' -- callers (e.g. weld.swarm) gate on has('bus').
+  function busPublish(channel, message) {
+    return request('bus', { op: 'publish', channel: String(channel), message: message });
+  }
+  function busSubscribe(channel, fn) {
+    if (typeof fn !== 'function') return function () {};
+    var ch = String(channel);
+    var arr = Reflect.get(busSubs, ch);
+    if (!arr) { arr = new Array(); Reflect.set(busSubs, ch, arr); request('bus', { op: 'subscribe', channel: ch }); }
+    arr.push(fn);
+    return function () {
+      var a = Reflect.get(busSubs, ch); if (!a) return;
+      var ix = a.indexOf(fn); if (ix !== -1) a.splice(ix, 1);
+      if (!a.length) { Reflect.deleteProperty(busSubs, ch); request('bus', { op: 'unsubscribe', channel: ch }); }
+    };
+  }
+
+  function ai(prompt, options) {
+    var payload = { prompt: String(prompt != null ? prompt : '') };
+    if (options && typeof options === 'object') {
+      if (options.system != null) payload.system = String(options.system);
+      if (options.maxTokens != null) payload.maxTokens = options.maxTokens | 0;
+      if (options.temperature != null) payload.temperature = +options.temperature;
+    }
+    return request('ai', payload);     // resolves { ok, value } or { ok:false, reason }
+  }
+
+  // ---- start the handshake ----
+  function connect() {
+    if (connected) return;
+    var ps = peers();
+    rec('tx', 'hello', '', ps.length + ' peer(s)');
+    sbDebug('sending hello to ' + ps.length + ' peer frame(s); framed=' + (window.top !== window.self));
+    postUp({ channel: MSG, type: 'hello', protoMin: PROTO_MIN, protoMax: PROTO_MAX });
+    if (!helloTimer) {
+      helloTimer = setTimeout(function () { helloTimer = null; if (!connected) { rec('to', 'timeout', '', 'no answer'); sbDebug('no companion answered (fallback mode)'); } }, HELLO_TIMEOUT);
+    }
+  }
+
+  try { window.addEventListener('message', onMessage, false); } catch (e) { /* no window.addEventListener?? */ }
+  // kick the handshake now and once more after load, in case the anchor mounts late
+  connect();
+  try { window.addEventListener('load', connect, { once: true }); } catch (e) {}
+  // The companion anchor mounts at the top frame's document-idle -- usually AFTER
+  // we load -- so our first hellos may arrive before it is listening. Retry a few
+  // times; connect() no-ops once linked. (The companion also announces itself
+  // downward, so whichever side comes up first, the link forms.)
+  Array.of(150, 500, 1500, 3000).forEach(function (t) { setTimeout(connect, t); });
+
+  window.weld.skybridge = {
+    // connection
+    get connected() { return connected; },
+    get protocol() { return proto; },          // negotiated protocol int (0 = none)
+    get anchorVersion() { return anchorVersion; },
+    has: has,
+    onConnect: onConnect,
+    reconnect: connect,
+    // privileged calls (each resolves a result object, never throws)
+    request: request,
+    ai: ai,
+    // storage: graceful fallback, honest backend
+    storage: { get: storageGet, set: storageSet, list: storageList, backend: storageBackend },
+    // bus: cross-tab / cross-generator pub/sub (only live when the companion advertises 'bus')
+    bus: { publish: busPublish, subscribe: busSubscribe },
+    // protocol range this sandbox end speaks
+    protocolRange: { min: PROTO_MIN, max: PROTO_MAX },
+    version: '1.0.0',
+    build: BUILD,
+    // verbose-logging toggle. on()/off; returns the new state.
+    debug: function (on) {
+      DEBUG = (on !== false);
+      sbLog('debug ' + (DEBUG ? 'ON' : 'OFF') + ' \u2014 build ' + BUILD + ', connected=' + connected + ', protocol=' + proto);
+      return DEBUG;
+    },
+    // a live snapshot for troubleshooting (state + recent handshake events)
+    diagnostics: function () {
+      return {
+        build: BUILD, version: '1.0.0', debug: DEBUG, loadedAt: LOADED_AT,
+        connected: connected, protocol: proto, anchorVersion: anchorVersion,
+        framed: (function () { try { return window.top !== window.self; } catch (e) { return null; } })(),
+        origin: location.origin,
+        peers: peers().length,
+        capabilities: Object.keys(caps),
+        storageBackend: storageBackend(),
+        trace: TRACE.slice()
+      };
+    }
+  };
+
+  rec('init', 'load', location.origin, BUILD);
+  sbLog('plugin ' + BUILD + ' loaded; framed=' + (function () { try { return window.top !== window.self; } catch (e) { return '?'; } })() + ' origin=' + location.origin + (DEBUG ? ' (debug ON)' : ''));
+  return window.weld.skybridge;

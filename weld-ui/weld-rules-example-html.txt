@@ -1,0 +1,311 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--amber:#d29922;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:780px;margin:0 auto;padding:34px 18px 90px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 0 16px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+.breadcrumb a{color:var(--muted);}.breadcrumb .sep{color:var(--faint);margin:0 8px;}.breadcrumb .cur{color:var(--ink);}.breadcrumb .act a{color:var(--accent);}
+.hdr{margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}.hdr h1{font:700 24px var(--mono);letter-spacing:-0.5px;}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;}
+.hdr .lead{color:var(--muted);margin-top:8px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;}
+.panel h2{font:600 13px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:8px 0;}
+.lbl{font:600 12px var(--mono);color:var(--muted);min-width:74px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 15px;font:600 13px var(--font);cursor:pointer;transition:.12s;}
+.btn:hover{filter:brightness(1.08);}.btn.ghost{background:var(--faint);color:var(--ink);}.btn.sm{padding:6px 11px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+input[type=text],textarea{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:8px 10px;font:13px var(--font);}
+input[type=text]{flex:1;min-width:120px;}textarea{width:100%;font:12.5px/1.5 var(--mono);resize:vertical;}
+.mono{font:13px var(--mono);}
+.out{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font:12.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;min-height:20px;color:#c9d1d9;}
+.chip{display:inline-block;background:var(--faint);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font:600 12px var(--mono);margin:2px;}
+.chip.k{background:rgba(63,185,80,.14);border-color:rgba(63,185,80,.4);color:#7ee787;}
+.chip.d{opacity:.4;text-decoration:line-through;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:9px 13px;border-radius:0 4px 4px 0;margin:12px 0 0;font-size:12.5px;color:#c9d1d9;}
+.note.warn{background:rgba(210,153,34,.08);border-color:var(--amber);}
+.tag{font:600 10px var(--mono);padding:2px 7px;border-radius:4px;background:rgba(63,185,80,.14);color:#7ee787;border:1px solid rgba(63,185,80,.4);}
+.tag.ai{background:rgba(210,153,34,.12);color:#e3b341;border-color:rgba(210,153,34,.4);}
+.bar{height:14px;background:var(--accent);border-radius:3px;transition:width .3s;}
+.footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);}.footer a{color:var(--muted);}
+.flex{display:flex;gap:10px;align-items:center;}.wrap{flex-wrap:wrap;}.grow{flex:1;}.mt{margin-top:10px;}
+</style>
+<div id="page">
+<div class="breadcrumb"><span><a href="https://perchance.org/weld-ui-index">weld</a><span class="sep">/</span>weld.rules<span class="sep">/</span><span class="cur">demo</span></span><span class="act"><a href="https://perchance.org/weld-rules-plugin">docs &rarr;</a></span></div>
+<div class="hdr"><div class="hdr-row"><h1>weld.rules &mdash; demo</h1><span class="ver">v1.0.0</span></div><p class="lead">Move the token and idle sliders, tick the clock, and watch a declarative rules engine fire actions when conditions hold -- with cooldown and hold-duration in play. You supply the metrics and actions; the engine decides when.</p></div>
+  <div class="panel"><h2>Rules playground <span class="tag">when X, do Y</span></h2>
+    <div class="row"><label class="lbl">tokens</label><input id="tok" type="range" min="0" max="5000" value="1000" style="flex:1;"><span id="tokv" class="chip">1000</span></div>
+    <div class="row"><label class="lbl">idle (s)</label><input id="idle" type="range" min="0" max="60" value="0" style="flex:1;"><span id="idlev" class="chip">0</span></div>
+    <div class="row"><button id="tick" class="btn">Tick 1s</button><button id="reset" class="btn ghost">Reset</button><span id="clock" class="chip">t=0</span></div>
+    <div class="note">Two rules are registered: <code>tokens &gt; 3000 &rarr; summarize</code> (cooldown 5s) and <code>idle &ge; 10 &rarr; autosave</code> (must hold 3s). Move the sliders, then tick the clock and watch the log. The condition for autosave must stay true across enough ticks before it fires; summarize won&rsquo;t re-fire until its cooldown elapses. This is the whole engine: you supply the metrics and actions, it decides when.</div>
+    <div id="log" class="out mt" style="min-height:90px;"></div>
+  </div>
+<footer class="footer"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
+</div>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.rules) return window.weld.rules;
+
+// -----------------------------------------------------------------
+// weld.rules: reactive "when X, do Y" for app-supplied signals.
+//
+// The app owns the signals and the actions; weld.rules owns the logic of
+// deciding WHEN to act. You register metric getters and an action handler,
+// declare rules as plain data, and tick the engine from your loop:
+//
+//   var r = weld.rules.create();
+//   r.metric('tokens', function () { return weld.tokens.count(buffer); });
+//   r.metric('idleSec', function () { return (Date.now() - lastInput) / 1000; });
+//   r.onAction(function (action, rule) {
+//     if (action.type === 'summarize') doSummary();
+//     if (action.type === 'autosave')  hist.save();
+//   });
+//   r.add({ when: { metric: 'tokens', op: '>', value: 3000 },
+//           then: { type: 'summarize' }, cooldownSec: 60 });
+//   r.add({ when: { metric: 'idleSec', op: '>=', value: 30 },
+//           then: { type: 'autosave' }, durationSec: 0, cooldownSec: 30 });
+//   setInterval(function () { r.tick(1); }, 1000);   // 1s frames
+//
+// A RULE is plain data so it can be saved/edited/imported:
+//   { id, enabled, when: { metric, op, value }, then: <action>,
+//     durationSec, cooldownSec }
+//   op is one of < > <= >= == != ; durationSec = the condition must hold
+//   this long before firing (debounce); cooldownSec = min gap between
+//   re-fires. Both default to 0.
+//
+// The engine bakes in NO metrics and NO actions -- it compares numbers and
+// dispatches whatever 'then' you wrote to your handler. That keeps it
+// backend-agnostic and reusable across any weld app.
+// -----------------------------------------------------------------
+
+var OPS = {
+  '<':  function (a, b) { return a <  b; },
+  '>':  function (a, b) { return a >  b; },
+  '<=': function (a, b) { return a <= b; },
+  '>=': function (a, b) { return a >= b; },
+  '==': function (a, b) { return a === b; },
+  '!=': function (a, b) { return a !== b; }
+};
+
+var idSeq = 0;
+function uid() { idSeq++; return 'r' + Date.now().toString(36) + '_' + idSeq.toString(36); }
+
+function createEngine(opts) {
+  opts = opts || {};
+  var metrics = {};        // name -> getter function
+  var actionHandlers = new Array();
+  var rules = new Array();
+  var ruleState = {};      // id -> { heldSec, lastFiredAt }
+  var clock = 0;           // absolute seconds, accumulated across ticks
+
+  // ---- metrics ----
+  // register(name, getter): getter() -> number (or anything == comparable).
+  function metric(name, getter) {
+    if (!name || typeof getter !== 'function') return;
+    Reflect.set(metrics, String(name), getter);
+    return engine;
+  }
+  function readMetric(name) {
+    var g = Reflect.get(metrics, String(name));
+    if (typeof g !== 'function') return undefined;
+    try { return g(); } catch (e) { return undefined; }
+  }
+  function metricNames() { return Object.keys(metrics); }
+
+  // ---- action handlers ----
+  function onAction(fn) {
+    if (typeof fn !== 'function') return function () {};
+    actionHandlers.push(fn);
+    return function () {
+      var ix = actionHandlers.indexOf(fn);
+      if (ix !== -1) actionHandlers.splice(ix, 1);
+    };
+  }
+  function dispatch(action, rule) {
+    for (var i = 0; i < actionHandlers.length; i++) {
+      try { Reflect.get(actionHandlers, i)(action, rule); } catch (e) { /* swallow */ }
+    }
+    // a rule may also carry its own callback in `then.run`
+    if (rule && rule.then && typeof rule.then.run === 'function') {
+      try { rule.then.run(rule); } catch (e) { /* swallow */ }
+    }
+  }
+
+  // ---- rule normalization (plain data in, valid rule out) ----
+  function normalize(r) {
+    r = r || {};
+    var when = r.when || r.condition || {};
+    var op = Reflect.get(OPS, when.op) ? when.op : '>';
+    return {
+      id: r.id || uid(),
+      enabled: r.enabled !== false,
+      when: {
+        metric: String(when.metric || ''),
+        op: op,
+        value: when.value
+      },
+      then: r.then || r.action || { type: 'noop' },
+      durationSec: numOr(r.durationSec, 0),
+      cooldownSec: numOr(r.cooldownSec, 0),
+      meta: r.meta || null
+    };
+  }
+  function numOr(v, d) { var n = Number(v); return isFinite(n) && n >= 0 ? n : d; }
+
+  // ---- CRUD on rules ----
+  function add(r) {
+    var rule = normalize(r);
+    rules.push(rule);
+    Reflect.set(ruleState, rule.id, { heldSec: 0, lastFiredAt: -Infinity });
+    return rule;
+  }
+  function addAll(list) { return (list || new Array()).map(add); }
+  function get(id) { for (var i = 0; i < rules.length; i++) { var ru = Reflect.get(rules, i); if (ru.id === id) return ru; } return null; }
+  function update(id, patch) {
+    var rule = get(id);
+    if (!rule) return null;
+    var merged = normalize(Object.assign({}, rule, patch, { id: id }));
+    for (var i = 0; i < rules.length; i++) { if (Reflect.get(rules, i).id === id) { Reflect.set(rules, i, merged); break; } }
+    return merged;
+  }
+  function remove(id) {
+    for (var i = 0; i < rules.length; i++) {
+      if (Reflect.get(rules, i).id === id) { rules.splice(i, 1); Reflect.deleteProperty(ruleState, id); return true; }
+    }
+    return false;
+  }
+  function toggle(id, on) {
+    var rule = get(id);
+    if (!rule) return null;
+    rule.enabled = (on === undefined) ? !rule.enabled : (on === true);
+    return rule.enabled;
+  }
+  function list() { return rules.map(function (r) { return Object.assign({}, r); }); }
+  function clear() { rules = new Array(); ruleState = {}; }
+
+  // ---- evaluation ----
+  // evalRule(rule): is the condition currently true? (no side effects)
+  function evalRule(rule) {
+    var fn = Reflect.get(OPS, rule.when.op);
+    if (!fn) return false;
+    var actual = readMetric(rule.when.metric);
+    if (actual === undefined) return false;
+    return fn(actual, rule.when.value);
+  }
+
+  // tick(elapsedSec): advance the engine by elapsedSec seconds. For each
+  // enabled rule, if its condition holds, accumulate hold time; once the
+  // hold reaches durationSec AND the cooldown has elapsed since the last
+  // fire, dispatch the action. A condition going false resets the hold.
+  // Returns the rules that fired this tick.
+  function tick(elapsedSec) {
+    var dt = numOr(elapsedSec, 0);
+    clock += dt;
+    var fired = new Array();
+    for (var i = 0; i < rules.length; i++) {
+      var rule = Reflect.get(rules, i);
+      if (!rule.enabled) continue;
+      var rs = Reflect.get(ruleState, rule.id) || { heldSec: 0, lastFiredAt: -Infinity };
+      if (evalRule(rule)) {
+        rs.heldSec += dt;
+        if (rs.heldSec >= rule.durationSec) {
+          var sinceFire = clock - rs.lastFiredAt;
+          if (rs.lastFiredAt === -Infinity || sinceFire >= rule.cooldownSec) {
+            rs.lastFiredAt = clock;
+            rs.heldSec = 0;
+            dispatch(rule.then, rule);
+            fired.push(rule);
+          }
+        }
+      } else {
+        rs.heldSec = 0;
+      }
+      Reflect.set(ruleState, rule.id, rs);
+    }
+    return fired;
+  }
+
+  // evaluateNow(): fire any rules whose condition is true RIGHT NOW,
+  // ignoring durationSec but still respecting cooldown. Handy for one-shot
+  // checks outside a tick loop (e.g. right after an event).
+  function evaluateNow() {
+    var fired = new Array();
+    for (var i = 0; i < rules.length; i++) {
+      var rule = Reflect.get(rules, i);
+      if (!rule.enabled) continue;
+      var rs = Reflect.get(ruleState, rule.id) || { heldSec: 0, lastFiredAt: -Infinity };
+      if (evalRule(rule)) {
+        var sinceFire = clock - rs.lastFiredAt;
+        if (rs.lastFiredAt === -Infinity || sinceFire >= rule.cooldownSec) {
+          rs.lastFiredAt = clock;
+          rs.heldSec = 0;
+          dispatch(rule.then, rule);
+          fired.push(rule);
+          Reflect.set(ruleState, rule.id, rs);
+        }
+      }
+    }
+    return fired;
+  }
+
+  // reset(): clear hold/cooldown state without removing rules (e.g. on a
+  // session switch) so cooldowns don't carry across contexts.
+  function reset() {
+    clock = 0;
+    for (var i = 0; i < rules.length; i++) {
+      Reflect.set(ruleState, Reflect.get(rules, i).id, { heldSec: 0, lastFiredAt: -Infinity });
+    }
+  }
+
+  // snapshot(): the rules as plain data (for saving). restore(list) loads.
+  function snapshot() { return list(); }
+  function restore(saved) { clear(); addAll(saved || new Array()); }
+
+  var engine = {
+    metric: metric, metricNames: metricNames,
+    onAction: onAction,
+    add: add, addAll: addAll, get: get, update: update, remove: remove,
+    toggle: toggle, list: list, clear: clear,
+    evalRule: evalRule, tick: tick, evaluateNow: evaluateNow, reset: reset,
+    snapshot: snapshot, restore: restore,
+    ops: function () { return Object.keys(OPS); }
+  };
+  return engine;
+}
+
+window.weld.rules = {
+  create: createEngine,
+  version: '1.0.0'
+};
+
+return window.weld.rules;
+})();
+</script>
+<script>
+
+  function boot(){ if(!window.weld||!window.weld.rules){return setTimeout(boot,100);} init(); }
+  function init(){
+    var R=window.weld.rules, $=function(id){return document.getElementById(id);};
+    var tokens=1000, idle=0, t=0, log=[];
+    var e=R.create();
+    e.metric('tokens', function(){ return tokens; });
+    e.metric('idle', function(){ return idle; });
+    e.onAction(function(a){ log.unshift('t='+t+'s  FIRED  '+a.type); render(); });
+    e.add({ when:{metric:'tokens', op:'>', value:3000}, then:{type:'summarize'}, cooldownSec:5 });
+    e.add({ when:{metric:'idle', op:'>=', value:10}, then:{type:'autosave'}, durationSec:3 });
+    $('tok').oninput=function(){ tokens=+this.value; $('tokv').textContent=tokens; };
+    $('idle').oninput=function(){ idle=+this.value; $('idlev').textContent=idle; };
+    $('tick').onclick=function(){ t+=1; $('clock').textContent='t='+t; var f=e.tick(1); if(!f.length){ log.unshift('t='+t+'s  (no rules fired)'); } render(); };
+    $('reset').onclick=function(){ t=0; e.reset(); log=['reset']; $('clock').textContent='t=0'; render(); };
+    function render(){ $('log').textContent=log.slice(0,12).join('\n'); }
+    render();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+
+</script>

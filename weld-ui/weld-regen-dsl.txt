@@ -111,8 +111,13 @@ $output() =>
     if (!id) return null;
     if (typeof tree.switchSibling === 'function') {
       var moved = tree.switchSibling(id, (dir == null ? 1 : dir));
-      if (moved && moved.id && tree.setActive) tree.setActive(moved.id);
-      return moved || null;
+      if (moved == null) return null;
+      // switchSibling may return either a node object or a bare id string,
+      // depending on the tree implementation. Normalize to an id, switch the
+      // active leaf, and hand back the node.
+      var movedId = (typeof moved === 'object') ? moved.id : moved;
+      if (movedId && tree.setActive) tree.setActive(movedId);
+      return (typeof moved === 'object') ? moved : (tree.get ? tree.get(movedId) : { id: movedId });
     }
     return null;
   }
@@ -150,7 +155,7 @@ $output() =>
     swipe: swipe,
     variants: variants,
     edit: edit,
-    version: '1.0.0'
+    version: '1.0.1'
   };
 
   window.weld.regen.attach({ stream: window.weld.stream, branching: window.weld.branching });

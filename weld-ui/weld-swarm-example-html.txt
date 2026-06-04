@@ -1,0 +1,270 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--amber:#d29922;--purple:#bc8cff;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:820px;margin:0 auto;padding:34px 18px 90px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 0 16px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+.breadcrumb a{color:var(--muted);}.breadcrumb .sep{color:var(--faint);margin:0 8px;}.breadcrumb .cur{color:var(--ink);}
+.hdr{margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}.hdr h1{font:700 24px var(--mono);letter-spacing:-0.5px;}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;}
+.hdr .lead{color:var(--muted);margin-top:8px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;}
+.panel h2{font:600 13px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:10px 0;}
+.lbl{font:600 12px var(--mono);color:var(--muted);min-width:84px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 15px;font:600 13px var(--font);cursor:pointer;transition:.12s;}
+.btn:hover{filter:brightness(1.08);}.btn.ghost{background:var(--faint);color:var(--ink);}.btn.sm{padding:6px 11px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+input,select,textarea{background:var(--bg);color:var(--ink);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font:14px var(--font);}
+input.grow,select.grow,textarea.grow{flex:1;min-width:200px;}
+textarea{width:100%;resize:vertical;min-height:46px;font:13px/1.5 var(--font);}
+select{cursor:pointer;}
+input[type=range]{padding:0;flex:1;min-width:120px;accent-color:var(--accent);}
+.val{font:600 12px var(--mono);color:var(--accent);min-width:30px;text-align:right;}
+.tools{display:flex;gap:14px;flex-wrap:wrap;}
+.tools label{font:13px var(--font);color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+.pill{display:inline-flex;align-items:center;gap:6px;font:600 11px var(--mono);padding:3px 9px;border-radius:999px;border:1px solid var(--border);}
+.pill.on{color:var(--green);border-color:rgba(63,185,80,.4);}.pill.off{color:var(--muted);}
+.dot{width:7px;height:7px;border-radius:50%;background:currentColor;}
+.stream{list-style:none;margin:0;padding:0;}
+.ev{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-top:1px solid var(--border);font-size:14px;}
+.ev:first-child{border-top:0;}
+.tag{flex:none;width:74px;text-align:center;font:700 10px var(--mono);letter-spacing:.04em;padding:3px 0;border-radius:5px;text-transform:uppercase;}
+.tag.thought{background:rgba(188,140,255,.15);color:var(--purple);}
+.tag.action{background:rgba(68,147,248,.15);color:var(--accent);}
+.tag.obs{background:rgba(125,133,144,.18);color:var(--muted);}
+.tag.final{background:rgba(63,185,80,.15);color:var(--green);}
+.tag.start,.tag.maxsteps,.tag.error{background:rgba(210,153,34,.15);color:var(--amber);}
+.ev .body{flex:1;min-width:0;}
+.ev .what{font-weight:600;}
+.ev .detail{color:var(--muted);font:12px/1.5 var(--mono);margin-top:2px;white-space:pre-wrap;word-break:break-word;}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+@media(max-width:680px){.cols{grid-template-columns:1fr;}}
+.out{font:13px/1.5 var(--mono);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;white-space:pre-wrap;color:var(--ink);min-height:40px;}
+.note{font:12px/1.5 var(--font);color:var(--muted);margin-top:8px;}
+.kbd{font:600 11px var(--mono);background:var(--faint);border:1px solid var(--border);border-radius:4px;padding:1px 6px;color:var(--ink);}
+.dbg{font:12px/1.5 var(--mono);background:#010409;border:1px solid var(--border);border-radius:6px;padding:10px;max-height:300px;overflow:auto;white-space:pre-wrap;word-break:break-word;}
+.dbg .l{display:block;padding:1px 0;}
+.dbg .ts{color:var(--faint);}
+.dbg .k-prompt{color:var(--purple);}.dbg .k-raw{color:var(--amber);}.dbg .k-thought{color:var(--purple);}
+.dbg .k-action{color:var(--accent);}.dbg .k-obs{color:var(--muted);}.dbg .k-final{color:var(--green);}
+.dbg .k-start,.dbg .k-error,.dbg .k-maxsteps{color:var(--red);}
+.dbg .body{color:var(--ink);}
+</style>
+<div id="page">
+  <div class="breadcrumb">
+    <span><a href="https://perchance.org/weld">weld</a><span class="sep">/</span><span class="cur">swarm</span><span class="sep">/</span><span class="cur">live demo</span></span>
+    <span><a href="https://perchance.org/weld-swarm-plugin">plugin source</a></span>
+  </div>
+
+  <div class="hdr">
+    <div class="hdr-row"><h1>weld.swarm &mdash; live demo</h1><span class="ver">v1.0.0</span></div>
+    <p class="lead">Multi-agent orchestration: a <strong>driver</strong> fans a batch of subtasks out to <strong>worker</strong> agents (each running weld.crew) and collects the results in parallel. Run the self-contained local demo here, or switch this tab&rsquo;s role and open it in a second tab to coordinate across tabs over weld.sync.</p>
+  </div>
+
+  <div class="panel">
+    <div class="row" style="margin:0 0 6px">
+      <span id="transport" class="pill off">transport: &mdash;</span>
+      <span id="role" class="pill off">role: &mdash;</span>
+      <span id="peers" class="pill off">peers: 0</span>
+    </div>
+    <div class="row"><span class="lbl">Mode</span><select id="mode" class="grow"></select></div>
+
+    <div id="cfg-local">
+      <div class="row"><span class="lbl">Workers</span><input id="workers" type="range" min="1" max="4" value="3"><span class="val" id="workers-v">3</span>
+        <span class="lbl" style="min-width:74px">Concurrency</span><input id="conc" type="range" min="1" max="4" value="2"><span class="val" id="conc-v">2</span></div>
+    </div>
+    <div id="cfg-user" style="display:none">
+      <div class="row"><span class="lbl">Concurrency</span><input id="conc2" type="range" min="1" max="4" value="2"><span class="val" id="conc2-v">2</span></div>
+    </div>
+
+    <div id="cfg-tasks">
+      <div class="row"><span class="lbl">Task batch</span><select id="preset" class="grow"></select></div>
+      <div class="row"><span class="lbl">Subtasks</span><textarea id="tasks" class="grow" style="min-height:78px" placeholder="one subtask per line"></textarea></div>
+    </div>
+
+    <div class="row">
+      <button class="btn" id="go">Run batch</button>
+      <button class="btn ghost" id="serve" style="display:none">Start serving</button>
+      <button class="btn sm ghost" id="clear">Clear</button>
+    </div>
+  </div>
+
+  <div class="cols">
+    <div class="panel">
+      <h2>Results</h2>
+      <div class="out" id="results">&mdash;</div>
+    </div>
+    <div class="panel">
+      <h2>Live peers</h2>
+      <div class="out" id="presence">&mdash;</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Activity feed</h2>
+    <div class="dbg" id="feed"></div>
+    <div class="row" style="margin-top:8px"><button class="btn sm ghost" id="feed-clear">Clear</button></div>
+  </div>
+
+  <div class="panel">
+    <p class="note" style="margin-top:0"><strong>Local demo</strong> runs a driver and several worker agents in this one tab over an in-page bus. <strong>Worker</strong> / <strong>User</strong> modes coordinate across two tabs of this generator over weld.sync (same origin) &mdash; open this page in two tabs, set one to Worker and Start serving, the other to User and dispatch. True <em>cross-generator</em> crews need the companion bus (coming next); until then it&rsquo;s same-origin. Workers here use a scripted demo reasoner unless your own model is configured in Weld Companion.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  try { if (typeof root !== 'undefined' && typeof root.weldSkybridge === 'function') root.weldSkybridge(); } catch (e) {}
+  try { if (typeof root !== 'undefined' && typeof root.weldSync === 'function') root.weldSync(); } catch (e) {}
+  try { if (typeof root !== 'undefined' && typeof root.weldCrew === 'function') root.weldCrew(); } catch (e) {}
+  try { if (typeof root !== 'undefined' && typeof root.weldSwarm === 'function') root.weldSwarm(); } catch (e) {}
+
+  function $(id) { return document.getElementById(id); }
+  var SW = (window.weld && window.weld.swarm) || null;
+  var CR = (window.weld && window.weld.crew) || null;
+  var sb = (window.weld && window.weld.skybridge) || null;
+
+  var MODES = [
+    { id: 'local', label: 'Local demo (driver + workers in this tab)' },
+    { id: 'worker', label: 'This tab: Worker (serve tasks)' },
+    { id: 'user', label: 'This tab: User / Driver (dispatch to other tabs)' }
+  ];
+  var PRESETS = [
+    { label: 'Three tavern names', tasks: ['Invent a fantasy tavern name', 'Invent a second tavern name', 'Invent a third tavern name'] },
+    { label: 'Summarize three topics', tasks: ['Summarize the topic: dragons', 'Summarize the topic: alchemy', 'Summarize the topic: sea trade'] },
+    { label: 'Roll four initiatives', tasks: ['Roll initiative for the rogue', 'Roll initiative for the mage', 'Roll initiative for the fighter', 'Roll initiative for the cleric'] }
+  ];
+
+  var t0 = 0;
+  function feedLine(kind, text) {
+    var el = document.createElement('span'); el.className = 'l';
+    var ts = document.createElement('span'); ts.className = 'ts'; ts.textContent = t0 ? ('+' + String(Date.now() - t0) + 'ms ') : '';
+    var k = document.createElement('span'); k.className = 'k-' + kind; k.textContent = kind.toUpperCase() + ' ';
+    var b = document.createElement('span'); b.className = 'body'; b.textContent = text;
+    el.appendChild(ts); el.appendChild(k); el.appendChild(b); $('feed').appendChild(el);
+    $('feed').scrollTop = $('feed').scrollHeight;
+  }
+
+  // in-page shared bus for the local demo (delivers to all peers but sender; crews ignore their own)
+  function sharedBus() {
+    var subs = [];
+    return function endpoint(id) {
+      return { kind: 'demo', send: function (m) { setTimeout(function () { subs.forEach(function (s) { if (s.id !== id) { try { s.fn(m); } catch (e) {} } }); }, 0); }, onMessage: function (fn) { subs.push({ id: id, fn: fn }); } };
+    };
+  }
+
+  // a worker's brain: run weld.crew on the task; demo reasoner echoes the goal so results differ
+  function workerReasoner(workerId) {
+    var step = 0;
+    return function (prompt) {
+      step++;
+      var g = (prompt.match(/GOAL:\s*(.*)/) || [])[1] || 'task';
+      if (step === 1) return Promise.resolve(JSON.stringify({ thought: 'Working on it.', tool: 'think', args: { note: 'handling ' + g } }));
+      return Promise.resolve(JSON.stringify({ thought: 'Done.', final: workerId + ' completed: ' + g }));
+    };
+  }
+  function makeServe(workerId, ownModel) {
+    return async function (payload) {
+      var a = CR.create({ workspace: 'swarm-' + workerId, reason: ownModel ? undefined : workerReasoner(workerId) });
+      feedLine('action', workerId + ' \u2190 ' + payload.goal);
+      var out = await a.run(payload.goal, {});
+      feedLine('obs', workerId + ' \u2192 ' + (out.answer || JSON.stringify(out)));
+      return { worker: workerId, answer: out.answer, ok: out.ok };
+    };
+  }
+
+  async function ownModelAvailable() {
+    if (sb && sb.connected && typeof sb.has === 'function' && sb.has('ai') && typeof sb.ai === 'function') {
+      try { var r = await sb.ai('Reply with: ok', { system: 'Reply with the single word ok.' }); return !!(r && r.ok); } catch (e) {}
+    }
+    return false;
+  }
+
+  function readTasks() { return $('tasks').value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean).map(function (g) { return { goal: g }; }); }
+  function renderResults(rs) { $('results').textContent = rs.length ? rs.map(function (r, i) { return (i + 1) + '. ' + (r && r.error ? ('ERROR: ' + r.error) : (r.answer + '   (' + r.worker + ')')); }).join('\n') : '(none)'; }
+
+  var active = [];            // crews to tear down between runs
+  function teardown() { active.forEach(function (c) { try { c.leave(); } catch (e) {} }); active = []; }
+
+  // ---- LOCAL DEMO: spin up driver + N workers over an in-page bus, dispatch the batch ----
+  async function runLocal() {
+    teardown();
+    var tasks = readTasks(); if (!tasks.length) { feedLine('error', 'no subtasks'); return; }
+    var nWorkers = parseInt($('workers').value, 10) || 3;
+    var conc = parseInt($('conc').value, 10) || 2;
+    var ownModel = await ownModelAvailable();
+    $('role').textContent = 'role: local demo'; $('transport').textContent = 'transport: in-page'; paintModelPill(ownModel);
+    var bus = sharedBus();
+    for (var i = 1; i <= nWorkers; i++) {
+      var id = 'worker-' + i;
+      var w = SW.create({ role: 'worker', id: id, transport: bus(id), heartbeat: false });
+      w.serve(makeServe(id, ownModel)); active.push(w);
+    }
+    var driver = SW.create({ role: 'user', id: 'driver', transport: bus('driver'), heartbeat: false }); active.push(driver);
+    await new Promise(function (r) { setTimeout(r, 40); });          // let registrations land
+    refreshPresence(driver);
+    feedLine('start', 'dispatching ' + tasks.length + ' subtasks to ' + nWorkers + ' workers (concurrency ' + conc + ')');
+    var results = await driver.dispatchMany(tasks, { concurrency: conc, timeoutMs: 8000 });
+    feedLine('final', 'collected ' + results.length + ' results');
+    renderResults(results); refreshPresence(driver);
+  }
+
+  // ---- WORKER MODE: register over weld.sync, serve tasks from other tabs ----
+  var roleCrew = null;
+  async function startServing() {
+    teardown();
+    var ownModel = await ownModelAvailable(); paintModelPill(ownModel);
+    roleCrew = SW.create({ role: 'worker' }); active.push(roleCrew);
+    roleCrew.serve(makeServe('worker@' + roleCrew.id.slice(-4), ownModel));
+    $('transport').textContent = 'transport: ' + roleCrew.transport; $('role').textContent = 'role: worker (serving)';
+    feedLine('start', 'serving as ' + roleCrew.id + ' over ' + roleCrew.transport);
+    pollPresence(roleCrew);
+  }
+  // ---- USER MODE: register over weld.sync, dispatch to workers in other tabs ----
+  async function runUser() {
+    var tasks = readTasks(); if (!tasks.length) { feedLine('error', 'no subtasks'); return; }
+    if (!roleCrew) { roleCrew = SW.create({ role: 'user' }); active.push(roleCrew); $('transport').textContent = 'transport: ' + roleCrew.transport; $('role').textContent = 'role: user'; pollPresence(roleCrew); await new Promise(function (r) { setTimeout(r, 300); }); }
+    var conc = parseInt($('conc2').value, 10) || 2;
+    if (!roleCrew.workers().length) { feedLine('error', 'no workers found \u2014 open a second tab, set it to Worker, and Start serving'); return; }
+    feedLine('start', 'dispatching ' + tasks.length + ' subtasks to ' + roleCrew.workers().length + ' worker(s)');
+    var results = await roleCrew.dispatchMany(tasks, { concurrency: conc, timeoutMs: 15000 });
+    feedLine('final', 'collected ' + results.length + ' results'); renderResults(results);
+  }
+
+  function refreshPresence(crew) {
+    var ps = crew.peers(); $('peers').textContent = 'peers: ' + ps.length;
+    $('presence').textContent = ps.length ? ps.map(function (p) { return '\u2022 ' + p.role + '  ' + p.peerId; }).join('\n') : '(none yet)';
+  }
+  var pollTimer = null;
+  function pollPresence(crew) { if (pollTimer) clearInterval(pollTimer); pollTimer = setInterval(function () { refreshPresence(crew); }, 1000); }
+
+  function paintModelPill(own) { /* reuse role pill area */ }
+
+  function buildSelect(sel, arr, fn) { arr.forEach(function (x, i) { var o = document.createElement('option'); o.value = String(i); o.textContent = x.label; sel.appendChild(o); }); sel.onchange = function () { fn(arr[parseInt(sel.value, 10)]); }; sel.value = '0'; sel.onchange(); }
+
+  function applyMode(m) {
+    $('cfg-local').style.display = (m === 'local') ? '' : 'none';
+    $('cfg-user').style.display = (m === 'user') ? '' : 'none';
+    $('cfg-tasks').style.display = (m === 'worker') ? 'none' : '';
+    $('go').style.display = (m === 'worker') ? 'none' : '';
+    $('serve').style.display = (m === 'worker') ? '' : 'none';
+    teardown(); roleCrew = null; if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    $('role').textContent = 'role: ' + m; $('peers').textContent = 'peers: 0'; $('presence').textContent = '\u2014';
+  }
+
+  // init
+  if (!SW || !CR) { feedLine('error', 'weld.swarm or weld.crew not loaded \u2014 check imports + triggers'); }
+  buildSelect($('mode'), MODES, function (m) { applyMode(m.id); });
+  buildSelect($('preset'), PRESETS, function (p) { $('tasks').value = p.tasks.join('\n'); });
+  $('workers').oninput = function () { $('workers-v').textContent = $('workers').value; };
+  $('conc').oninput = function () { $('conc-v').textContent = $('conc').value; };
+  $('conc2').oninput = function () { $('conc2-v').textContent = $('conc2').value; };
+  $('go').onclick = function () { t0 = Date.now(); $('feed').innerHTML = ''; var m = MODES[parseInt($('mode').value, 10)].id; if (m === 'local') runLocal(); else runUser(); };
+  $('serve').onclick = function () { t0 = Date.now(); $('feed').innerHTML = ''; startServing(); };
+  $('clear').onclick = function () { $('results').textContent = '\u2014'; $('feed').innerHTML = ''; };
+  $('feed-clear').onclick = function () { $('feed').innerHTML = ''; };
+})();
+</script>

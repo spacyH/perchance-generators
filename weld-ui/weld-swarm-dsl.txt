@@ -26,7 +26,7 @@ $output() =>
   // message: { id, from, to, type, payload, corr?, t }   to = peerId | role | '*'
   // -----------------------------------------------------------------
 
-  var BUILD = 'swarm/2026-06-04.1';
+  var BUILD = 'swarm/2026-06-04.2';
 
   function uid(p) { return (p || 'm_') + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
@@ -36,7 +36,7 @@ $output() =>
     var channel = (opts && opts.channel) || 'weld.swarm';
     var sb = window.weld && window.weld.skybridge;
     // 1) companion bus (cross-generator, cross-tab) -- present once the companion exposes it
-    if (sb && sb.bus && typeof sb.bus.publish === 'function' && typeof sb.bus.subscribe === 'function') {
+    if (sb && sb.connected && typeof sb.has === 'function' && sb.has('bus') && sb.bus && typeof sb.bus.publish === 'function' && typeof sb.bus.subscribe === 'function') {
       return { kind: 'bus', send: function (m) { sb.bus.publish(channel, m); }, onMessage: function (fn) { return sb.bus.subscribe(channel, fn); } };
     }
     // 2) weld.sync (same-origin tabs of one generator)
