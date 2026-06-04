@@ -1,0 +1,342 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.changelog{margin:14px 0;padding:14px 16px;background:var(--faint);border:1px solid var(--border);border-radius:6px;}
+.changelog .cl-ver{font:700 13px var(--mono);color:var(--accent);margin:10px 0 4px;}
+.changelog .cl-ver:first-child{margin-top:0;}
+.changelog ul{margin:0 0 4px;padding-left:18px;}
+.changelog li{font-size:13px;color:#c9d1d9;line-height:1.5;margin:2px 0;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.reactions<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-reactions-example">demo &rarr;</a></span></div>
+<div class="hdr">
+  <div class="hdr-row">
+      <h1>weld.reactions</h1>
+      <span class="ver">v1.0.0</span>
+  </div>
+  <p class="lead">Aggregate reactions on anything with an id -- a chat turn, a gallery image, a comment, a result. The Discord model distilled: attach emoji to an item, track how many of each and whether you reacted, emit change events. Backend-agnostic -- the app supplies storage (weld.kv for shared counts, weld.persist or in-memory for local) and the current user id. Pure data + events; renders nothing, so it pairs with chatui, comments, or gallery.</p>
+</div>
+<h2>The Discord reaction, distilled</h2>
+<p>A reaction is just a count of who reacted with what, attached to an id. weld.reactions owns that bookkeeping &mdash; per item, which users reacted with which emoji &mdash; and the change events. It renders nothing, so it drops onto a chat turn, a gallery image, a comment, or any generated result, and you draw the bar however you like.</p>
+<pre data-codeid="install"></pre>
+<p>It is <strong>backend-agnostic</strong>: pass the current user id, and optionally a <code>store</code> so reactions persist or are shared across users. Without a store, reactions live in memory for the session.</p>
+
+<h2>Reacting</h2>
+<div class="sig" data-codeid="sig_react"></div>
+<p><code>react</code> adds a reaction (idempotent per user &mdash; reacting twice is a no-op), <code>unreact</code> removes one, and <code>toggle</code> flips it. Each acts as the current user unless you pass an explicit user id. When the last user removes an emoji it drops from the item entirely, so counts never show a stale zero.</p>
+<pre data-codeid="react_ex"></pre>
+
+<h2>Reading the tally</h2>
+<div class="sig" data-codeid="sig_read"></div>
+<p><code>countsFor(itemId)</code> returns an emoji&rarr;count map sorted by descending count &mdash; exactly what a reaction bar renders. <code>mine(itemId)</code> lists the emoji the current user reacted with (so you can highlight their picks), <code>hasReacted</code> checks one, <code>count</code> and <code>total</code> give individual and summed counts, and <code>reactors</code> lists the user ids behind an emoji.</p>
+<pre data-codeid="read_ex"></pre>
+
+<h2>Storage &amp; persistence</h2>
+<div class="sig" data-codeid="sig_store"></div>
+<p>Pass a <code>store</code> with <code>get(itemId)</code> and <code>set(itemId, data)</code> to back reactions with anything: <code>weld.kv</code> for counts shared across users, <code>weld.persist</code> for local-only, or your own. <code>serialize()</code> / <code>load()</code> round-trip the whole set for a manual save. <code>setUser(id)</code> changes the acting user (e.g. after login), and <code>onChange(fn)</code> fires on every add/remove/clear so a UI can re-render just the affected item.</p>
+<pre data-codeid="store_ex"></pre>
+<div class="note">Pairs across the suite: attach to a <code>weld.chatui</code> bubble or a <code>weld.comments</code> thread, render the emoji through <code>weld.emotes</code> when that lands, and back shared counts with <code>weld.kv</code>. It is the social-signal primitive the chat plugins were missing.</div>
+<h2>Changelog</h2>
+<div class="changelog">
+<p class="cl-ver">v1.0.0</p>
+<ul>
+<li>Initial release: aggregate emoji reactions on any item id; react/unreact/toggle, countsFor/mine/count/total/reactors, pluggable store, serialize/load, onChange events.</li>
+</ul>
+</div>
+<script>
+(function(){
+  var examples = {
+  'install': 'output\n  weld-reactions = \{import:weld-reactions-plugin\}',
+  'sig_react': 'rx.react(itemId, emoji, user?)  //  rx.unreact(...)  //  rx.toggle(itemId, emoji, user?)',
+  'react_ex': 'var rx = weld.reactions.create(\{ me: currentUserId \});\nrx.react(turnId, thumbsUp);     // I react (idempotent)\nrx.toggle(turnId, heart);       // flip my heart on/off',
+  'sig_read': 'rx.countsFor(itemId) -> \{ emoji: count \}  //  rx.mine(itemId) -> emoji\[]  //  rx.count / total / reactors',
+  'read_ex': 'var counts = rx.countsFor(turnId);   // \{ thumbsUp: 3, heart: 1 \}, sorted\nvar mineSet = rx.mine(turnId);       // emoji I picked, to highlight them\nif (rx.hasReacted(turnId, heart)) markActive();',
+  'sig_store': 'weld.reactions.create(\{ me, store \})  //  store = \{ get(id), set(id, data) \}  //  serialize() / load(data)',
+  'store_ex': '// shared counts backed by weld.kv:\nvar store = \{\n  get: function (id) \{ return kvCache\[id]; \},\n  set: function (id, data) \{ weld.kv.set(\'rx:\' + id, data); \}\n\};\nvar rx = weld.reactions.create(\{ me: userId, store: store \});\nrx.onChange(function (e) \{ rerender(e.itemId); \});'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    document.querySelectorAll('[data-codeid]').forEach(function(n){
+      var src = examples[n.getAttribute('data-codeid')];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.reactions) return window.weld.reactions;
+
+// -----------------------------------------------------------------
+// weld.reactions: a count of emoji on an id, plus "did I react".
+//
+// Discord and Twitch both attach lightweight aggregate reactions to
+// messages. The essence is tiny: per item, a map emoji -> set of user
+// ids; counts fall out of the set sizes, and "mine" is membership of the
+// current user. weld.reactions owns that bookkeeping and the events; the
+// app owns storage and identity.
+//
+//   var rx = weld.reactions.create({ me: currentUserId });
+//   rx.react(turnId, '\u{1F44D}');           // I add a thumbs-up
+//   rx.toggle(turnId, '\u2764\uFE0F');         // toggle a heart
+//   rx.countsFor(turnId);                       // { '\u{1F44D}': 3, '\u2764\uFE0F': 1 }
+//   rx.mine(turnId);                            // the emoji I reacted with
+//   rx.onChange(function (e) { rerender(e.itemId); });
+//
+// STORAGE is pluggable. By default reactions live in memory for the
+// session. Pass { store } with get(itemId)->data and set(itemId,data) to
+// persist -- e.g. a weld.kv-backed store for counts shared across users,
+// or weld.persist for local. serialize()/load() round-trip the whole set.
+//
+// It RENDERS NOTHING. countsFor + mine give an app everything it needs to
+// draw a reaction bar however it likes (and weld.emotes can turn tokens
+// into images). That keeps it composable and testable.
+// -----------------------------------------------------------------
+
+function createReactions(opts) {
+  opts = opts || {};
+  var me = opts.me != null ? String(opts.me) : 'me';   // current user id
+  var store = opts.store || null;                       // optional { get, set }
+  var listeners = new Array();
+
+  // In-memory model: items keyed by itemId -> { emoji: { userId: true } }
+  var items = {};
+
+  function emit(itemId, emoji, action) {
+    var e = { itemId: itemId, emoji: emoji, action: action };
+    for (var i = 0; i < listeners.length; i++) {
+      try { Reflect.get(listeners, i)(e); } catch (err) { /* swallow */ }
+    }
+  }
+  function onChange(fn) {
+    if (typeof fn !== 'function') return function () {};
+    listeners.push(fn);
+    return function () { var ix = listeners.indexOf(fn); if (ix !== -1) listeners.splice(ix, 1); };
+  }
+
+  // ---- identity ----
+  function setUser(id) { me = (id != null) ? String(id) : me; }
+
+  // ---- internal item access (with optional backing store) ----
+  function itemOf(itemId) {
+    var key = String(itemId);
+    var it = Reflect.get(items, key);
+    if (it) return it;
+    // try the backing store
+    if (store && typeof store.get === 'function') {
+      try {
+        var loaded = store.get(key);
+        if (loaded && typeof loaded === 'object') { Reflect.set(items, key, loaded); return loaded; }
+      } catch (e) { /* fall through */ }
+    }
+    it = {};
+    Reflect.set(items, key, it);
+    return it;
+  }
+  function persistItem(itemId) {
+    if (store && typeof store.set === 'function') {
+      try { store.set(String(itemId), Reflect.get(items, String(itemId))); } catch (e) { /* swallow */ }
+    }
+  }
+
+  // ---- mutate ----
+  // react(itemId, emoji, optional user): add a reaction. Idempotent per user.
+  function react(itemId, emoji, user) {
+    var u = (user != null) ? String(user) : me;
+    var key = String(emoji);
+    var it = itemOf(itemId);
+    var bag = Reflect.get(it, key);
+    if (!bag) { bag = {}; Reflect.set(it, key, bag); }
+    if (Reflect.get(bag, u)) return false;     // already reacted
+    Reflect.set(bag, u, true);
+    persistItem(itemId);
+    emit(itemId, key, 'add');
+    return true;
+  }
+  // unreact(itemId, emoji, optional user): remove a reaction.
+  function unreact(itemId, emoji, user) {
+    var u = (user != null) ? String(user) : me;
+    var key = String(emoji);
+    var it = itemOf(itemId);
+    var bag = Reflect.get(it, key);
+    if (!bag || !Reflect.get(bag, u)) return false;
+    Reflect.deleteProperty(bag, u);
+    if (Object.keys(bag).length === 0) Reflect.deleteProperty(it, key);  // drop empty emoji
+    persistItem(itemId);
+    emit(itemId, key, 'remove');
+    return true;
+  }
+  // toggle(itemId, emoji, optional user): add if absent, remove if present.
+  function toggle(itemId, emoji, user) {
+    var u = (user != null) ? String(user) : me;
+    return hasReacted(itemId, emoji, u) ? (unreact(itemId, emoji, u), false) : (react(itemId, emoji, u), true);
+  }
+
+  // ---- query ----
+  // countsFor(itemId): { emoji: count } sorted by descending count.
+  function countsFor(itemId) {
+    var it = itemOf(itemId);
+    var out = {};
+    var keys = Object.keys(it);
+    keys.sort(function (a, b) { return Object.keys(Reflect.get(it, b)).length - Object.keys(Reflect.get(it, a)).length; });
+    for (var i = 0; i < keys.length; i++) {
+      var k = Reflect.get(keys, i);
+      Reflect.set(out, k, Object.keys(Reflect.get(it, k)).length);
+    }
+    return out;
+  }
+  // count(itemId, emoji): number of users who reacted with emoji.
+  function count(itemId, emoji) {
+    var bag = Reflect.get(itemOf(itemId), String(emoji));
+    return bag ? Object.keys(bag).length : 0;
+  }
+  // total(itemId): total reactions across all emoji.
+  function total(itemId) {
+    var it = itemOf(itemId), n = 0, keys = Object.keys(it);
+    for (var i = 0; i < keys.length; i++) n += Object.keys(Reflect.get(it, Reflect.get(keys, i))).length;
+    return n;
+  }
+  // mine(itemId, optional user): array of emoji the user reacted with.
+  function mine(itemId, user) {
+    var u = (user != null) ? String(user) : me;
+    var it = itemOf(itemId), out = new Array(), keys = Object.keys(it);
+    for (var i = 0; i < keys.length; i++) {
+      var k = Reflect.get(keys, i);
+      if (Reflect.get(Reflect.get(it, k), u)) out.push(k);
+    }
+    return out;
+  }
+  // hasReacted(itemId, emoji, optional user): did the user react with this emoji?
+  function hasReacted(itemId, emoji, user) {
+    var u = (user != null) ? String(user) : me;
+    var bag = Reflect.get(itemOf(itemId), String(emoji));
+    return !!(bag && Reflect.get(bag, u));
+  }
+  // reactors(itemId, emoji): the user ids who reacted with emoji.
+  function reactors(itemId, emoji) {
+    var bag = Reflect.get(itemOf(itemId), String(emoji));
+    return bag ? Object.keys(bag) : new Array();
+  }
+
+  // ---- maintenance ----
+  function clearItem(itemId) {
+    Reflect.deleteProperty(items, String(itemId));
+    persistItem(itemId);
+    emit(itemId, null, 'clear');
+  }
+  function clearAll() { items = {}; }
+
+  // ---- persistence ----
+  function serialize() { return JSON.parse(JSON.stringify(items)); }
+  function load(data) {
+    if (data && typeof data === 'object') { items = JSON.parse(JSON.stringify(data)); return true; }
+    return false;
+  }
+
+  return {
+    setUser: setUser,
+    react: react, unreact: unreact, toggle: toggle,
+    countsFor: countsFor, count: count, total: total,
+    mine: mine, hasReacted: hasReacted, reactors: reactors,
+    clearItem: clearItem, clearAll: clearAll,
+    serialize: serialize, load: load,
+    onChange: onChange
+  };
+}
+
+window.weld.reactions = {
+  create: createReactions,
+  version: '1.0.0'
+};
+
+return window.weld.reactions;
+})();
+</script>
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>
+</div>

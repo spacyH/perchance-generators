@@ -43,6 +43,11 @@ pre code{background:none;padding:0;color:inherit;font-size:inherit;}
   min-height:1.5em;}
 .note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
   padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.changelog{margin:14px 0;padding:14px 16px;background:var(--faint);border:1px solid var(--border);border-radius:6px;}
+.changelog .cl-ver{font:700 13px var(--mono);color:var(--accent);margin:10px 0 4px;}
+.changelog .cl-ver:first-child{margin-top:0;}
+.changelog ul{margin:0 0 4px;padding-left:18px;}
+.changelog li{font-size:13px;color:#c9d1d9;line-height:1.5;margin:2px 0;}
 .warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
 table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
 th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
@@ -70,7 +75,7 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
 <div class="hdr">
   <div class="hdr-row">
       <h1>weld.background</h1>
-      <span class="ver">v1.1.0</span>
+      <span class="ver">v1.2.0</span>
   </div>
   <p class="lead">Remove and replace an image background entirely in the browser &mdash; built for photos a user uploads from their phone or PC. A pure-canvas engine (edge flood-fill + chroma key, feathered) that needs no model, with a multi-colour eyedropper, trim, and despeckle for clean portraits, plus a hook to plug in an AI segmenter for hard cutouts.</p>
 </div>
@@ -143,6 +148,29 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
 <div class="sig" data-codeid="sig_mask"></div>
 <div class="sig" data-codeid="sig_maskdata"></div>
 <p><code>mask</code> returns <code>\{ width, height, alpha \}</code> for custom compositing. <code>maskFromData</code> is the pure math over a raw RGBA array &mdash; no canvas &mdash; handy for testing or running off the main thread.</p>
+<h2>Batch processing <span class="tag">v1.2.0</span></h2>
+<div class="sig" data-codeid="sig_batch"></div>
+<p><code>processBatch(files, opts)</code> runs the background-removal pipeline over many images at once, reporting progress through <code>opts.onProgress(done, total)</code> and returning the per-image results. <code>downloadZip(results, opts)</code> packages those results into a single <code>.zip</code> of PNGs for the user to download. Together they turn the single-image tool into a bulk one.</p>
+<pre data-codeid="batch_ex"></pre>
+<h2>Pipeline internals <span class="tag">v1.2.0</span></h2>
+<div class="sig" data-codeid="sig_internals"></div>
+<p>The lower-level pure helpers are exposed for custom pipelines and testing: <code>estimateBgColor(data, w, h)</code> (trimmed-mean border colour), <code>alphaBounds(alpha, w, h, threshold)</code> (bounding box of non-transparent pixels), and <code>labelComponents(alpha, w, h)</code> (connected-component labelling, for dropping stray specks). <code>hasSegmenter()</code> reports whether the browser&rsquo;s native segmentation is available.</p>
+<h2>Changelog</h2>
+<div class="changelog">
+<p class="cl-ver">v1.2.0</p>
+<ul>
+<li>Batch pipeline: processBatch with progress + downloadZip (one .zip of PNGs).</li>
+<li>Exposed pure pipeline helpers (estimateBgColor, alphaBounds, labelComponents) and hasSegmenter().</li>
+</ul>
+<p class="cl-ver">v1.1.0</p>
+<ul>
+<li>Portrait helpers for visual-novel cut-outs.</li>
+</ul>
+<p class="cl-ver">v1.0.0</p>
+<ul>
+<li>Initial release: background removal / knockout.</li>
+</ul>
+</div>
 <script>
 (function(){
   var examples = {
@@ -165,7 +193,10 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
   'sig_despeckle': 'weld.background.despeckle(canvas, \{ minArea \}) -> canvas',
   'cleanup_ex': 'var cut = await weld.background.remove(photo, \{ keyColors: picks \});\ncut = weld.background.despeckle(cut, \{ minArea: 40 \});  // drop stray pixels\nvar portrait = weld.background.trim(cut, \{ padding: 8 \}); // crop to the subject',
   'sig_extract': 'weld.background.extractObjects(src, opts) -> Promise<\[\{ canvas, x, y, w, h, area \}]>',
-  'extract_ex': 'var parts = await weld.background.extractObjects(sheet, \{ minArea: 200 \});\nparts.forEach(function(p, i)\{ weld.background.download(p.canvas, \'sprite_\' + i + \'.png\'); \});'
+  'extract_ex': 'var parts = await weld.background.extractObjects(sheet, \{ minArea: 200 \});\nparts.forEach(function(p, i)\{ weld.background.download(p.canvas, \'sprite_\' + i + \'.png\'); \});',
+  'sig_batch': 'await background.processBatch(files, \{ onProgress: function (done, total) \{ \} \})\nawait background.downloadZip(results, \{ name \})',
+  'batch_ex': 'var results = await weld.background.processBatch(fileList, \{\n  onProgress: function (done, total) \{ bar.value = done / total; \}\n\});\nawait weld.background.downloadZip(results, \{ name: \'portraits.zip\' \});',
+  'sig_internals': 'background.estimateBgColor(data, w, h)  //  background.alphaBounds(alpha, w, h, threshold)  //  background.labelComponents(alpha, w, h)  //  background.hasSegmenter()',
 };
   function escapeHTML(s){
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -698,6 +729,101 @@ function extractObjects(src, opts) {
   });
 }
 
+// -----------------------------------------------------------------
+// Batch + ZIP (supersedes the old multi-image background remover).
+// -----------------------------------------------------------------
+
+// processBatch(files, opts) -> Promise<[{ name, canvas, error? }]>.
+// Runs remove() (or replace() if opts.background is set) over many
+// files/sources, reporting progress via opts.onProgress(done, total).
+function processBatch(files, opts) {
+  opts = opts || {};
+  var list = [].slice.call(files || []);
+  var bg = opts.background;
+  var results = [];
+  var i = 0;
+  function step() {
+    if (i >= list.length) return Promise.resolve(results);
+    var f = list[i];
+    var name = (f && f.name) ? String(f.name).replace(/\.[^.]+$/, '') : ('image_' + (i + 1));
+    var op = (bg !== undefined) ? replace(f, bg, opts) : remove(f, opts);
+    return op.then(function (canvas) {
+      results.push({ name: name + '.png', canvas: canvas });
+    }, function (err) {
+      results.push({ name: name + '.png', canvas: null, error: String(err && err.message || err) });
+    }).then(function () {
+      i += 1;
+      if (typeof opts.onProgress === 'function') { try { opts.onProgress(i, list.length); } catch (e) {} }
+      return step();
+    });
+  }
+  return step();
+}
+
+// --- minimal STORE-method ZIP writer (no compression, no dependency) ---
+var ZCRC = (function () {
+  var t = new Array(256);
+  for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[n] = c >>> 0; }
+  return t;
+})();
+function zcrc32(bytes) { var c = 0xFFFFFFFF; for (var i = 0; i < bytes.length; i++) c = ZCRC[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function strBytes(s) { var a = []; for (var i = 0; i < s.length; i++) a.push(s.charCodeAt(i) & 0xFF); return a; }
+function u16(n) { return [n & 0xFF, (n >>> 8) & 0xFF]; }
+function u32z(n) { return [n & 0xFF, (n >>> 8) & 0xFF, (n >>> 16) & 0xFF, (n >>> 24) & 0xFF]; }
+
+function zipFiles(entries) {
+  // entries: [{ name, bytes(Uint8Array) }]
+  var local = [], central = [], offset = 0;
+  for (var i = 0; i < entries.length; i++) {
+    var nameBytes = strBytes(entries[i].name);
+    var data = entries[i].bytes;
+    var crc = zcrc32(data);
+    var size = data.length;
+    var hdr = [].concat(u32z(0x04034b50), u16(20), u16(0), u16(0), u16(0), u16(0),
+      u32z(crc), u32z(size), u32z(size), u16(nameBytes.length), u16(0), nameBytes);
+    var localStart = offset;
+    for (var h = 0; h < hdr.length; h++) local.push(hdr[h]);
+    for (var d = 0; d < data.length; d++) local.push(data[d]);
+    offset += hdr.length + data.length;
+    central.push({ nameBytes: nameBytes, crc: crc, size: size, localStart: localStart });
+  }
+  var cd = [], cdStart = offset;
+  for (var c = 0; c < central.length; c++) {
+    var e = central[c];
+    var rec = [].concat(u32z(0x02014b50), u16(20), u16(20), u16(0), u16(0), u16(0), u16(0),
+      u32z(e.crc), u32z(e.size), u32z(e.size), u16(e.nameBytes.length), u16(0), u16(0), u16(0), u16(0),
+      u32z(0), u32z(e.localStart), e.nameBytes);
+    for (var r = 0; r < rec.length; r++) cd.push(rec[r]);
+  }
+  var cdSize = cd.length;
+  var end = [].concat(u32z(0x06054b50), u16(0), u16(0), u16(central.length), u16(central.length),
+    u32z(cdSize), u32z(cdStart), u16(0));
+  return new Uint8Array(local.concat(cd).concat(end));
+}
+
+// downloadZip(results, opts): take processBatch output (or [{name,canvas}])
+// and download a single .zip of PNGs. Returns a Promise.
+function downloadZip(results, opts) {
+  opts = opts || {};
+  var items = (results || []).filter(function (r) { return r && r.canvas; });
+  return Promise.all(items.map(function (r, idx) {
+    return toBlob(r.canvas, 'image/png').then(function (blob) {
+      return blob.arrayBuffer().then(function (buf) {
+        return { name: r.name || ('image_' + (idx + 1) + '.png'), bytes: new Uint8Array(buf) };
+      });
+    });
+  })).then(function (entries) {
+    var zip = zipFiles(entries);
+    var blob = new Blob([zip], { type: 'application/zip' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = opts.filename || 'cutouts.zip';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    return entries.length;
+  });
+}
+
 window.weld.background = {
   remove: remove,
   replace: replace,
@@ -710,6 +836,8 @@ window.weld.background = {
   extractObjects: extractObjects,
   alphaBounds: alphaBounds,
   labelComponents: labelComponents,
+  processBatch: processBatch,
+  downloadZip: downloadZip,
   fromFile: fromFile,
   fromUrl: fromUrl,
   toDataUrl: toDataUrl,
@@ -717,7 +845,7 @@ window.weld.background = {
   download: download,
   useSegmenter: useSegmenter,
   hasSegmenter: hasSegmenter,
-  version: '1.1.0'
+  version: '1.2.0'
 };
 
 return window.weld.background;

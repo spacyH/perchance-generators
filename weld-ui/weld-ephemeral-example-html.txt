@@ -1,0 +1,260 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--amber:#d29922;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:780px;margin:0 auto;padding:34px 18px 90px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 0 16px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+.breadcrumb a{color:var(--muted);}.breadcrumb .sep{color:var(--faint);margin:0 8px;}.breadcrumb .cur{color:var(--ink);}.breadcrumb .act a{color:var(--accent);}
+.hdr{margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}.hdr h1{font:700 24px var(--mono);letter-spacing:-0.5px;}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;}
+.hdr .lead{color:var(--muted);margin-top:8px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;}
+.panel h2{font:600 13px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:8px 0;}
+.lbl{font:600 12px var(--mono);color:var(--muted);min-width:74px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 15px;font:600 13px var(--font);cursor:pointer;transition:.12s;}
+.btn:hover{filter:brightness(1.08);}.btn.ghost{background:var(--faint);color:var(--ink);}.btn.sm{padding:6px 11px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+input[type=text],textarea{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:8px 10px;font:13px var(--font);}
+input[type=text]{flex:1;min-width:120px;}textarea{width:100%;font:12.5px/1.5 var(--mono);resize:vertical;}
+.mono{font:13px var(--mono);}
+.out{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font:12.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;min-height:20px;color:#c9d1d9;}
+.chip{display:inline-block;background:var(--faint);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font:600 12px var(--mono);margin:2px;}
+.chip.k{background:rgba(63,185,80,.14);border-color:rgba(63,185,80,.4);color:#7ee787;}
+.chip.d{opacity:.4;text-decoration:line-through;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:9px 13px;border-radius:0 4px 4px 0;margin:12px 0 0;font-size:12.5px;color:#c9d1d9;}
+.note.warn{background:rgba(210,153,34,.08);border-color:var(--amber);}
+.tag{font:600 10px var(--mono);padding:2px 7px;border-radius:4px;background:rgba(63,185,80,.14);color:#7ee787;border:1px solid rgba(63,185,80,.4);}
+.tag.ai{background:rgba(210,153,34,.12);color:#e3b341;border-color:rgba(210,153,34,.4);}
+.bar{height:14px;background:var(--accent);border-radius:3px;transition:width .3s;}
+.footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);}.footer a{color:var(--muted);}
+.flex{display:flex;gap:10px;align-items:center;}.wrap{flex-wrap:wrap;}.grow{flex:1;}.mt{margin-top:10px;}
+</style>
+<div id="page">
+<div class="breadcrumb"><span><a href="https://perchance.org/weld-ui-index">weld</a><span class="sep">/</span>weld.ephemeral<span class="sep">/</span><span class="cur">demo</span></span><span class="act"><a href="https://perchance.org/weld-ephemeral-plugin">docs &rarr;</a></span></div>
+<div class="hdr"><div class="hdr-row"><h1>weld.ephemeral &mdash; demo</h1><span class="ver">v1.0.0</span></div><p class="lead">Preview what a full local wipe would clear, arm a one-time confirmation token, and see what clearAll would delete. The demo simulates the wipe rather than touching your real data.</p></div>
+  <div class="panel"><h2>Clear all local data <span class="tag">Duck.ai-style delete-all</span></h2>
+    <div class="row"><button id="prev" class="btn">Preview what would clear</button></div>
+    <div id="plan" class="out mt"></div>
+    <div class="row"><button id="arm" class="btn ghost" disabled>Arm</button><button id="wipe" class="btn" disabled>Clear all (confirm)</button><span id="st" class="chip">safe</span></div>
+    <div id="out" class="out mt"></div>
+    <div class="note">This demo simulates the wipe (it reports what it would do rather than deleting your real data). In a live app, <code>preview()</code> shows what is local and clearable, <code>arm()</code> issues a one-time token behind your confirm UI, and <code>clearAll(token)</code> deletes every weld-managed IndexedDB database and localStorage key. It clears LOCAL data only â server-side weld.kv values and uploaded files are out of reach of a client wipe.</div>
+  </div>
+<footer class="footer"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
+</div>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.ephemeral) return window.weld.ephemeral;
+
+// -----------------------------------------------------------------
+// weld.ephemeral: a "burn it all" button for local data.
+//
+// Duck.ai makes deleting everything a first-class verb. weld.ephemeral does
+// the same for a Perchance generator: it knows the storage conventions the
+// suite uses, so one call clears every weld-managed IndexedDB database and
+// localStorage key in this browser.
+//
+//   var plan = await weld.ephemeral.preview();   // what WOULD be cleared
+//   var token = weld.ephemeral.arm();            // get a one-time confirm token
+//   var result = await weld.ephemeral.clearAll(token);  // actually clear
+//
+// The confirm token exists so a stray clearAll() can't wipe a user's data --
+// an app must arm() (typically behind a "type DELETE / tap to confirm" UI)
+// and pass the returned token. Tokens are single-use and expire.
+//
+// SCOPE -- read this: it clears LOCAL data only (IndexedDB + localStorage in
+// this browser). It does NOT delete server-side data: weld.kv values live on
+// Perchance's server, and weld.upload / weld.report files live at public
+// URLs -- those are out of reach of any client wipe. preview() says so.
+// -----------------------------------------------------------------
+
+// The IndexedDB databases the suite creates by default. An app that passed a
+// custom dbName (e.g. weld.persist.open('my-app')) registers it via add().
+var KNOWN_DBS = ['weld-embed', 'weld-gallery', 'weld-history', 'weld-kv', 'weld-memory', 'weld-persist'];
+
+// localStorage key prefixes the suite uses. Anything starting with one of
+// these is considered weld-managed.
+var KNOWN_LS_PREFIXES = ['weld-', 'weld:', 'weld_', '__m'];
+
+// App-registered extras.
+var extraDbs = new Array();
+var extraPrefixes = new Array();
+
+// add({ dbs, lsPrefixes }): register app-owned databases / key prefixes so
+// clearAll covers them too.
+function add(spec) {
+  spec = spec || {};
+  toArray(spec.dbs).forEach(function (d) { if (d && extraDbs.indexOf(d) === -1) extraDbs.push(String(d)); });
+  toArray(spec.lsPrefixes).forEach(function (p) { if (p && extraPrefixes.indexOf(p) === -1) extraPrefixes.push(String(p)); });
+  return { dbs: allDbs(), lsPrefixes: allPrefixes() };
+}
+
+function toArray(x) { return Array.isArray(x) ? x : (x == null ? new Array() : Array.of(x)); }
+function allDbs() { return KNOWN_DBS.concat(extraDbs); }
+function allPrefixes() { return KNOWN_LS_PREFIXES.concat(extraPrefixes); }
+
+// Which localStorage keys currently match a weld-managed prefix?
+function matchingLsKeys() {
+  var out = new Array();
+  try {
+    var prefixes = allPrefixes();
+    for (var i = 0; i < localStorage.length; i++) {
+      var key = localStorage.key(i);
+      if (!key) continue;
+      for (var j = 0; j < prefixes.length; j++) {
+        if (key.indexOf(Reflect.get(prefixes, j)) === 0) { out.push(key); break; }
+      }
+    }
+  } catch (e) { /* localStorage unavailable */ }
+  return out;
+}
+
+// Which known databases actually exist right now? Uses indexedDB.databases()
+// where supported; otherwise falls back to "all known" (can't enumerate).
+function existingDbs() {
+  return new Promise(function (resolve) {
+    var known = allDbs();
+    try {
+      if (indexedDB && typeof indexedDB.databases === 'function') {
+        indexedDB.databases().then(function (list) {
+          var names = (list || new Array()).map(function (d) { return d && d.name; }).filter(Boolean);
+          resolve(known.filter(function (n) { return names.indexOf(n) !== -1; }));
+        }).catch(function () { resolve(known.slice()); });
+      } else {
+        resolve(known.slice());     // can't enumerate; assume all known may exist
+      }
+    } catch (e) { resolve(known.slice()); }
+  });
+}
+
+// preview(): a plan of what clearAll would remove, plus an explicit note of
+// what it CANNOT remove (server-side data). Safe to call any time.
+function preview() {
+  return existingDbs().then(function (dbs) {
+    var lsKeys = matchingLsKeys();
+    return {
+      databases: dbs,
+      localStorageKeys: lsKeys,
+      counts: { databases: dbs.length, localStorageKeys: lsKeys.length },
+      cannotClear: [
+        'weld.kv values (stored on Perchance server)',
+        'weld.upload / weld.report files (public URLs, may auto-expire)'
+      ],
+      note: 'Clears local browser data only. Server-side and uploaded data are out of reach of a client-side wipe.'
+    };
+  });
+}
+
+// --- confirmation tokens -------------------------------------------------
+var armed = null;   // { token, expires }
+var TOKEN_TTL_MS = 60000;
+
+function arm() {
+  var token = 'wipe-' + Date.now().toString(36) + '-' + Math.floor(Math.random() * 1e9).toString(36);
+  armed = { token: token, expires: Date.now() + TOKEN_TTL_MS };
+  return token;
+}
+function isValid(token) {
+  return !!(armed && token && token === armed.token && Date.now() < armed.expires);
+}
+function disarm() { armed = null; }
+
+// clearAll(token): the destructive call. Requires a token from arm().
+// Deletes every existing weld-managed IndexedDB database and removes every
+// matching localStorage key. Returns a report of what was cleared.
+function clearAll(token) {
+  if (!isValid(token)) {
+    return Promise.reject(new Error('weld.ephemeral: clearAll requires a valid token from arm(). This guards against accidental data loss.'));
+  }
+  disarm();   // single-use
+
+  return existingDbs().then(function (dbs) {
+    var lsKeys = matchingLsKeys();
+
+    // Remove localStorage keys first (synchronous, can't fail mid-way badly).
+    var lsCleared = new Array();
+    lsKeys.forEach(function (k) {
+      try { localStorage.removeItem(k); lsCleared.push(k); } catch (e) { /* skip */ }
+    });
+
+    // Delete each IndexedDB database. deleteDatabase is async + can block if
+    // a connection is open, so we race each against a timeout and report.
+    var dbResults = dbs.map(function (name) {
+      return deleteDb(name).then(
+        function () { return { name: name, deleted: true }; },
+        function (e) { return { name: name, deleted: false, error: String(e && e.message || e) }; }
+      );
+    });
+
+    return Promise.all(dbResults).then(function (results) {
+      return {
+        localStorageCleared: lsCleared,
+        databases: results,
+        counts: {
+          localStorageKeys: lsCleared.length,
+          databasesDeleted: results.filter(function (r) { return r.deleted; }).length,
+          databasesFailed: results.filter(function (r) { return !r.deleted; }).length
+        }
+      };
+    });
+  });
+}
+
+function deleteDb(name) {
+  return new Promise(function (resolve, reject) {
+    var settled = false;
+    var req;
+    try { req = indexedDB.deleteDatabase(name); }
+    catch (e) { reject(e); return; }
+    req.onsuccess = function () { if (!settled) { settled = true; resolve(); } };
+    req.onerror = function () { if (!settled) { settled = true; reject(req.error || new Error('deleteDatabase error')); } };
+    // onblocked fires when another tab/connection holds the db open. We treat
+    // it as "couldn't complete now" rather than hanging forever.
+    req.onblocked = function () { if (!settled) { settled = true; reject(new Error('database is open in another connection; close it and retry')); } };
+    setTimeout(function () { if (!settled) { settled = true; reject(new Error('deleteDatabase timed out')); } }, 8000);
+  });
+}
+
+window.weld.ephemeral = {
+  preview: preview,
+  arm: arm,
+  clearAll: clearAll,
+  add: add,
+  disarm: disarm,
+  knownDatabases: function () { return allDbs(); },
+  knownPrefixes: function () { return allPrefixes(); },
+  version: '1.0.0'
+};
+
+return window.weld.ephemeral;
+})();
+</script>
+<script>
+
+  function boot(){ if(!window.weld||!window.weld.ephemeral){return setTimeout(boot,100);} init(); }
+  function init(){
+    var E=window.weld.ephemeral, $=function(id){return document.getElementById(id);}, token=null;
+    $('prev').onclick=function(){
+      E.preview().then(function(p){
+        $('plan').textContent='Would clear (local only):\n  IndexedDB: '+(p.databases.join(', ')||'(none)')+'\n  localStorage keys: '+p.counts.localStorageKeys+'\n\nCannot clear (not local):\n  - '+p.cannotClear.join('\n  - ');
+        $('arm').disabled=false;
+      });
+    };
+    $('arm').onclick=function(){ token=E.arm(); $('st').textContent='armed (token issued)'; $('st').className='chip k'; $('wipe').disabled=false; };
+    $('wipe').onclick=function(){
+      // DEMO: show what clearAll would return, without nuking the demo page's own storage.
+      E.preview().then(function(p){
+        $('out').textContent='clearAll(token) would return:\n'+JSON.stringify({ localStorageCleared:p.counts.localStorageKeys, databasesDeleted:p.databases.length }, null, 2)+'\n\n(token is single-use; arm again to repeat)';
+        token=null; $('st').textContent='cleared (demo)'; $('st').className='chip'; $('wipe').disabled=true; $('arm').disabled=true;
+      });
+    };
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+
+</script>

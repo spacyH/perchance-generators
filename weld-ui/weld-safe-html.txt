@@ -43,6 +43,11 @@ pre code{background:none;padding:0;color:inherit;font-size:inherit;}
   min-height:1.5em;}
 .note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
   padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.changelog{margin:14px 0;padding:14px 16px;background:var(--faint);border:1px solid var(--border);border-radius:6px;}
+.changelog .cl-ver{font:700 13px var(--mono);color:var(--accent);margin:10px 0 4px;}
+.changelog .cl-ver:first-child{margin-top:0;}
+.changelog ul{margin:0 0 4px;padding-left:18px;}
+.changelog li{font-size:13px;color:#c9d1d9;line-height:1.5;margin:2px 0;}
 .warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
 table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
 th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
@@ -70,7 +75,7 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
 <div class="hdr">
   <div class="hdr-row">
       <h1>weld.safe</h1>
-      <span class="ver">v1.0.0</span>
+      <span class="ver">v1.1.0</span>
   </div>
   <p class="lead">The brace-interception toolkit for Perchance authors. Scan code for the tokens the platform silently rewrites &mdash; with line numbers, explanations, and fixes &mdash; then escape strings and build safe tokens so your code survives the parser.</p>
 </div>
@@ -113,6 +118,21 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
 <h2>explain(kind)</h2>
 <div class="sig" data-codeid="sig_explain"></div>
 <p>Returns the rule (<code>severity</code>, <code>why</code>, <code>fix</code>) for any trap kind &mdash; handy for surfacing guidance in your own tooling. <code>weld.safe.KINDS</code> lists them all.</p>
+<h2>Canonical escape set <span class="tag">v1.1.0</span></h2>
+<div class="sig" data-codeid="sig_esc"></div>
+<p>Straight from Perchance&rsquo;s engine (<code>processEscapedCharacters</code>), <code>escapableChars()</code> returns the exact characters a backslash escapes: the assignment/odds operator, the brace pair, the square-bracket pair, the caret, and the pipe &mdash; plus the whitespace escapes (<code>\n</code> newline, <code>\t</code> tab, <code>\s</code> a literal space the parser would otherwise trim from an item edge). As of this version <code>escape()</code> also entity-encodes <code>=</code> and <code>^</code>, not just the brace/bracket/pipe characters, so displayed prose can&rsquo;t be misread as an assignment or an odds operator. Use <code>escapableChars()</code> when you need the authoritative list rather than folklore &mdash; for example to build a live-lint tool.</p>
+<pre data-codeid="esc_ex"></pre>
+<h2>Changelog</h2>
+<div class="changelog">
+<p class="cl-ver">v1.1.0</p>
+<ul>
+<li>escapableChars() returns the canonical engine escape set; escape() now also encodes = and ^ (the assignment and odds operators), matching processEscapedCharacters.</li>
+</ul>
+<p class="cl-ver">v1.0.0</p>
+<ul>
+<li>Initial release: scan/check for brace-interception traps, escape (entity-encode), build/builderSnippet (runtime assembly), explain.</li>
+</ul>
+</div>
 <script>
 (function(){
   var examples = {
@@ -125,7 +145,9 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
   'sig_build': 'weld.safe.build(token) -> string   // real chars, made at runtime',
   'sig_snip': 'weld.safe.builderSnippet(token) -> "String.fromCharCode(...)"',
   'build_ex': '// need a literal import-directive token in a string at runtime:\nvar token = weld.safe.build(\'\{import:other-plugin\}\');\n// or paste a constructor into your source:\nweld.safe.builderSnippet(\'\{n\}\');   // \'String.fromCharCode(123,110,125)\'',
-  'sig_explain': 'weld.safe.explain(kind) -> \{ kind, severity, why, fix \}'
+  'sig_explain': 'weld.safe.explain(kind) -> \{ kind, severity, why, fix \}',
+  'sig_esc': 'weld.safe.escapableChars() -> { structural, whitespace, note }   //  weld.safe.escape(str)',
+  'esc_ex': 'var set = weld.safe.escapableChars();\n// set.structural -> the chars to backslash-escape\nvar safe = weld.safe.escape(userText);  // entity-encodes = ^ braces brackets pipe',
 };
   function escapeHTML(s){
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -169,8 +191,9 @@ if (window.weld.safe) return window.weld.safe;
 // pick-list, or a regex count quantifier sitting in a string can all be
 // silently mangled, producing bugs with no stack trace.
 //
-//   weld.safe.scan(code)   -> /[/{ line, col, token, severity, why, fix /}/]
-//   weld.safe.check(code)  -> /{ ok, findings /}   (ok = no errors)
+//   weld.safe.scan(code)   -> array of findings, each with line, col,
+//                             token, severity, why, fix
+//   weld.safe.check(code)  -> ok flag plus findings (ok = no errors)
 //   weld.safe.escape(str)  -> a parser-safe version of a string
 //   weld.safe.build(token) -> assemble a risky literal at runtime
 //   weld.safe.explain(kind)-> the rule behind a trap kind
@@ -179,10 +202,10 @@ if (window.weld.safe) return window.weld.safe;
 // on pick-lists and quantifiers, plus the escape/build helpers diag lacks.
 // -----------------------------------------------------------------
 
-var OB = String.fromCharCode(123); // /{
-var CB = String.fromCharCode(125); // /}
-var OS = String.fromCharCode(91);  // /[
-var CS = String.fromCharCode(93);  // /]
+var OB = String.fromCharCode(123); // {
+var CB = String.fromCharCode(125); // }
+var OS = String.fromCharCode(91);  // [
+var CS = String.fromCharCode(93);  // ]
 var BAR = String.fromCharCode(124);// |
 
 var RULES = {
@@ -225,12 +248,12 @@ var RULES = {
 
 function scan(code) {
   var lines = String(code == null ? '' : code).split('\n');
-  var out = [];
+  var out = new Array();
   var outIdx = -1;
-  for (var i = 0; i < lines.length; i++) { if (/^\s*\$output\s*\(/.test(lines[i])) { outIdx = i; break; } }
+  for (var i = 0; i < lines.length; i++) { if (/^\s*\$output\s*\(/.test(Reflect.get(lines, i))) { outIdx = i; break; } }
 
   for (var ln = 0; ln < lines.length; ln++) {
-    var raw = lines[ln];
+    var raw = Reflect.get(lines, ln);
 
     // double square / double curly (opening)
     findAll(raw, OS + OS, function (col) { push(out, ln, col, OS + OS, 'double-square'); });
@@ -240,16 +263,16 @@ function scan(code) {
     });
 
     // import directive that is NOT a legit top-level assignment
-    var importRe = new RegExp(OB + 'import:[^' + CB + ']*' + CB, 'g');
+    var importRe = new RegExp(OB + 'import:' + OS + '^' + CB + CS + '*' + CB, 'g');
     var im;
     while ((im = importRe.exec(raw)) !== null) {
       var isTopImport = (outIdx === -1 || ln < outIdx)
-        && new RegExp('^\\s*[\\w$]+\\s*=\\s*' + OB + 'import:[^' + CB + ']+' + CB + '\\s*$').test(raw.trim());
+        && new RegExp('^\\s*' + OS + '\\w$' + CS + '+\\s*=\\s*' + OB + 'import:' + OS + '^' + CB + CS + '+' + CB + '\\s*$').test(raw.trim());
       if (!isTopImport) push(out, ln, im.index, im[0], 'import-directive');
     }
 
     // tight pick-list: a braced, pipe-separated group with no spaces
-    var pickRe = new RegExp(OB + '[^' + OB + CB + '\\s]*\\' + BAR + '[^' + OB + CB + ']*' + CB, 'g');
+    var pickRe = new RegExp(OB + OS + '^' + OB + CB + '\\s' + CS + '*\\' + BAR + OS + '^' + OB + CB + CS + '*' + CB, 'g');
     var pk;
     while ((pk = pickRe.exec(raw)) !== null) {
       var tok = pk[0];
@@ -268,7 +291,7 @@ function scan(code) {
     }
 
     // bare single-word token: a braced identifier, no spaces/colon/quote -> info
-    var bareRe = new RegExp(OB + '[A-Za-z_][A-Za-z0-9_]*' + CB, 'g');
+    var bareRe = new RegExp(OB + OS + 'A-Za-z_' + CS + OS + 'A-Za-z0-9_' + CS + '*' + CB, 'g');
     var b;
     while ((b = bareRe.exec(raw)) !== null) {
       push(out, ln, b.index, b[0], 'bare-token');
@@ -285,7 +308,7 @@ function findAll(s, needle, cb) {
 }
 
 function push(out, ln, col, token, kind) {
-  var rule = RULES[kind];
+  var rule = Reflect.get(RULES, kind);
   out.push({
     line: ln + 1, col: col + 1, token: token, kind: kind,
     severity: rule.severity, why: rule.why, fix: rule.fix
@@ -301,13 +324,45 @@ function check(code) {
 // escape(str): produce a version of a string that the Perchance parser
 // will leave alone, by replacing the trap-trigger characters with HTML
 // entities. Use for prose/HTML you want to display literally.
+//
+// The entity STRINGS themselves are assembled at runtime from char codes
+// because Perchance decodes HTML entities and RE-SCANS the result -- so a
+// literal numeric-entity for an opening brace, written here in source,
+// would decode back to that brace and trip the very interception this
+// function exists to prevent. Never write the entity (or the brace) raw.
+var AMP = String.fromCharCode(38) + String.fromCharCode(35); // ampersand + hash
+var SEMI = String.fromCharCode(59);                          // semicolon
+function ent(code) { return AMP + code + SEMI; }
+var EQ = String.fromCharCode(61);    // =  (assignment / odds operator)
+var CARET = String.fromCharCode(94); // ^  (conditional-odds operator)
 function escape(str) {
+  // Search regexes are also built from char-code vars (OB/CB/OS/CS/BAR) so
+  // no literal trap character appears in this plugin's own source.
+  // The full set Perchance treats as escapable (per the engine's
+  // processEscapedCharacters) covers assignment, brace, square, caret,
+  // and pipe characters, plus the whitespace escapes (newline/tab/space).
+  // We entity-encode the structural ones so displayed prose can't be read
+  // as a list reference, assignment, pick-list, or odds operator.
   return String(str == null ? '' : str)
-    .replace(/\{/g, '&#123;')
-    .replace(/\}/g, '&#125;')
-    .replace(/\[/g, '&#91;')
-    .replace(/\]/g, '&#93;')
-    .replace(/\|/g, '&#124;');
+    .replace(new RegExp('\\' + OB, 'g'), ent('123'))
+    .replace(new RegExp('\\' + CB, 'g'), ent('125'))
+    .replace(new RegExp('\\' + OS, 'g'), ent('91'))
+    .replace(new RegExp('\\' + CS, 'g'), ent('93'))
+    .replace(new RegExp('\\' + BAR, 'g'), ent('124'))
+    .replace(new RegExp(EQ, 'g'), ent('61'))
+    .replace(new RegExp('\\' + CARET, 'g'), ent('94'));
+}
+// escapableChars(): the canonical set Perchance treats as escapable with a
+// leading backslash, taken from the engine's own processEscapedCharacters,
+// returned as data so a tool (such as a live-lint userscript) can rely on the
+// exact list rather than folklore. Whitespace escapes are included with
+// their outputs (\\s escapes a space the parser would otherwise trim).
+function escapableChars() {
+  return {
+    structural: Array.of(EQ, OB, CB, OS, CS, CARET, BAR),
+    whitespace: { n: String.fromCharCode(10), t: String.fromCharCode(9), s: String.fromCharCode(32) },
+    note: 'Backslash-escape any structural char to show it literally.'
+  };
 }
 
 // build(token): assemble a string at RUNTIME so the literal trap token
@@ -324,13 +379,13 @@ function build(token) {
 // so authors can paste a safe constructor into their own source.
 function builderSnippet(token) {
   var s = String(token == null ? '' : token);
-  var codes = [];
+  var codes = new Array();
   for (var i = 0; i < s.length; i++) codes.push(s.charCodeAt(i));
   return 'String.fromCharCode(' + codes.join(',') + ')';
 }
 
 function explain(kind) {
-  var r = RULES[kind];
+  var r = Reflect.get(RULES, kind);
   return r ? { kind: kind, severity: r.severity, why: r.why, fix: r.fix } : null;
 }
 
@@ -341,8 +396,9 @@ window.weld.safe = {
   build: build,
   builderSnippet: builderSnippet,
   explain: explain,
+  escapableChars: escapableChars,
   KINDS: Object.keys(RULES),
-  version: '1.0.0'
+  version: '1.1.0'
 };
 
 return window.weld.safe;

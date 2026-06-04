@@ -45,11 +45,11 @@ a:hover{text-decoration:underline;}
 .cards{display:grid;grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));gap:14px;}
 .card{background:var(--faint);border:1px solid var(--border);border-radius:8px;
   padding:18px;display:flex;flex-direction:column;
-  transition:border-color 240ms, transform 240ms, opacity 400ms;opacity:0.4;}
+  transition:border-color 240ms, transform 240ms, opacity 400ms;opacity:0.85;}
 .card.ready{opacity:1;}
-.card.ready:hover{border-color:var(--accent);transform:translateY(-1px);}
-.card.soon{opacity:0.4;}
-.card.soon:hover{opacity:0.6;}
+.card:hover{border-color:var(--accent);transform:translateY(-1px);}
+.card.soon{opacity:0.55;}
+.card.soon:hover{opacity:0.7;}
 .card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;}
 .card-name{font:700 17px var(--mono);color:var(--ink);letter-spacing:-0.3px;}
 .card-status{font:600 9px var(--mono);padding:3px 8px;border-radius:10px;
@@ -60,11 +60,12 @@ a:hover{text-decoration:underline;}
 .card-status.loading .dot{animation:status-pulse 1.4s ease-in-out infinite;}
 .card-status.ready{background:rgba(63,185,80,0.12);color:var(--green);border:1px solid rgba(63,185,80,0.3);}
 .card-status.soon{background:var(--bg);color:var(--muted);border:1px solid var(--border);}
+.card-status.idle{background:var(--bg);color:var(--muted);border:1px solid var(--border);}
+.card-status.idle .dot{animation:none;opacity:0.6;}
 .card-tagline{font:500 12px var(--mono);color:var(--accent);margin-bottom:10px;}
 .card.soon .card-tagline{color:var(--muted);}
 .card-desc{font-size:13px;color:#c9d1d9;line-height:1.55;flex:1;margin-bottom:14px;}
 .card-links{display:flex;gap:14px;font-size:13px;font-family:var(--mono);transition:opacity 240ms;}
-.card:not(.ready):not(.soon) .card-links{opacity:0.3;pointer-events:none;}
 .card-links a{color:var(--accent);}
 .card-links .placeholder{color:var(--muted);font-size:12px;}
 .banner{background:linear-gradient(135deg, rgba(68,147,248,0.08) 0%, rgba(63,185,80,0.04) 100%);
@@ -142,8 +143,44 @@ a:hover{text-decoration:underline;}
     <div class="principle"><h4>DSL-SAFE</h4><p>Every plugin is audited for Perchance's parser quirks. Drop-in compatible with any generator.</p></div>
   </div>
 
-  <div class="section-head"><h2>Available</h2><span class="count">23 plugins</span></div>
+  <div class="section-head"><h2>Available</h2><span class="count">56 plugins</span></div>
 <div class="cards" id="stable-cards">
+<div class="card" data-plugin="ephemeral">
+  <div class="card-head">
+    <span class="card-name">weld.ephemeral</span>
+    <span class="card-status loading"><span class="dot"></span><span class="lbl">loading</span></span>
+  </div>
+  <div class="card-tagline">Clear all local data</div>
+  <p class="card-desc">A privacy primitive inspired by Duck.ai: wipe all weld-managed IndexedDB and localStorage for this generator in one call, behind a required single-use confirmation token. Previews what would clear and honestly notes what it canât (server-side kv, public uploads). Local-only.</p>
+  <div class="card-links">
+    <a href="https://perchance.org/weld-ephemeral-plugin">docs &rarr;</a>
+    <a href="https://perchance.org/weld-ephemeral-example">demo &rarr;</a>
+  </div>
+</div>
+<div class="card" data-plugin="privacy">
+  <div class="card-head">
+    <span class="card-name">weld.privacy</span>
+    <span class="card-status loading"><span class="dot"></span><span class="lbl">loading</span></span>
+  </div>
+  <div class="card-tagline">Data-handling transparency</div>
+  <p class="card-desc">Declare and display, per backend, how data is handled â local-only, anonymized, server-stored, public, expiring, third-party â with honest pre-registered claims for the suiteâs own backends and a plain-language summary. Inspired by Duck.ai. Describes posture; enforces nothing.</p>
+  <div class="card-links">
+    <a href="https://perchance.org/weld-privacy-plugin">docs &rarr;</a>
+    <a href="https://perchance.org/weld-privacy-example">demo &rarr;</a>
+  </div>
+</div>
+<div class="card" data-plugin="genparams">
+  <div class="card-head">
+    <span class="card-name">weld.genparams</span>
+    <span class="card-status loading"><span class="dot"></span><span class="lbl">loading</span></span>
+  </div>
+  <div class="card-tagline">Generation parameter schema</div>
+  <p class="card-desc">One normalized shape for image-generation parameters â prompt, negative, aspect, steps, cfg, sampler, seed, conditioning â with defaults, validation that clamps and warns, named aspect ratios that resolve to legal sizes, and a weld.image-ready opts builder. Remix forks with a fresh seed.</p>
+  <div class="card-links">
+    <a href="https://perchance.org/weld-genparams-plugin">docs &rarr;</a>
+    <a href="https://perchance.org/weld-genparams-example">demo &rarr;</a>
+  </div>
+</div>
 <div class="card" data-plugin="ui">
   <div class="card-head">
     <span class="card-name">weld.ui</span>
@@ -420,10 +457,6 @@ a:hover{text-decoration:underline;}
     <a href="https://perchance.org/weld-testrig-example">demo &rarr;</a>
   </div>
 </div>
-</div>
-
-  <div class="section-head"><h2>Latest additions</h2><span class="count">30 new</span></div>
-<div class="cards" id="added-cards">
 <div class="card" data-plugin="report">
   <div class="card-head">
     <span class="card-name">weld.report</span>
@@ -7578,9 +7611,9 @@ return window.weld.testrig;
 <script>
 (function(){
   var REQUIRED = ['ui', 'migrate', 'backup', 'diag', 'quota', 'undo', 'settings', 'toast', 'markdown', 'chatui', 'lorebook', 'branching', 'tokens', 'sync', 'spamguard', 'image', 'gen', 'prompt', 'persist', 'history', 'queue', 'gallery', 'testrig'];
-  // Latest additions: detected and shown as stable when loaded, but kept out
-  // of REQUIRED so the on-page demo gate never stalls during incremental rollout.
-  var ADDED = ['stream', 'clean', 'structured', 'summarize', 'regen', 'memory', 'voice', 'dice', 'cards', 'confetti', 'konami', 'background', 'comments', 'banlist', 'vn', 'embed', 'promptforge', 'persona', 'state', 'director', 'cache', 'safe', 'monitor', 'fetch', 'kv', 'upload', 'registry', 'audio', 'import', 'report'];
+  // These also show as stable when loaded, but are kept out of REQUIRED so the
+  // on-page demo gate never stalls if one of them is slow to load.
+  var ADDED = ['stream', 'clean', 'structured', 'summarize', 'regen', 'memory', 'voice', 'dice', 'cards', 'confetti', 'konami', 'background', 'comments', 'banlist', 'vn', 'embed', 'promptforge', 'persona', 'state', 'director', 'cache', 'safe', 'monitor', 'fetch', 'kv', 'upload', 'registry', 'audio', 'import', 'report', 'genparams', 'privacy', 'ephemeral'];
   var readyState = { ui: false, migrate: false, backup: false, diag: false, quota: false, undo: false, settings: false, toast: false, markdown: false, chatui: false, lorebook: false, branching: false, tokens: false, sync: false, spamguard: false, image: false, gen: false, prompt: false, persist: false, history: false, queue: false, gallery: false, testrig: false };
 
   function triggerImports(){
@@ -7607,6 +7640,39 @@ return window.weld.testrig;
     try { if (typeof root !== 'undefined' && typeof root.weldQueue    === 'function') root.weldQueue(); } catch(e){}
     try { if (typeof root !== 'undefined' && typeof root.weldGallery  === 'function') root.weldGallery(); } catch(e){}
     try { if (typeof root !== 'undefined' && typeof root.weldTestrig  === 'function') root.weldTestrig(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldStream      === 'function') root.weldStream(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldClean       === 'function') root.weldClean(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldStructured  === 'function') root.weldStructured(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldSummarize   === 'function') root.weldSummarize(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldRegen       === 'function') root.weldRegen(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldMemory      === 'function') root.weldMemory(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldVoice       === 'function') root.weldVoice(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldDice        === 'function') root.weldDice(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldCards       === 'function') root.weldCards(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldConfetti    === 'function') root.weldConfetti(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldKonami      === 'function') root.weldKonami(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldBackground  === 'function') root.weldBackground(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldComments    === 'function') root.weldComments(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldBanlist     === 'function') root.weldBanlist(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldVn          === 'function') root.weldVn(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldEmbed       === 'function') root.weldEmbed(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldPromptforge === 'function') root.weldPromptforge(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldPersona     === 'function') root.weldPersona(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldState       === 'function') root.weldState(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldDirector    === 'function') root.weldDirector(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldCache       === 'function') root.weldCache(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldSafe        === 'function') root.weldSafe(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldMonitor     === 'function') root.weldMonitor(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldFetch       === 'function') root.weldFetch(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldKv          === 'function') root.weldKv(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldUpload      === 'function') root.weldUpload(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldRegistry    === 'function') root.weldRegistry(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldAudio       === 'function') root.weldAudio(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldImport      === 'function') root.weldImport(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldReport      === 'function') root.weldReport(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldGenparams === 'function') root.weldGenparams(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldPrivacy === 'function') root.weldPrivacy(); } catch(e){}
+    try { if (typeof root !== 'undefined' && typeof root.weldEphemeral === 'function') root.weldEphemeral(); } catch(e){}
     // Wire image + gen optional Perchance deps from the index DSL imports, if present.
     try {
       if (window.weld && window.weld.image && typeof root !== 'undefined' && typeof root.imageT2i === 'function') {
@@ -7637,6 +7703,30 @@ return window.weld.testrig;
     updateStatusBar();
   }
 
+  // Resolve the "loading forever" case. A plugin only flips to ready when its
+  // JS actually attaches to window.weld; one that isn't triggered on this page
+  // (or fails to load) would otherwise pulse "loading" indefinitely. After a
+  // generous window we settle every still-loading card into a calm terminal
+  // state so the indicator always resolves to *something*. The docs/demo links
+  // stay clickable throughout -- they point at pages that exist regardless of
+  // whether the plugin's code loaded here.
+  var settled = false;
+  function settleIdle(){
+    if (settled) return;
+    settled = true;
+    var cards = document.querySelectorAll('.card[data-plugin]');
+    cards.forEach(function(card){
+      var status = card.querySelector('.card-status');
+      if (!status || status.classList.contains('ready') || status.classList.contains('soon')) return;
+      if (status.classList.contains('loading')) {
+        status.classList.remove('loading');
+        status.classList.add('idle');
+        var lbl = status.querySelector('.lbl');
+        if (lbl) lbl.textContent = 'available';
+      }
+    });
+  }
+
   function updateStatusBar(){
     var n = 0;
     REQUIRED.forEach(function(k){ if (readyState[k]) n++; });
@@ -7653,7 +7743,10 @@ return window.weld.testrig;
     }
   }
 
+  var detectStart = 0;
+  var SETTLE_MS = 6000;   // generous window for Perchance imports to attach
   function detectLoop(){
+    if (!detectStart) detectStart = Date.now();
     triggerImports();
     REQUIRED.forEach(function(k){
       if (window.weld && window.weld[k]) setReady(k);
@@ -7661,9 +7754,13 @@ return window.weld.testrig;
     ADDED.forEach(function(k){
       if (window.weld && window.weld[k]) setReady(k);
     });
-    if (REQUIRED.some(function(k){ return !readyState[k]; })
-        || ADDED.some(function(k){ return window.weld && window.weld[k] && !readyState[k]; })) {
+    var anyPending = REQUIRED.some(function(k){ return !readyState[k]; })
+        || ADDED.some(function(k){ return window.weld && window.weld[k] && !readyState[k]; });
+    if (anyPending && (Date.now() - detectStart) < SETTLE_MS) {
       setTimeout(detectLoop, 150);
+    } else if (anyPending) {
+      // window elapsed: settle anything still loading into a terminal state
+      settleIdle();
     }
   }
 

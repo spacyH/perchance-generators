@@ -1,0 +1,371 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.changelog{margin:14px 0;padding:14px 16px;background:var(--faint);border:1px solid var(--border);border-radius:6px;}
+.changelog .cl-ver{font:700 13px var(--mono);color:var(--accent);margin:10px 0 4px;}
+.changelog .cl-ver:first-child{margin-top:0;}
+.changelog ul{margin:0 0 4px;padding-left:18px;}
+.changelog li{font-size:13px;color:#c9d1d9;line-height:1.5;margin:2px 0;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.privacy<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-privacy-example">demo &rarr;</a></span></div>
+<div class="hdr">
+  <div class="hdr-row">
+      <h1>weld.privacy</h1>
+      <span class="ver">v1.1.0</span>
+  </div>
+  <p class="lead">A vocabulary and registry for declaring, honestly, how each backend an app uses handles data -- inspired by Duck.ai per-model privacy claims. Claim kinds (local-only, anonymized, server-stored, public, expiring, third-party, transient), honest pre-registered claims for the suite own backends, and a legible data-handling summary. Describes posture; enforces nothing.</p>
+</div>
+<h2>Make your app legible about where data goes</h2>
+<p>Duck.ai's sharpest idea is showing, per model, what privacy guarantee applies <em>before</em> you use it. weld.privacy ports that pattern (not the guarantees, which are platform-specific): a small claim vocabulary, an honest registry of how the suite's own backends behave, and a way to render a data-handling summary your app can show users.</p>
+<div class="note"><strong>Honesty rule:</strong> a claim describes data-handling <em>posture</em> &mdash; it does <em>not</em> enforce anything. The built-in claims reflect what Perchance's backends actually do. Never attach a claim you can't stand behind; an overstated label is worse than none.</div>
+<pre data-codeid="install"></pre>
+
+<h2>The claim vocabulary</h2>
+<table>
+<tr><th>kind</th><th>meaning</th><th>leaves device?</th></tr>
+<tr><td><code>local-only</code></td><td>kept in this browser, never sent</td><td>no</td></tr>
+<tr><td><code>anonymized</code></td><td>sent with identifying metadata stripped/proxied</td><td>yes</td></tr>
+<tr><td><code>server-stored</code></td><td>persisted on a remote server (often to sync)</td><td>yes</td></tr>
+<tr><td><code>public</code></td><td>uploaded to a public, link-accessible URL</td><td>yes</td></tr>
+<tr><td><code>expiring</code></td><td>stored with an expiry, auto-deleted later</td><td>yes</td></tr>
+<tr><td><code>third-party</code></td><td>passes through a service outside your control</td><td>yes</td></tr>
+<tr><td><code>transient</code></td><td>used for one request, not retained</td><td>yes</td></tr>
+</table>
+
+<h2>Pre-registered claims for the suite</h2>
+<p>The suite's own backends ship with honest claims, so an app gets a correct summary for free:</p>
+<table>
+<tr><th>backend</th><th>claims</th></tr>
+<tr><td><code>persist</code>, <code>history</code>, <code>backup</code>, <code>cache</code>, <code>state</code>, <code>memory</code></td><td>local-only</td></tr>
+<tr><td><code>kv</code></td><td>server-stored (cross-device)</td></tr>
+<tr><td><code>upload</code>, <code>report</code></td><td>public + expiring</td></tr>
+<tr><td><code>stream</code>, <code>image</code>, <code>fetch</code></td><td>anonymized + third-party (Perchance broker/proxy)</td></tr>
+<tr><td><code>registry</code></td><td>transient + third-party</td></tr>
+</table>
+
+<h2>claimsFor / register</h2>
+<div class="sig" data-codeid="sig_claims"></div>
+<p>Read the claims for any backend, or declare your own. Unknown claim kinds are dropped rather than throwing, so a typo can never crash a privacy panel.</p>
+<pre data-codeid="register_ex"></pre>
+
+<h2>summary / report / leavesDevice</h2>
+<div class="sig" data-codeid="sig_summary"></div>
+<p>Given the set of backends your app uses, <code>summary()</code> returns a plain-language digest, <code>report()</code> a structured version for building UI, and <code>leavesDevice()</code> a single at-a-glance boolean. <code>localOnly()</code> filters to the backends that keep data on-device.</p>
+<pre data-codeid="summary_ex"></pre>
+<div class="note">Pairs with the suite: declare your app's full backend set once, show <code>summary()</code> in an info panel, and use <code>leavesDevice()</code> to drive a privacy indicator. Complements <code>weld.report</code> (which encrypts before its public+expiring upload).</div>
+<h2>Restricted mode (?$csp) <span class="tag">v1.1.0</span></h2>
+<div class="sig" data-codeid="sig_csp"></div>
+<p>Perchance offers a <code>?$csp</code> URL mode (its <em>Custom Content-Security-Policy</em> feature) that restricts a generator&rsquo;s ability to reach external servers &mdash; adding <code>?$csp</code> to a page&rsquo;s URL means a user has to trust the author less, because outbound third-party requests are blocked at the platform level. That is a real data-handling fact, so <code>cspRestricted()</code> reports it, and <code>summary()</code> / <code>report()</code> note it when active. An app can use this to tell the user they&rsquo;re in a hardened mode, or to adjust which features it offers.</p>
+<h2>Changelog</h2>
+<div class="changelog">
+<p class="cl-ver">v1.1.0</p>
+<ul>
+<li>cspRestricted() detects Perchance ?$csp restricted mode; surfaced in summary() and report().</li>
+</ul>
+<p class="cl-ver">v1.0.0</p>
+<ul>
+<li>Initial release: per-backend data-handling claims with summary/report/leavesDevice/localOnly.</li>
+</ul>
+</div>
+<script>
+(function(){
+  var examples = {
+  'install': 'output\n  weld-privacy = \{import:weld-privacy-plugin\}',
+  'sig_claims': 'weld.privacy.claimsFor(name) -> claims\[]   //  register(name, kinds), describeKind(id)',
+  'register_ex': '// declare a backend your app talks to directly:\nweld.privacy.register(\'myGameServer\', \[\'server-stored\', \'third-party\']);\nweld.privacy.claimsFor(\'myGameServer\');\n// -> array of claim objects: \{ kind:\'server-stored\', title:\'Stored on a server\', ... \}',
+  'sig_summary': 'weld.privacy.summary(names) -> string   //  report(names), leavesDevice(names), localOnly(names)',
+  'summary_ex': 'var used = \[\'persist\', \'history\', \'stream\', \'upload\'];\nconsole.log(weld.privacy.summary(used));\n// Some data leaves this device:\n//   persist: Stays on this device\n//   stream:  Sent without identifying you; Handled by a third party\n//   upload:  Publicly accessible; Auto-deletes later\nif (weld.privacy.leavesDevice(used)) showPrivacyBadge();',
+  'sig_csp': 'weld.privacy.cspRestricted() -> boolean   // true under Perchance ?\$csp restricted mode',
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    document.querySelectorAll('[data-codeid]').forEach(function(n){
+      var src = examples[n.getAttribute('data-codeid')];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.privacy) return window.weld.privacy;
+
+// -----------------------------------------------------------------
+// weld.privacy: make an app legible about where its data goes.
+//
+// Duck.ai's best idea is showing, per model, what privacy guarantee
+// applies BEFORE you use it -- anonymized, zero-retention, no-training,
+// and so on. weld.privacy ports the *pattern* (not the guarantees, which
+// are platform-specific): a small claim vocabulary, an honest registry of
+// how the suite's own backends behave, and a way to render a data-handling
+// summary an app can show its users.
+//
+//   weld.privacy.claimsFor('kv')   returns an array of claim objects
+//   weld.privacy.summary of the backends an app uses -> human-readable text
+//   weld.privacy.register a backend with its claim kinds
+//
+// IMPORTANT HONESTY RULE: a claim describes data-handling POSTURE; it does
+// NOT enforce anything. The labels here reflect what Perchance's backends
+// actually do, to the best of documented behavior. An app must not attach
+// a claim it can't stand behind -- an overstated label is worse than none.
+// -----------------------------------------------------------------
+
+// The claim vocabulary. Each kind has a stable id, a short title, a
+// plain-language detail, and a coarse 'leaves-device' flag apps can sort on.
+var KINDS = {
+  'local-only': {
+    title: 'Stays on this device',
+    detail: 'Data is kept in this browser only (IndexedDB / localStorage) and is never sent anywhere. Clearing your browser data removes it.',
+    leavesDevice: false
+  },
+  'anonymized': {
+    title: 'Sent without identifying you',
+    detail: 'Data is sent to a backend with identifying metadata stripped or proxied, so the request is not tied to your identity.',
+    leavesDevice: true
+  },
+  'server-stored': {
+    title: 'Stored on a server',
+    detail: 'Data is stored on a remote server and persists there (often so it can sync across your devices). It is not only on this device.',
+    leavesDevice: true
+  },
+  'public': {
+    title: 'Publicly accessible',
+    detail: 'Data is uploaded to a public URL that anyone with the link can access. Do not put anything sensitive here.',
+    leavesDevice: true
+  },
+  'expiring': {
+    title: 'Auto-deletes later',
+    detail: 'Data is stored with an expiry and is removed automatically after a set time.',
+    leavesDevice: true
+  },
+  'third-party': {
+    title: 'Handled by a third party',
+    detail: 'Data passes through a service outside your control, whose own data-handling policy applies.',
+    leavesDevice: true
+  },
+  'transient': {
+    title: 'Not stored at all',
+    detail: 'Data is used for a single request and not retained after the response.',
+    leavesDevice: true
+  }
+};
+
+function kindIds() { return Object.keys(KINDS); }
+function describeKind(id) {
+  var k = Reflect.get(KINDS, id);
+  return k ? { kind: id, title: k.title, detail: k.detail, leavesDevice: k.leavesDevice } : null;
+}
+
+// Honest, pre-registered claims for the suite's own backends. These reflect
+// documented Perchance behavior; an app can override or extend them.
+//   persist/history/backup -> local IndexedDB only          -> local-only
+//   cache/state            -> in-memory or local            -> local-only
+//   kv                     -> kv-plugin, server cross-device -> server-stored
+//   upload                 -> public URL (+ optional expiry) -> public (+expiring)
+//   stream/image           -> Perchance broker (proxied)     -> anonymized + third-party
+//   fetch                  -> superFetch proxy (strips hdrs) -> anonymized + third-party
+//   registry               -> reads Perchance public API     -> transient + third-party
+//   report                 -> encrypted, expiring upload     -> public + expiring
+var REGISTRY = {
+  persist:  ['local-only'],
+  history:  ['local-only'],
+  backup:   ['local-only'],
+  cache:    ['local-only'],
+  state:    ['local-only'],
+  memory:   ['local-only'],
+  kv:       ['server-stored'],
+  upload:   ['public', 'expiring'],
+  report:   ['public', 'expiring'],
+  stream:   ['anonymized', 'third-party'],
+  image:    ['anonymized', 'third-party'],
+  fetch:    ['anonymized', 'third-party'],
+  registry: ['transient', 'third-party']
+};
+
+// register(name, kinds): declare (or override) the claims for a backend.
+// kinds is an array of claim ids; unknown ids are dropped with no throw.
+function register(name, kinds) {
+  if (!name) return null;
+  var list = (Array.isArray(kinds) ? kinds : Array.of(kinds)).filter(function (k) { return !!Reflect.get(KINDS, k); });
+  Reflect.set(REGISTRY, String(name), list);
+  return claimsFor(name);
+}
+
+// claimsFor(name): the resolved claim objects for a backend (or empty array).
+function claimsFor(name) {
+  var ids = Reflect.get(REGISTRY, String(name)) || new Array();
+  return ids.map(describeKind).filter(Boolean);
+}
+
+// worst-case posture across a set of backends: does ANY of them leave the
+// device? Useful for a single at-a-glance indicator.
+function leavesDevice(names) {
+  return toArray(names).some(function (n) {
+    return claimsFor(n).some(function (c) { return c.leavesDevice; });
+  });
+}
+
+function toArray(x) { return Array.isArray(x) ? x : (x == null ? new Array() : Array.of(x)); }
+
+// summary(names): a human-readable data-handling digest for the backends an
+// app uses. Apps can show this in a privacy panel or an info modal.
+function summary(names) {
+  var list = toArray(names);
+  if (!list.length) return 'No backends declared.';
+  var lines = new Array();
+  lines.push(leavesDevice(list)
+    ? 'Some data leaves this device:'
+    : 'All data stays on this device.');
+  if (cspRestricted()) {
+    lines.push('(Running in Perchance ?$csp restricted mode: outbound external requests are blocked by the platform.)');
+  }
+  list.forEach(function (n) {
+    var claims = claimsFor(n);
+    if (!claims.length) {
+      lines.push('  ' + n + ': (no privacy claim declared)');
+    } else {
+      lines.push('  ' + n + ': ' + claims.map(function (c) { return c.title; }).join('; '));
+    }
+  });
+  return lines.join('\n');
+}
+
+// report(names): a structured version of summary() for building UI.
+function report(names) {
+  var list = toArray(names);
+  return {
+    leavesDevice: leavesDevice(list),
+    cspRestricted: cspRestricted(),
+    backends: list.map(function (n) { return { name: n, claims: claimsFor(n) }; })
+  };
+}
+
+// Audit helper: which declared backends keep data only on-device?
+function localOnly(names) {
+  return toArray(names).filter(function (n) {
+    var c = claimsFor(n);
+    return c.length && c.every(function (x) { return !x.leavesDevice; });
+  });
+}
+
+// Perchance's ?$csp URL mode (perchance.org/custom-content-security-policy)
+// restricts a generator's ability to talk to external servers -- adding
+// ?$csp to a page's URL reduces how much a user must trust the author.
+// It's a real, current data-handling fact, so weld.privacy surfaces it:
+// an app can tell the user "you're running in restricted mode" and adjust
+// claims accordingly (outbound third-party calls won't go through).
+function cspRestricted() {
+  try {
+    var q = (typeof location !== 'undefined' && location.search) ? location.search : '';
+    var h = (typeof location !== 'undefined' && location.href) ? location.href : '';
+    // Perchance uses a bare ?$csp flag; match it in the query or full URL.
+    return /[?&]\$csp(\b|=|&|$)/.test(q) || /[?&]\$csp(\b|=|&|$)/.test(h);
+  } catch (e) { return false; }
+}
+
+window.weld.privacy = {
+  kinds: KINDS,
+  kindIds: kindIds,
+  describeKind: describeKind,
+  register: register,
+  claimsFor: claimsFor,
+  leavesDevice: leavesDevice,
+  localOnly: localOnly,
+  summary: summary,
+  report: report,
+  cspRestricted: cspRestricted,
+  version: '1.1.0'
+};
+
+return window.weld.privacy;
+})();
+</script>
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>
+</div>

@@ -76,12 +76,12 @@ $output() =>
 
   function scan(code) {
     var lines = String(code == null ? '' : code).split('\n');
-    var out = [];
+    var out = new Array();
     var outIdx = -1;
-    for (var i = 0; i < lines.length; i++) { if (/^\s*\$output\s*\(/.test(lines[i])) { outIdx = i; break; } }
+    for (var i = 0; i < lines.length; i++) { if (/^\s*\$output\s*\(/.test(Reflect.get(lines, i))) { outIdx = i; break; } }
 
     for (var ln = 0; ln < lines.length; ln++) {
-      var raw = lines[ln];
+      var raw = Reflect.get(lines, ln);
 
       // double square / double curly (opening)
       findAll(raw, OS + OS, function (col) { push(out, ln, col, OS + OS, 'double-square'); });
@@ -136,7 +136,7 @@ $output() =>
   }
 
   function push(out, ln, col, token, kind) {
-    var rule = RULES[kind];
+    var rule = Reflect.get(RULES, kind);
     out.push({
       line: ln + 1, col: col + 1, token: token, kind: kind,
       severity: rule.severity, why: rule.why, fix: rule.fix
@@ -161,15 +161,36 @@ $output() =>
   var AMP = String.fromCharCode(38) + String.fromCharCode(35); // ampersand + hash
   var SEMI = String.fromCharCode(59);                          // semicolon
   function ent(code) { return AMP + code + SEMI; }
+  var EQ = String.fromCharCode(61);    // =  (assignment / odds operator)
+  var CARET = String.fromCharCode(94); // ^  (conditional-odds operator)
   function escape(str) {
     // Search regexes are also built from char-code vars (OB/CB/OS/CS/BAR) so
     // no literal trap character appears in this plugin's own source.
+    // The full set Perchance treats as escapable (per the engine's
+    // processEscapedCharacters) covers assignment, brace, square, caret,
+    // and pipe characters, plus the whitespace escapes (newline/tab/space).
+    // We entity-encode the structural ones so displayed prose can't be read
+    // as a list reference, assignment, pick-list, or odds operator.
     return String(str == null ? '' : str)
       .replace(new RegExp('\\' + OB, 'g'), ent('123'))
       .replace(new RegExp('\\' + CB, 'g'), ent('125'))
       .replace(new RegExp('\\' + OS, 'g'), ent('91'))
       .replace(new RegExp('\\' + CS, 'g'), ent('93'))
-      .replace(new RegExp('\\' + BAR, 'g'), ent('124'));
+      .replace(new RegExp('\\' + BAR, 'g'), ent('124'))
+      .replace(new RegExp(EQ, 'g'), ent('61'))
+      .replace(new RegExp('\\' + CARET, 'g'), ent('94'));
+  }
+  // escapableChars(): the canonical set Perchance treats as escapable with a
+  // leading backslash, taken from the engine's own processEscapedCharacters,
+  // returned as data so a tool (such as a live-lint userscript) can rely on the
+  // exact list rather than folklore. Whitespace escapes are included with
+  // their outputs (\\s escapes a space the parser would otherwise trim).
+  function escapableChars() {
+    return {
+      structural: Array.of(EQ, OB, CB, OS, CS, CARET, BAR),
+      whitespace: { n: String.fromCharCode(10), t: String.fromCharCode(9), s: String.fromCharCode(32) },
+      note: 'Backslash-escape any structural char to show it literally.'
+    };
   }
 
   // build(token): assemble a string at RUNTIME so the literal trap token
@@ -186,13 +207,13 @@ $output() =>
   // so authors can paste a safe constructor into their own source.
   function builderSnippet(token) {
     var s = String(token == null ? '' : token);
-    var codes = [];
+    var codes = new Array();
     for (var i = 0; i < s.length; i++) codes.push(s.charCodeAt(i));
     return 'String.fromCharCode(' + codes.join(',') + ')';
   }
 
   function explain(kind) {
-    var r = RULES[kind];
+    var r = Reflect.get(RULES, kind);
     return r ? { kind: kind, severity: r.severity, why: r.why, fix: r.fix } : null;
   }
 
@@ -203,8 +224,9 @@ $output() =>
     build: build,
     builderSnippet: builderSnippet,
     explain: explain,
+    escapableChars: escapableChars,
     KINDS: Object.keys(RULES),
-    version: '1.0.0'
+    version: '1.1.0'
   };
 
   return window.weld.safe;

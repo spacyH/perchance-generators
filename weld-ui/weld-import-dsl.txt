@@ -29,14 +29,55 @@ $output() =>
   function attach(d) { if (d && d.cards) deps.cards = d.cards; }
   function cards() { return deps.cards || (window.weld && window.weld.cards) || null; }
 
+  // ---- defensive limits -------------------------------------------------
+  // weld.import takes UNTRUSTED files (character cards, chat logs from other
+  // apps). Without bounds, a malicious or accidentally-huge input -- a 50MB
+  // JSON, a card with a megabyte-long name, a chat log with a million
+  // messages -- would be parsed straight into memory. These caps reject
+  // oversized input before it can do damage. They are generous for real
+  // cards/logs and tunable via weld.import.limits(). (Pattern adapted from
+  // the import-validator in Adaptive Session Studio.)
+  var LIMITS = {
+    INPUT_BYTES:   8000000,   // 8 MB raw text/JSON (a v2 card is ~tens of KB; logs larger)
+    PNG_BYTES:    16000000,   // 16 MB PNG (embedded-card images run large)
+    MESSAGES:        50000,   // max messages in an imported chat
+    STRING_LEN:     500000,   // max length of any single normalized string field
+    JSONL_LINES:    100000    // max lines scanned in a JSONL chat
+  };
+  function limits(patch) {
+    if (patch && typeof patch === 'object') {
+      for (var k in patch) { if (Object.prototype.hasOwnProperty.call(patch, k) && typeof Reflect.get(LIMITS, k) === 'number') Reflect.set(LIMITS, k, Reflect.get(patch, k) | 0); }
+    }
+    return Object.assign({}, LIMITS);
+  }
+  // Approx byte length of a string input (chars are close enough for the cap).
+  function rawSize(input) {
+    if (typeof input === 'string') return input.length;
+    if (input && (input.byteLength !== undefined)) return input.byteLength;     // ArrayBuffer / typed array
+    if (input && typeof input === 'object') { try { return JSON.stringify(input).length; } catch (e) { return 0; } }
+    return 0;
+  }
+  function guardInput(input) {
+    var isBytes = input && (input.byteLength !== undefined || (typeof Uint8Array !== 'undefined' && input instanceof Uint8Array));
+    var cap = isBytes ? LIMITS.PNG_BYTES : LIMITS.INPUT_BYTES;
+    var size = rawSize(input);
+    if (size > cap) {
+      throw new Error('weld.import: input too large (' + Math.round(size / 1e6) + ' MB; max ' + Math.round(cap / 1e6) + ' MB). Tune via weld.import.limits() if intentional.');
+    }
+  }
+
   // ---- helpers ----
   function asObj(input) {
     if (input && typeof input === 'object') return input;
     if (typeof input === 'string') { try { return JSON.parse(input); } catch (e) { return null; } }
     return null;
   }
-  function has(o) { for (var i = 1; i < arguments.length; i++) { if (o && o[arguments[i]] !== undefined) return true; } return false; }
-  function str(v) { return v == null ? '' : String(v); }
+  function has(o) { var keys = Array.prototype.slice.call(arguments, 1); for (var i = 0; i < keys.length; i++) { if (o && Reflect.get(o, Reflect.get(keys, i)) !== undefined) return true; } return false; }
+  function str(v) {
+    if (v == null) return '';
+    var s = String(v);
+    return s.length > LIMITS.STRING_LEN ? s.slice(0, LIMITS.STRING_LEN) : s;   // cap runaway string fields
+  }
 
   // ---- format detection -------------------------------------------------
   // Returns { format, kind, confidence } without fully parsing.
@@ -97,7 +138,7 @@ $output() =>
     var okCount = 0, checked = 0;
     for (var i = 0; i < lines.length && checked < 6; i++) {
       checked++;
-      try { var o = JSON.parse(lines[i]); if (o && typeof o === 'object') okCount++; } catch (e) { /* tolerate a bad line */ }
+      try { var o = JSON.parse(Reflect.get(lines, i)); if (o && typeof o === 'object') okCount++; } catch (e) { /* tolerate a bad line */ }
     }
     // It's JSONL if most sampled lines parse as objects (allows a stray bad line).
     return okCount >= 2 && okCount >= (checked - 1);
@@ -114,7 +155,7 @@ $output() =>
       example_dialogue: str(d.mes_example || d.example_dialogue),
       system_prompt: str(d.system_prompt),
       creator_notes: str(d.creator_notes),
-      tags: Array.isArray(d.tags) ? d.tags : [],
+      tags: Array.isArray(d.tags) ? d.tags : new Array(),
       creator: str(d.creator)
     };
   }
@@ -130,14 +171,17 @@ $output() =>
     return { role: role, name: name, content: content };
   }
   function normChatMessages(arr) {
-    return (arr || []).map(normMessage).filter(function (m) { return m.content; });
+    var list = arr || new Array();
+    if (list.length > LIMITS.MESSAGES) list = list.slice(0, LIMITS.MESSAGES);   // cap runaway logs
+    return list.map(normMessage).filter(function (m) { return m.content; });
   }
 
   // ---- parse ------------------------------------------------------------
   // parse(input) -> Promise<{ format, kind, character?, chat?, warnings }>
   function parse(input) {
+    try { guardInput(input); } catch (e) { return Promise.reject(e); }
     var det = detect(input);
-    var warnings = [];
+    var warnings = new Array();
     try {
       switch (det.format) {
         case 'tavern-png': {
@@ -175,8 +219,9 @@ $output() =>
         }
         case 'jsonl-chat': {
           var lines = String(input).split(/\r?\n/).filter(function (l) { return l.trim(); });
-          var msgs = [];
-          for (var i = 0; i < lines.length; i++) { try { msgs.push(JSON.parse(lines[i])); } catch (e) { warnings.push('skipped malformed line ' + (i + 1)); } }
+          if (lines.length > LIMITS.JSONL_LINES) { warnings.push('truncated to first ' + LIMITS.JSONL_LINES + ' lines'); lines = lines.slice(0, LIMITS.JSONL_LINES); }
+          var msgs = new Array();
+          for (var i = 0; i < lines.length; i++) { try { msgs.push(JSON.parse(Reflect.get(lines, i))); } catch (e) { warnings.push('skipped malformed line ' + (i + 1)); } }
           return Promise.resolve({ format: det.format, kind: 'chat', chat: { title: '', messages: normChatMessages(msgs) }, warnings: warnings });
         }
         default:
@@ -191,6 +236,10 @@ $output() =>
   function parseFile(file) {
     if (!file) return Promise.reject(new Error('weld.import: no file'));
     var isPngName = /\.png$/i.test(file.name || '') || (file.type === 'image/png');
+    var sizeCap = isPngName ? LIMITS.PNG_BYTES : LIMITS.INPUT_BYTES;
+    if (typeof file.size === 'number' && file.size > sizeCap) {
+      return Promise.reject(new Error('weld.import: file too large (' + Math.round(file.size / 1e6) + ' MB; max ' + Math.round(sizeCap / 1e6) + ' MB).'));
+    }
     return new Promise(function (resolve, reject) {
       if (typeof FileReader === 'undefined') { reject(new Error('weld.import: FileReader unavailable')); return; }
       var fr = new FileReader();
@@ -213,7 +262,8 @@ $output() =>
     parseFile: parseFile,
     attach: attach,
     formats: formats,
-    version: '1.0.0'
+    limits: limits,
+    version: '1.1.0'
   };
 
   return window.weld.import;

@@ -43,6 +43,11 @@ pre code{background:none;padding:0;color:inherit;font-size:inherit;}
   min-height:1.5em;}
 .note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
   padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.changelog{margin:14px 0;padding:14px 16px;background:var(--faint);border:1px solid var(--border);border-radius:6px;}
+.changelog .cl-ver{font:700 13px var(--mono);color:var(--accent);margin:10px 0 4px;}
+.changelog .cl-ver:first-child{margin-top:0;}
+.changelog ul{margin:0 0 4px;padding-left:18px;}
+.changelog li{font-size:13px;color:#c9d1d9;line-height:1.5;margin:2px 0;}
 .warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
 table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
 th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
@@ -70,7 +75,7 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
 <div class="hdr">
   <div class="hdr-row">
       <h1>weld.fetch</h1>
-      <span class="ver">v1.0.0</span>
+      <span class="ver">v1.1.0</span>
   </div>
   <p class="lead">Outbound HTTP from a generator, done right: get/post/json helpers over the superFetch proxy, with timeouts, retries, normalized responses, and automatic direct routing for CORS-friendly hosts.</p>
 </div>
@@ -109,6 +114,20 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
 <div class="sig" data-codeid="sig_direct"></div>
 <p>Hosts that already serve permissive CORS (raw.githubusercontent.com, cdn.jsdelivr.net, api.github.com) are hit directly, skipping the proxy hop. Add your own with <code>addDirectHost(hostname)</code>, or force per-request with <code>\&#123; direct: true \&#125;</code>.</p>
 <div class="note">Pair with <code>weld.cache</code> to memoize responses (the proxy is a network hop worth saving), and with <code>weld.queue</code> if you need to rate-limit a burst of calls.</div>
+<h2>Restricted mode (?$csp) <span class="tag">v1.1.0</span></h2>
+<div class="sig" data-codeid="sig_csp"></div>
+<p>Perchance&rsquo;s <code>?$csp</code> URL mode restricts a page from reaching external servers. Under it, both the superFetch proxy and direct fetches to outside hosts may be blocked by the platform. weld.fetch can&rsquo;t lift that, but <code>cspActive()</code> reports it, and a request that fails while it&rsquo;s in effect is annotated with that context &mdash; so a blocked call reads as &ldquo;CSP restricted this&rdquo; instead of a mysterious network error. Check it up front to disable outbound features gracefully.</p>
+<h2>Changelog</h2>
+<div class="changelog">
+<p class="cl-ver">v1.1.0</p>
+<ul>
+<li>cspActive() detects Perchance ?$csp restricted mode; failed outbound requests are annotated with that context.</li>
+</ul>
+<p class="cl-ver">v1.0.0</p>
+<ul>
+<li>Initial release: superFetch wrapper with get/post/json, timeouts, retries, direct-host fallback.</li>
+</ul>
+</div>
 <script>
 (function(){
   var examples = {
@@ -117,7 +136,8 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
   'sig_verbs': 'weld.fetch.get/post/del(url, opts) -> Promise<response>',
   'json_ex': 'var data = await weld.fetch.json(\'https://api.example.com/items\');\n\nvar res = await weld.fetch.post(\'https://api.example.com/items\', \{\n  body: \{ name: \'gadget\' \}, json: true\n\});\nif (res.ok) console.log(await res.json());',
   'sig_req': 'weld.fetch.request(url, opts) -> Promise<\{ ok, status, url, via, headers, text(), json(), raw \}>',
-  'sig_direct': 'weld.fetch.addDirectHost(hostname)   //  weld.fetch.directHosts() -> string\[]'
+  'sig_direct': 'weld.fetch.addDirectHost(hostname)   //  weld.fetch.directHosts() -> string\[]',
+  'sig_csp': 'weld.fetch.cspActive() -> boolean   // true under Perchance ?\$csp restricted mode'
 };
   function escapeHTML(s){
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -169,7 +189,7 @@ if (window.weld.fetch) return window.weld.fetch;
 //   await weld.fetch.get(url, { timeoutMs: 8000, retries: 2 })
 //
 // For hosts that already send permissive CORS (raw.githubusercontent,
-// jsdelivr, ...), set \{ direct: true \} (or call when superFetch is
+// jsdelivr, ...), set { direct: true } (or call when superFetch is
 // absent) to use the browser's own fetch and skip the proxy hop.
 // -----------------------------------------------------------------
 
@@ -240,6 +260,11 @@ function request(url, opts) {
         if (n < retries) {
           return new Promise(function (r) { setTimeout(r, retryDelay * (n + 1)); }).then(function () { return attempt(n + 1); });
         }
+        // If we're under Perchance's ?$csp restricted mode, an outbound
+        // failure is most likely the platform blocking it, not a bug.
+        if (cspActive() && err && err.message && err.message.indexOf('$csp') === -1) {
+          err.message += ' (note: page is in Perchance ?$csp restricted mode, which can block outbound requests)';
+        }
         throw err;
       });
   }
@@ -280,6 +305,20 @@ function text(url, opts) { return request(url, opts || {}).then(function (res) {
 
 function available() { return !!getSF(); }
 
+// Perchance's ?$csp URL mode (perchance.org/custom-content-security-policy)
+// restricts a page's ability to reach external servers. Under it, the
+// superFetch proxy and direct fetches to outside hosts may be blocked at
+// the platform level. weld.fetch can't lift that restriction, but it can
+// tell you it's in effect so a failed request reads as "CSP blocked this"
+// rather than a mysterious network error.
+function cspActive() {
+  try {
+    var q = (typeof location !== 'undefined' && location.search) ? location.search : '';
+    var h = (typeof location !== 'undefined' && location.href) ? location.href : '';
+    return /[?&]\$csp(\b|=|&|$)/.test(q) || /[?&]\$csp(\b|=|&|$)/.test(h);
+  } catch (e) { return false; }
+}
+
 window.weld.fetch = {
   request: request,
   get: get,
@@ -289,9 +328,10 @@ window.weld.fetch = {
   text: text,
   attach: attach,
   available: available,
+  cspActive: cspActive,
   addDirectHost: addDirectHost,
   directHosts: function () { return DIRECT_HOSTS.slice(); },
-  version: '1.0.0'
+  version: '1.1.0'
 };
 
 return window.weld.fetch;

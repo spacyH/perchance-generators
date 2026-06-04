@@ -43,6 +43,11 @@ pre code{background:none;padding:0;color:inherit;font-size:inherit;}
   min-height:1.5em;}
 .note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
   padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.changelog{margin:14px 0;padding:14px 16px;background:var(--faint);border:1px solid var(--border);border-radius:6px;}
+.changelog .cl-ver{font:700 13px var(--mono);color:var(--accent);margin:10px 0 4px;}
+.changelog .cl-ver:first-child{margin-top:0;}
+.changelog ul{margin:0 0 4px;padding-left:18px;}
+.changelog li{font-size:13px;color:#c9d1d9;line-height:1.5;margin:2px 0;}
 .warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
 table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
 th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
@@ -70,7 +75,7 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
   <div class="hdr">
     <div class="hdr-row">
       <h1>weld.stream</h1>
-      <span class="ver">v1.0.0</span>
+      <span class="ver">v1.1.0</span>
     </div>
     <p class="lead">The generation half of an AI chat app. Sends an instruction to <code>ai-text-plugin</code>, streams the reply, and manages the awkward parts: boxed-String results, the real stopReason vocabulary, aborting, and the broker's one-at-a-time limit.</p>
   </div>
@@ -162,6 +167,21 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
 <div class="note">weld.stream follows the standard weld loading pattern: it creates <code>window.weld</code> if needed and attaches itself at <code>window.weld.stream</code>. Loading it twice is a no-op that just re-attaches the dependency.</div>
 <div class="note">Pairs naturally with <a href="https://perchance.org/weld-prompt-plugin">weld.prompt</a> (build the instruction) and <a href="https://perchance.org/weld-tokens-plugin">weld.tokens</a> (exact counts). The demo also uses <a href="https://perchance.org/weld-ui-plugin">weld.ui</a> for its controls.</div>
 </div>
+<h2>Default chat stops <span class="tag">v1.1.0</span></h2>
+<div class="sig" data-codeid="sig_stops"></div>
+<p><code>DEFAULT_CHAT_STOPS</code> is the exported list of the two standard chat stop sequences weld.stream applies in <code>chat</code> mode. It&rsquo;s exposed so an app can reuse or extend the same defaults rather than re-deriving them.</p>
+<pre data-codeid="stops_ex"></pre>
+<h2>Changelog</h2>
+<div class="changelog">
+<p class="cl-ver">v1.1.0</p>
+<ul>
+<li>Exposed DEFAULT_CHAT_STOPS.</li>
+</ul>
+<p class="cl-ver">v1.0.0</p>
+<ul>
+<li>Initial release: streamed text generation via ai-text.</li>
+</ul>
+</div>
 <script>
 (function(){
   var examples = {
@@ -181,7 +201,9 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
   'sig_meta': 'weld.stream.meta() -> \{ countTokens, idealMaxContextTokens \} | null',
   'sig_preload': 'weld.stream.preload()',
   'token_ex': 'var budget = stream.budget();        // e.g. 5200  (6000 - 800)\nvar used   = stream.count(history);  // approx tokens in the history\nwhile (used > budget) \{\n  history = dropOldest(history);\n  used = stream.count(history);\n\}',
-  'sig_attach': 'weld.stream.attach(\{ aiTextPlugin \})'
+  'sig_attach': 'weld.stream.attach(\{ aiTextPlugin \})',
+  'sig_stops': 'weld.stream.DEFAULT_CHAT_STOPS -> string\[]',
+  'stops_ex': 'var stops = weld.stream.DEFAULT_CHAT_STOPS.concat(\[\'### \']);',
 };
   function escapeHTML(s){
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -215,6 +237,7 @@ var aiTextPlugin = (window.root && window.root.aiTextPlugin) || null;
 
 if (!window.weld) window.weld = {};
 if (window.weld.stream) {
+  window.weld.stream.attach({ aiTextPlugin: aiTextPlugin });
   return window.weld.stream;
 }
 
@@ -550,6 +573,7 @@ function preload() {
 window.weld.stream = {
   attach: attach,
   run: run,
+  normalize: normalize,
   stopAll: stopAll,
   isBusy: isBusy,
   pending: pending,
@@ -558,12 +582,12 @@ window.weld.stream = {
   budget: budget,
   preload: preload,
   DEFAULT_CHAT_STOPS: DEFAULT_CHAT_STOPS,
-  version: '1.0.0'
+  version: '1.1.0'
 };
 
+window.weld.stream.attach({ aiTextPlugin: aiTextPlugin });
 
 return window.weld.stream;
-
 })();
 </script>
 <footer class="footer">

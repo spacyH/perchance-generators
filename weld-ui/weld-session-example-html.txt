@@ -1,0 +1,734 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--amber:#d29922;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:780px;margin:0 auto;padding:34px 18px 90px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 0 16px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+.breadcrumb a{color:var(--muted);}.breadcrumb .sep{color:var(--faint);margin:0 8px;}.breadcrumb .cur{color:var(--ink);}.breadcrumb .act a{color:var(--accent);}
+.hdr{margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}.hdr h1{font:700 24px var(--mono);letter-spacing:-0.5px;}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;}
+.hdr .lead{color:var(--muted);margin-top:8px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;}
+.panel h2{font:600 13px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:8px 0;}
+.lbl{font:600 12px var(--mono);color:var(--muted);min-width:74px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 15px;font:600 13px var(--font);cursor:pointer;transition:.12s;}
+.btn:hover{filter:brightness(1.08);}.btn.ghost{background:var(--faint);color:var(--ink);}.btn.sm{padding:6px 11px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+input[type=text],textarea{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:8px 10px;font:13px var(--font);}
+input[type=text]{flex:1;min-width:120px;}textarea{width:100%;font:12.5px/1.5 var(--mono);resize:vertical;}
+.mono{font:13px var(--mono);}
+.out{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font:12.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;min-height:20px;color:#c9d1d9;}
+.chip{display:inline-block;background:var(--faint);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font:600 12px var(--mono);margin:2px;}
+.chip.k{background:rgba(63,185,80,.14);border-color:rgba(63,185,80,.4);color:#7ee787;}
+.chip.d{opacity:.4;text-decoration:line-through;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:9px 13px;border-radius:0 4px 4px 0;margin:12px 0 0;font-size:12.5px;color:#c9d1d9;}
+.note.warn{background:rgba(210,153,34,.08);border-color:var(--amber);}
+.tag{font:600 10px var(--mono);padding:2px 7px;border-radius:4px;background:rgba(63,185,80,.14);color:#7ee787;border:1px solid rgba(63,185,80,.4);}
+.tag.ai{background:rgba(210,153,34,.12);color:#e3b341;border-color:rgba(210,153,34,.4);}
+.bar{height:14px;background:var(--accent);border-radius:3px;transition:width .3s;}
+.footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);}.footer a{color:var(--muted);}
+.flex{display:flex;gap:10px;align-items:center;}.wrap{flex-wrap:wrap;}.grow{flex:1;}.mt{margin-top:10px;}
+</style>
+<div id="page">
+<div class="breadcrumb"><span><a href="https://perchance.org/weld-ui-index">weld</a><span class="sep">/</span>weld.session<span class="sep">/</span><span class="cur">demo</span></span><span class="act"><a href="https://perchance.org/weld-session-plugin">docs &rarr;</a></span></div>
+<div class="hdr"><div class="hdr-row"><h1>weld.session &mdash; demo</h1><span class="ver">v1.0.0</span></div><p class="lead">Build a branching conversation: send messages, regenerate a reply into a new sibling take, and swipe between takes. Assistant text and images are mocked so the demo runs without a backend; in a real app they come from weld.stream and weld.image.</p></div>
+  <div class="panel"><h2>Conversation timeline <span class="tag">one object, the whole weave</span></h2>
+    <div id="tl" class="out mt" style="min-height:120px;"></div>
+    <div class="row"><input id="msg" type="text" value="tell me about foxes" style="flex:1;"><button id="send" class="btn">Send</button></div>
+    <div class="row"><button id="regen" class="btn ghost">Regenerate last</button><button id="prev" class="btn sm ghost">&larr; take</button><span id="takeinfo" class="chip">â</span><button id="next" class="btn sm ghost">take &rarr;</button></div>
+    <div class="note">A weld.session owns a branching tree of turns. Sending adds a user turn and a (mock) assistant reply; Regenerate forks a new sibling take of the last reply; the take arrows swipe between alternates. In a real app the assistant text comes from weld.stream and images from weld.image &mdash; here they are mocked so the demo runs without a backend. This is the weave Smart-story did by hand, now in one plugin.</div>
+  </div>
+<footer class="footer"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
+</div>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.session) return window.weld.session;
+
+// -----------------------------------------------------------------
+// weld.session: the timeline an app talks to, instead of five plugins.
+//
+// Frosting's dreamChat models a chat and its generated images as ONE
+// timeline. Weld split that across stream (text), image (pictures),
+// branching (alternates/tree), regen (swipe), and history (persistence) --
+// and left every app (Smart-story included) to weave them by hand. That
+// weave is where the seams and bugs live. weld.session owns the weave.
+//
+//   var s = weld.session.create();
+//   s.addUser('draw me a fox in snow');
+//   await s.addAssistant({ stream: true });        // streams via weld.stream
+//   await s.addImage({ prompt: 'a fox in snow' });  // via weld.image
+//   var turns = s.timeline();                        // what to render
+//   await s.regenerate(turnId);                      // a new sibling take
+//   s.swipe(turnId, +1);                             // move between takes
+//
+// A TURN is { id, role, kind, content, meta, createdAt }:
+//   role: 'user' | 'assistant' | 'system'
+//   kind: 'text' | 'image'
+//   content: the text string, or for images { url, prompt, params }
+// The active path through the branching tree IS the visible conversation;
+// siblings of a node are its alternate takes.
+//
+// Every dependency is SOFT. With weld.branching it gets real per-turn
+// branching; without it, a flat linear list. With weld.stream/image it can
+// generate; without, you add turns manually. With weld.history it persists.
+// -----------------------------------------------------------------
+
+function createSession(opts) {
+  opts = opts || {};
+  var listeners = new Array();
+  var idSeq = 0;
+  function uid() { idSeq++; return 't' + Date.now().toString(36) + '_' + idSeq.toString(36); }
+
+  // ---- the backing store: a branching tree if available, else linear ----
+  var tree = null;
+  var linear = null;          // fallback: ordered array of turn objects
+  var linearActive = null;    // id of the last turn in linear mode
+  if (window.weld && window.weld.branching && typeof window.weld.branching.create === 'function') {
+    tree = window.weld.branching.create();
+  } else {
+    linear = new Array();
+  }
+
+  function emit(event, data) {
+    for (var i = 0; i < listeners.length; i++) {
+      try { Reflect.get(listeners, i)(event, data); } catch (e) { /* swallow */ }
+    }
+  }
+  function onChange(fn) {
+    if (typeof fn !== 'function') return function () {};
+    listeners.push(fn);
+    return function () {
+      var ix = listeners.indexOf(fn);
+      if (ix !== -1) listeners.splice(ix, 1);
+    };
+  }
+
+  // ---- turn construction --------------------------------------------
+  function makeTurn(role, kind, content, meta) {
+    return {
+      id: uid(),
+      role: role,
+      kind: kind || 'text',
+      content: content,
+      meta: meta || null,
+      createdAt: Date.now()
+    };
+  }
+
+  // Append a turn after the current active leaf. Returns the turn.
+  function appendTurn(turn) {
+    if (tree) {
+      var parentId = tree.getActiveId ? tree.getActiveId() : null;
+      var nodeId = tree.append(turn, parentId);
+      turn.id = nodeId;                 // adopt the tree's id as the turn id
+      if (tree.setActive) tree.setActive(nodeId);
+    } else {
+      linear.push(turn);
+      linearActive = turn.id;
+    }
+    emit('turn', { turn: turn });
+    return turn;
+  }
+
+  // ---- public: add turns --------------------------------------------
+  function addUser(text, meta) {
+    return appendTurn(makeTurn('user', 'text', String(text == null ? '' : text), meta));
+  }
+  function addSystem(text, meta) {
+    return appendTurn(makeTurn('system', 'text', String(text == null ? '' : text), meta));
+  }
+
+  // addAssistant(textOrOpts): if given a string, appends it directly. If
+  // given { stream:true } (and weld.stream is present), streams a reply,
+  // emitting 'stream' events as chunks arrive, then finalizes the turn.
+  function addAssistant(arg, meta) {
+    if (typeof arg === 'string') {
+      return Promise.resolve(appendTurn(makeTurn('assistant', 'text', arg, meta)));
+    }
+    var o = arg || {};
+    var turn = makeTurn('assistant', 'text', '', o.meta || meta);
+    // place the (empty) turn now so the UI can show a streaming bubble
+    appendTurn(turn);
+
+    var stream = window.weld && window.weld.stream;
+    if (!o.stream || !stream || typeof stream.generate !== 'function') {
+      // no streaming available: if a prompt was given but we can't run it,
+      // just return the (possibly empty) turn for the app to fill.
+      if (typeof o.text === 'string') { turn.content = o.text; emit('turn', { turn: turn }); }
+      return Promise.resolve(turn);
+    }
+
+    var prompt = o.prompt != null ? o.prompt : promptFromTimeline();
+    return new Promise(function (resolve, reject) {
+      var acc = '';
+      stream.generate({
+        prompt: prompt,
+        onChunk: function (chunk) {
+          acc += String(chunk == null ? '' : chunk);
+          turn.content = acc;
+          emit('stream', { turn: turn, chunk: chunk, content: acc });
+        }
+      }).then(function (result) {
+        // weld.stream returns normalized text; prefer it over our accumulation
+        var finalText = (result && (result.text != null)) ? String(result.text) : acc;
+        turn.content = finalText;
+        if (result && result.stopReason) turn.meta = Object.assign({}, turn.meta, { stopReason: result.stopReason });
+        emit('turn', { turn: turn });
+        resolve(turn);
+      }).catch(function (e) {
+        turn.meta = Object.assign({}, turn.meta, { error: String(e && e.message || e) });
+        emit('turn', { turn: turn });
+        reject(e);
+      });
+    });
+  }
+
+  // addImage(opts): append an image turn. With weld.image present it
+  // generates (normalizing params through weld.genparams if available);
+  // otherwise it records the request so the app can fulfill it.
+  function addImage(arg) {
+    var o = arg || {};
+    var image = window.weld && window.weld.image;
+    var genparams = window.weld && window.weld.genparams;
+
+    var params = o;
+    var imgOpts = o;
+    if (genparams && typeof genparams.toImageOpts === 'function') {
+      params = genparams.create ? genparams.create(o) : o;
+      imgOpts = genparams.toImageOpts(o);
+    }
+
+    var turn = makeTurn('assistant', 'image', { url: null, prompt: o.prompt || '', params: params }, o.meta);
+    appendTurn(turn);
+
+    if (!image || typeof image.generate !== 'function') {
+      return Promise.resolve(turn);   // no backend; app fills turn.content.url
+    }
+    return image.generate(imgOpts).then(function (res) {
+      var url = res && (res.url || res.imageURL || res.dataURL || res.src);
+      turn.content = { url: url || null, prompt: o.prompt || '', params: params };
+      emit('turn', { turn: turn });
+      return turn;
+    }).catch(function (e) {
+      turn.meta = Object.assign({}, turn.meta, { error: String(e && e.message || e) });
+      emit('turn', { turn: turn });
+      throw e;
+    });
+  }
+
+  // ---- the visible conversation -------------------------------------
+  // timeline(): the active path through the tree (or the linear list),
+  // as an ordered array of turns. This is what an app renders.
+  function timeline() {
+    if (tree) {
+      var nodes = tree.activeBranch ? tree.activeBranch() : (tree.path ? tree.path() : new Array());
+      return nodes.map(function (n) { return n.data || n; }).filter(Boolean);
+    }
+    return linear.slice();
+  }
+
+  // Build a text prompt from the current timeline (simple role-tagged join).
+  // Apps with weld.promptforge can ignore this and pass their own prompt.
+  function promptFromTimeline() {
+    return timeline().filter(function (t) { return t.kind === 'text'; })
+      .map(function (t) { return t.role + ': ' + t.content; })
+      .join('\n') + '\nassistant:';
+  }
+
+  // ---- alternates: regenerate + swipe -------------------------------
+  // regenerate(turnId): create a NEW sibling take of an assistant/image
+  // turn (a branch off the same parent), then generate into it. Needs the
+  // tree; without branching it appends a fresh turn instead.
+  function regenerate(turnId, genOpts) {
+    genOpts = genOpts || {};
+    var existing = getTurn(turnId);
+    if (!existing) return Promise.reject(new Error('weld.session: no such turn ' + turnId));
+
+    if (tree && typeof tree.branch === 'function') {
+      var fresh = makeTurn(existing.role, existing.kind, existing.kind === 'image' ? { url: null, prompt: (existing.content && existing.content.prompt) || '', params: existing.content && existing.content.params } : '', existing.meta);
+      // branch(fromId, data) creates a sibling carrying our fresh turn as its
+      // node data in one step -- get() returns a node COPY, so setting
+      // node.data afterward would not stick. Pass the data up front.
+      var newId = tree.branch(turnId, fresh);
+      fresh.id = newId;
+      if (tree.setActive) tree.setActive(newId);
+      emit('turn', { turn: fresh, regenerated: true });
+      // generate into it
+      if (existing.kind === 'image') return fillImage(fresh, Object.assign({ prompt: fresh.content.prompt, params: fresh.content.params }, genOpts));
+      return fillAssistant(fresh, genOpts);
+    }
+    // no branching: just add a new turn
+    if (existing.kind === 'image') return addImage(Object.assign({ prompt: existing.content && existing.content.prompt }, genOpts));
+    return addAssistant(Object.assign({ stream: true }, genOpts));
+  }
+
+  // helpers that generate into an EXISTING turn (used by regenerate)
+  function fillAssistant(turn, o) {
+    o = o || {};
+    var stream = window.weld && window.weld.stream;
+    if (!stream || typeof stream.generate !== 'function') return Promise.resolve(turn);
+    var prompt = o.prompt != null ? o.prompt : promptFromTimeline();
+    var acc = '';
+    return stream.generate({
+      prompt: prompt,
+      onChunk: function (chunk) { acc += String(chunk == null ? '' : chunk); turn.content = acc; emit('stream', { turn: turn, chunk: chunk, content: acc }); }
+    }).then(function (result) {
+      turn.content = (result && result.text != null) ? String(result.text) : acc;
+      emit('turn', { turn: turn });
+      return turn;
+    });
+  }
+  function fillImage(turn, o) {
+    o = o || {};
+    var image = window.weld && window.weld.image;
+    var genparams = window.weld && window.weld.genparams;
+    if (!image || typeof image.generate !== 'function') return Promise.resolve(turn);
+    var imgOpts = (genparams && genparams.toImageOpts) ? genparams.toImageOpts(o) : o;
+    return image.generate(imgOpts).then(function (res) {
+      var url = res && (res.url || res.imageURL || res.dataURL || res.src);
+      turn.content = { url: url || null, prompt: o.prompt || '', params: o.params || null };
+      emit('turn', { turn: turn });
+      return turn;
+    });
+  }
+
+  // swipe(turnId, dir): move between sibling takes of a turn. dir is +1/-1
+  // (or 'next'/'prev'). Normalizes the tree's return (id-string OR node) the
+  // same way weld.regen does, and CLAMPS at the ends (no wraparound).
+  function swipe(turnId, dir) {
+    if (!tree || typeof tree.siblings !== 'function') return null;
+    var sibs = tree.siblings(turnId) || new Array();
+    if (sibs.length <= 1) return getTurn(turnId);
+    var ids = sibs.map(function (s) { return (typeof s === 'object') ? s.id : s; });
+    var cur = ids.indexOf(turnId);
+    if (cur === -1) cur = 0;
+    var step = (dir === 'prev' || dir === -1 || dir < 0) ? -1 : 1;
+    var next = cur + step;
+    if (next < 0) next = 0;                     // clamp, don't wrap
+    if (next >= ids.length) next = ids.length - 1;
+    var targetId = Reflect.get(ids, next);
+    if (tree.setActive) tree.setActive(targetId);
+    emit('swipe', { from: turnId, to: targetId, index: next, count: ids.length });
+    return getTurn(targetId);
+  }
+
+  // sibling info for a turn -> { index, count, ids } for swipe UIs.
+  function takes(turnId) {
+    if (!tree || typeof tree.siblings !== 'function') return { index: 0, count: 1, ids: Array.of(turnId) };
+    var sibs = tree.siblings(turnId) || new Array();
+    var ids = sibs.map(function (s) { return (typeof s === 'object') ? s.id : s; });
+    if (!ids.length) ids = Array.of(turnId);
+    var idx = ids.indexOf(turnId);
+    return { index: idx === -1 ? 0 : idx, count: ids.length, ids: ids };
+  }
+
+  // branchFrom(turnId): fork the conversation from a turn (make it active,
+  // so the next append continues from there). Returns the turn.
+  function branchFrom(turnId) {
+    if (tree && tree.setActive) tree.setActive(turnId);
+    else linearActive = turnId;
+    emit('branch', { turnId: turnId });
+    return getTurn(turnId);
+  }
+
+  // ---- lookup -------------------------------------------------------
+  function getTurn(turnId) {
+    if (tree && tree.get) {
+      var n = tree.get(turnId);
+      return n ? (n.data || n) : null;
+    }
+    for (var i = 0; i < linear.length; i++) { var lt = Reflect.get(linear, i); if (lt.id === turnId) return lt; }
+    return null;
+  }
+
+  // ---- persistence --------------------------------------------------
+  // serialize(): a plain snapshot { turns/tree }. load(snap): restore it.
+  // With weld.branching we serialize the tree; otherwise the linear list.
+  function serialize() {
+    if (tree && tree.serialize) return { mode: 'tree', tree: tree.serialize() };
+    return { mode: 'linear', turns: linear.slice(), active: linearActive };
+  }
+  function load(snap) {
+    if (!snap) return false;
+    if (snap.mode === 'tree' && tree && tree.deserialize) { tree.deserialize(snap.tree); emit('load', {}); return true; }
+    if (snap.mode === 'linear' && linear) { linear = (snap.turns || new Array()).slice(); linearActive = snap.active || null; emit('load', {}); return true; }
+    return false;
+  }
+
+  function clear() {
+    if (tree && tree.clear) tree.clear();
+    if (linear) { linear = new Array(); linearActive = null; }
+    emit('clear', {});
+  }
+
+  return {
+    addUser: addUser,
+    addSystem: addSystem,
+    addAssistant: addAssistant,
+    addImage: addImage,
+    timeline: timeline,
+    regenerate: regenerate,
+    swipe: swipe,
+    takes: takes,
+    branchFrom: branchFrom,
+    getTurn: getTurn,
+    promptFromTimeline: promptFromTimeline,
+    serialize: serialize,
+    load: load,
+    clear: clear,
+    onChange: onChange,
+    hasBranching: function () { return !!tree; }
+  };
+}
+
+window.weld.session = {
+  create: createSession,
+  version: '1.0.0'
+};
+
+return window.weld.session;
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.branching) return window.weld.branching;
+
+// -----------------------------------------------------------------
+// Node id generator
+// -----------------------------------------------------------------
+function uid() {
+  return 'n_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+// -----------------------------------------------------------------
+// Tree instance factory
+// -----------------------------------------------------------------
+function createTree(opts) {
+  opts = opts || {};
+  var storage = opts.storage;
+  var storageKey = opts.storageKey || 'weld-branching';
+
+  // Internal state
+  var nodes = {};      // id -> node
+  var rootIds = [];    // ordered list of root node ids
+  var activeId = null; // currently active leaf
+
+  function save() {
+    if (!storage) return;
+    try {
+      storage.setItem(storageKey, JSON.stringify({
+        nodes: nodes,
+        rootIds: rootIds,
+        activeId: activeId
+      }));
+    } catch (e) { /* swallow */ }
+  }
+
+  function load() {
+    if (!storage) return false;
+    try {
+      var raw = storage.getItem(storageKey);
+      if (!raw) return false;
+      var parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        nodes = parsed.nodes || {};
+        rootIds = parsed.rootIds || [];
+        activeId = parsed.activeId || null;
+        return true;
+      }
+    } catch (e) { /* swallow */ }
+    return false;
+  }
+
+  // Try loading initial state
+  load();
+
+  // -----------------------------------------------------------------
+  // Core: append a node
+  // -----------------------------------------------------------------
+  function append(data, parentId) {
+    if (data === undefined) data = null;
+    if (parentId === undefined) {
+      // Default parent: the currently active leaf, if any
+      parentId = activeId;
+    }
+    var id = uid();
+    var node = {
+      id: id,
+      parentId: parentId || null,
+      childIds: [],
+      data: data,
+      createdAt: Date.now()
+    };
+    nodes[id] = node;
+
+    if (parentId && nodes[parentId]) {
+      nodes[parentId].childIds.push(id);
+    } else {
+      // New root
+      rootIds.push(id);
+    }
+    activeId = id;
+    save();
+    return id;
+  }
+
+  // -----------------------------------------------------------------
+  // Branch -- explicit alias for append with parent
+  // -----------------------------------------------------------------
+  function branch(fromId, data) {
+    if (!nodes[fromId]) throw new Error('branching: unknown node ' + fromId);
+    var parentId = nodes[fromId].parentId;
+    var id = append(data, parentId);
+    return id;
+  }
+
+  // -----------------------------------------------------------------
+  // Get / list
+  // -----------------------------------------------------------------
+  function get(id) {
+    var n = nodes[id];
+    if (!n) return null;
+    return {
+      id: n.id,
+      parentId: n.parentId,
+      childIds: n.childIds.slice(),
+      data: n.data,
+      createdAt: n.createdAt
+    };
+  }
+
+  function getAll() {
+    var out = [];
+    for (var id in nodes) out.push(get(id));
+    return out;
+  }
+
+  function getRoots() {
+    return rootIds.map(get);
+  }
+
+  // -----------------------------------------------------------------
+  // Path: from root to a given node (or active leaf)
+  // -----------------------------------------------------------------
+  function path(toId) {
+    var target = toId || activeId;
+    if (!target || !nodes[target]) return [];
+    var chain = [];
+    var cursor = nodes[target];
+    while (cursor) {
+      chain.unshift(get(cursor.id));
+      cursor = cursor.parentId ? nodes[cursor.parentId] : null;
+    }
+    return chain;
+  }
+
+  function activeBranch() {
+    return path(activeId);
+  }
+
+  function setActive(id) {
+    if (!nodes[id]) throw new Error('branching: unknown node ' + id);
+    activeId = id;
+    save();
+    return id;
+  }
+
+  function getActiveId() {
+    return activeId;
+  }
+
+  // -----------------------------------------------------------------
+  // Siblings -- nodes with the same parent
+  // -----------------------------------------------------------------
+  function siblings(id) {
+    var n = nodes[id];
+    if (!n) return [];
+    var parentChildren;
+    if (n.parentId && nodes[n.parentId]) {
+      parentChildren = nodes[n.parentId].childIds;
+    } else {
+      parentChildren = rootIds;
+    }
+    return parentChildren.map(get);
+  }
+
+  // -----------------------------------------------------------------
+  // Switching to a sibling -- pick by index relative to current
+  // -----------------------------------------------------------------
+  function switchSibling(id, direction) {
+    var sibs = siblings(id);
+    if (sibs.length === 0) return null;
+    var idx = sibs.findIndex(function(s) { return s.id === id; });
+    if (idx === -1) return null;
+    var newIdx;
+    if (direction === 'next' || direction === 1) {
+      newIdx = (idx + 1) % sibs.length;
+    } else if (direction === 'prev' || direction === -1) {
+      newIdx = (idx - 1 + sibs.length) % sibs.length;
+    } else if (typeof direction === 'number') {
+      newIdx = Math.max(0, Math.min(sibs.length - 1, direction));
+    } else {
+      return null;
+    }
+    return sibs[newIdx].id;
+  }
+
+  // -----------------------------------------------------------------
+  // Switch branch by selecting a node; updates active to that node's deepest descendant
+  // along its primary (first-child) path
+  // -----------------------------------------------------------------
+  function switchTo(id) {
+    if (!nodes[id]) throw new Error('branching: unknown node ' + id);
+    // Walk down following first child until leaf
+    var cursor = nodes[id];
+    while (cursor.childIds.length > 0) {
+      cursor = nodes[cursor.childIds[0]];
+    }
+    activeId = cursor.id;
+    save();
+    return activeId;
+  }
+
+  // -----------------------------------------------------------------
+  // Remove a node and all its descendants
+  // -----------------------------------------------------------------
+  function remove(id) {
+    var n = nodes[id];
+    if (!n) return false;
+    // Collect descendants
+    var toRemove = [];
+    var stack = [id];
+    while (stack.length) {
+      var cur = stack.pop();
+      toRemove.push(cur);
+      var node = nodes[cur];
+      if (node) {
+        for (var i = 0; i < node.childIds.length; i++) stack.push(node.childIds[i]);
+      }
+    }
+    // Detach from parent
+    if (n.parentId && nodes[n.parentId]) {
+      nodes[n.parentId].childIds = nodes[n.parentId].childIds.filter(function(c) { return c !== id; });
+    } else {
+      rootIds = rootIds.filter(function(r) { return r !== id; });
+    }
+    // Delete all
+    for (var k = 0; k < toRemove.length; k++) delete nodes[toRemove[k]];
+    // Reset active if needed
+    if (toRemove.indexOf(activeId) !== -1) {
+      activeId = (n.parentId && nodes[n.parentId]) ? n.parentId : (rootIds[0] || null);
+    }
+    save();
+    return true;
+  }
+
+  function clear() {
+    nodes = {};
+    rootIds = [];
+    activeId = null;
+    save();
+  }
+
+  // -----------------------------------------------------------------
+  // Serialize / deserialize
+  // -----------------------------------------------------------------
+  function serialize() {
+    return JSON.parse(JSON.stringify({
+      nodes: nodes,
+      rootIds: rootIds,
+      activeId: activeId
+    }));
+  }
+
+  function deserialize(state) {
+    if (!state || typeof state !== 'object') throw new Error('branching: invalid state');
+    nodes = state.nodes ? JSON.parse(JSON.stringify(state.nodes)) : {};
+    rootIds = state.rootIds ? state.rootIds.slice() : [];
+    activeId = state.activeId || null;
+    save();
+  }
+
+  function size() {
+    var n = 0;
+    for (var k in nodes) n++;
+    return n;
+  }
+
+  function isLeaf(id) {
+    var n = nodes[id];
+    return n && n.childIds.length === 0;
+  }
+
+  return {
+    append: append,
+    branch: branch,
+    get: get,
+    getAll: getAll,
+    getRoots: getRoots,
+    path: path,
+    activeBranch: activeBranch,
+    setActive: setActive,
+    getActiveId: getActiveId,
+    siblings: siblings,
+    switchSibling: switchSibling,
+    switchTo: switchTo,
+    remove: remove,
+    clear: clear,
+    serialize: serialize,
+    deserialize: deserialize,
+    size: size,
+    isLeaf: isLeaf
+  };
+}
+
+window.weld.branching = {
+  create: createTree,
+  version: '1.0.0'
+};
+
+return window.weld.branching;
+})();
+</script>
+<script>
+
+  function boot(){ if(!window.weld||!window.weld.session||!window.weld.branching){return setTimeout(boot,100);} init(); }
+  function init(){
+    var $=function(id){return document.getElementById(id);};
+    // mock stream + image so the demo is self-contained
+    var n=0;
+    window.weld.stream={ generate:function(o){ n++; var t='Foxes are remarkable (reply '+n+'). They are agile, clever, and live almost everywhere.'; if(o.onChunk)o.onChunk(t); return Promise.resolve({text:t, stopReason:'natural'}); } };
+    var s=window.weld.session.create();
+    var lastAssistant=null;
+    function render(){
+      var tl=s.timeline();
+      $('tl').innerHTML = tl.map(function(t){
+        var who = t.role==='user' ? 'you' : (t.kind==='image'?'image':'ai');
+        var body = t.kind==='image' ? ('[image: '+(t.content&&t.content.url||'...')+']') : t.content;
+        return '<div style="margin:6px 0;"><b style="color:var(--accent)">'+who+':</b> '+escapeHtml(body)+'</div>';
+      }).join('') || '<span class="muted">no messages yet</span>';
+      if(lastAssistant){ var tk=s.takes(lastAssistant.id); $('takeinfo').textContent='take '+(tk.index+1)+' / '+tk.count; }
+    }
+    function escapeHtml(x){ return String(x).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+    $('send').onclick=function(){
+      var v=$('msg').value.trim(); if(!v)return; s.addUser(v); $('msg').value='';
+      s.addAssistant({stream:true}).then(function(a){ lastAssistant=a; render(); }); render();
+    };
+    $('regen').onclick=function(){ if(!lastAssistant)return; s.regenerate(lastAssistant.id).then(function(a){ lastAssistant=a; render(); }); };
+    $('prev').onclick=function(){ if(!lastAssistant)return; var r=s.swipe(lastAssistant.id,-1); if(r)lastAssistant=r; render(); };
+    $('next').onclick=function(){ if(!lastAssistant)return; var r=s.swipe(lastAssistant.id,+1); if(r)lastAssistant=r; render(); };
+    render();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+
+</script>

@@ -1,0 +1,312 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--amber:#d29922;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:780px;margin:0 auto;padding:34px 18px 90px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 0 16px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+.breadcrumb a{color:var(--muted);}.breadcrumb .sep{color:var(--faint);margin:0 8px;}.breadcrumb .cur{color:var(--ink);}.breadcrumb .act a{color:var(--accent);}
+.hdr{margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}.hdr h1{font:700 24px var(--mono);letter-spacing:-0.5px;}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;}
+.hdr .lead{color:var(--muted);margin-top:8px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;}
+.panel h2{font:600 13px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:8px 0;}
+.lbl{font:600 12px var(--mono);color:var(--muted);min-width:74px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 15px;font:600 13px var(--font);cursor:pointer;transition:.12s;}
+.btn:hover{filter:brightness(1.08);}.btn.ghost{background:var(--faint);color:var(--ink);}.btn.sm{padding:6px 11px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+input[type=text],textarea{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:8px 10px;font:13px var(--font);}
+input[type=text]{flex:1;min-width:120px;}textarea{width:100%;font:12.5px/1.5 var(--mono);resize:vertical;}
+.mono{font:13px var(--mono);}
+.out{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font:12.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;min-height:20px;color:#c9d1d9;}
+.chip{display:inline-block;background:var(--faint);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font:600 12px var(--mono);margin:2px;}
+.chip.k{background:rgba(63,185,80,.14);border-color:rgba(63,185,80,.4);color:#7ee787;}
+.chip.d{opacity:.4;text-decoration:line-through;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:9px 13px;border-radius:0 4px 4px 0;margin:12px 0 0;font-size:12.5px;color:#c9d1d9;}
+.note.warn{background:rgba(210,153,34,.08);border-color:var(--amber);}
+.tag{font:600 10px var(--mono);padding:2px 7px;border-radius:4px;background:rgba(63,185,80,.14);color:#7ee787;border:1px solid rgba(63,185,80,.4);}
+.tag.ai{background:rgba(210,153,34,.12);color:#e3b341;border-color:rgba(210,153,34,.4);}
+.bar{height:14px;background:var(--accent);border-radius:3px;transition:width .3s;}
+.footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);}.footer a{color:var(--muted);}
+.flex{display:flex;gap:10px;align-items:center;}.wrap{flex-wrap:wrap;}.grow{flex:1;}.mt{margin-top:10px;}
+</style>
+<div id="page">
+<div class="breadcrumb"><span><a href="https://perchance.org/weld-ui-index">weld</a><span class="sep">/</span>weld.genparams<span class="sep">/</span><span class="cur">demo</span></span><span class="act"><a href="https://perchance.org/weld-genparams-plugin">docs &rarr;</a></span></div>
+<div class="hdr"><div class="hdr-row"><h1>weld.genparams &mdash; demo</h1><span class="ver">v1.0.0</span></div><p class="lead">Build and validate a generation-parameter set, watch out-of-range values get clamped, resolve named aspect ratios to legal sizes, and see the exact opts object weld.image.generate consumes. Remix forks it with a fresh seed.</p></div>
+  <div class="panel"><h2>Parameter builder <span class="tag">normalized schema</span></h2>
+    <div class="row"><label class="lbl">prompt</label><input id="prompt" type="text" value="a fox in snow, watercolor" style="flex:1;"></div>
+    <div class="row"><label class="lbl">negative</label><input id="neg" type="text" value="blurry, low quality" style="flex:1;"></div>
+    <div class="row"><label class="lbl">aspect</label><select id="aspect"><option>square</option><option>portrait</option><option>landscape</option><option>large</option></select>
+      <label class="lbl">steps</label><input id="steps" type="number" value="30" style="width:70px;">
+      <label class="lbl">cfg</label><input id="cfg" type="number" value="8" style="width:60px;"></div>
+    <div class="row"><button id="build" class="btn">Validate &amp; build</button><button id="remix" class="btn ghost">Remix (new seed)</button><span id="desc" class="chip">—</span></div>
+    <div id="warn" class="out mt" style="display:none;"></div>
+    <div id="out" class="out mt"></div>
+    <div class="note">weld.genparams normalizes everything an image app needs into one shape, clamps out-of-range values (try steps=999), resolves named aspect ratios to Perchance-legal sizes, and produces the exact opts object <code>weld.image.generate</code> wants. "Remix" forks the params with a fresh random seed. It calls no backend &mdash; it just hands you a clean, validated params object.</div>
+  </div>
+<footer class="footer"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
+</div>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.genparams) return window.weld.genparams;
+
+// -----------------------------------------------------------------
+// weld.genparams: one shape for "how should this image be generated".
+//
+// Every image front-end ends up with the same sprawling parameter set --
+// prompt, negative prompt, aspect ratio, steps, guidance scale, sampler,
+// seed, batch size, and so on. Apps reinvent it, weld.promptforge emits a
+// prompt with no home for the rest, and weld.image just forwards whatever
+// opts it's handed. weld.genparams gives that set a name and a default:
+//
+//   var p = weld.genparams.create({ prompt: 'a fox in snow', steps: 30 });
+//   var fixed = weld.genparams.validate(p);          // clamps + warns
+//   var forImage = weld.genparams.toImageOpts(fixed); // -> weld.image.generate
+//   var remixed = weld.genparams.remix(p, { seed: 12345, cfgScale: 9 });
+//
+// It calls NO backend. It just normalizes, so the rest of the suite agrees
+// on one schema and an app can degrade gracefully: a backend that ignores
+// cfgScale still gets a valid prompt + size, never a crash.
+// -----------------------------------------------------------------
+
+// Named aspect ratios -> Perchance-legal t2i sizes (512/768 grid).
+// (Perchance's text-to-image-plugin only accepts these four boxes.)
+var ASPECTS = {
+  square:    { ratio: '1:1',  width: 512, height: 512 },
+  portrait:  { ratio: '2:3',  width: 512, height: 768 },
+  landscape: { ratio: '3:2',  width: 768, height: 512 },
+  large:     { ratio: '1:1',  width: 768, height: 768 }
+};
+
+// The full default schema. Fields a backend doesn't understand are simply
+// ignored downstream; nothing here forces a particular generator.
+function defaults() {
+  return {
+    prompt: '',
+    negativePrompt: '',
+    aspect: 'square',          // a key of ASPECTS, or set width/height directly
+    width: null,               // if set, overrides aspect
+    height: null,
+    steps: 25,                 // sampling steps
+    cfgScale: 7,               // guidance / how hard to follow the prompt
+    sampler: 'default',        // sampler/scheduler name (backend-specific)
+    seed: null,                // null = random each run
+    batchSize: 1,              // how many images to request
+    clipSkip: 1,
+    strength: null,            // img2img/denoise strength, 0..1 (null = n/a)
+    style: null,               // a weld.image style preset name, optional
+    conditioning: null,        // optional ControlNet-style block (see below)
+    extra: null                // escape hatch for backend-specific fields
+  };
+}
+
+// Allowed ranges for clamping. Kept deliberately generous; a backend may
+// narrow further. Each range is a two-element min/max pair.
+var RANGES = {
+  steps:     [1, 150],
+  cfgScale:  [1, 30],
+  batchSize: [1, 8],
+  clipSkip:  [1, 12],
+  strength:  [0, 1]
+};
+
+function clampNum(v, lohi, fallback) {
+  var n = Number(v);
+  if (!isFinite(n)) return fallback;
+  if (n < lohi[0]) return lohi[0];
+  if (n > lohi[1]) return lohi[1];
+  return n;
+}
+
+// create(overrides): a fully-populated params object (defaults + your keys).
+function create(overrides) {
+  var p = defaults();
+  if (overrides && typeof overrides === 'object') {
+    for (var k in overrides) {
+      if (Object.prototype.hasOwnProperty.call(overrides, k)) Reflect.set(p, k, Reflect.get(overrides, k));
+    }
+  }
+  return p;
+}
+
+// resolveSize(p): figure out the final width/height. Explicit width+height
+// win; otherwise the named aspect resolves to a legal box.
+function resolveSize(p) {
+  if (p && p.width && p.height) return { width: p.width | 0, height: p.height | 0, ratio: null };
+  var a = (p && Reflect.get(ASPECTS, p.aspect)) ? Reflect.get(ASPECTS, p.aspect) : ASPECTS.square;
+  return { width: a.width, height: a.height, ratio: a.ratio };
+}
+
+// validate(p): returns { params, warnings }. Clamps numbers into range,
+// fills missing fields, and notes anything it had to correct. Never throws
+// on bad input -- it repairs and warns, because a generator call shouldn't
+// die over a too-high step count.
+function validate(input) {
+  var p = create(input);
+  var warnings = new Array();
+
+  if (!String(p.prompt || '').trim()) {
+    warnings.push('empty prompt -- most backends will hang or error on this');
+  }
+
+  var before;
+  before = p.steps;     p.steps = clampNum(p.steps, RANGES.steps, 25);          if (p.steps !== Number(before)) warnings.push('steps clamped to ' + p.steps);
+  before = p.cfgScale;  p.cfgScale = clampNum(p.cfgScale, RANGES.cfgScale, 7);  if (p.cfgScale !== Number(before)) warnings.push('cfgScale clamped to ' + p.cfgScale);
+  before = p.batchSize; p.batchSize = clampNum(p.batchSize, RANGES.batchSize, 1) | 0; if (p.batchSize !== (Number(before) | 0)) warnings.push('batchSize clamped to ' + p.batchSize);
+  before = p.clipSkip;  p.clipSkip = clampNum(p.clipSkip, RANGES.clipSkip, 1) | 0; if (p.clipSkip !== (Number(before) | 0)) warnings.push('clipSkip clamped to ' + p.clipSkip);
+
+  if (p.strength != null) {
+    before = p.strength; p.strength = clampNum(p.strength, RANGES.strength, null);
+    if (p.strength !== Number(before)) warnings.push('strength clamped to ' + p.strength);
+  }
+
+  if (p.seed != null) {
+    var s = Number(p.seed);
+    p.seed = isFinite(s) ? (s | 0) : null;
+    if (p.seed == null) warnings.push('seed was not a number -- set to random (null)');
+  }
+
+  if (!p.width && !p.height && !Reflect.get(ASPECTS, p.aspect)) {
+    warnings.push('unknown aspect "' + p.aspect + '" -- defaulting to square');
+    p.aspect = 'square';
+  }
+
+  if (p.conditioning) {
+    var c = normalizeConditioning(p.conditioning);
+    if (!c) { warnings.push('conditioning block was malformed -- dropped'); p.conditioning = null; }
+    else p.conditioning = c;
+  }
+
+  return { params: p, warnings: warnings };
+}
+
+// Optional ControlNet-style conditioning. Normalized but never required.
+function normalizeConditioning(c) {
+  if (!c || typeof c !== 'object') return null;
+  if (!c.image && !c.type) return null;
+  return {
+    type: String(c.type || 'reference'),     // pose | depth | canny | reference | ...
+    image: c.image || null,                  // url/dataURL the backend understands
+    strength: c.strength != null ? clampNum(c.strength, [0, 2], 1) : 1,
+    scale: c.scale != null ? Number(c.scale) : 1,
+    endPercent: c.endPercent != null ? clampNum(c.endPercent, [0, 1], 1) : 1
+  };
+}
+
+// merge(base, overrides): shallow merge producing a NEW params object.
+function merge(base, overrides) {
+  var p = create(base);
+  if (overrides && typeof overrides === 'object') {
+    for (var k in overrides) {
+      if (Object.prototype.hasOwnProperty.call(overrides, k)) Reflect.set(p, k, Reflect.get(overrides, k));
+    }
+  }
+  return p;
+}
+
+// remix(base, overrides): like merge, but tuned for "take this generation
+// and tweak it" -- by default it RANDOMIZES the seed (a remix should look
+// different) unless you pin one in the overrides.
+function remix(base, overrides) {
+  var p = merge(base, overrides);
+  var pinnedSeed = overrides && Object.prototype.hasOwnProperty.call(overrides, 'seed');
+  if (!pinnedSeed) p.seed = randomSeed();
+  return p;
+}
+
+function randomSeed() { return (Math.floor(Math.random() * 2147483647)) | 0; }
+
+// toImageOpts(p): produce the opts object weld.image.generate expects.
+// Resolves the size, maps names, and forwards the rest so a richer backend
+// can pick up what it understands. weld.image only needs prompt+resolution,
+// so this always yields something it can run.
+function toImageOpts(input) {
+  var v = validate(input);
+  var p = v.params;
+  var size = resolveSize(p);
+  var opts = {
+    prompt: p.prompt,
+    negativePrompt: p.negativePrompt || undefined,
+    resolution: size.width + 'x' + size.height,
+    width: size.width,
+    height: size.height,
+    steps: p.steps,
+    cfgScale: p.cfgScale,
+    guidanceScale: p.cfgScale,     // alias many backends use
+    sampler: p.sampler !== 'default' ? p.sampler : undefined,
+    seed: p.seed != null ? p.seed : undefined,
+    batchSize: p.batchSize,
+    clipSkip: p.clipSkip,
+    strength: p.strength != null ? p.strength : undefined,
+    style: p.style || undefined
+  };
+  if (p.conditioning) opts.conditioning = p.conditioning;
+  if (p.extra && typeof p.extra === 'object') {
+    for (var k in p.extra) { if (Object.prototype.hasOwnProperty.call(p.extra, k)) Reflect.set(opts, k, Reflect.get(p.extra, k)); }
+  }
+  return opts;
+}
+
+// A compact human-readable description of a params set, for UIs/tooltips.
+function describe(input) {
+  var p = create(input);
+  var size = resolveSize(p);
+  var bits = new Array();
+  bits.push(size.width + 'x' + size.height + (size.ratio ? ' (' + size.ratio + ')' : ''));
+  bits.push(p.steps + ' steps');
+  bits.push('cfg ' + p.cfgScale);
+  if (p.seed != null) bits.push('seed ' + p.seed);
+  if (p.batchSize > 1) bits.push('x' + p.batchSize);
+  if (p.style) bits.push('style: ' + p.style);
+  if (p.conditioning) bits.push('+' + p.conditioning.type);
+  return bits.join(' / ');
+}
+
+function aspectNames() { return Object.keys(ASPECTS); }
+
+window.weld.genparams = {
+  defaults: defaults,
+  create: create,
+  validate: validate,
+  merge: merge,
+  remix: remix,
+  toImageOpts: toImageOpts,
+  resolveSize: resolveSize,
+  describe: describe,
+  aspects: ASPECTS,
+  aspectNames: aspectNames,
+  ranges: RANGES,
+  randomSeed: randomSeed,
+  version: '1.0.0'
+};
+
+return window.weld.genparams;
+})();
+</script>
+<script>
+
+  function boot(){ if(!window.weld||!window.weld.genparams){return setTimeout(boot,100);} init(); }
+  function init(){
+    var G=window.weld.genparams, $=function(id){return document.getElementById(id);};
+    var last=null;
+    function read(){ return { prompt:$('prompt').value, negativePrompt:$('neg').value, aspect:$('aspect').value, steps:+$('steps').value, cfgScale:+$('cfg').value }; }
+    function show(p){
+      last=p;
+      var v=G.validate(p);
+      $('desc').textContent=G.describe(v.params);
+      if(v.warnings.length){ $('warn').style.display='block'; $('warn').textContent='warnings:\n  '+v.warnings.join('\n  '); } else { $('warn').style.display='none'; }
+      $('out').textContent='// weld.image.generate(opts):\n'+JSON.stringify(G.toImageOpts(v.params), null, 2);
+    }
+    $('build').onclick=function(){ show(read()); };
+    $('remix').onclick=function(){ if(!last)last=read(); var r=G.remix(last,{}); $('prompt').value=r.prompt; show(r); };
+    show(read());
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+
+</script>

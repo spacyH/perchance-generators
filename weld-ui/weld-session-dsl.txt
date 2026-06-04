@@ -1,0 +1,354 @@
+$meta
+  title       = weld.session
+  description = The unified conversation timeline for a Perchance AI app: one object that owns a branching tree of turns (user / assistant / image), so apps stop hand-weaving weld.stream + weld.image + weld.branching + weld.history. A turn is { id, role, kind, content, meta }; the active path through the tree is the visible conversation. addUser/addAssistant/addImage append turns, regenerate forks an alternate, swipe moves between siblings, branchFrom forks the thread, timeline() returns what to render. Delegates to the rest of the suite when present (branching for the tree, stream for text, image+genparams for pictures, history for persistence) and degrades gracefully when a dep is absent. Inspired by Frosting's dreamChat. Stash on window.weld.session.
+  tags        = weld, session, timeline, chat, conversation, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.session) return window.weld.session;
+
+  // -----------------------------------------------------------------
+  // weld.session: the timeline an app talks to, instead of five plugins.
+  //
+  // Frosting's dreamChat models a chat and its generated images as ONE
+  // timeline. Weld split that across stream (text), image (pictures),
+  // branching (alternates/tree), regen (swipe), and history (persistence) --
+  // and left every app (Smart-story included) to weave them by hand. That
+  // weave is where the seams and bugs live. weld.session owns the weave.
+  //
+  //   var s = weld.session.create();
+  //   s.addUser('draw me a fox in snow');
+  //   await s.addAssistant({ stream: true });        // streams via weld.stream
+  //   await s.addImage({ prompt: 'a fox in snow' });  // via weld.image
+  //   var turns = s.timeline();                        // what to render
+  //   await s.regenerate(turnId);                      // a new sibling take
+  //   s.swipe(turnId, +1);                             // move between takes
+  //
+  // A TURN is { id, role, kind, content, meta, createdAt }:
+  //   role: 'user' | 'assistant' | 'system'
+  //   kind: 'text' | 'image'
+  //   content: the text string, or for images { url, prompt, params }
+  // The active path through the branching tree IS the visible conversation;
+  // siblings of a node are its alternate takes.
+  //
+  // Every dependency is SOFT. With weld.branching it gets real per-turn
+  // branching; without it, a flat linear list. With weld.stream/image it can
+  // generate; without, you add turns manually. With weld.history it persists.
+  // -----------------------------------------------------------------
+
+  function createSession(opts) {
+    opts = opts || {};
+    var listeners = new Array();
+    var idSeq = 0;
+    function uid() { idSeq++; return 't' + Date.now().toString(36) + '_' + idSeq.toString(36); }
+
+    // ---- the backing store: a branching tree if available, else linear ----
+    var tree = null;
+    var linear = null;          // fallback: ordered array of turn objects
+    var linearActive = null;    // id of the last turn in linear mode
+    if (window.weld && window.weld.branching && typeof window.weld.branching.create === 'function') {
+      tree = window.weld.branching.create();
+    } else {
+      linear = new Array();
+    }
+
+    function emit(event, data) {
+      for (var i = 0; i < listeners.length; i++) {
+        try { Reflect.get(listeners, i)(event, data); } catch (e) { /* swallow */ }
+      }
+    }
+    function onChange(fn) {
+      if (typeof fn !== 'function') return function () {};
+      listeners.push(fn);
+      return function () {
+        var ix = listeners.indexOf(fn);
+        if (ix !== -1) listeners.splice(ix, 1);
+      };
+    }
+
+    // ---- turn construction --------------------------------------------
+    function makeTurn(role, kind, content, meta) {
+      return {
+        id: uid(),
+        role: role,
+        kind: kind || 'text',
+        content: content,
+        meta: meta || null,
+        createdAt: Date.now()
+      };
+    }
+
+    // Append a turn after the current active leaf. Returns the turn.
+    function appendTurn(turn) {
+      if (tree) {
+        var parentId = tree.getActiveId ? tree.getActiveId() : null;
+        var nodeId = tree.append(turn, parentId);
+        turn.id = nodeId;                 // adopt the tree's id as the turn id
+        if (tree.setActive) tree.setActive(nodeId);
+      } else {
+        linear.push(turn);
+        linearActive = turn.id;
+      }
+      emit('turn', { turn: turn });
+      return turn;
+    }
+
+    // ---- public: add turns --------------------------------------------
+    function addUser(text, meta) {
+      return appendTurn(makeTurn('user', 'text', String(text == null ? '' : text), meta));
+    }
+    function addSystem(text, meta) {
+      return appendTurn(makeTurn('system', 'text', String(text == null ? '' : text), meta));
+    }
+
+    // addAssistant(textOrOpts): if given a string, appends it directly. If
+    // given { stream:true } (and weld.stream is present), streams a reply,
+    // emitting 'stream' events as chunks arrive, then finalizes the turn.
+    function addAssistant(arg, meta) {
+      if (typeof arg === 'string') {
+        return Promise.resolve(appendTurn(makeTurn('assistant', 'text', arg, meta)));
+      }
+      var o = arg || {};
+      var turn = makeTurn('assistant', 'text', '', o.meta || meta);
+      // place the (empty) turn now so the UI can show a streaming bubble
+      appendTurn(turn);
+
+      var stream = window.weld && window.weld.stream;
+      if (!o.stream || !stream || typeof stream.generate !== 'function') {
+        // no streaming available: if a prompt was given but we can't run it,
+        // just return the (possibly empty) turn for the app to fill.
+        if (typeof o.text === 'string') { turn.content = o.text; emit('turn', { turn: turn }); }
+        return Promise.resolve(turn);
+      }
+
+      var prompt = o.prompt != null ? o.prompt : promptFromTimeline();
+      return new Promise(function (resolve, reject) {
+        var acc = '';
+        stream.generate({
+          prompt: prompt,
+          onChunk: function (chunk) {
+            acc += String(chunk == null ? '' : chunk);
+            turn.content = acc;
+            emit('stream', { turn: turn, chunk: chunk, content: acc });
+          }
+        }).then(function (result) {
+          // weld.stream returns normalized text; prefer it over our accumulation
+          var finalText = (result && (result.text != null)) ? String(result.text) : acc;
+          turn.content = finalText;
+          if (result && result.stopReason) turn.meta = Object.assign({}, turn.meta, { stopReason: result.stopReason });
+          emit('turn', { turn: turn });
+          resolve(turn);
+        }).catch(function (e) {
+          turn.meta = Object.assign({}, turn.meta, { error: String(e && e.message || e) });
+          emit('turn', { turn: turn });
+          reject(e);
+        });
+      });
+    }
+
+    // addImage(opts): append an image turn. With weld.image present it
+    // generates (normalizing params through weld.genparams if available);
+    // otherwise it records the request so the app can fulfill it.
+    function addImage(arg) {
+      var o = arg || {};
+      var image = window.weld && window.weld.image;
+      var genparams = window.weld && window.weld.genparams;
+
+      var params = o;
+      var imgOpts = o;
+      if (genparams && typeof genparams.toImageOpts === 'function') {
+        params = genparams.create ? genparams.create(o) : o;
+        imgOpts = genparams.toImageOpts(o);
+      }
+
+      var turn = makeTurn('assistant', 'image', { url: null, prompt: o.prompt || '', params: params }, o.meta);
+      appendTurn(turn);
+
+      if (!image || typeof image.generate !== 'function') {
+        return Promise.resolve(turn);   // no backend; app fills turn.content.url
+      }
+      return image.generate(imgOpts).then(function (res) {
+        var url = res && (res.url || res.imageURL || res.dataURL || res.src);
+        turn.content = { url: url || null, prompt: o.prompt || '', params: params };
+        emit('turn', { turn: turn });
+        return turn;
+      }).catch(function (e) {
+        turn.meta = Object.assign({}, turn.meta, { error: String(e && e.message || e) });
+        emit('turn', { turn: turn });
+        throw e;
+      });
+    }
+
+    // ---- the visible conversation -------------------------------------
+    // timeline(): the active path through the tree (or the linear list),
+    // as an ordered array of turns. This is what an app renders.
+    function timeline() {
+      if (tree) {
+        var nodes = tree.activeBranch ? tree.activeBranch() : (tree.path ? tree.path() : new Array());
+        return nodes.map(function (n) { return n.data || n; }).filter(Boolean);
+      }
+      return linear.slice();
+    }
+
+    // Build a text prompt from the current timeline (simple role-tagged join).
+    // Apps with weld.promptforge can ignore this and pass their own prompt.
+    function promptFromTimeline() {
+      return timeline().filter(function (t) { return t.kind === 'text'; })
+        .map(function (t) { return t.role + ': ' + t.content; })
+        .join('\n') + '\nassistant:';
+    }
+
+    // ---- alternates: regenerate + swipe -------------------------------
+    // regenerate(turnId): create a NEW sibling take of an assistant/image
+    // turn (a branch off the same parent), then generate into it. Needs the
+    // tree; without branching it appends a fresh turn instead.
+    function regenerate(turnId, genOpts) {
+      genOpts = genOpts || {};
+      var existing = getTurn(turnId);
+      if (!existing) return Promise.reject(new Error('weld.session: no such turn ' + turnId));
+
+      if (tree && typeof tree.branch === 'function') {
+        var fresh = makeTurn(existing.role, existing.kind, existing.kind === 'image' ? { url: null, prompt: (existing.content && existing.content.prompt) || '', params: existing.content && existing.content.params } : '', existing.meta);
+        // branch(fromId, data) creates a sibling carrying our fresh turn as its
+        // node data in one step -- get() returns a node COPY, so setting
+        // node.data afterward would not stick. Pass the data up front.
+        var newId = tree.branch(turnId, fresh);
+        fresh.id = newId;
+        if (tree.setActive) tree.setActive(newId);
+        emit('turn', { turn: fresh, regenerated: true });
+        // generate into it
+        if (existing.kind === 'image') return fillImage(fresh, Object.assign({ prompt: fresh.content.prompt, params: fresh.content.params }, genOpts));
+        return fillAssistant(fresh, genOpts);
+      }
+      // no branching: just add a new turn
+      if (existing.kind === 'image') return addImage(Object.assign({ prompt: existing.content && existing.content.prompt }, genOpts));
+      return addAssistant(Object.assign({ stream: true }, genOpts));
+    }
+
+    // helpers that generate into an EXISTING turn (used by regenerate)
+    function fillAssistant(turn, o) {
+      o = o || {};
+      var stream = window.weld && window.weld.stream;
+      if (!stream || typeof stream.generate !== 'function') return Promise.resolve(turn);
+      var prompt = o.prompt != null ? o.prompt : promptFromTimeline();
+      var acc = '';
+      return stream.generate({
+        prompt: prompt,
+        onChunk: function (chunk) { acc += String(chunk == null ? '' : chunk); turn.content = acc; emit('stream', { turn: turn, chunk: chunk, content: acc }); }
+      }).then(function (result) {
+        turn.content = (result && result.text != null) ? String(result.text) : acc;
+        emit('turn', { turn: turn });
+        return turn;
+      });
+    }
+    function fillImage(turn, o) {
+      o = o || {};
+      var image = window.weld && window.weld.image;
+      var genparams = window.weld && window.weld.genparams;
+      if (!image || typeof image.generate !== 'function') return Promise.resolve(turn);
+      var imgOpts = (genparams && genparams.toImageOpts) ? genparams.toImageOpts(o) : o;
+      return image.generate(imgOpts).then(function (res) {
+        var url = res && (res.url || res.imageURL || res.dataURL || res.src);
+        turn.content = { url: url || null, prompt: o.prompt || '', params: o.params || null };
+        emit('turn', { turn: turn });
+        return turn;
+      });
+    }
+
+    // swipe(turnId, dir): move between sibling takes of a turn. dir is +1/-1
+    // (or 'next'/'prev'). Normalizes the tree's return (id-string OR node) the
+    // same way weld.regen does, and CLAMPS at the ends (no wraparound).
+    function swipe(turnId, dir) {
+      if (!tree || typeof tree.siblings !== 'function') return null;
+      var sibs = tree.siblings(turnId) || new Array();
+      if (sibs.length <= 1) return getTurn(turnId);
+      var ids = sibs.map(function (s) { return (typeof s === 'object') ? s.id : s; });
+      var cur = ids.indexOf(turnId);
+      if (cur === -1) cur = 0;
+      var step = (dir === 'prev' || dir === -1 || dir < 0) ? -1 : 1;
+      var next = cur + step;
+      if (next < 0) next = 0;                     // clamp, don't wrap
+      if (next >= ids.length) next = ids.length - 1;
+      var targetId = Reflect.get(ids, next);
+      if (tree.setActive) tree.setActive(targetId);
+      emit('swipe', { from: turnId, to: targetId, index: next, count: ids.length });
+      return getTurn(targetId);
+    }
+
+    // sibling info for a turn -> { index, count, ids } for swipe UIs.
+    function takes(turnId) {
+      if (!tree || typeof tree.siblings !== 'function') return { index: 0, count: 1, ids: Array.of(turnId) };
+      var sibs = tree.siblings(turnId) || new Array();
+      var ids = sibs.map(function (s) { return (typeof s === 'object') ? s.id : s; });
+      if (!ids.length) ids = Array.of(turnId);
+      var idx = ids.indexOf(turnId);
+      return { index: idx === -1 ? 0 : idx, count: ids.length, ids: ids };
+    }
+
+    // branchFrom(turnId): fork the conversation from a turn (make it active,
+    // so the next append continues from there). Returns the turn.
+    function branchFrom(turnId) {
+      if (tree && tree.setActive) tree.setActive(turnId);
+      else linearActive = turnId;
+      emit('branch', { turnId: turnId });
+      return getTurn(turnId);
+    }
+
+    // ---- lookup -------------------------------------------------------
+    function getTurn(turnId) {
+      if (tree && tree.get) {
+        var n = tree.get(turnId);
+        return n ? (n.data || n) : null;
+      }
+      for (var i = 0; i < linear.length; i++) { var lt = Reflect.get(linear, i); if (lt.id === turnId) return lt; }
+      return null;
+    }
+
+    // ---- persistence --------------------------------------------------
+    // serialize(): a plain snapshot { turns/tree }. load(snap): restore it.
+    // With weld.branching we serialize the tree; otherwise the linear list.
+    function serialize() {
+      if (tree && tree.serialize) return { mode: 'tree', tree: tree.serialize() };
+      return { mode: 'linear', turns: linear.slice(), active: linearActive };
+    }
+    function load(snap) {
+      if (!snap) return false;
+      if (snap.mode === 'tree' && tree && tree.deserialize) { tree.deserialize(snap.tree); emit('load', {}); return true; }
+      if (snap.mode === 'linear' && linear) { linear = (snap.turns || new Array()).slice(); linearActive = snap.active || null; emit('load', {}); return true; }
+      return false;
+    }
+
+    function clear() {
+      if (tree && tree.clear) tree.clear();
+      if (linear) { linear = new Array(); linearActive = null; }
+      emit('clear', {});
+    }
+
+    return {
+      addUser: addUser,
+      addSystem: addSystem,
+      addAssistant: addAssistant,
+      addImage: addImage,
+      timeline: timeline,
+      regenerate: regenerate,
+      swipe: swipe,
+      takes: takes,
+      branchFrom: branchFrom,
+      getTurn: getTurn,
+      promptFromTimeline: promptFromTimeline,
+      serialize: serialize,
+      load: load,
+      clear: clear,
+      onChange: onChange,
+      hasBranching: function () { return !!tree; }
+    };
+  }
+
+  window.weld.session = {
+    create: createSession,
+    version: '1.0.0'
+  };
+
+  return window.weld.session;

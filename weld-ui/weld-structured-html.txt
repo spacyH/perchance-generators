@@ -43,6 +43,11 @@ pre code{background:none;padding:0;color:inherit;font-size:inherit;}
   min-height:1.5em;}
 .note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
   padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.changelog{margin:14px 0;padding:14px 16px;background:var(--faint);border:1px solid var(--border);border-radius:6px;}
+.changelog .cl-ver{font:700 13px var(--mono);color:var(--accent);margin:10px 0 4px;}
+.changelog .cl-ver:first-child{margin-top:0;}
+.changelog ul{margin:0 0 4px;padding-left:18px;}
+.changelog li{font-size:13px;color:#c9d1d9;line-height:1.5;margin:2px 0;}
 .warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
 table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
 th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
@@ -70,7 +75,7 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
 <div class="hdr">
   <div class="hdr-row">
       <h1>weld.structured</h1>
-      <span class="ver">v1.0.0</span>
+      <span class="ver">v1.1.0</span>
   </div>
   <p class="lead">Reliable structured output from a plain text model. Prime for JSON, parse tolerantly, validate against a small schema, and repair-retry on failure &mdash; the layer an agent needs to turn prose into data it can act on.</p>
 </div>
@@ -120,6 +125,21 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
 <div class="sig" data-codeid="sig_validate"></div>
 <div class="sig" data-codeid="sig_describe"></div>
 <pre data-codeid="parse_ex"></pre>
+<h2>Streaming structured output <span class="tag">v1.1.0</span></h2>
+<div class="sig" data-codeid="sig_genstream"></div>
+<p><code>generateStream(opts)</code> is the streaming counterpart of <code>generate()</code>: when <code>weld.stream</code> is present it streams the model&rsquo;s tokens (via <code>opts.onChunk</code>) while building toward the schema, and falls back to a single <code>generate()</code> when it isn&rsquo;t. <code>parsePartial(text)</code> attempts to parse an <em>incomplete</em> JSON string as it arrives &mdash; returning the best partial object so far, or null when nothing is parseable yet, and never throwing. Together they let a UI fill in fields live as the model emits them.</p>
+<pre data-codeid="genstream_ex"></pre>
+<h2>Changelog</h2>
+<div class="changelog">
+<p class="cl-ver">v1.1.0</p>
+<ul>
+<li>generateStream for streamed structured output and parsePartial for incremental JSON parsing.</li>
+</ul>
+<p class="cl-ver">v1.0.0</p>
+<ul>
+<li>Initial release: schema-constrained generate().</li>
+</ul>
+</div>
 <script>
 (function(){
   var examples = {
@@ -132,7 +152,9 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
   'sig_extract': 'weld.structured.extract(text) -> string | null',
   'sig_validate': 'weld.structured.validate(value, schema) -> \{ ok, error \}',
   'sig_describe': 'weld.structured.describeSchema(schema) -> string',
-  'parse_ex': 'var out = weld.structured.parse(\'Sure! ```json\\n\{"a":1,\}\\n```\');\nout.value;   // \{ a: 1 \}   (fences stripped, trailing comma tolerated)\n\nweld.structured.validate(\{ a: 1 \}, \{ fields: \{ a: \{ type: \'integer\' \} \} \}).ok;  // true'
+  'parse_ex': 'var out = weld.structured.parse(\'Sure! ```json\\n\{"a":1,\}\\n```\');\nout.value;   // \{ a: 1 \}   (fences stripped, trailing comma tolerated)\n\nweld.structured.validate(\{ a: 1 \}, \{ fields: \{ a: \{ type: \'integer\' \} \} \}).ok;  // true',
+  'sig_genstream': 'await structured.generateStream(\{ schema, prompt, onChunk \})   //  structured.parsePartial(text) -> partialObj | null',
+  'genstream_ex': 'await weld.structured.generateStream(\{\n  schema: mySchema, prompt: p,\n  onChunk: function (chunk, soFar) \{\n    var partial = weld.structured.parsePartial(soFar);\n    if (partial) renderFields(partial);   // live-fill the form\n  \}\n\});',
 };
   function escapeHTML(s){
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -256,7 +278,53 @@ function parse(text) {
   }
 }
 
-// Minimal schema validation.
+// parsePartial(text): best-effort parse of an INCOMPLETE JSON object as
+// it streams in. Finds the first '{' or '[', closes any open string,
+// drops a trailing partial token, and balances open brackets, so the UI
+// can render fields the moment they arrive. Returns { value } or {} when
+// nothing parseable yet. Never throws.
+function parsePartial(text) {
+  var raw = stripFences(String(text == null ? '' : text));
+  var start = -1;
+  for (var a = 0; a < raw.length; a++) { var ch0 = raw.charAt(a); if (ch0 === '{' || ch0 === '[') { start = a; break; } }
+  if (start === -1) return {};
+  var s = raw.slice(start);
+
+  // Scan once to learn: open-bracket stack, whether we end inside a string,
+  // and whether we end with a dangling structural token we must drop.
+  var stack = [], inStr = false, esc = false;
+  for (var i = 0; i < s.length; i++) {
+    var c = s.charAt(i);
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === '\\') esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === '{' || c === '[') stack.push(c === '{' ? '}' : ']');
+    else if (c === '}' || c === ']') stack.pop();
+  }
+
+  function attempt(str) {
+    var t = str;
+    if (inStr) t += '"';                 // close an open string literal
+    t = t.replace(/\s+$/, '');
+    t = t.replace(/,\s*$/, '');          // dangling comma
+    // "key": with no value yet -> drop the key and colon entirely
+    if (/:\s*$/.test(t)) {
+      t = t.replace(/:\s*$/, '');
+      t = t.replace(/(\{|,)\s*"[^"]*"\s*$/, '$1');
+      t = t.replace(/,\s*$/, '');
+    }
+    for (var k = stack.length - 1; k >= 0; k--) t += stack[k];
+    try { return JSON.parse(looseFix(t)); } catch (e) { return undefined; }
+  }
+
+  var v = attempt(s);
+  if (v !== undefined) return { value: v };
+  return {};
+}
 // schema = { fields: { name: { type, required, enum, of } }, allowExtra }
 //   type: 'string' | 'number' | 'integer' | 'boolean' | 'array' | 'object'
 // Returns { ok:true } or { ok:false, error }.
@@ -372,10 +440,10 @@ function generateOnce(instruction, opts) {
 //
 // opts:
 //   instruction     (string)  your task / system prompt
-//   schema          (object)  { fields: { name: { type, required, enum, of } } }
+//   schema          (object)  \{ fields: \{ name: \{ type, required, enum, of \} \} \}
 //   example         (object)  alternative to schema: a sample shape to mimic
 //   shape           (string)  free-text description of the desired JSON
-//   startWith       (string)  default '{' to prime an object
+//   startWith       (string)  default '\{' to prime an object
 //   stopSequences   (array)   passthrough to weld.stream
 //   repairAttempts  (number)  extra tries on failure (default 1)
 // -----------------------------------------------------------------
@@ -416,13 +484,43 @@ function generate(opts) {
   return step(null);
 }
 
+// generateStream(opts): like generate(), but reports the partially-parsed
+// object as it streams via opts.onPartial(obj). Resolves to the same
+// \{ ok, value, raw, error, attempts \} as generate(). Requires weld.stream
+// (which carries onChunk); without it, falls back to generate().
+function generateStream(opts) {
+  opts = opts || {};
+  var stream = getStream();
+  if (!stream || typeof opts.onPartial !== 'function') return generate(opts);
+  var instruction = buildInstruction(opts, null);
+  var onPartial = opts.onPartial;
+  return stream.run({
+    instruction: instruction,
+    startWith: opts.startWith != null ? opts.startWith : '{',
+    stopSequences: opts.stopSequences || null,
+    onChunk: function (delta, full) {
+      var p = parsePartial(full);
+      if ('value' in p) { try { onPartial(p.value); } catch (e) {} }
+    }
+  }).then(function (res) {
+    if (res.error) return { ok: false, value: null, raw: res.text, error: res.error, attempts: 1 };
+    var parsed = parse(res.text);
+    if (parsed.error) return { ok: false, value: null, raw: res.text, error: parsed.error, attempts: 1 };
+    var check = validate(parsed.value, opts.schema);
+    if (!check.ok) return { ok: false, value: parsed.value, raw: res.text, error: check.error, attempts: 1 };
+    return { ok: true, value: parsed.value, raw: res.text, error: null, attempts: 1 };
+  });
+}
+
 window.weld.structured = {
   generate: generate,
+  generateStream: generateStream,
   parse: parse,
+  parsePartial: parsePartial,
   validate: validate,
   extract: extractBalanced,
   describeSchema: describeSchema,
-  version: '1.0.0'
+  version: '1.1.0'
 };
 
 return window.weld.structured;

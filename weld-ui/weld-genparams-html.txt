@@ -1,0 +1,396 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590;
+  --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149;
+  --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+#page{max-width:720px;margin:0 auto;padding:48px 24px 96px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);
+  padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;
+  padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);
+  letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;color:#c9d1d9;min-height:1.5em;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}
+.c-k{color:#ff7b72;}
+.c-s{color:#a5d6ff;}
+.c-n{color:#d2a8ff;}
+.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);
+  background:var(--faint);padding:8px 12px;border-radius:4px;
+  border-left:3px solid var(--accent);margin:8px 0 12px;display:block;
+  min-height:1.5em;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:1px;}
+td{color:#c9d1d9;}
+td code{font-size:12px;}
+ul{list-style:none;padding:0;margin:14px 0;}
+li{padding:4px 0;color:#c9d1d9;}
+li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:10px;font-size:11px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;
+  font:12px var(--mono);color:var(--muted);padding:14px 0 18px;margin-bottom:28px;
+  border-bottom:1px solid var(--border);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+<div id="page">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.genparams<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-genparams-example">demo &rarr;</a></span></div>
+<div class="hdr">
+  <div class="hdr-row">
+      <h1>weld.genparams</h1>
+      <span class="ver">v1.0.0</span>
+  </div>
+  <p class="lead">A normalized schema for image-generation parameters so apps, weld.image, and weld.promptforge speak one shape: full parameter vocabulary with defaults, validation/clamping, named aspect ratios that resolve to Perchance-legal sizes, merge/remix, and a weld.image-ready opts builder. Calls no backend.</p>
+</div>
+<h2>One shape for "how to generate this image"</h2>
+<p>Every image front-end accumulates the same sprawling parameter set &mdash; prompt, negative prompt, aspect ratio, steps, guidance scale, sampler, seed, batch size, and more. Apps reinvent it, <code>weld.promptforge</code> emits a prompt with nowhere to put the rest, and <code>weld.image</code> just forwards whatever it's handed. weld.genparams gives that set a name, a default, and a validator, so the whole suite agrees on one schema.</p>
+<p>It calls <strong>no backend</strong>. It produces a clean params object you hand to a generator, and it degrades gracefully: a backend that ignores <code>cfgScale</code> still gets a valid prompt and size rather than a crash.</p>
+<pre data-codeid="install"></pre>
+
+<h2>create / defaults</h2>
+<div class="sig" data-codeid="sig_create"></div>
+<p>Start from a fully-populated object and override what you need. The full vocabulary: <code>prompt</code>, <code>negativePrompt</code>, <code>aspect</code> (or explicit <code>width</code>/<code>height</code>), <code>steps</code>, <code>cfgScale</code>, <code>sampler</code>, <code>seed</code>, <code>batchSize</code>, <code>clipSkip</code>, <code>strength</code>, <code>style</code>, a <code>conditioning</code> block, and an <code>extra</code> escape hatch for backend-specific fields.</p>
+<pre data-codeid="create_ex"></pre>
+
+<h2>Named aspect ratios</h2>
+<p>Aspect names resolve to the four sizes Perchance's text-to-image-plugin actually accepts, so you never hand it an illegal box.</p>
+<table>
+<tr><th>aspect</th><th>ratio</th><th>size</th></tr>
+<tr><td><code>square</code></td><td>1:1</td><td>512&times;512</td></tr>
+<tr><td><code>portrait</code></td><td>2:3</td><td>512&times;768</td></tr>
+<tr><td><code>landscape</code></td><td>3:2</td><td>768&times;512</td></tr>
+<tr><td><code>large</code></td><td>1:1</td><td>768&times;768</td></tr>
+</table>
+<p>Explicit <code>width</code> + <code>height</code> override the named aspect when you need a custom box.</p>
+
+<h2>validate</h2>
+<div class="sig" data-codeid="sig_validate"></div>
+<p>Returns <code>\{ params, warnings \}</code>. It clamps out-of-range numbers (steps, cfg, batch, clip-skip, strength) into safe ranges, repairs unknown aspects, coerces a non-numeric seed to random, and collects a plain-language warning for each correction. It never throws &mdash; a too-high step count shouldn't kill a generate call.</p>
+<pre data-codeid="validate_ex"></pre>
+
+<h2>merge vs remix</h2>
+<div class="sig" data-codeid="sig_remix"></div>
+<p><code>merge</code> is a plain shallow merge that preserves the seed. <code>remix</code> is tuned for "take this generation and tweak it": it randomizes the seed by default (a remix should look different) unless you pin one. This is the missing "variations with edited params" verb.</p>
+<pre data-codeid="remix_ex"></pre>
+
+<h2>toImageOpts</h2>
+<div class="sig" data-codeid="sig_toopts"></div>
+<p>Produces the opts object <code>weld.image.generate</code> expects: resolves the size, maps <code>cfgScale</code> to the <code>guidanceScale</code> alias many backends use, forwards the conditioning block and any <code>extra</code> fields, and drops defaults a backend would ignore. Because weld.image only strictly needs a prompt and resolution, this always yields something runnable.</p>
+<pre data-codeid="toopts_ex"></pre>
+<div class="note">Pairs with the suite: feed a <code>weld.promptforge</code> prompt into <code>create()</code>, hand the result to <code>weld.image.generate(weld.genparams.toImageOpts(p))</code>, and use <code>remix()</code> for one-tap variations. <code>describe()</code> gives a compact label (e.g. "512x768 (2:3) / 30 steps / cfg 8") for UI tooltips.</div>
+<script>
+(function(){
+  var examples = {
+  'install': 'output\n  weld-genparams = \{import:weld-genparams-plugin\}',
+  'sig_create': 'weld.genparams.create(overrides) -> params   //  .defaults(), .aspectNames(), .ranges',
+  'create_ex': 'var p = weld.genparams.create(\{\n  prompt: \'a fox in snow, watercolor\',\n  negativePrompt: \'blurry, low quality\',\n  aspect: \'portrait\',\n  steps: 30, cfgScale: 8\n\});',
+  'sig_validate': 'weld.genparams.validate(params) -> \{ params, warnings \}',
+  'validate_ex': 'var v = weld.genparams.validate(\{ prompt: \'a cat\', steps: 999 \});\n// v.params.steps === 150  (clamped)\n// v.warnings  -> \[\'steps clamped to 150\']',
+  'sig_remix': 'weld.genparams.remix(base, overrides) -> params   //  merge(base, overrides) keeps the seed',
+  'remix_ex': 'var v1 = weld.genparams.create(\{ prompt: \'a fox\', seed: 100, cfgScale: 7 \});\nvar v2 = weld.genparams.remix(v1, \{ cfgScale: 9 \});   // new random seed, cfg 9\nvar v3 = weld.genparams.remix(v1, \{ seed: 777 \});     // pinned seed',
+  'sig_toopts': 'weld.genparams.toImageOpts(params) -> opts   // ready for weld.image.generate',
+  'toopts_ex': 'var p = weld.genparams.create(\{ prompt: \'a fox\', aspect: \'landscape\', cfgScale: 8 \});\nvar img = await weld.image.generate(weld.genparams.toImageOpts(p));\n// opts.resolution === \'768x512\', opts.guidanceScale === 8'
+};
+  function escapeHTML(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function highlight(code){
+    code = escapeHTML(code);
+    code = code.replace(/(\/\/[^\n]*)/g, '<span class="c-c">$1</span>');
+    code = code.replace(/('[^'\n]*')/g, '<span class="c-s">$1</span>');
+    code = code.replace(/("[^"\n]*")/g, '<span class="c-s">$1</span>');
+    var kws = ['var','let','const','function','return','if','else','for','while','await','async','new','typeof','instanceof','null','true','false','this','of','in'];
+    code = code.replace(new RegExp('\\b(' + kws.join('|') + ')\\b', 'g'), '<span class="c-k">$1</span>');
+    code = code.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="c-n">$1</span>');
+    return code;
+  }
+  function fill(){
+    document.querySelectorAll('[data-codeid]').forEach(function(n){
+      var src = examples[n.getAttribute('data-codeid')];
+      if (src == null) return;
+      if (n.tagName === 'PRE') n.innerHTML = highlight(src);
+      else n.textContent = src;
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+  else fill();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.genparams) return window.weld.genparams;
+
+// -----------------------------------------------------------------
+// weld.genparams: one shape for "how should this image be generated".
+//
+// Every image front-end ends up with the same sprawling parameter set --
+// prompt, negative prompt, aspect ratio, steps, guidance scale, sampler,
+// seed, batch size, and so on. Apps reinvent it, weld.promptforge emits a
+// prompt with no home for the rest, and weld.image just forwards whatever
+// opts it's handed. weld.genparams gives that set a name and a default:
+//
+//   var p = weld.genparams.create({ prompt: 'a fox in snow', steps: 30 });
+//   var fixed = weld.genparams.validate(p);          // clamps + warns
+//   var forImage = weld.genparams.toImageOpts(fixed); // -> weld.image.generate
+//   var remixed = weld.genparams.remix(p, { seed: 12345, cfgScale: 9 });
+//
+// It calls NO backend. It just normalizes, so the rest of the suite agrees
+// on one schema and an app can degrade gracefully: a backend that ignores
+// cfgScale still gets a valid prompt + size, never a crash.
+// -----------------------------------------------------------------
+
+// Named aspect ratios -> Perchance-legal t2i sizes (512/768 grid).
+// (Perchance's text-to-image-plugin only accepts these four boxes.)
+var ASPECTS = {
+  square:    { ratio: '1:1',  width: 512, height: 512 },
+  portrait:  { ratio: '2:3',  width: 512, height: 768 },
+  landscape: { ratio: '3:2',  width: 768, height: 512 },
+  large:     { ratio: '1:1',  width: 768, height: 768 }
+};
+
+// The full default schema. Fields a backend doesn't understand are simply
+// ignored downstream; nothing here forces a particular generator.
+function defaults() {
+  return {
+    prompt: '',
+    negativePrompt: '',
+    aspect: 'square',          // a key of ASPECTS, or set width/height directly
+    width: null,               // if set, overrides aspect
+    height: null,
+    steps: 25,                 // sampling steps
+    cfgScale: 7,               // guidance / how hard to follow the prompt
+    sampler: 'default',        // sampler/scheduler name (backend-specific)
+    seed: null,                // null = random each run
+    batchSize: 1,              // how many images to request
+    clipSkip: 1,
+    strength: null,            // img2img/denoise strength, 0..1 (null = n/a)
+    style: null,               // a weld.image style preset name, optional
+    conditioning: null,        // optional ControlNet-style block (see below)
+    extra: null                // escape hatch for backend-specific fields
+  };
+}
+
+// Allowed ranges for clamping. Kept deliberately generous; a backend may
+// narrow further. Each range is a two-element min/max pair.
+var RANGES = {
+  steps:     [1, 150],
+  cfgScale:  [1, 30],
+  batchSize: [1, 8],
+  clipSkip:  [1, 12],
+  strength:  [0, 1]
+};
+
+function clampNum(v, lohi, fallback) {
+  var n = Number(v);
+  if (!isFinite(n)) return fallback;
+  if (n < lohi[0]) return lohi[0];
+  if (n > lohi[1]) return lohi[1];
+  return n;
+}
+
+// create(overrides): a fully-populated params object (defaults + your keys).
+function create(overrides) {
+  var p = defaults();
+  if (overrides && typeof overrides === 'object') {
+    for (var k in overrides) {
+      if (Object.prototype.hasOwnProperty.call(overrides, k)) Reflect.set(p, k, Reflect.get(overrides, k));
+    }
+  }
+  return p;
+}
+
+// resolveSize(p): figure out the final width/height. Explicit width+height
+// win; otherwise the named aspect resolves to a legal box.
+function resolveSize(p) {
+  if (p && p.width && p.height) return { width: p.width | 0, height: p.height | 0, ratio: null };
+  var a = (p && Reflect.get(ASPECTS, p.aspect)) ? Reflect.get(ASPECTS, p.aspect) : ASPECTS.square;
+  return { width: a.width, height: a.height, ratio: a.ratio };
+}
+
+// validate(p): returns { params, warnings }. Clamps numbers into range,
+// fills missing fields, and notes anything it had to correct. Never throws
+// on bad input -- it repairs and warns, because a generator call shouldn't
+// die over a too-high step count.
+function validate(input) {
+  var p = create(input);
+  var warnings = new Array();
+
+  if (!String(p.prompt || '').trim()) {
+    warnings.push('empty prompt -- most backends will hang or error on this');
+  }
+
+  var before;
+  before = p.steps;     p.steps = clampNum(p.steps, RANGES.steps, 25);          if (p.steps !== Number(before)) warnings.push('steps clamped to ' + p.steps);
+  before = p.cfgScale;  p.cfgScale = clampNum(p.cfgScale, RANGES.cfgScale, 7);  if (p.cfgScale !== Number(before)) warnings.push('cfgScale clamped to ' + p.cfgScale);
+  before = p.batchSize; p.batchSize = clampNum(p.batchSize, RANGES.batchSize, 1) | 0; if (p.batchSize !== (Number(before) | 0)) warnings.push('batchSize clamped to ' + p.batchSize);
+  before = p.clipSkip;  p.clipSkip = clampNum(p.clipSkip, RANGES.clipSkip, 1) | 0; if (p.clipSkip !== (Number(before) | 0)) warnings.push('clipSkip clamped to ' + p.clipSkip);
+
+  if (p.strength != null) {
+    before = p.strength; p.strength = clampNum(p.strength, RANGES.strength, null);
+    if (p.strength !== Number(before)) warnings.push('strength clamped to ' + p.strength);
+  }
+
+  if (p.seed != null) {
+    var s = Number(p.seed);
+    p.seed = isFinite(s) ? (s | 0) : null;
+    if (p.seed == null) warnings.push('seed was not a number -- set to random (null)');
+  }
+
+  if (!p.width && !p.height && !Reflect.get(ASPECTS, p.aspect)) {
+    warnings.push('unknown aspect "' + p.aspect + '" -- defaulting to square');
+    p.aspect = 'square';
+  }
+
+  if (p.conditioning) {
+    var c = normalizeConditioning(p.conditioning);
+    if (!c) { warnings.push('conditioning block was malformed -- dropped'); p.conditioning = null; }
+    else p.conditioning = c;
+  }
+
+  return { params: p, warnings: warnings };
+}
+
+// Optional ControlNet-style conditioning. Normalized but never required.
+function normalizeConditioning(c) {
+  if (!c || typeof c !== 'object') return null;
+  if (!c.image && !c.type) return null;
+  return {
+    type: String(c.type || 'reference'),     // pose | depth | canny | reference | ...
+    image: c.image || null,                  // url/dataURL the backend understands
+    strength: c.strength != null ? clampNum(c.strength, [0, 2], 1) : 1,
+    scale: c.scale != null ? Number(c.scale) : 1,
+    endPercent: c.endPercent != null ? clampNum(c.endPercent, [0, 1], 1) : 1
+  };
+}
+
+// merge(base, overrides): shallow merge producing a NEW params object.
+function merge(base, overrides) {
+  var p = create(base);
+  if (overrides && typeof overrides === 'object') {
+    for (var k in overrides) {
+      if (Object.prototype.hasOwnProperty.call(overrides, k)) Reflect.set(p, k, Reflect.get(overrides, k));
+    }
+  }
+  return p;
+}
+
+// remix(base, overrides): like merge, but tuned for "take this generation
+// and tweak it" -- by default it RANDOMIZES the seed (a remix should look
+// different) unless you pin one in the overrides.
+function remix(base, overrides) {
+  var p = merge(base, overrides);
+  var pinnedSeed = overrides && Object.prototype.hasOwnProperty.call(overrides, 'seed');
+  if (!pinnedSeed) p.seed = randomSeed();
+  return p;
+}
+
+function randomSeed() { return (Math.floor(Math.random() * 2147483647)) | 0; }
+
+// toImageOpts(p): produce the opts object weld.image.generate expects.
+// Resolves the size, maps names, and forwards the rest so a richer backend
+// can pick up what it understands. weld.image only needs prompt+resolution,
+// so this always yields something it can run.
+function toImageOpts(input) {
+  var v = validate(input);
+  var p = v.params;
+  var size = resolveSize(p);
+  var opts = {
+    prompt: p.prompt,
+    negativePrompt: p.negativePrompt || undefined,
+    resolution: size.width + 'x' + size.height,
+    width: size.width,
+    height: size.height,
+    steps: p.steps,
+    cfgScale: p.cfgScale,
+    guidanceScale: p.cfgScale,     // alias many backends use
+    sampler: p.sampler !== 'default' ? p.sampler : undefined,
+    seed: p.seed != null ? p.seed : undefined,
+    batchSize: p.batchSize,
+    clipSkip: p.clipSkip,
+    strength: p.strength != null ? p.strength : undefined,
+    style: p.style || undefined
+  };
+  if (p.conditioning) opts.conditioning = p.conditioning;
+  if (p.extra && typeof p.extra === 'object') {
+    for (var k in p.extra) { if (Object.prototype.hasOwnProperty.call(p.extra, k)) Reflect.set(opts, k, Reflect.get(p.extra, k)); }
+  }
+  return opts;
+}
+
+// A compact human-readable description of a params set, for UIs/tooltips.
+function describe(input) {
+  var p = create(input);
+  var size = resolveSize(p);
+  var bits = new Array();
+  bits.push(size.width + 'x' + size.height + (size.ratio ? ' (' + size.ratio + ')' : ''));
+  bits.push(p.steps + ' steps');
+  bits.push('cfg ' + p.cfgScale);
+  if (p.seed != null) bits.push('seed ' + p.seed);
+  if (p.batchSize > 1) bits.push('x' + p.batchSize);
+  if (p.style) bits.push('style: ' + p.style);
+  if (p.conditioning) bits.push('+' + p.conditioning.type);
+  return bits.join(' / ');
+}
+
+function aspectNames() { return Object.keys(ASPECTS); }
+
+window.weld.genparams = {
+  defaults: defaults,
+  create: create,
+  validate: validate,
+  merge: merge,
+  remix: remix,
+  toImageOpts: toImageOpts,
+  resolveSize: resolveSize,
+  describe: describe,
+  aspects: ASPECTS,
+  aspectNames: aspectNames,
+  ranges: RANGES,
+  randomSeed: randomSeed,
+  version: '1.0.0'
+};
+
+return window.weld.genparams;
+})();
+</script>
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>
+</div>

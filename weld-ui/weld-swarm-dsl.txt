@@ -1,0 +1,159 @@
+$meta
+  title       = weld.swarm
+  description = Generator-side multi-agent orchestration -- the DSL companion to the orchestrator that lives in Weld Companion. A generator joins a crew with a role (user = a Perchance chat driven by a human, or worker = a tab running weld.crew), then peers find each other, exchange messages addressed by id or role, and the driver fans tasks out across workers in parallel with a concurrency cap, awaiting results. Transport is pluggable and auto-selected: the skybridge bus when the companion provides it (cross-generator, cross-tab), else weld.sync (same-origin tabs of one generator), else in-memory. A worker turns into an agent with serve(handler) -- typically handler runs weld.crew on the task. Degrades gracefully: with only weld.sync it orchestrates same-origin tabs today, and upgrades to cross-generator when the companion bus is present. Stash on window.weld.swarm.
+  tags        = weld, swarm, orchestrator, agent, multiplayer, sync, skybridge, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.swarm) return window.weld.swarm;
+
+  // -----------------------------------------------------------------
+  // weld.swarm: the generator-side half of orchestration. The heavy routing
+  // logic is shared with the companion's orchestrator core; here every peer
+  // runs it locally over a broadcast transport, so the tab that calls
+  // dispatch() acts as the orchestrator for that exchange.
+  //
+  //   // worker tab (a generator that imports weld.crew):
+  //   var a = weld.crew.create({ workspace: 'crew' });
+  //   weld.swarm.create({ role: 'worker' }).serve(function (task) { return a.run(task.goal); });
+  //
+  //   // user/driver tab (the chat):
+  //   var crew = weld.swarm.create({ role: 'user' });
+  //   var results = await crew.dispatchMany(subtasks, { concurrency: 3 });
+  //
+  // message: { id, from, to, type, payload, corr?, t }   to = peerId | role | '*'
+  // -----------------------------------------------------------------
+
+  var BUILD = 'swarm/2026-06-04.1';
+
+  function uid(p) { return (p || 'm_') + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+  // ---- transport: { send(msg), onMessage(fn) } -- auto-selected, or injected ----
+  function pickTransport(opts) {
+    if (opts && opts.transport) return opts.transport;
+    var channel = (opts && opts.channel) || 'weld.swarm';
+    var sb = window.weld && window.weld.skybridge;
+    // 1) companion bus (cross-generator, cross-tab) -- present once the companion exposes it
+    if (sb && sb.bus && typeof sb.bus.publish === 'function' && typeof sb.bus.subscribe === 'function') {
+      return { kind: 'bus', send: function (m) { sb.bus.publish(channel, m); }, onMessage: function (fn) { return sb.bus.subscribe(channel, fn); } };
+    }
+    // 2) weld.sync (same-origin tabs of one generator)
+    if (window.weld && window.weld.sync && typeof window.weld.sync.create === 'function') {
+      var s = window.weld.sync.create({ namespace: channel });
+      return { kind: 'sync', send: function (m) { s.broadcast('m', m); }, onMessage: function (fn) { s.subscribe('m', fn); }, _sync: s };
+    }
+    // 3) in-memory (single tab / tests / standalone)
+    var subs = [];
+    return { kind: 'memory', send: function (m) { setTimeout(function () { subs.forEach(function (fn) { try { fn(m); } catch (e) {} }); }, 0); }, onMessage: function (fn) { subs.push(fn); } };
+  }
+
+  function createSwarm(opts) {
+    opts = opts || {};
+    var role = opts.role || 'worker';
+    var now = opts.now || Date.now;
+    var TTL = opts.peerTTL || 8000;
+    var selfId = opts.id || uid(role + '_');
+    var transport = pickTransport(opts);
+
+    var peers = {};            // peerId -> { peerId, role, caps, lastSeen }
+    var handlers = {};         // type -> [fn]
+    var pending = {};          // corr -> { resolve, reject, timer }
+
+    function emit(type, msg) { (handlers[type] || []).forEach(function (f) { try { f(msg); } catch (e) {} }); }
+    function on(type, fn) { (handlers[type] = handlers[type] || []).push(fn); return function () { handlers[type] = handlers[type].filter(function (f) { return f !== fn; }); }; }
+    function touch(id, r, caps) { peers[id] = { peerId: id, role: r || (peers[id] && peers[id].role), caps: caps || (peers[id] && peers[id].caps) || [], lastSeen: now() }; }
+    function livePeers(r) { var t = now(); return Object.keys(peers).map(function (k) { return peers[k]; }).filter(function (p) { return (t - p.lastSeen) < TTL && (!r || p.role === r); }); }
+
+    function handleIncoming(msg) {
+      if (!msg || !msg.type || msg.from === selfId) return;
+      if (msg.type === 'register') { touch(msg.from, msg.role, msg.payload && msg.payload.caps); emit('peer', peers[msg.from]); if (!msg._reply) raw('register', { caps: opts.caps || [] }, '*', { _reply: true }); return; }
+      if (msg.type === 'heartbeat') { touch(msg.from, msg.role); return; }
+      if (msg.type === 'bye') { delete peers[msg.from]; emit('peerleave', { peerId: msg.from }); return; }
+      if (peers[msg.from]) peers[msg.from].lastSeen = now();
+      if (msg.type === 'result' && msg.corr && pending[msg.corr]) { var p = pending[msg.corr]; clearTimeout(p.timer); delete pending[msg.corr]; p.resolve(msg.payload); return; }
+      // deliver to this peer's handlers only if addressed to it, its role, or broadcast
+      if (msg.to === selfId || msg.to === role || msg.to === '*' || msg.to == null) { emit(msg.type, msg); emit('message', msg); }
+    }
+    transport.onMessage(handleIncoming);
+
+    function raw(type, payload, to, extra) {
+      var msg = { id: uid(), from: selfId, to: to == null ? '*' : to, role: role, type: type, payload: payload, t: now() };
+      if (extra) for (var k in extra) if (extra.hasOwnProperty(k)) msg[k] = extra[k];
+      transport.send(msg);
+      return msg.id;
+    }
+    function send(to, type, payload, extra) { return raw(type, payload, to, extra); }
+
+    // request/response: assign one task to one worker, await its 'result'
+    function dispatch(workerId, task, timeoutMs) {
+      return new Promise(function (resolve, reject) {
+        var corr = uid('c_');
+        var timer = setTimeout(function () { delete pending[corr]; reject(new Error('worker timeout: ' + workerId)); }, timeoutMs || 30000);
+        pending[corr] = { resolve: resolve, reject: reject, timer: timer };
+        raw('task', task, workerId, { corr: corr });
+      });
+    }
+
+    // fan tasks out across live workers with bounded concurrency -> results in order
+    function dispatchMany(tasks, o) {
+      o = o || {};
+      var workers = livePeers('worker');
+      if (!workers.length) return Promise.reject(new Error('no workers available'));
+      var limit = o.concurrency || workers.length;
+      var results = new Array(tasks.length); var done = 0; var next = 0; var active = 0;
+      return new Promise(function (resolve) {
+        function settle(idx, val) { results[idx] = val; done++; active--; if (done === tasks.length) resolve(results); else pump(); }
+        function pump() {
+          while (active < limit && next < tasks.length) {
+            (function (idx) {
+              active++;
+              var w = workers[idx % workers.length];
+              dispatch(w.peerId, tasks[idx], o.timeoutMs).then(function (r) { settle(idx, r); }, function (e) { settle(idx, { error: String(e && e.message || e) }); });
+            })(next++);
+          }
+        }
+        pump();
+      });
+    }
+
+    // worker convenience: auto-answer 'task' messages by running handler(payload) -> result
+    function serve(handler) {
+      on('task', async function (msg) {
+        if (!msg.corr) return;
+        var out;
+        try { out = await handler(msg.payload, msg); } catch (e) { out = { error: String(e && e.message || e) }; }
+        raw('result', out, msg.from, { corr: msg.corr });
+      });
+      return api;
+    }
+
+    // presence: announce, heartbeat, prune
+    raw('register', { caps: opts.caps || [] }, '*');
+    var hbMs = opts.heartbeatMs || 3000;
+    var hbTimer = (opts.heartbeat === false) ? null : setInterval(function () { raw('heartbeat'); }, hbMs);
+    if (typeof window !== 'undefined' && window.addEventListener) try { window.addEventListener('beforeunload', function () { raw('bye'); }); } catch (e) {}
+
+    function leave() { if (hbTimer) clearInterval(hbTimer); raw('bye'); }
+
+    var api = {
+      id: selfId, role: role, transport: transport.kind,
+      on: on, send: send,
+      peers: function () { return livePeers(); },
+      workers: function () { return livePeers('worker'); },
+      users: function () { return livePeers('user'); },
+      dispatch: dispatch, dispatchMany: dispatchMany,
+      serve: serve, leave: leave,
+      _ingest: handleIncoming   // exposed for tests
+    };
+    return api;
+  }
+
+  window.weld.swarm = {
+    create: createSwarm,
+    version: '1.0.0',
+    build: BUILD
+  };
+
+  return window.weld.swarm;

@@ -98,6 +98,11 @@ $output() =>
           if (n < retries) {
             return new Promise(function (r) { setTimeout(r, retryDelay * (n + 1)); }).then(function () { return attempt(n + 1); });
           }
+          // If we're under Perchance's ?$csp restricted mode, an outbound
+          // failure is most likely the platform blocking it, not a bug.
+          if (cspActive() && err && err.message && err.message.indexOf('$csp') === -1) {
+            err.message += ' (note: page is in Perchance ?$csp restricted mode, which can block outbound requests)';
+          }
           throw err;
         });
     }
@@ -138,6 +143,20 @@ $output() =>
 
   function available() { return !!getSF(); }
 
+  // Perchance's ?$csp URL mode (perchance.org/custom-content-security-policy)
+  // restricts a page's ability to reach external servers. Under it, the
+  // superFetch proxy and direct fetches to outside hosts may be blocked at
+  // the platform level. weld.fetch can't lift that restriction, but it can
+  // tell you it's in effect so a failed request reads as "CSP blocked this"
+  // rather than a mysterious network error.
+  function cspActive() {
+    try {
+      var q = (typeof location !== 'undefined' && location.search) ? location.search : '';
+      var h = (typeof location !== 'undefined' && location.href) ? location.href : '';
+      return /[?&]\$csp(\b|=|&|$)/.test(q) || /[?&]\$csp(\b|=|&|$)/.test(h);
+    } catch (e) { return false; }
+  }
+
   window.weld.fetch = {
     request: request,
     get: get,
@@ -147,9 +166,10 @@ $output() =>
     text: text,
     attach: attach,
     available: available,
+    cspActive: cspActive,
     addDirectHost: addDirectHost,
     directHosts: function () { return DIRECT_HOSTS.slice(); },
-    version: '1.0.0'
+    version: '1.1.0'
   };
 
   return window.weld.fetch;

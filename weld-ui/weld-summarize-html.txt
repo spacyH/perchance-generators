@@ -43,6 +43,11 @@ pre code{background:none;padding:0;color:inherit;font-size:inherit;}
   min-height:1.5em;}
 .note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
   padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.changelog{margin:14px 0;padding:14px 16px;background:var(--faint);border:1px solid var(--border);border-radius:6px;}
+.changelog .cl-ver{font:700 13px var(--mono);color:var(--accent);margin:10px 0 4px;}
+.changelog .cl-ver:first-child{margin-top:0;}
+.changelog ul{margin:0 0 4px;padding-left:18px;}
+.changelog li{font-size:13px;color:#c9d1d9;line-height:1.5;margin:2px 0;}
 .warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
 table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
 th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
@@ -70,7 +75,7 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
 <div class="hdr">
   <div class="hdr-row">
       <h1>weld.summarize</h1>
-      <span class="ver">v1.0.0</span>
+      <span class="ver">v1.1.0</span>
   </div>
   <p class="lead">Keep a long conversation inside the token budget without amnesia. Where weld.prompt can only drop old turns, weld.summarize condenses them &mdash; keeping recent turns verbatim and folding the rest into a rolling, hierarchical summary.</p>
 </div>
@@ -121,6 +126,21 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
 <div class="sig" data-codeid="sig_estimate"></div>
 <div class="sig" data-codeid="sig_join"></div>
 <p><code>estimateTokens</code> uses <code>weld.tokens</code> when it is loaded, falls back to <code>weld.stream.count</code>, and finally to a chars/4 estimate. <code>joinMessages</code> renders a message array into the <code>Name: text</code> wire form.</p>
+<h2>Fact extraction &amp; consolidation <span class="tag">v1.1.0</span></h2>
+<div class="sig" data-codeid="sig_facts"></div>
+<p><code>extractFacts(input, opts)</code> pulls discrete, durable facts out of text or a message array (rather than a prose summary) &mdash; useful for feeding <code>weld.memory</code>. <code>consolidate(summaries, opts)</code> merges many summaries into one, recursively if needed (<code>opts.maxDepth</code>, default 3; <code>opts.maxWords</code>, default 250), so a long session&rsquo;s rolling summaries collapse into a single coherent recap.</p>
+<pre data-codeid="facts_ex"></pre>
+<h2>Changelog</h2>
+<div class="changelog">
+<p class="cl-ver">v1.1.0</p>
+<ul>
+<li>extractFacts (discrete facts for memory) and consolidate (recursive merge of summaries).</li>
+</ul>
+<p class="cl-ver">v1.0.0</p>
+<ul>
+<li>Initial release: summarize text / message arrays.</li>
+</ul>
+</div>
 <script>
 (function(){
   var examples = {
@@ -133,7 +153,9 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
   'context_ex': '// after many turns, context() stays bounded:\n// Summary of earlier events: The user introduced themselves as Mara,\n// a teacher planning a trip to Kyoto, and asked about temples...\n//\n// User: what about food?\n// Assistant: ...',
   'persist_ex': 'var snap = convo.state();\nawait weld.persist.open(\'chat\').collection(\'sessions\').put(\{ id: \'main\', snap: snap \});\n\n// later:\nvar row = await weld.persist.open(\'chat\').collection(\'sessions\').get(\'main\');\nconvo.load(row.snap);',
   'sig_estimate': 'weld.summarize.estimateTokens(text) -> number',
-  'sig_join': 'weld.summarize.joinMessages(messages) -> string'
+  'sig_join': 'weld.summarize.joinMessages(messages) -> string',
+  'sig_facts': 'await summarize.extractFacts(input, opts) -> \{ ok, facts, error \}\nawait summarize.consolidate(summaries, \{ maxDepth, maxWords, prompt \})',
+  'facts_ex': 'var res = await weld.summarize.extractFacts(transcript);\nres.facts.forEach(function (f) \{ weld.memory.remember(f); \});\n\nvar recap = await weld.summarize.consolidate(rollingSummaries, \{ maxWords: 200 \});',
 };
   function escapeHTML(s){
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -388,12 +410,81 @@ function rolling(opts) {
   };
 }
 
+// extractFacts(input, opts) -> Promise<{ ok, facts, error }>.
+// Pulls discrete, standalone facts out of text or a set of summaries as
+// a JSON array of strings. Prefers weld.structured (robust JSON) and
+// falls back to weld.stream with a bracket-scan parse.
+var FACTS_PROMPT =
+  'Extract all unique, discrete facts from the text below as a JSON array '
+  + 'of strings. Each fact must be a complete, standalone statement; remove '
+  + 'duplicates; preserve important names and details; keep each concise. '
+  + 'Return ONLY a JSON array, e.g. ["fact one.", "fact two."]. If there is '
+  + 'nothing worth keeping, return [].';
+
+function extractFacts(input, opts) {
+  opts = opts || {};
+  var text = Array.isArray(input) ? joinMessages(input) : String(input == null ? '' : input);
+  if (!text.trim()) return Promise.resolve({ ok: true, facts: [], error: null });
+  var instruction = (opts.prompt || FACTS_PROMPT) + '\n\nText:\n' + text;
+
+  var structured = (window.weld && window.weld.structured) ? window.weld.structured : null;
+  if (structured) {
+    return structured.generate({ instruction: instruction, startWith: '[', shape: 'a JSON array of short factual strings' })
+      .then(function (r) {
+        if (r.ok && Array.isArray(r.value)) return { ok: true, facts: r.value.map(String), error: null };
+        return { ok: false, facts: [], error: r.error || 'no facts extracted' };
+      });
+  }
+  var stream = getStream();
+  if (!stream) return Promise.resolve({ ok: false, facts: [], error: 'weld.summarize: weld.stream is not loaded' });
+  return stream.run({ instruction: instruction, startWith: '[' }).then(function (res) {
+    if (res.error) return { ok: false, facts: [], error: res.error };
+    var list = [];
+    try {
+      var raw = res.text, open = raw.indexOf('['), close = raw.lastIndexOf(']');
+      if (open !== -1 && close > open) list = JSON.parse(raw.slice(open, close + 1));
+    } catch (e) { list = []; }
+    if (!Array.isArray(list)) list = [];
+    return { ok: true, facts: list.map(String), error: null };
+  });
+}
+
+// consolidate(summaries, opts) -> Promise<{ ok, summary, depth, error }>.
+// Merges several summaries (strings or { summary, depth }) into one, with
+// a hard depth cap so repeated re-summarization can't recurse forever.
+// opts: { maxDepth (default 3), maxWords (default 250), prompt }
+function consolidate(summaries, opts) {
+  opts = opts || {};
+  var maxDepth = opts.maxDepth != null ? opts.maxDepth : 3;
+  var list = (summaries || []).map(function (s) {
+    return (typeof s === 'string') ? { summary: s, depth: 0 } : { summary: String(s.summary || ''), depth: s.depth || 0 };
+  }).filter(function (s) { return s.summary.trim(); });
+
+  if (!list.length) return Promise.resolve({ ok: true, summary: '', depth: 0, error: null });
+  var inDepth = list.reduce(function (m, s) { return Math.max(m, s.depth); }, 0);
+  var outDepth = inDepth + 1;
+  if (inDepth >= maxDepth) {
+    // refuse to recurse further: concatenate as-is
+    return Promise.resolve({ ok: true, summary: list.map(function (s) { return s.summary; }).join('\n\n'), depth: inDepth, error: null, capped: true });
+  }
+  var combined = list.map(function (s) { return s.summary; }).join('\n\n---\n\n');
+  return runSummary(combined, {
+    prompt: opts.prompt || 'Merge the following summaries into one coherent, non-redundant summary that preserves every important fact, name, and unresolved thread.',
+    maxWords: opts.maxWords || 250
+  }).then(function (r) {
+    if (!r.ok) return { ok: false, summary: '', depth: outDepth, error: r.error };
+    return { ok: true, summary: r.summary, depth: outDepth, error: null };
+  });
+}
+
 window.weld.summarize = {
   summarize: summarize,
   rolling: rolling,
+  extractFacts: extractFacts,
+  consolidate: consolidate,
   estimateTokens: estimateTokens,
   joinMessages: joinMessages,
-  version: '1.0.0'
+  version: '1.1.0'
 };
 
 return window.weld.summarize;

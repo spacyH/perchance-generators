@@ -1,0 +1,192 @@
+$meta
+  title       = weld.ephemeral
+  description = A privacy primitive: wipe all weld-managed local storage for this generator in one call. Inspired by Duck.ai's "delete all" -- enumerate the IndexedDB databases and localStorage keys the suite creates (plus any an app registers), report what would be cleared, and clear it behind a required confirmation token so it can never fire by accident. Local-only by definition: it removes data from this browser, it does not touch any server (kv, uploads). Stash on window.weld.ephemeral.
+  tags        = weld, ephemeral, privacy, clear, storage, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.ephemeral) return window.weld.ephemeral;
+
+  // -----------------------------------------------------------------
+  // weld.ephemeral: a "burn it all" button for local data.
+  //
+  // Duck.ai makes deleting everything a first-class verb. weld.ephemeral does
+  // the same for a Perchance generator: it knows the storage conventions the
+  // suite uses, so one call clears every weld-managed IndexedDB database and
+  // localStorage key in this browser.
+  //
+  //   var plan = await weld.ephemeral.preview();   // what WOULD be cleared
+  //   var token = weld.ephemeral.arm();            // get a one-time confirm token
+  //   var result = await weld.ephemeral.clearAll(token);  // actually clear
+  //
+  // The confirm token exists so a stray clearAll() can't wipe a user's data --
+  // an app must arm() (typically behind a "type DELETE / tap to confirm" UI)
+  // and pass the returned token. Tokens are single-use and expire.
+  //
+  // SCOPE -- read this: it clears LOCAL data only (IndexedDB + localStorage in
+  // this browser). It does NOT delete server-side data: weld.kv values live on
+  // Perchance's server, and weld.upload / weld.report files live at public
+  // URLs -- those are out of reach of any client wipe. preview() says so.
+  // -----------------------------------------------------------------
+
+  // The IndexedDB databases the suite creates by default. An app that passed a
+  // custom dbName (e.g. weld.persist.open('my-app')) registers it via add().
+  var KNOWN_DBS = ['weld-embed', 'weld-gallery', 'weld-history', 'weld-kv', 'weld-memory', 'weld-persist'];
+
+  // localStorage key prefixes the suite uses. Anything starting with one of
+  // these is considered weld-managed.
+  var KNOWN_LS_PREFIXES = ['weld-', 'weld:', 'weld_', '__m'];
+
+  // App-registered extras.
+  var extraDbs = new Array();
+  var extraPrefixes = new Array();
+
+  // add({ dbs, lsPrefixes }): register app-owned databases / key prefixes so
+  // clearAll covers them too.
+  function add(spec) {
+    spec = spec || {};
+    toArray(spec.dbs).forEach(function (d) { if (d && extraDbs.indexOf(d) === -1) extraDbs.push(String(d)); });
+    toArray(spec.lsPrefixes).forEach(function (p) { if (p && extraPrefixes.indexOf(p) === -1) extraPrefixes.push(String(p)); });
+    return { dbs: allDbs(), lsPrefixes: allPrefixes() };
+  }
+
+  function toArray(x) { return Array.isArray(x) ? x : (x == null ? new Array() : Array.of(x)); }
+  function allDbs() { return KNOWN_DBS.concat(extraDbs); }
+  function allPrefixes() { return KNOWN_LS_PREFIXES.concat(extraPrefixes); }
+
+  // Which localStorage keys currently match a weld-managed prefix?
+  function matchingLsKeys() {
+    var out = new Array();
+    try {
+      var prefixes = allPrefixes();
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        if (!key) continue;
+        for (var j = 0; j < prefixes.length; j++) {
+          if (key.indexOf(Reflect.get(prefixes, j)) === 0) { out.push(key); break; }
+        }
+      }
+    } catch (e) { /* localStorage unavailable */ }
+    return out;
+  }
+
+  // Which known databases actually exist right now? Uses indexedDB.databases()
+  // where supported; otherwise falls back to "all known" (can't enumerate).
+  function existingDbs() {
+    return new Promise(function (resolve) {
+      var known = allDbs();
+      try {
+        if (indexedDB && typeof indexedDB.databases === 'function') {
+          indexedDB.databases().then(function (list) {
+            var names = (list || new Array()).map(function (d) { return d && d.name; }).filter(Boolean);
+            resolve(known.filter(function (n) { return names.indexOf(n) !== -1; }));
+          }).catch(function () { resolve(known.slice()); });
+        } else {
+          resolve(known.slice());     // can't enumerate; assume all known may exist
+        }
+      } catch (e) { resolve(known.slice()); }
+    });
+  }
+
+  // preview(): a plan of what clearAll would remove, plus an explicit note of
+  // what it CANNOT remove (server-side data). Safe to call any time.
+  function preview() {
+    return existingDbs().then(function (dbs) {
+      var lsKeys = matchingLsKeys();
+      return {
+        databases: dbs,
+        localStorageKeys: lsKeys,
+        counts: { databases: dbs.length, localStorageKeys: lsKeys.length },
+        cannotClear: [
+          'weld.kv values (stored on Perchance server)',
+          'weld.upload / weld.report files (public URLs, may auto-expire)'
+        ],
+        note: 'Clears local browser data only. Server-side and uploaded data are out of reach of a client-side wipe.'
+      };
+    });
+  }
+
+  // --- confirmation tokens -------------------------------------------------
+  var armed = null;   // { token, expires }
+  var TOKEN_TTL_MS = 60000;
+
+  function arm() {
+    var token = 'wipe-' + Date.now().toString(36) + '-' + Math.floor(Math.random() * 1e9).toString(36);
+    armed = { token: token, expires: Date.now() + TOKEN_TTL_MS };
+    return token;
+  }
+  function isValid(token) {
+    return !!(armed && token && token === armed.token && Date.now() < armed.expires);
+  }
+  function disarm() { armed = null; }
+
+  // clearAll(token): the destructive call. Requires a token from arm().
+  // Deletes every existing weld-managed IndexedDB database and removes every
+  // matching localStorage key. Returns a report of what was cleared.
+  function clearAll(token) {
+    if (!isValid(token)) {
+      return Promise.reject(new Error('weld.ephemeral: clearAll requires a valid token from arm(). This guards against accidental data loss.'));
+    }
+    disarm();   // single-use
+
+    return existingDbs().then(function (dbs) {
+      var lsKeys = matchingLsKeys();
+
+      // Remove localStorage keys first (synchronous, can't fail mid-way badly).
+      var lsCleared = new Array();
+      lsKeys.forEach(function (k) {
+        try { localStorage.removeItem(k); lsCleared.push(k); } catch (e) { /* skip */ }
+      });
+
+      // Delete each IndexedDB database. deleteDatabase is async + can block if
+      // a connection is open, so we race each against a timeout and report.
+      var dbResults = dbs.map(function (name) {
+        return deleteDb(name).then(
+          function () { return { name: name, deleted: true }; },
+          function (e) { return { name: name, deleted: false, error: String(e && e.message || e) }; }
+        );
+      });
+
+      return Promise.all(dbResults).then(function (results) {
+        return {
+          localStorageCleared: lsCleared,
+          databases: results,
+          counts: {
+            localStorageKeys: lsCleared.length,
+            databasesDeleted: results.filter(function (r) { return r.deleted; }).length,
+            databasesFailed: results.filter(function (r) { return !r.deleted; }).length
+          }
+        };
+      });
+    });
+  }
+
+  function deleteDb(name) {
+    return new Promise(function (resolve, reject) {
+      var settled = false;
+      var req;
+      try { req = indexedDB.deleteDatabase(name); }
+      catch (e) { reject(e); return; }
+      req.onsuccess = function () { if (!settled) { settled = true; resolve(); } };
+      req.onerror = function () { if (!settled) { settled = true; reject(req.error || new Error('deleteDatabase error')); } };
+      // onblocked fires when another tab/connection holds the db open. We treat
+      // it as "couldn't complete now" rather than hanging forever.
+      req.onblocked = function () { if (!settled) { settled = true; reject(new Error('database is open in another connection; close it and retry')); } };
+      setTimeout(function () { if (!settled) { settled = true; reject(new Error('deleteDatabase timed out')); } }, 8000);
+    });
+  }
+
+  window.weld.ephemeral = {
+    preview: preview,
+    arm: arm,
+    clearAll: clearAll,
+    add: add,
+    disarm: disarm,
+    knownDatabases: function () { return allDbs(); },
+    knownPrefixes: function () { return allPrefixes(); },
+    version: '1.0.0'
+  };
+
+  return window.weld.ephemeral;

@@ -43,6 +43,11 @@ pre code{background:none;padding:0;color:inherit;font-size:inherit;}
   min-height:1.5em;}
 .note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
   padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.changelog{margin:14px 0;padding:14px 16px;background:var(--faint);border:1px solid var(--border);border-radius:6px;}
+.changelog .cl-ver{font:700 13px var(--mono);color:var(--accent);margin:10px 0 4px;}
+.changelog .cl-ver:first-child{margin-top:0;}
+.changelog ul{margin:0 0 4px;padding-left:18px;}
+.changelog li{font-size:13px;color:#c9d1d9;line-height:1.5;margin:2px 0;}
 .warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
 table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
 th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
@@ -72,7 +77,7 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
 <div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.history<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-history-example">demo &rarr;</a></span></div>  <div class="hdr">
     <div class="hdr-row">
       <h1>weld.history</h1>
-      <span class="ver">v1.0.0</span>
+      <span class="ver">v1.1.0</span>
     </div>
     <p class="lead">Chat session management with auto-save and branching. Create, load, list, rename, delete conversations. The "continue where you left off" layer backed by weld.persist.</p>
   </div>
@@ -101,7 +106,7 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
 <p><code>getMessages()</code> returns the active branch as a flat array (from the branching tree's <code>activeBranch()</code>, or the plain array fallback). <code>getTree()</code> returns the live weld.branching instance for direct tree operations (branch, switchSibling, etc.).</p>
 <h2>Session management</h2><h3>hist.list(opts?)</h3>
 <div class="sig" data-codeid="sig7"></div>
-<p>List sessions sorted by most-recently-updated. Filter by <code>characterId</code>, search by title/character name, limit the result count.</p>
+<p>List sessions, pinned first and then by most-recently-updated. Filter by <code>characterId</code>, search by title / character name / summary, limit the result count. Pass <code>pinnedFirst: false</code> to sort purely by recency, or <code>pinnedOnly: true</code> for only pinned sessions.</p>
 <pre data-codeid="code8"></pre>
 <h3>hist.load(sessionId) / .save()</h3>
 <div class="sig" data-codeid="sig9"></div>
@@ -114,9 +119,18 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
 <div class="sig" data-codeid="sig14"></div>
 <div class="sig" data-codeid="sig15"></div>
 <p>Standard session metadata operations. <code>delete</code> removes both the session metadata and its stored tree. <code>clear</code> removes everything.</p>
+<h2>Pinning &amp; summaries</h2><h3>hist.pin() / .unpin() / .togglePin()</h3>
+<div class="sig" data-codeid="sigP1"></div>
+<div class="sig" data-codeid="sigP2"></div>
+<div class="sig" data-codeid="sigP3"></div>
+<p>Pin a session to keep it at the top of <code>list()</code>. Every session has a <code>pinned</code> boolean (default <code>false</code>); <code>list()</code> sorts pinned sessions first, then by most-recently-updated. Pass <code>pinnedFirst: false</code> to <code>list()</code> to sort purely by recency, or <code>pinnedOnly: true</code> to return only pinned sessions. Pinning is not treated as activity, so it does <em>not</em> bump <code>updatedAt</code> &mdash; a pinned old chat keeps its real last-touched time.</p>
+<h3>hist.setSummary(sessionId?, summary)</h3>
+<div class="sig" data-codeid="sigP4"></div>
+<p>Set (or clear) a short recap for a session &mdash; useful for showing a one-line description in a session list, or storing a model-generated summary. Every session has a <code>summary</code> string (default <code>''</code>), and <code>list(\{ search \})</code> matches against summary text as well as title and character name. Like pinning, <code>setSummary</code> does not bump <code>updatedAt</code>. Omit the id to target the active session.</p>
+<pre data-codeid="codeP5"></pre>
 <h2>Events</h2>
 <div class="sig" data-codeid="sig16"></div>
-<p>Listen for session events: <code>'create'</code>, <code>'load'</code>, <code>'save'</code>, <code>'append'</code>, <code>'rename'</code>, <code>'delete'</code>, <code>'clear'</code>. The callback receives <code>(event, data)</code>.</p>
+<p>Listen for session events: <code>'create'</code>, <code>'load'</code>, <code>'save'</code>, <code>'append'</code>, <code>'rename'</code>, <code>'pin'</code>, <code>'summary'</code>, <code>'delete'</code>, <code>'clear'</code>. The callback receives <code>(event, data)</code>.</p>
 <pre data-codeid="code17"></pre>
 <h2>Auto-save</h2>
 <p>By default, every <code>append()</code> schedules a save after a 2-second debounce. Configure via <code>create()</code> options:</p>
@@ -127,6 +141,17 @@ weld.history delegates all persistence to weld.persist. The session metadata liv
 </div>
   <div class="footer">Part of the <a href="https://perchance.org/weld-ui-index">weld plugin suite</a>. Stashed at <code>window.weld.history</code>. This page loads the plugin so you can inspect it in DevTools.</div>
 </div>
+<h2>Changelog</h2>
+<div class="changelog">
+<p class="cl-ver">v1.1.0</p>
+<ul>
+<li>pinned + summary on the session shape; pin/unpin/togglePin/setSummary; list() sorts pinned-first (pinnedFirst:false to disable), pinnedOnly filter, searches summary text.</li>
+</ul>
+<p class="cl-ver">v1.0.0</p>
+<ul>
+<li>Initial release: create/load/save/append, message + tree storage via weld.persist.</li>
+</ul>
+</div>
 <script>
 (function(){
   var examples = {
@@ -136,7 +161,7 @@ weld.history delegates all persistence to weld.persist. The session metadata liv
   'sig4': 'hist.append(message)  ->  nodeId | messageId',
   'sig5': 'hist.getMessages()  ->  message\[\]',
   'sig6': 'hist.getTree()  ->  branching instance | null',
-  'sig7': 'hist.list(\{characterId?, search?, limit?\})  ->  Promise<session\[\]>',
+  'sig7': 'hist.list(\{characterId?, search?, limit?, pinnedFirst?, pinnedOnly?\})  ->  Promise<session\[\]>',
   'code8': 'const recent = await hist.list(\{ limit: 10 \});\nconst chloeChats = await hist.list(\{ characterId: \'char_123\' \});\nconst searched = await hist.list(\{ search: \'dragon\' \});',
   'sig9': 'hist.load(sessionId)  ->  Promise<sessionId>',
   'sig10': 'hist.save()  ->  Promise',
@@ -147,7 +172,12 @@ weld.history delegates all persistence to weld.persist. The session metadata liv
   'sig15': 'hist.clear()  ->  Promise',
   'sig16': 'hist.onChange(fn)  ->  unsubscribe function',
   'code17': 'const unsub = hist.onChange((event, data) => \{\n  if (event === \'append\') rerenderChat();\n  if (event === \'load\') refreshUI(data.sessionId);\n\});',
-  'code18': 'const hist = weld.history.create(\{\n  autoSave: true,            // default\n  autoSaveDebounceMs: 3000,  // wait 3s after last append\n  dbName: \'my-chat-history\'  // custom IndexedDB name\n\});'
+  'code18': 'const hist = weld.history.create(\{\n  autoSave: true,            // default\n  autoSaveDebounceMs: 3000,  // wait 3s after last append\n  dbName: \'my-chat-history\'  // custom IndexedDB name\n\});',
+  'sigP1': 'hist.pin(sessionId?)  ->  Promise<true>',
+  'sigP2': 'hist.unpin(sessionId?)  ->  Promise<false>',
+  'sigP3': 'hist.togglePin(sessionId?)  ->  Promise<boolean>',
+  'sigP4': 'hist.setSummary(sessionId?, summary)  ->  Promise',
+  'codeP5': '// keep important chats at the top\nawait hist.pin(sessionId);\nconst pinned = await hist.list(\{ pinnedOnly: true \});\n\n// store a one-line recap (e.g. model-generated)\nawait hist.setSummary(sessionId, \'A tense negotiation with the dragon council.\');\nconst found = await hist.list(\{ search: \'dragon\' \});  // matches summary too'
 };
   function escapeHTML(s){
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -181,7 +211,7 @@ weld.history delegates all persistence to weld.persist. The session metadata liv
 'use strict';
 
 if (!window.weld) window.weld = {};
-if (window.weld.history) return; // already loaded
+if (window.weld.history) return window.weld.history;
 
 // -----------------------------------------------------------------
 // weld.history: Chat session manager.
@@ -219,7 +249,7 @@ function createHistory(opts) {
   var activeTree = null;        // weld.branching instance if available
   var activeMessages = null;    // fallback: plain array of messages
   var saveTimer = null;
-  var changeListeners = [];
+  var changeListeners = new Array();
 
   function hasBranching() {
     return !!(window.weld && window.weld.branching);
@@ -227,7 +257,7 @@ function createHistory(opts) {
 
   function emit(event, data) {
     for (var i = 0; i < changeListeners.length; i++) {
-      try { changeListeners[i](event, data); } catch (e) { /* swallow */ }
+      try { Reflect.get(changeListeners, i)(event, data); } catch (e) { /* swallow */ }
     }
   }
 
@@ -237,7 +267,7 @@ function createHistory(opts) {
     saveTimer = setTimeout(function() {
       saveTimer = null;
       save().catch(function(e) {
-        console.error('[weld.history] auto-save failed:', e);
+        console.error(String.fromCharCode(91)+'weld.history'+String.fromCharCode(93)+' auto-save failed:', e);
       });
     }, autoSaveDebounce);
   }
@@ -255,6 +285,8 @@ function createHistory(opts) {
       createdAt: now,
       updatedAt: now,
       messageCount: 0,
+      pinned: meta.pinned === true,
+      summary: meta.summary || '',
       metadata: meta.metadata || null
     };
 
@@ -264,7 +296,7 @@ function createHistory(opts) {
       activeMessages = null;
     } else {
       activeTree = null;
-      activeMessages = [];
+      activeMessages = new Array();
     }
     activeSessionId = id;
 
@@ -300,7 +332,7 @@ function createHistory(opts) {
             activeMessages = null;
           } else {
             activeTree = null;
-            activeMessages = [];
+            activeMessages = new Array();
           }
         }
         // Update view time
@@ -321,7 +353,7 @@ function createHistory(opts) {
       treeData.messages = null;
     } else {
       treeData.tree = null;
-      treeData.messages = activeMessages ? activeMessages.slice() : [];
+      treeData.messages = activeMessages ? activeMessages.slice() : new Array();
     }
     var msgCount = activeTree ? activeTree.size() : (activeMessages ? activeMessages.length : 0);
     return Promise.all([
@@ -342,7 +374,7 @@ function createHistory(opts) {
       treeData.messages = null;
     } else {
       treeData.tree = null;
-      treeData.messages = activeMessages ? activeMessages.slice() : [];
+      treeData.messages = activeMessages ? activeMessages.slice() : new Array();
     }
     return trees.put(treeData);
   }
@@ -366,11 +398,11 @@ function createHistory(opts) {
 
   // -------- Get the active conversation --------
   function getMessages() {
-    if (!activeSessionId) return [];
+    if (!activeSessionId) return new Array();
     if (activeTree) {
       return activeTree.activeBranch().map(function(n) { return n.data; });
     }
-    return activeMessages ? activeMessages.slice() : [];
+    return activeMessages ? activeMessages.slice() : new Array();
   }
 
   function getTree() {
@@ -390,11 +422,23 @@ function createHistory(opts) {
         all = all.filter(function(s) {
           var t = s.title ? s.title.toLowerCase() : '';
           var cn = s.characterName ? s.characterName.toLowerCase() : '';
-          return t.indexOf(q) !== -1 || cn.indexOf(q) !== -1;
+          var sm = s.summary ? s.summary.toLowerCase() : '';
+          return t.indexOf(q) !== -1 || cn.indexOf(q) !== -1 || sm.indexOf(q) !== -1;
         });
       }
-      // Sort by updatedAt descending (most recent first)
-      all.sort(function(a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); });
+      if (listOpts.pinnedOnly) {
+        all = all.filter(function(s) { return s.pinned === true; });
+      }
+      // Sort: pinned sessions first, then by updatedAt descending. Pass
+      // pinnedFirst:false to sort purely by recency.
+      var pinFirst = listOpts.pinnedFirst !== false;
+      all.sort(function(a, b) {
+        if (pinFirst) {
+          var pa = a.pinned ? 1 : 0, pb = b.pinned ? 1 : 0;
+          if (pa !== pb) return pb - pa;
+        }
+        return (b.updatedAt || 0) - (a.updatedAt || 0);
+      });
       // Limit
       if (listOpts.limit && listOpts.limit > 0) {
         all = all.slice(0, listOpts.limit);
@@ -407,6 +451,33 @@ function createHistory(opts) {
   function rename(sessionId, title) {
     return sessions.update(sessionId, { title: String(title), updatedAt: Date.now() }).then(function() {
       emit('rename', { sessionId: sessionId, title: title });
+    });
+  }
+
+  // Pin / unpin a session. Pinning is not "activity", so it does NOT bump
+  // updatedAt -- a pinned old chat should keep its real last-touched time,
+  // it just sorts to the top via list()'s pinnedFirst.
+  function setPinned(sessionId, pinned) {
+    var id = sessionId || activeSessionId;
+    return sessions.update(id, { pinned: pinned === true }).then(function() {
+      emit('pin', { sessionId: id, pinned: pinned === true });
+      return pinned === true;
+    });
+  }
+  function pin(sessionId) { return setPinned(sessionId, true); }
+  function unpin(sessionId) { return setPinned(sessionId, false); }
+  function togglePin(sessionId) {
+    var id = sessionId || activeSessionId;
+    return sessions.get(id).then(function(s) { return setPinned(id, !(s && s.pinned)); });
+  }
+
+  // Set (or clear) a session's summary -- a short recap an app can show in
+  // the session list or generate from the conversation. Not activity, so it
+  // doesn't bump updatedAt either.
+  function setSummary(sessionId, summary) {
+    var id = sessionId || activeSessionId;
+    return sessions.update(id, { summary: String(summary == null ? '' : summary) }).then(function() {
+      emit('summary', { sessionId: id, summary: String(summary == null ? '' : summary) });
     });
   }
 
@@ -472,6 +543,10 @@ function createHistory(opts) {
     getTree: getTree,
     list: list,
     rename: rename,
+    pin: pin,
+    unpin: unpin,
+    togglePin: togglePin,
+    setSummary: setSummary,
     getMeta: getMeta,
     updateMeta: updateMeta,
     delete: del,
@@ -484,11 +559,11 @@ function createHistory(opts) {
 
 window.weld.history = {
   create: createHistory,
-  version: '1.0.0'
+  version: '1.1.0'
 };
 
+return window.weld.history;
 })();
-
 </script>
 <footer class="footer-social">
   <span>&#169; 2026 therealwestninja.</span> &#183;

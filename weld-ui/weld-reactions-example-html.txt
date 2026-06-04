@@ -1,0 +1,276 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--amber:#d29922;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:780px;margin:0 auto;padding:34px 18px 90px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 0 16px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+.breadcrumb a{color:var(--muted);}.breadcrumb .sep{color:var(--faint);margin:0 8px;}.breadcrumb .cur{color:var(--ink);}.breadcrumb .act a{color:var(--accent);}
+.hdr{margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}.hdr h1{font:700 24px var(--mono);letter-spacing:-0.5px;}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;}
+.hdr .lead{color:var(--muted);margin-top:8px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;}
+.panel h2{font:600 13px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:8px 0;}
+.lbl{font:600 12px var(--mono);color:var(--muted);min-width:74px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 15px;font:600 13px var(--font);cursor:pointer;transition:.12s;}
+.btn:hover{filter:brightness(1.08);}.btn.ghost{background:var(--faint);color:var(--ink);}.btn.sm{padding:6px 11px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+input[type=text],textarea{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:8px 10px;font:13px var(--font);}
+input[type=text]{flex:1;min-width:120px;}textarea{width:100%;font:12.5px/1.5 var(--mono);resize:vertical;}
+.mono{font:13px var(--mono);}
+.out{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font:12.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;min-height:20px;color:#c9d1d9;}
+.chip{display:inline-block;background:var(--faint);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font:600 12px var(--mono);margin:2px;}
+.chip.k{background:rgba(63,185,80,.14);border-color:rgba(63,185,80,.4);color:#7ee787;}
+.chip.d{opacity:.4;text-decoration:line-through;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:9px 13px;border-radius:0 4px 4px 0;margin:12px 0 0;font-size:12.5px;color:#c9d1d9;}
+.note.warn{background:rgba(210,153,34,.08);border-color:var(--amber);}
+.tag{font:600 10px var(--mono);padding:2px 7px;border-radius:4px;background:rgba(63,185,80,.14);color:#7ee787;border:1px solid rgba(63,185,80,.4);}
+.tag.ai{background:rgba(210,153,34,.12);color:#e3b341;border-color:rgba(210,153,34,.4);}
+.bar{height:14px;background:var(--accent);border-radius:3px;transition:width .3s;}
+.footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);}.footer a{color:var(--muted);}
+.flex{display:flex;gap:10px;align-items:center;}.wrap{flex-wrap:wrap;}.grow{flex:1;}.mt{margin-top:10px;}
+</style>
+<div id="page">
+<div class="breadcrumb"><span><a href="https://perchance.org/weld-ui-index">weld</a><span class="sep">/</span>weld.reactions<span class="sep">/</span><span class="cur">demo</span></span><span class="act"><a href="https://perchance.org/weld-reactions-plugin">docs &rarr;</a></span></div>
+<div class="hdr"><div class="hdr-row"><h1>weld.reactions &mdash; demo</h1><span class="ver">v1.0.0</span></div><p class="lead">Click emoji to toggle your reaction and switch acting users to watch counts aggregate. weld.reactions tracks the per-user bookkeeping and fires change events; the demo just draws the bar. The same primitive attaches to any id -- a chat turn, an image, a comment.</p></div>
+  <div class="panel"><h2>Reaction bar <span class="tag">aggregate, per-user</span></h2>
+    <div class="out" style="padding:14px;border-radius:8px;">
+      <p style="margin:0 0 10px;"><b style="color:var(--accent)">Nyx:</b> Just shipped the new plugin! ð</p>
+      <div id="bar" class="row" style="gap:8px;flex-wrap:wrap;"></div>
+    </div>
+    <div class="row mt"><span class="lbl">acting as</span>
+      <button class="btn sm" data-u="you">you</button>
+      <button class="btn sm ghost" data-u="sam">sam</button>
+      <button class="btn sm ghost" data-u="kit">kit</button>
+      <span id="who" class="chip">you</span>
+    </div>
+    <div class="note">Click an emoji to toggle your reaction; switch the acting user to see counts aggregate across people. Counts and âdid I reactâ come from weld.reactions â it stores the bookkeeping and fires change events, while this demo draws the bar. The same primitive attaches to a gallery image, a comment, or any id.</div>
+  </div>
+<footer class="footer"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
+</div>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.reactions) return window.weld.reactions;
+
+// -----------------------------------------------------------------
+// weld.reactions: a count of emoji on an id, plus "did I react".
+//
+// Discord and Twitch both attach lightweight aggregate reactions to
+// messages. The essence is tiny: per item, a map emoji -> set of user
+// ids; counts fall out of the set sizes, and "mine" is membership of the
+// current user. weld.reactions owns that bookkeeping and the events; the
+// app owns storage and identity.
+//
+//   var rx = weld.reactions.create({ me: currentUserId });
+//   rx.react(turnId, '\u{1F44D}');           // I add a thumbs-up
+//   rx.toggle(turnId, '\u2764\uFE0F');         // toggle a heart
+//   rx.countsFor(turnId);                       // { '\u{1F44D}': 3, '\u2764\uFE0F': 1 }
+//   rx.mine(turnId);                            // the emoji I reacted with
+//   rx.onChange(function (e) { rerender(e.itemId); });
+//
+// STORAGE is pluggable. By default reactions live in memory for the
+// session. Pass { store } with get(itemId)->data and set(itemId,data) to
+// persist -- e.g. a weld.kv-backed store for counts shared across users,
+// or weld.persist for local. serialize()/load() round-trip the whole set.
+//
+// It RENDERS NOTHING. countsFor + mine give an app everything it needs to
+// draw a reaction bar however it likes (and weld.emotes can turn tokens
+// into images). That keeps it composable and testable.
+// -----------------------------------------------------------------
+
+function createReactions(opts) {
+  opts = opts || {};
+  var me = opts.me != null ? String(opts.me) : 'me';   // current user id
+  var store = opts.store || null;                       // optional { get, set }
+  var listeners = new Array();
+
+  // In-memory model: items keyed by itemId -> { emoji: { userId: true } }
+  var items = {};
+
+  function emit(itemId, emoji, action) {
+    var e = { itemId: itemId, emoji: emoji, action: action };
+    for (var i = 0; i < listeners.length; i++) {
+      try { Reflect.get(listeners, i)(e); } catch (err) { /* swallow */ }
+    }
+  }
+  function onChange(fn) {
+    if (typeof fn !== 'function') return function () {};
+    listeners.push(fn);
+    return function () { var ix = listeners.indexOf(fn); if (ix !== -1) listeners.splice(ix, 1); };
+  }
+
+  // ---- identity ----
+  function setUser(id) { me = (id != null) ? String(id) : me; }
+
+  // ---- internal item access (with optional backing store) ----
+  function itemOf(itemId) {
+    var key = String(itemId);
+    var it = Reflect.get(items, key);
+    if (it) return it;
+    // try the backing store
+    if (store && typeof store.get === 'function') {
+      try {
+        var loaded = store.get(key);
+        if (loaded && typeof loaded === 'object') { Reflect.set(items, key, loaded); return loaded; }
+      } catch (e) { /* fall through */ }
+    }
+    it = {};
+    Reflect.set(items, key, it);
+    return it;
+  }
+  function persistItem(itemId) {
+    if (store && typeof store.set === 'function') {
+      try { store.set(String(itemId), Reflect.get(items, String(itemId))); } catch (e) { /* swallow */ }
+    }
+  }
+
+  // ---- mutate ----
+  // react(itemId, emoji, optional user): add a reaction. Idempotent per user.
+  function react(itemId, emoji, user) {
+    var u = (user != null) ? String(user) : me;
+    var key = String(emoji);
+    var it = itemOf(itemId);
+    var bag = Reflect.get(it, key);
+    if (!bag) { bag = {}; Reflect.set(it, key, bag); }
+    if (Reflect.get(bag, u)) return false;     // already reacted
+    Reflect.set(bag, u, true);
+    persistItem(itemId);
+    emit(itemId, key, 'add');
+    return true;
+  }
+  // unreact(itemId, emoji, optional user): remove a reaction.
+  function unreact(itemId, emoji, user) {
+    var u = (user != null) ? String(user) : me;
+    var key = String(emoji);
+    var it = itemOf(itemId);
+    var bag = Reflect.get(it, key);
+    if (!bag || !Reflect.get(bag, u)) return false;
+    Reflect.deleteProperty(bag, u);
+    if (Object.keys(bag).length === 0) Reflect.deleteProperty(it, key);  // drop empty emoji
+    persistItem(itemId);
+    emit(itemId, key, 'remove');
+    return true;
+  }
+  // toggle(itemId, emoji, optional user): add if absent, remove if present.
+  function toggle(itemId, emoji, user) {
+    var u = (user != null) ? String(user) : me;
+    return hasReacted(itemId, emoji, u) ? (unreact(itemId, emoji, u), false) : (react(itemId, emoji, u), true);
+  }
+
+  // ---- query ----
+  // countsFor(itemId): { emoji: count } sorted by descending count.
+  function countsFor(itemId) {
+    var it = itemOf(itemId);
+    var out = {};
+    var keys = Object.keys(it);
+    keys.sort(function (a, b) { return Object.keys(Reflect.get(it, b)).length - Object.keys(Reflect.get(it, a)).length; });
+    for (var i = 0; i < keys.length; i++) {
+      var k = Reflect.get(keys, i);
+      Reflect.set(out, k, Object.keys(Reflect.get(it, k)).length);
+    }
+    return out;
+  }
+  // count(itemId, emoji): number of users who reacted with emoji.
+  function count(itemId, emoji) {
+    var bag = Reflect.get(itemOf(itemId), String(emoji));
+    return bag ? Object.keys(bag).length : 0;
+  }
+  // total(itemId): total reactions across all emoji.
+  function total(itemId) {
+    var it = itemOf(itemId), n = 0, keys = Object.keys(it);
+    for (var i = 0; i < keys.length; i++) n += Object.keys(Reflect.get(it, Reflect.get(keys, i))).length;
+    return n;
+  }
+  // mine(itemId, optional user): array of emoji the user reacted with.
+  function mine(itemId, user) {
+    var u = (user != null) ? String(user) : me;
+    var it = itemOf(itemId), out = new Array(), keys = Object.keys(it);
+    for (var i = 0; i < keys.length; i++) {
+      var k = Reflect.get(keys, i);
+      if (Reflect.get(Reflect.get(it, k), u)) out.push(k);
+    }
+    return out;
+  }
+  // hasReacted(itemId, emoji, optional user): did the user react with this emoji?
+  function hasReacted(itemId, emoji, user) {
+    var u = (user != null) ? String(user) : me;
+    var bag = Reflect.get(itemOf(itemId), String(emoji));
+    return !!(bag && Reflect.get(bag, u));
+  }
+  // reactors(itemId, emoji): the user ids who reacted with emoji.
+  function reactors(itemId, emoji) {
+    var bag = Reflect.get(itemOf(itemId), String(emoji));
+    return bag ? Object.keys(bag) : new Array();
+  }
+
+  // ---- maintenance ----
+  function clearItem(itemId) {
+    Reflect.deleteProperty(items, String(itemId));
+    persistItem(itemId);
+    emit(itemId, null, 'clear');
+  }
+  function clearAll() { items = {}; }
+
+  // ---- persistence ----
+  function serialize() { return JSON.parse(JSON.stringify(items)); }
+  function load(data) {
+    if (data && typeof data === 'object') { items = JSON.parse(JSON.stringify(data)); return true; }
+    return false;
+  }
+
+  return {
+    setUser: setUser,
+    react: react, unreact: unreact, toggle: toggle,
+    countsFor: countsFor, count: count, total: total,
+    mine: mine, hasReacted: hasReacted, reactors: reactors,
+    clearItem: clearItem, clearAll: clearAll,
+    serialize: serialize, load: load,
+    onChange: onChange
+  };
+}
+
+window.weld.reactions = {
+  create: createReactions,
+  version: '1.0.0'
+};
+
+return window.weld.reactions;
+})();
+</script>
+<script>
+
+  function boot(){ if(!window.weld||!window.weld.reactions){return setTimeout(boot,100);} init(); }
+  function init(){
+    var R=window.weld.reactions, $=function(id){return document.getElementById(id);};
+    var PALETTE=['\u{1F44D}','\u2764\uFE0F','\u{1F602}','\u{1F389}','\u{1F525}'];
+    var ITEM='msg1', me='you';
+    var rx=R.create({ me: me });
+    // seed a little activity from other users
+    rx.react(ITEM,'\u{1F44D}','sam'); rx.react(ITEM,'\u{1F389}','kit'); rx.react(ITEM,'\u{1F44D}','kit');
+    rx.onChange(function(){ render(); });
+    function render(){
+      var counts=rx.countsFor(ITEM), mineSet=rx.mine(ITEM);
+      $('bar').innerHTML = PALETTE.map(function(e){
+        var n=counts[e]||0, on=mineSet.indexOf(e)!==-1;
+        return '<button class="btn sm '+(on?'':'ghost')+'" data-e="'+e+'" style="min-width:54px;">'+e+' '+(n||'')+'</button>';
+      }).join('');
+      Array.prototype.forEach.call($('bar').querySelectorAll('[data-e]'), function(b){
+        b.onclick=function(){ rx.toggle(ITEM, b.getAttribute('data-e')); };
+      });
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('[data-u]'), function(b){
+      b.onclick=function(){ me=b.getAttribute('data-u'); rx.setUser(me); $('who').textContent=me;
+        Array.prototype.forEach.call(document.querySelectorAll('[data-u]'), function(x){ x.className='btn sm '+(x===b?'':'ghost'); });
+        render(); };
+    });
+    render();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+
+</script>

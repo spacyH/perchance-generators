@@ -43,6 +43,11 @@ pre code{background:none;padding:0;color:inherit;font-size:inherit;}
   min-height:1.5em;}
 .note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
   padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.changelog{margin:14px 0;padding:14px 16px;background:var(--faint);border:1px solid var(--border);border-radius:6px;}
+.changelog .cl-ver{font:700 13px var(--mono);color:var(--accent);margin:10px 0 4px;}
+.changelog .cl-ver:first-child{margin-top:0;}
+.changelog ul{margin:0 0 4px;padding-left:18px;}
+.changelog li{font-size:13px;color:#c9d1d9;line-height:1.5;margin:2px 0;}
 .warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
 table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
 th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
@@ -157,6 +162,21 @@ Perchance's text-to-image backend silently ignores the <code>negativePrompt</cod
 </div>
   <div class="footer">Part of the <a href="https://perchance.org/weld-ui-index">weld plugin suite</a>. Stashed at <code>window.weld.image</code>. This page loads the plugin so you can inspect it in DevTools.</div>
 </div>
+<h2>Listing styles &amp; resolutions <span class="tag">v1.1.0</span></h2>
+<div class="sig" data-codeid="sig_names"></div>
+<p><code>styleNames()</code> and <code>resolutionNames()</code> return the available named styles and the legal resolution presets, so an app can build a dropdown from the live list rather than hard-coding it.</p>
+<pre data-codeid="names_ex"></pre>
+<h2>Changelog</h2>
+<div class="changelog">
+<p class="cl-ver">v1.1.0</p>
+<ul>
+<li>styleNames() and resolutionNames() for building UI from the live presets.</li>
+</ul>
+<p class="cl-ver">v1.0.0</p>
+<ul>
+<li>Initial release: image generation via weld backend.</li>
+</ul>
+</div>
 <script>
 (function(){
   var examples = {
@@ -176,7 +196,9 @@ Perchance's text-to-image backend silently ignores the <code>negativePrompt</cod
   'code12': 'const results = await weld.image.variations(\n  \[\'Knight in armor\', \'Knight casting a spell\', \'Knight in a tavern\'\],\n  \{ width: 512, height: 768, seed: 42 \}\n);',
   'sig13': 'weld.image.generateWithRetry(opts, maxRetries?)  ->  Promise<data>',
   'code14': 'try \{\n  const data = await weld.image.generateWithRetry(\n    \{ prompt: \'A volcano\' \},\n    5\n  );\n\} catch (lastError) \{\n  console.error(\'All 5 attempts failed:\', lastError);\n\}',
-  'code15': '// In a generator that imports text-to-image-plugin under a different name:\nimager = \{import:text-to-image-plugin\}\n\n// In HTML JS:\nweld.image.setT2i(root.imager);'
+  'code15': '// In a generator that imports text-to-image-plugin under a different name:\nimager = \{import:text-to-image-plugin\}\n\n// In HTML JS:\nweld.image.setT2i(root.imager);',
+  'sig_names': 'image.styleNames() -> string\[]   //  image.resolutionNames() -> string\[]',
+  'names_ex': 'weld.image.styleNames().forEach(function (s) \{ addOption(styleSelect, s); \});',
 };
   function escapeHTML(s){
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -210,7 +232,7 @@ Perchance's text-to-image backend silently ignores the <code>negativePrompt</cod
 'use strict';
 
 if (!window.weld) window.weld = {};
-if (window.weld.image) return; // already loaded
+if (window.weld.image) { window.weld.image.setT2i(t2iSource); return window.weld.image; }
 
 // -----------------------------------------------------------------
 // weld.image: Promise-based wrapper around Perchance's text-to-image-plugin.
@@ -273,6 +295,41 @@ function withResolution(opts, resName) {
   return Object.assign({}, opts, { width: parseInt(parts[0], 10), height: parseInt(parts[1], 10) });
 }
 
+// --- truth-layer helpers (text-to-image-plugin's sharp edges) ---
+// Only four resolutions are accepted by the backend; anything else is
+// rejected. Validate up front with a clear error instead of a silent fail.
+var VALID_WH = { '512x512': 1, '512x768': 1, '768x512': 1, '768x768': 1 };
+function resolutionOf(opts) {
+  if (!opts) return null;
+  if (opts.resolution && VALID_WH[opts.resolution]) return opts.resolution;
+  if (opts.width && opts.height) return opts.width + 'x' + opts.height;
+  return null;
+}
+function validateResolution(opts) {
+  var wh = resolutionOf(opts);
+  if (wh && !VALID_WH[wh]) {
+    throw new Error('weld.image: unsupported resolution "' + wh + '". Use one of 512x512, 512x768, 768x512, 768x768 (or a preset: ' + resolutionNames().join('/') + ').');
+  }
+}
+function promptText(opts) { return String((opts && (opts.prompt != null ? opts.prompt : opts.text)) || '').trim(); }
+
+// The awaited t2i result is a BOXED String carrying canvas/dataUrl/inputs.
+// Comparing it with === fails and reading it as text needs coercion.
+// normalizeResult turns it into a plain, predictable object.
+function normalizeResult(data) {
+  if (data == null) return { dataUrl: null, canvas: null, inputs: null, text: '' };
+  var text = '';
+  try { text = String(data); } catch (e) { text = ''; }
+  return {
+    dataUrl: (data.dataUrl != null) ? String(data.dataUrl) : (/^data:/.test(text) ? text : null),
+    canvas: data.canvas || null,
+    inputs: data.inputs || null,
+    seed: (data.inputs && data.inputs.seed != null) ? data.inputs.seed : (data.seed != null ? data.seed : null),
+    text: text,
+    raw: data
+  };
+}
+
 // Synchronous embed -- returns the iframe HTML for direct insertion
 function embed(opts) {
   return String(getT2i()(opts));
@@ -281,13 +338,21 @@ function embed(opts) {
 // Async single generation -- resolves with the result data
 function generate(opts) {
   return new Promise(function(resolve, reject) {
+    // Guard the two silent failure modes up front.
+    try {
+      validateResolution(opts);
+    } catch (e) { reject(e); return; }
+    if (!promptText(opts)) {
+      reject(new Error('weld.image: empty prompt. text-to-image hangs forever on an empty prompt, so it is rejected here.'));
+      return;
+    }
     var settled = false;
     var fn = getT2i();
     var enriched = Object.assign({}, opts, {
       onFinish: function(data) {
         if (settled) return;
         settled = true;
-        resolve(data);
+        resolve(normalizeResult(data));
       }
     });
     var html;
@@ -387,6 +452,19 @@ function generateWithRetry(opts, maxRetries) {
   });
 }
 
+// regenerate(opts): reproduce or vary an image deterministically. With an
+// explicit opts.seed, the same prompt+seed reproduces the same image (the
+// "regenerate at full quality from a saved thumbnail" pattern). Pass
+// opts.vary:true to roll a fresh seed for an alternate take.
+function regenerate(opts) {
+  opts = opts || {};
+  var next = Object.assign({}, opts);
+  if (opts.vary || next.seed == null || next.seed === -1) {
+    next.seed = Math.floor(Math.random() * 1000000);
+  }
+  return generate(next).then(function (r) { r.seed = (next.seed != null ? next.seed : r.seed); return r; });
+}
+
 window.weld.image = {
   setT2i: setT2i,
   withStyle: withStyle,
@@ -395,16 +473,21 @@ window.weld.image = {
   resolutionNames: resolutionNames,
   styles: STYLES,
   resolutions: RESOLUTIONS,
+  validResolution: function (wh) { return !!VALID_WH[wh]; },
+  normalizeResult: normalizeResult,
   embed: embed,
   generate: generate,
+  regenerate: regenerate,
   batch: batch,
   variations: variations,
   generateWithRetry: generateWithRetry,
-  version: '1.0.0'
+  version: '1.1.0'
 };
 
-})();
+window.weld.image.setT2i(t2iSource);
 
+return window.weld.image;
+})();
 </script>
 <footer class="footer-social">
   <span>&#169; 2026 therealwestninja.</span> &#183;

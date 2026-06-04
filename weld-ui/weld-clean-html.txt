@@ -43,6 +43,11 @@ pre code{background:none;padding:0;color:inherit;font-size:inherit;}
   min-height:1.5em;}
 .note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
   padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.changelog{margin:14px 0;padding:14px 16px;background:var(--faint);border:1px solid var(--border);border-radius:6px;}
+.changelog .cl-ver{font:700 13px var(--mono);color:var(--accent);margin:10px 0 4px;}
+.changelog .cl-ver:first-child{margin-top:0;}
+.changelog ul{margin:0 0 4px;padding-left:18px;}
+.changelog li{font-size:13px;color:#c9d1d9;line-height:1.5;margin:2px 0;}
 .warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
 table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
 th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
@@ -70,7 +75,7 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
 <div class="hdr">
   <div class="hdr-row">
       <h1>weld.clean</h1>
-      <span class="ver">v1.0.0</span>
+      <span class="ver">v1.1.0</span>
   </div>
   <p class="lead">Scrub raw model text before you store or render it: trim a dangling sentence after truncation, strip role-name bleed, collapse repetition, balance code fences, drop hidden blocks, and apply your own regex rules.</p>
 </div>
@@ -88,6 +93,21 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
 <div class="sig" data-codeid="sig_collapse"></div><div class="sig" data-codeid="sig_fences"></div>
 <div class="sig" data-codeid="sig_hidden"></div><div class="sig" data-codeid="sig_rules"></div>
 <pre data-codeid="rules_ex"></pre>
+<h2>Impersonation stripping <span class="tag">v1.1.0</span></h2>
+<div class="sig" data-codeid="sig_strip"></div>
+<p><code>stripImpersonation(text, playerName)</code> removes passages where the model has spoken or acted <em>as the player</em> &mdash; the classic failure mode in single-protagonist roleplay. Pass the player&rsquo;s name and it trims lines that put words in their mouth, protecting player agency without disturbing the rest of the reply.</p>
+<pre data-codeid="strip_ex"></pre>
+<h2>Changelog</h2>
+<div class="changelog">
+<p class="cl-ver">v1.1.0</p>
+<ul>
+<li>stripImpersonation to protect player agency in single-protagonist stories.</li>
+</ul>
+<p class="cl-ver">v1.0.0</p>
+<ul>
+<li>Initial release: whitespace, artifact, and formatting cleanup.</li>
+</ul>
+</div>
 <script>
 (function(){
   var examples = {
@@ -100,7 +120,9 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
   'sig_fences': 'weld.clean.balanceFences(text) -> string',
   'sig_hidden': 'weld.clean.stripHidden(text) -> string',
   'sig_rules': 'weld.clean.rules(text, ruleList) -> string',
-  'rules_ex': 'weld.clean.rules(text, \[\n  \{ find: \'teh\', replace: \'the\', flags: \'gi\' \},\n  \{ find: /\\s+$/, replace: \'\' \}\n]);'
+  'rules_ex': 'weld.clean.rules(text, \[\n  \{ find: \'teh\', replace: \'the\', flags: \'gi\' \},\n  \{ find: /\\s+$/, replace: \'\' \}\n]);',
+  'sig_strip': 'clean.stripImpersonation(text, playerName) -> string',
+  'strip_ex': 'var reply = weld.clean.stripImpersonation(raw, \'Alex\');\n// drops \'Alex laughs and says...\' style passages the model shouldn\'t write',
 };
   function escapeHTML(s){
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -273,13 +295,39 @@ function applyRules(text, ruleList) {
 // from weld.stream and clean() will trimPartial only when truncated.
 // opts:
 //   truncated     (bool)    run trimPartial (auto-true if you pass result)
-//   roleNames     (array)   names for stripRolePrefix; [] enables generic mode
+//   roleNames     (array)   names for stripRolePrefix; \[\] enables generic mode
 //   roles         (bool)    enable stripRolePrefix even without names
 //   collapse      (bool)    collapseRepeats (default true)
 //   fences        (bool)    balanceFences (default true)
 //   hidden        (bool)    stripHidden (default true)
 //   rules         (array)   custom find/replace rules
 //   trim          (bool)    trim outer whitespace (default true)
+// Agency Shield: stop the model from speaking or acting AS the player.
+// Drops any line that opens with the player's name as a speaker
+// ("Alex:" or a bracket-wrapped "Alex" speaker label), and trims a trailing block where the model
+// begins narrating the player's own dialogue/action. Keeps the reply up
+// to the point the impersonation starts. Inspired by multi-speaker chat
+// engines that must protect player agency in a single-protagonist story.
+function stripImpersonation(text, playerName) {
+  var s = String(text == null ? '' : text);
+  if (!s || !playerName) return s;
+  var name = String(playerName).trim();
+  if (!name) return s;
+  var esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  // 1. Cut at the first line that starts a player speaker turn, with or
+  //    without bracket wrappers: "Name:", "[Name]:", or doubled brackets.
+  var br = '\\[+\\s*' + esc + '\\s*\\]+';
+  var boundary = new RegExp('(^|\\n)\\s*(?:' + esc + '|' + br + ')\\s*:', 'i');
+  var hit = s.search(boundary);
+  if (hit > 0) s = s.slice(0, hit);
+  else if (hit === 0) {
+    // whole reply is impersonation; drop the leading turn label only
+    s = s.replace(new RegExp('^\\s*(?:' + esc + '|' + br + ')\\s*:\\s*', 'i'), '');
+  }
+  return s.replace(/\s+$/, '');
+}
+
 function clean(input, opts) {
   opts = opts || {};
   var text, truncated;
@@ -294,6 +342,7 @@ function clean(input, opts) {
   var s = String(text == null ? '' : text);
 
   if (opts.hidden !== false) s = stripHidden(s);
+  if (opts.playerName || opts.player) s = stripImpersonation(s, opts.playerName || opts.player);
   if (opts.roles || (opts.roleNames != null)) s = stripRolePrefix(s, opts.roleNames);
   if (opts.collapse !== false) s = collapseRepeats(s, opts);
   if (truncated) s = trimPartial(s);
@@ -311,7 +360,8 @@ window.weld.clean = {
   balanceFences: balanceFences,
   stripHidden: stripHidden,
   rules: applyRules,
-  version: '1.0.0'
+  stripImpersonation: stripImpersonation,
+  version: '1.1.0'
 };
 
 return window.weld.clean;

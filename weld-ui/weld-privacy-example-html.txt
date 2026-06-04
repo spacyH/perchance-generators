@@ -1,0 +1,251 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0d1117;--surface:#161b22;--ink:#e6edf3;--muted:#7d8590;--faint:#21262d;--accent:#4493f8;--green:#3fb950;--red:#f85149;--amber:#d29922;--border:rgba(255,255,255,0.10);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+#page{max-width:780px;margin:0 auto;padding:34px 18px 90px;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 0 16px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+.breadcrumb a{color:var(--muted);}.breadcrumb .sep{color:var(--faint);margin:0 8px;}.breadcrumb .cur{color:var(--ink);}.breadcrumb .act a{color:var(--accent);}
+.hdr{margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}.hdr h1{font:700 24px var(--mono);letter-spacing:-0.5px;}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;}
+.hdr .lead{color:var(--muted);margin-top:8px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;}
+.panel h2{font:600 13px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:8px 0;}
+.lbl{font:600 12px var(--mono);color:var(--muted);min-width:74px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:9px 15px;font:600 13px var(--font);cursor:pointer;transition:.12s;}
+.btn:hover{filter:brightness(1.08);}.btn.ghost{background:var(--faint);color:var(--ink);}.btn.sm{padding:6px 11px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+input[type=text],textarea{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:8px 10px;font:13px var(--font);}
+input[type=text]{flex:1;min-width:120px;}textarea{width:100%;font:12.5px/1.5 var(--mono);resize:vertical;}
+.mono{font:13px var(--mono);}
+.out{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font:12.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;min-height:20px;color:#c9d1d9;}
+.chip{display:inline-block;background:var(--faint);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font:600 12px var(--mono);margin:2px;}
+.chip.k{background:rgba(63,185,80,.14);border-color:rgba(63,185,80,.4);color:#7ee787;}
+.chip.d{opacity:.4;text-decoration:line-through;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:9px 13px;border-radius:0 4px 4px 0;margin:12px 0 0;font-size:12.5px;color:#c9d1d9;}
+.note.warn{background:rgba(210,153,34,.08);border-color:var(--amber);}
+.tag{font:600 10px var(--mono);padding:2px 7px;border-radius:4px;background:rgba(63,185,80,.14);color:#7ee787;border:1px solid rgba(63,185,80,.4);}
+.tag.ai{background:rgba(210,153,34,.12);color:#e3b341;border-color:rgba(210,153,34,.4);}
+.bar{height:14px;background:var(--accent);border-radius:3px;transition:width .3s;}
+.footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);}.footer a{color:var(--muted);}
+.flex{display:flex;gap:10px;align-items:center;}.wrap{flex-wrap:wrap;}.grow{flex:1;}.mt{margin-top:10px;}
+</style>
+<div id="page">
+<div class="breadcrumb"><span><a href="https://perchance.org/weld-ui-index">weld</a><span class="sep">/</span>weld.privacy<span class="sep">/</span><span class="cur">demo</span></span><span class="act"><a href="https://perchance.org/weld-privacy-plugin">docs &rarr;</a></span></div>
+<div class="hdr"><div class="hdr-row"><h1>weld.privacy &mdash; demo</h1><span class="ver">v1.0.0</span></div><p class="lead">Toggle the backends an app uses and watch weld.privacy render an honest, plain-language data-handling summary -- which backends keep data on-device and which send it somewhere, and where.</p></div>
+  <div class="panel"><h2>Data-handling panel <span class="tag">toggle the backends your app uses</span></h2>
+    <div id="picks" class="row" style="flex-wrap:wrap;gap:8px;"></div>
+    <div class="row"><span id="verdict" class="chip">â</span></div>
+    <div id="out" class="out mt"></div>
+    <div class="note">Pick the backends an app composes and weld.privacy renders an honest, plain-language data-handling summary &mdash; the kind of legibility Duck.ai shows per model. Local-only backends (persist, history, cache) keep data in your browser; others send it somewhere, and the panel says exactly where. weld.privacy describes posture; it does not enforce anything.</div>
+  </div>
+<footer class="footer"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
+</div>
+<script>
+(function(){
+'use strict';
+
+if (!window.weld) window.weld = {};
+if (window.weld.privacy) return window.weld.privacy;
+
+// -----------------------------------------------------------------
+// weld.privacy: make an app legible about where its data goes.
+//
+// Duck.ai's best idea is showing, per model, what privacy guarantee
+// applies BEFORE you use it -- anonymized, zero-retention, no-training,
+// and so on. weld.privacy ports the *pattern* (not the guarantees, which
+// are platform-specific): a small claim vocabulary, an honest registry of
+// how the suite's own backends behave, and a way to render a data-handling
+// summary an app can show its users.
+//
+//   weld.privacy.claimsFor('kv')   returns an array of claim objects
+//   weld.privacy.summary of the backends an app uses -> human-readable text
+//   weld.privacy.register a backend with its claim kinds
+//
+// IMPORTANT HONESTY RULE: a claim describes data-handling POSTURE; it does
+// NOT enforce anything. The labels here reflect what Perchance's backends
+// actually do, to the best of documented behavior. An app must not attach
+// a claim it can't stand behind -- an overstated label is worse than none.
+// -----------------------------------------------------------------
+
+// The claim vocabulary. Each kind has a stable id, a short title, a
+// plain-language detail, and a coarse 'leaves-device' flag apps can sort on.
+var KINDS = {
+  'local-only': {
+    title: 'Stays on this device',
+    detail: 'Data is kept in this browser only (IndexedDB / localStorage) and is never sent anywhere. Clearing your browser data removes it.',
+    leavesDevice: false
+  },
+  'anonymized': {
+    title: 'Sent without identifying you',
+    detail: 'Data is sent to a backend with identifying metadata stripped or proxied, so the request is not tied to your identity.',
+    leavesDevice: true
+  },
+  'server-stored': {
+    title: 'Stored on a server',
+    detail: 'Data is stored on a remote server and persists there (often so it can sync across your devices). It is not only on this device.',
+    leavesDevice: true
+  },
+  'public': {
+    title: 'Publicly accessible',
+    detail: 'Data is uploaded to a public URL that anyone with the link can access. Do not put anything sensitive here.',
+    leavesDevice: true
+  },
+  'expiring': {
+    title: 'Auto-deletes later',
+    detail: 'Data is stored with an expiry and is removed automatically after a set time.',
+    leavesDevice: true
+  },
+  'third-party': {
+    title: 'Handled by a third party',
+    detail: 'Data passes through a service outside your control, whose own data-handling policy applies.',
+    leavesDevice: true
+  },
+  'transient': {
+    title: 'Not stored at all',
+    detail: 'Data is used for a single request and not retained after the response.',
+    leavesDevice: true
+  }
+};
+
+function kindIds() { return Object.keys(KINDS); }
+function describeKind(id) {
+  var k = Reflect.get(KINDS, id);
+  return k ? { kind: id, title: k.title, detail: k.detail, leavesDevice: k.leavesDevice } : null;
+}
+
+// Honest, pre-registered claims for the suite's own backends. These reflect
+// documented Perchance behavior; an app can override or extend them.
+//   persist/history/backup -> local IndexedDB only          -> local-only
+//   cache/state            -> in-memory or local            -> local-only
+//   kv                     -> kv-plugin, server cross-device -> server-stored
+//   upload                 -> public URL (+ optional expiry) -> public (+expiring)
+//   stream/image           -> Perchance broker (proxied)     -> anonymized + third-party
+//   fetch                  -> superFetch proxy (strips hdrs) -> anonymized + third-party
+//   registry               -> reads Perchance public API     -> transient + third-party
+//   report                 -> encrypted, expiring upload     -> public + expiring
+var REGISTRY = {
+  persist:  ['local-only'],
+  history:  ['local-only'],
+  backup:   ['local-only'],
+  cache:    ['local-only'],
+  state:    ['local-only'],
+  memory:   ['local-only'],
+  kv:       ['server-stored'],
+  upload:   ['public', 'expiring'],
+  report:   ['public', 'expiring'],
+  stream:   ['anonymized', 'third-party'],
+  image:    ['anonymized', 'third-party'],
+  fetch:    ['anonymized', 'third-party'],
+  registry: ['transient', 'third-party']
+};
+
+// register(name, kinds): declare (or override) the claims for a backend.
+// kinds is an array of claim ids; unknown ids are dropped with no throw.
+function register(name, kinds) {
+  if (!name) return null;
+  var list = (Array.isArray(kinds) ? kinds : Array.of(kinds)).filter(function (k) { return !!Reflect.get(KINDS, k); });
+  Reflect.set(REGISTRY, String(name), list);
+  return claimsFor(name);
+}
+
+// claimsFor(name): the resolved claim objects for a backend (or empty array).
+function claimsFor(name) {
+  var ids = Reflect.get(REGISTRY, String(name)) || new Array();
+  return ids.map(describeKind).filter(Boolean);
+}
+
+// worst-case posture across a set of backends: does ANY of them leave the
+// device? Useful for a single at-a-glance indicator.
+function leavesDevice(names) {
+  return toArray(names).some(function (n) {
+    return claimsFor(n).some(function (c) { return c.leavesDevice; });
+  });
+}
+
+function toArray(x) { return Array.isArray(x) ? x : (x == null ? new Array() : Array.of(x)); }
+
+// summary(names): a human-readable data-handling digest for the backends an
+// app uses. Apps can show this in a privacy panel or an info modal.
+function summary(names) {
+  var list = toArray(names);
+  if (!list.length) return 'No backends declared.';
+  var lines = new Array();
+  lines.push(leavesDevice(list)
+    ? 'Some data leaves this device:'
+    : 'All data stays on this device.');
+  list.forEach(function (n) {
+    var claims = claimsFor(n);
+    if (!claims.length) {
+      lines.push('  ' + n + ': (no privacy claim declared)');
+    } else {
+      lines.push('  ' + n + ': ' + claims.map(function (c) { return c.title; }).join('; '));
+    }
+  });
+  return lines.join('\n');
+}
+
+// report(names): a structured version of summary() for building UI.
+function report(names) {
+  var list = toArray(names);
+  return {
+    leavesDevice: leavesDevice(list),
+    backends: list.map(function (n) { return { name: n, claims: claimsFor(n) }; })
+  };
+}
+
+// Audit helper: which declared backends keep data only on-device?
+function localOnly(names) {
+  return toArray(names).filter(function (n) {
+    var c = claimsFor(n);
+    return c.length && c.every(function (x) { return !x.leavesDevice; });
+  });
+}
+
+window.weld.privacy = {
+  kinds: KINDS,
+  kindIds: kindIds,
+  describeKind: describeKind,
+  register: register,
+  claimsFor: claimsFor,
+  leavesDevice: leavesDevice,
+  localOnly: localOnly,
+  summary: summary,
+  report: report,
+  version: '1.0.0'
+};
+
+return window.weld.privacy;
+})();
+</script>
+<script>
+
+  function boot(){ if(!window.weld||!window.weld.privacy){return setTimeout(boot,100);} init(); }
+  function init(){
+    var P=window.weld.privacy, $=function(id){return document.getElementById(id);};
+    var BACKENDS=['persist','history','cache','kv','upload','stream','image','fetch','registry','report'];
+    var chosen={persist:true, stream:true};
+    var picks=$('picks');
+    BACKENDS.forEach(function(b){
+      var el=document.createElement('button');
+      el.className='btn sm '+(chosen[b]?'':'ghost');
+      el.textContent=b;
+      el.onclick=function(){ chosen[b]=!chosen[b]; el.className='btn sm '+(chosen[b]?'':'ghost'); render(); };
+      picks.appendChild(el);
+    });
+    function render(){
+      var names=BACKENDS.filter(function(b){return chosen[b];});
+      if(!names.length){ $('verdict').textContent='no backends selected'; $('out').textContent=''; return; }
+      var r=P.report(names);
+      $('verdict').textContent = r.leavesDevice ? 'some data leaves this device' : 'all data stays on this device';
+      $('verdict').className = 'chip '+(r.leavesDevice?'':'k');
+      $('out').textContent = P.summary(names);
+    }
+    render();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+
+</script>

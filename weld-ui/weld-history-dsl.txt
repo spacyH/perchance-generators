@@ -45,7 +45,7 @@ $output() =>
     var activeTree = null;        // weld.branching instance if available
     var activeMessages = null;    // fallback: plain array of messages
     var saveTimer = null;
-    var changeListeners = [];
+    var changeListeners = new Array();
 
     function hasBranching() {
       return !!(window.weld && window.weld.branching);
@@ -53,7 +53,7 @@ $output() =>
 
     function emit(event, data) {
       for (var i = 0; i < changeListeners.length; i++) {
-        try { changeListeners[i](event, data); } catch (e) { /* swallow */ }
+        try { Reflect.get(changeListeners, i)(event, data); } catch (e) { /* swallow */ }
       }
     }
 
@@ -63,7 +63,7 @@ $output() =>
       saveTimer = setTimeout(function() {
         saveTimer = null;
         save().catch(function(e) {
-          console.error('[weld.history] auto-save failed:', e);
+          console.error(String.fromCharCode(91)+'weld.history'+String.fromCharCode(93)+' auto-save failed:', e);
         });
       }, autoSaveDebounce);
     }
@@ -81,6 +81,8 @@ $output() =>
         createdAt: now,
         updatedAt: now,
         messageCount: 0,
+        pinned: meta.pinned === true,
+        summary: meta.summary || '',
         metadata: meta.metadata || null
       };
 
@@ -90,7 +92,7 @@ $output() =>
         activeMessages = null;
       } else {
         activeTree = null;
-        activeMessages = [];
+        activeMessages = new Array();
       }
       activeSessionId = id;
 
@@ -126,7 +128,7 @@ $output() =>
               activeMessages = null;
             } else {
               activeTree = null;
-              activeMessages = [];
+              activeMessages = new Array();
             }
           }
           // Update view time
@@ -147,7 +149,7 @@ $output() =>
         treeData.messages = null;
       } else {
         treeData.tree = null;
-        treeData.messages = activeMessages ? activeMessages.slice() : [];
+        treeData.messages = activeMessages ? activeMessages.slice() : new Array();
       }
       var msgCount = activeTree ? activeTree.size() : (activeMessages ? activeMessages.length : 0);
       return Promise.all([
@@ -168,7 +170,7 @@ $output() =>
         treeData.messages = null;
       } else {
         treeData.tree = null;
-        treeData.messages = activeMessages ? activeMessages.slice() : [];
+        treeData.messages = activeMessages ? activeMessages.slice() : new Array();
       }
       return trees.put(treeData);
     }
@@ -192,11 +194,11 @@ $output() =>
 
     // -------- Get the active conversation --------
     function getMessages() {
-      if (!activeSessionId) return [];
+      if (!activeSessionId) return new Array();
       if (activeTree) {
         return activeTree.activeBranch().map(function(n) { return n.data; });
       }
-      return activeMessages ? activeMessages.slice() : [];
+      return activeMessages ? activeMessages.slice() : new Array();
     }
 
     function getTree() {
@@ -216,11 +218,23 @@ $output() =>
           all = all.filter(function(s) {
             var t = s.title ? s.title.toLowerCase() : '';
             var cn = s.characterName ? s.characterName.toLowerCase() : '';
-            return t.indexOf(q) !== -1 || cn.indexOf(q) !== -1;
+            var sm = s.summary ? s.summary.toLowerCase() : '';
+            return t.indexOf(q) !== -1 || cn.indexOf(q) !== -1 || sm.indexOf(q) !== -1;
           });
         }
-        // Sort by updatedAt descending (most recent first)
-        all.sort(function(a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); });
+        if (listOpts.pinnedOnly) {
+          all = all.filter(function(s) { return s.pinned === true; });
+        }
+        // Sort: pinned sessions first, then by updatedAt descending. Pass
+        // pinnedFirst:false to sort purely by recency.
+        var pinFirst = listOpts.pinnedFirst !== false;
+        all.sort(function(a, b) {
+          if (pinFirst) {
+            var pa = a.pinned ? 1 : 0, pb = b.pinned ? 1 : 0;
+            if (pa !== pb) return pb - pa;
+          }
+          return (b.updatedAt || 0) - (a.updatedAt || 0);
+        });
         // Limit
         if (listOpts.limit && listOpts.limit > 0) {
           all = all.slice(0, listOpts.limit);
@@ -233,6 +247,33 @@ $output() =>
     function rename(sessionId, title) {
       return sessions.update(sessionId, { title: String(title), updatedAt: Date.now() }).then(function() {
         emit('rename', { sessionId: sessionId, title: title });
+      });
+    }
+
+    // Pin / unpin a session. Pinning is not "activity", so it does NOT bump
+    // updatedAt -- a pinned old chat should keep its real last-touched time,
+    // it just sorts to the top via list()'s pinnedFirst.
+    function setPinned(sessionId, pinned) {
+      var id = sessionId || activeSessionId;
+      return sessions.update(id, { pinned: pinned === true }).then(function() {
+        emit('pin', { sessionId: id, pinned: pinned === true });
+        return pinned === true;
+      });
+    }
+    function pin(sessionId) { return setPinned(sessionId, true); }
+    function unpin(sessionId) { return setPinned(sessionId, false); }
+    function togglePin(sessionId) {
+      var id = sessionId || activeSessionId;
+      return sessions.get(id).then(function(s) { return setPinned(id, !(s && s.pinned)); });
+    }
+
+    // Set (or clear) a session's summary -- a short recap an app can show in
+    // the session list or generate from the conversation. Not activity, so it
+    // doesn't bump updatedAt either.
+    function setSummary(sessionId, summary) {
+      var id = sessionId || activeSessionId;
+      return sessions.update(id, { summary: String(summary == null ? '' : summary) }).then(function() {
+        emit('summary', { sessionId: id, summary: String(summary == null ? '' : summary) });
       });
     }
 
@@ -298,6 +339,10 @@ $output() =>
       getTree: getTree,
       list: list,
       rename: rename,
+      pin: pin,
+      unpin: unpin,
+      togglePin: togglePin,
+      setSummary: setSummary,
       getMeta: getMeta,
       updateMeta: updateMeta,
       delete: del,
@@ -310,7 +355,7 @@ $output() =>
 
   window.weld.history = {
     create: createHistory,
-    version: '1.0.0'
+    version: '1.1.0'
   };
 
   return window.weld.history;

@@ -43,6 +43,11 @@ pre code{background:none;padding:0;color:inherit;font-size:inherit;}
   min-height:1.5em;}
 .note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);
   padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.changelog{margin:14px 0;padding:14px 16px;background:var(--faint);border:1px solid var(--border);border-radius:6px;}
+.changelog .cl-ver{font:700 13px var(--mono);color:var(--accent);margin:10px 0 4px;}
+.changelog .cl-ver:first-child{margin-top:0;}
+.changelog ul{margin:0 0 4px;padding-left:18px;}
+.changelog li{font-size:13px;color:#c9d1d9;line-height:1.5;margin:2px 0;}
 .warn{background:rgba(210,153,34,0.07);border-left-color:var(--yellow);}
 table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px;}
 th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
@@ -172,6 +177,21 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
 <h2>Notes</h2>
 <div class="note">All weld plugins follow the same loading pattern: they create <code>window.weld</code> if needed, then attach themselves under a sub-key. Order of loading doesn't matter — the first plugin loaded creates the namespace.</div>
 <div class="note">Component classes (<code>.w-btn</code>, <code>.w-input</code>, etc.) are stable. You can hand-write HTML using these classes if you prefer, or mix them with the JS API.</div></div>
+<h2>Lightbox, clipboard &amp; CSS <span class="tag">v1.1.0</span></h2>
+<div class="sig" data-codeid="sig_extras"></div>
+<p><code>lightbox(opts)</code> opens an image (or any element) in a dismissable full-screen overlay. <code>clipboard(text, msg)</code> copies text and shows optional toast feedback. <code>injectCSS()</code> ensures the suite&rsquo;s shared stylesheet is present (called automatically by the other helpers; exposed for apps that build UI before any weld.ui call).</p>
+<pre data-codeid="extras_ex"></pre>
+<h2>Changelog</h2>
+<div class="changelog">
+<p class="cl-ver">v1.1.0</p>
+<ul>
+<li>lightbox overlay, clipboard with toast feedback, and injectCSS.</li>
+</ul>
+<p class="cl-ver">v1.0.0</p>
+<ul>
+<li>Initial release: buttons, inputs, panels, toasts.</li>
+</ul>
+</div>
 <script>
 (function(){
   var examples = {
@@ -206,7 +226,9 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
   'sig29': 'divider()',
   'code30': 'var panel = ui.stack(\[\n  ui.label(\'Settings\'),\n  ui.card(ui.col(\[\n    ui.row(\[ui.label(\'Font size\'), ui.range(\{ min: 10, max: 24, value: 14 \})\]),\n    ui.row(\[ui.label(\'Theme\'),     ui.select(\{ options: \[\'light\', \'dark\'\] \})\]),\n  \])),\n  ui.divider(),\n  ui.row(\[ui.button(\{ label: \'Cancel\' \}), ui.button(\{ label: \'Save\', variant: \'primary\' \})\]),\n\]);',
   'sig31': 'el(tag, attrs, children)',
-  'code32': 'ui.el(\'div\', \{ class: \'my-class\', dataset: \{ id: 5 \}, onclick: handler \}, \[\n  ui.el(\'span\', \{ text: \'Hello\' \}),\n  ui.el(\'strong\', \{ html: \'<em>world</em>\' \}),\n\]);'
+  'code32': 'ui.el(\'div\', \{ class: \'my-class\', dataset: \{ id: 5 \}, onclick: handler \}, \[\n  ui.el(\'span\', \{ text: \'Hello\' \}),\n  ui.el(\'strong\', \{ html: \'<em>world</em>\' \}),\n\]);',
+  'sig_extras': 'ui.lightbox(\{ src \} | \{ el \})   //  ui.clipboard(text, msg?)   //  ui.injectCSS()',
+  'extras_ex': 'weld.ui.lightbox(\{ src: imageUrl \});\nweld.ui.clipboard(shareLink, \'Link copied!\');',
 };
   function escapeHTML(s){
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -241,7 +263,7 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
 
 // Namespace
 if (!window.weld) window.weld = {};
-if (window.weld.ui) return; // already loaded
+if (window.weld.ui) return window.weld.ui; // already loaded
 
 // THEME
 var defaultTheme = {
@@ -608,12 +630,12 @@ function modal(opts) {
     'aria-label': 'Close',
   }, [icon('x', { size: 18 })]);
 
-  var header = opts.title || opts.dismissable !== false
-    ? el('div', { class: 'w-modal-hdr' }, [
-        opts.title ? el('h3', { class: 'w-modal-title', text: opts.title }) : el('div'),
-        opts.dismissable !== false ? closeBtn : null,
-      ])
-    : null;
+  var header = null;
+  if (opts.title || opts.dismissable !== false) {
+    var titleEl = opts.title ? el('h3', { class: 'w-modal-title', text: opts.title }) : el('div');
+    var dismissEl = opts.dismissable !== false ? closeBtn : null;
+    header = el('div', { class: 'w-modal-hdr' }, [titleEl, dismissEl]);
+  }
 
   var bodyContent = opts.content;
   if (typeof bodyContent === 'string') bodyContent = el('div', { html: bodyContent });
@@ -658,6 +680,168 @@ function modal(opts) {
   return { el: overlay, close: close, body: body };
 }
 
+// LIGHTBOX — fullscreen image viewer with keyboard nav
+function lightboxInjectCss() {
+  if (window.__weldLightboxCss) return;
+  window.__weldLightboxCss = true;
+  var s = document.createElement('style');
+  s.textContent =
+    '.w-lb{position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.92);' +
+      'display:none;align-items:center;justify-content:center;padding:24px;cursor:zoom-out;}' +
+    '.w-lb.open{display:flex;}' +
+    '.w-lb-img{max-width:92vw;max-height:88vh;object-fit:contain;' +
+      'box-shadow:0 0 40px rgba(0,0,0,0.5);cursor:default;}' +
+    '.w-lb-close{position:absolute;top:16px;right:20px;background:rgba(0,0,0,0.6);' +
+      'color:#fff;border:1px solid rgba(255,255,255,0.2);padding:6px 14px;cursor:pointer;' +
+      'font:600 12px var(--weld-mono,monospace);letter-spacing:1px;border-radius:4px;z-index:1;}' +
+    '.w-lb-close:hover{background:rgba(255,255,255,0.1);}' +
+    '.w-lb-nav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.5);' +
+      'color:#fff;border:1px solid rgba(255,255,255,0.15);width:40px;height:40px;' +
+      'font-size:20px;display:flex;align-items:center;justify-content:center;' +
+      'cursor:pointer;border-radius:4px;z-index:1;}' +
+    '.w-lb-nav:hover{background:rgba(255,255,255,0.1);}' +
+    '.w-lb-prev{left:16px;}.w-lb-next{right:16px;}' +
+    '.w-lb-meta{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);' +
+      'background:rgba(0,0,0,0.7);color:rgba(255,255,255,0.7);' +
+      'font:11px var(--weld-mono,monospace);padding:6px 14px;border-radius:4px;' +
+      'max-width:80vw;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}';
+  document.head.appendChild(s);
+}
+
+function lightbox(opts) {
+  opts = opts || {};
+  lightboxInjectCss();
+  var items = [];
+  var currentIdx = -1;
+  var overlay = document.createElement('div');
+  overlay.className = 'w-lb';
+  var img = document.createElement('img');
+  img.className = 'w-lb-img';
+  var closeBtn = document.createElement('button');
+  closeBtn.className = 'w-lb-close';
+  closeBtn.textContent = 'CLOSE';
+  var prevBtn = document.createElement('button');
+  prevBtn.className = 'w-lb-nav w-lb-prev';
+  prevBtn.innerHTML = '&#8249;';
+  var nextBtn = document.createElement('button');
+  nextBtn.className = 'w-lb-nav w-lb-next';
+  nextBtn.innerHTML = '&#8250;';
+  var metaEl = document.createElement('div');
+  metaEl.className = 'w-lb-meta';
+  overlay.appendChild(closeBtn);
+  overlay.appendChild(prevBtn);
+  overlay.appendChild(nextBtn);
+  overlay.appendChild(img);
+  overlay.appendChild(metaEl);
+  document.body.appendChild(overlay);
+
+  function updateNav() {
+    prevBtn.style.display = items.length > 1 ? '' : 'none';
+    nextBtn.style.display = items.length > 1 ? '' : 'none';
+  }
+
+  function show(idx) {
+    if (idx < 0 || idx >= items.length) return;
+    currentIdx = idx;
+    var item = items[idx];
+    img.src = typeof item === 'string' ? item : (item.src || item.url || '');
+    img.alt = (item && item.alt) || '';
+    metaEl.textContent = (item && item.meta) || '';
+    metaEl.style.display = metaEl.textContent ? '' : 'none';
+    updateNav();
+  }
+
+  function open(src, openOpts) {
+    openOpts = openOpts || {};
+    if (Array.isArray(src)) {
+      items = src;
+      show(openOpts.index || 0);
+    } else {
+      items = [src];
+      show(0);
+    }
+    overlay.classList.add('open');
+  }
+
+  function close() {
+    overlay.classList.remove('open');
+    img.src = '';
+    if (opts.onClose) opts.onClose();
+  }
+
+  function next() {
+    if (items.length < 2) return;
+    show((currentIdx + 1) % items.length);
+  }
+
+  function prev() {
+    if (items.length < 2) return;
+    show((currentIdx - 1 + items.length) % items.length);
+  }
+
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) close();
+  });
+  closeBtn.addEventListener('click', close);
+  prevBtn.addEventListener('click', function(e) { e.stopPropagation(); prev(); });
+  nextBtn.addEventListener('click', function(e) { e.stopPropagation(); next(); });
+
+  function keyHandler(e) {
+    if (!overlay.classList.contains('open')) return;
+    if (e.key === 'Escape') close();
+    else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next();
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') prev();
+  }
+  document.addEventListener('keydown', keyHandler);
+
+  function destroy() {
+    document.removeEventListener('keydown', keyHandler);
+    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+  }
+
+  return {
+    open: open,
+    close: close,
+    next: next,
+    prev: prev,
+    destroy: destroy,
+    el: overlay,
+    isOpen: function() { return overlay.classList.contains('open'); }
+  };
+}
+
+// CLIPBOARD — copy text with optional toast feedback
+function clipboard(text, msg) {
+  var p;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    p = navigator.clipboard.writeText(String(text));
+  } else {
+    p = new Promise(function(resolve, reject) {
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = String(text);
+        ta.style.cssText = 'position:fixed;left:-9999px;';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        resolve();
+      } catch (e) { reject(e); }
+    });
+  }
+  return p.then(function() {
+    if (msg !== false && window.weld && window.weld.toast) {
+      window.weld.toast.show(msg || 'Copied to clipboard.', 'success');
+    }
+    return true;
+  }).catch(function() {
+    if (window.weld && window.weld.toast) {
+      window.weld.toast.show('Copy failed.', 'error');
+    }
+    return false;
+  });
+}
+
 // PUBLIC API
 window.weld.ui = {
   theme: theme,
@@ -682,8 +866,10 @@ window.weld.ui = {
   card: card,
   divider: divider,
   modal: modal,
+  lightbox: lightbox,
+  clipboard: clipboard,
   injectCSS: injectCSS,
-  version: '1.0.0',
+  version: '1.1.0',
 };
 
 // INIT
@@ -697,8 +883,9 @@ if (document.readyState === 'loading') {
 } else {
   init();
 }
-})();
 
+return window.weld.ui;
+})();
 </script>
 <footer class="footer">
   <span>&#169; 2026 therealwestninja.</span> &#183;

@@ -1,0 +1,194 @@
+$meta
+  title       = weld.reactions
+  description = Aggregate reactions on anything with an id -- a chat turn, a gallery image, a comment, a generated result. The Discord model distilled: attach emoji (or any token) to an item, track how many of each and whether you reacted, emit change events. Backend-agnostic -- the app supplies storage (drop it on weld.kv for counts shared across users, or weld.persist / in-memory for local), and supplies the current user id. Pure data + events; renders nothing, so it pairs with weld.chatui, weld.comments, or weld.gallery. Inspired by the reaction tallies in Discord and Twitch chat. Stash on window.weld.reactions.
+  tags        = weld, reactions, emoji, chat, social, plugin
+
+$output() =>
+  'use strict';
+
+  if (!window.weld) window.weld = {};
+  if (window.weld.reactions) return window.weld.reactions;
+
+  // -----------------------------------------------------------------
+  // weld.reactions: a count of emoji on an id, plus "did I react".
+  //
+  // Discord and Twitch both attach lightweight aggregate reactions to
+  // messages. The essence is tiny: per item, a map emoji -> set of user
+  // ids; counts fall out of the set sizes, and "mine" is membership of the
+  // current user. weld.reactions owns that bookkeeping and the events; the
+  // app owns storage and identity.
+  //
+  //   var rx = weld.reactions.create({ me: currentUserId });
+  //   rx.react(turnId, '\u{1F44D}');           // I add a thumbs-up
+  //   rx.toggle(turnId, '\u2764\uFE0F');         // toggle a heart
+  //   rx.countsFor(turnId);                       // { '\u{1F44D}': 3, '\u2764\uFE0F': 1 }
+  //   rx.mine(turnId);                            // the emoji I reacted with
+  //   rx.onChange(function (e) { rerender(e.itemId); });
+  //
+  // STORAGE is pluggable. By default reactions live in memory for the
+  // session. Pass { store } with get(itemId)->data and set(itemId,data) to
+  // persist -- e.g. a weld.kv-backed store for counts shared across users,
+  // or weld.persist for local. serialize()/load() round-trip the whole set.
+  //
+  // It RENDERS NOTHING. countsFor + mine give an app everything it needs to
+  // draw a reaction bar however it likes (and weld.emotes can turn tokens
+  // into images). That keeps it composable and testable.
+  // -----------------------------------------------------------------
+
+  function createReactions(opts) {
+    opts = opts || {};
+    var me = opts.me != null ? String(opts.me) : 'me';   // current user id
+    var store = opts.store || null;                       // optional { get, set }
+    var listeners = new Array();
+
+    // In-memory model: items keyed by itemId -> { emoji: { userId: true } }
+    var items = {};
+
+    function emit(itemId, emoji, action) {
+      var e = { itemId: itemId, emoji: emoji, action: action };
+      for (var i = 0; i < listeners.length; i++) {
+        try { Reflect.get(listeners, i)(e); } catch (err) { /* swallow */ }
+      }
+    }
+    function onChange(fn) {
+      if (typeof fn !== 'function') return function () {};
+      listeners.push(fn);
+      return function () { var ix = listeners.indexOf(fn); if (ix !== -1) listeners.splice(ix, 1); };
+    }
+
+    // ---- identity ----
+    function setUser(id) { me = (id != null) ? String(id) : me; }
+
+    // ---- internal item access (with optional backing store) ----
+    function itemOf(itemId) {
+      var key = String(itemId);
+      var it = Reflect.get(items, key);
+      if (it) return it;
+      // try the backing store
+      if (store && typeof store.get === 'function') {
+        try {
+          var loaded = store.get(key);
+          if (loaded && typeof loaded === 'object') { Reflect.set(items, key, loaded); return loaded; }
+        } catch (e) { /* fall through */ }
+      }
+      it = {};
+      Reflect.set(items, key, it);
+      return it;
+    }
+    function persistItem(itemId) {
+      if (store && typeof store.set === 'function') {
+        try { store.set(String(itemId), Reflect.get(items, String(itemId))); } catch (e) { /* swallow */ }
+      }
+    }
+
+    // ---- mutate ----
+    // react(itemId, emoji, optional user): add a reaction. Idempotent per user.
+    function react(itemId, emoji, user) {
+      var u = (user != null) ? String(user) : me;
+      var key = String(emoji);
+      var it = itemOf(itemId);
+      var bag = Reflect.get(it, key);
+      if (!bag) { bag = {}; Reflect.set(it, key, bag); }
+      if (Reflect.get(bag, u)) return false;     // already reacted
+      Reflect.set(bag, u, true);
+      persistItem(itemId);
+      emit(itemId, key, 'add');
+      return true;
+    }
+    // unreact(itemId, emoji, optional user): remove a reaction.
+    function unreact(itemId, emoji, user) {
+      var u = (user != null) ? String(user) : me;
+      var key = String(emoji);
+      var it = itemOf(itemId);
+      var bag = Reflect.get(it, key);
+      if (!bag || !Reflect.get(bag, u)) return false;
+      Reflect.deleteProperty(bag, u);
+      if (Object.keys(bag).length === 0) Reflect.deleteProperty(it, key);  // drop empty emoji
+      persistItem(itemId);
+      emit(itemId, key, 'remove');
+      return true;
+    }
+    // toggle(itemId, emoji, optional user): add if absent, remove if present.
+    function toggle(itemId, emoji, user) {
+      var u = (user != null) ? String(user) : me;
+      return hasReacted(itemId, emoji, u) ? (unreact(itemId, emoji, u), false) : (react(itemId, emoji, u), true);
+    }
+
+    // ---- query ----
+    // countsFor(itemId): { emoji: count } sorted by descending count.
+    function countsFor(itemId) {
+      var it = itemOf(itemId);
+      var out = {};
+      var keys = Object.keys(it);
+      keys.sort(function (a, b) { return Object.keys(Reflect.get(it, b)).length - Object.keys(Reflect.get(it, a)).length; });
+      for (var i = 0; i < keys.length; i++) {
+        var k = Reflect.get(keys, i);
+        Reflect.set(out, k, Object.keys(Reflect.get(it, k)).length);
+      }
+      return out;
+    }
+    // count(itemId, emoji): number of users who reacted with emoji.
+    function count(itemId, emoji) {
+      var bag = Reflect.get(itemOf(itemId), String(emoji));
+      return bag ? Object.keys(bag).length : 0;
+    }
+    // total(itemId): total reactions across all emoji.
+    function total(itemId) {
+      var it = itemOf(itemId), n = 0, keys = Object.keys(it);
+      for (var i = 0; i < keys.length; i++) n += Object.keys(Reflect.get(it, Reflect.get(keys, i))).length;
+      return n;
+    }
+    // mine(itemId, optional user): array of emoji the user reacted with.
+    function mine(itemId, user) {
+      var u = (user != null) ? String(user) : me;
+      var it = itemOf(itemId), out = new Array(), keys = Object.keys(it);
+      for (var i = 0; i < keys.length; i++) {
+        var k = Reflect.get(keys, i);
+        if (Reflect.get(Reflect.get(it, k), u)) out.push(k);
+      }
+      return out;
+    }
+    // hasReacted(itemId, emoji, optional user): did the user react with this emoji?
+    function hasReacted(itemId, emoji, user) {
+      var u = (user != null) ? String(user) : me;
+      var bag = Reflect.get(itemOf(itemId), String(emoji));
+      return !!(bag && Reflect.get(bag, u));
+    }
+    // reactors(itemId, emoji): the user ids who reacted with emoji.
+    function reactors(itemId, emoji) {
+      var bag = Reflect.get(itemOf(itemId), String(emoji));
+      return bag ? Object.keys(bag) : new Array();
+    }
+
+    // ---- maintenance ----
+    function clearItem(itemId) {
+      Reflect.deleteProperty(items, String(itemId));
+      persistItem(itemId);
+      emit(itemId, null, 'clear');
+    }
+    function clearAll() { items = {}; }
+
+    // ---- persistence ----
+    function serialize() { return JSON.parse(JSON.stringify(items)); }
+    function load(data) {
+      if (data && typeof data === 'object') { items = JSON.parse(JSON.stringify(data)); return true; }
+      return false;
+    }
+
+    return {
+      setUser: setUser,
+      react: react, unreact: unreact, toggle: toggle,
+      countsFor: countsFor, count: count, total: total,
+      mine: mine, hasReacted: hasReacted, reactors: reactors,
+      clearItem: clearItem, clearAll: clearAll,
+      serialize: serialize, load: load,
+      onChange: onChange
+    };
+  }
+
+  window.weld.reactions = {
+    create: createReactions,
+    version: '1.0.0'
+  };
+
+  return window.weld.reactions;
