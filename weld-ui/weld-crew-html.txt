@@ -37,7 +37,7 @@ td code{font-size:12px;}
 </style>
 <div id="page">
   <div class="hdr">
-    <div class="hdr-row"><h1>weld.crew</h1><span class="ver">v1.0.1</span></div>
+    <div class="hdr-row"><h1>weld.crew</h1><span class="ver">v1.1.0</span></div>
     <p class="lead">A tool-using AI agent that runs <em>inside</em> a Perchance generator, on the user&rsquo;s own model, over <a href="https://perchance.org/weld-skybridge-plugin">weld.skybridge</a>. It runs a ReAct loop &mdash; reason, call a tool, read the result, repeat &mdash; and keeps its state in the companion&rsquo;s storage: a long-term <strong>memory</strong> it can write and search, a per-task <strong>scratchpad</strong> of thoughts, and named <strong>workspaces</strong> that survive reloads, so a run can be paused, resumed, or inspected later.</p>
     <p class="toc">on this page: <a href="#why">concept</a> &middot; <a href="#use">quick start</a> &middot; <a href="#contract">output contract</a> &middot; <a href="#api">api</a> &middot; <a href="#tools">tools</a> &middot; <a href="#state">memory &amp; workspaces</a> &middot; <a href="#debug">live debug</a> &middot; <a href="#fallback">fallback</a></p>
   </div>
@@ -73,14 +73,14 @@ a.<span class="c-f">registerTool</span>(\{ name: <span class="c-s">'roll'</span>
     <tr><td><code>run(goal, \{onStep, maxSteps, runId\})</code></td><td>Run the loop. Resolves <code>\{ ok, answer, runId, steps \}</code>. <code>onStep</code> fires per event.</td></tr>
     <tr><td><code>resume(runId, \{maxSteps\})</code></td><td>Continue a saved run where it left off (give a larger budget than it stopped at).</td></tr>
     <tr><td><code>registerTool(\{name, description, args, run\})</code></td><td>Add a tool the agent may call; <code>run(args)</code> may be async and returns the observation.</td></tr>
-    <tr><td><code>memory.write(text, tags?) / search(q, tags?) / list()</code></td><td>Durable long-term memory. <code>write</code> returns an id; <code>search</code> matches text and/or tags.</td></tr>
+    <tr><td><code>memory.write(text, tags?) / search(q, tags?) / list()</code></td><td>Durable long-term memory. <code>write</code> returns an id; <code>search</code> ranks by relevance (whole-phrase, then per-term overlap, then tags).</td></tr>
     <tr><td><code>scratchpad.read() / write(note) / clear()</code></td><td>The agent&rsquo;s per-run thoughts, persisted every step.</td></tr>
     <tr><td><code>runs() / getRun(id)</code></td><td>List run records / fetch one (goal, steps, status, result).</td></tr>
     <tr><td><code>tools() / backend() / stop()</code></td><td>List tools / where state is going (<code>companion</code>/<code>persist</code>/<code>memory</code>) / abort a run.</td></tr>
   </table>
 
   <h2 id="tools">Tools</h2>
-  <p>Built-in (no companion capability beyond storage): <code>think</code>, <code>memory.write</code>, <code>memory.search</code>, <code>memory.list</code>, <code>time.now</code>. There is also a pluggable <code>web.fetch</code> that returns <code>\{ ok:false \}</code> unless the companion advertises a <code>fetch</code> capability. Register your own with <code>registerTool</code> &mdash; that is how the agent orchestrates the generator&rsquo;s own powers (dice, lorebook lookup, image generation, sheet edits).</p>
+  <p>Built-in (no companion capability beyond storage): <code>think</code>, <code>memory.write</code>, <code>memory.search</code> (ranked by relevance), <code>memory.list</code>, <code>time.now</code>. Two web tools: <code>web.fetch</code> (uses the companion <code>fetch</code> capability if present, else <code>weld.fetch</code>; it extracts readable text from HTML, and given a <code>query</code> it keeps the query-relevant passages instead of blindly truncating the head) and <code>web.search</code> (a short result list of <code>\{title, url, snippet\}</code> via the companion <code>search</code> capability). Register your own with <code>registerTool</code> &mdash; that is how the agent orchestrates the generator&rsquo;s own powers (dice, lorebook lookup, image generation, sheet edits).</p>
 
   <h2 id="state">Memory &amp; workspaces</h2>
   <p>State lives in skybridge storage under <code>agent:&lt;workspace&gt;:&lt;ns&gt;</code> &mdash; <code>:mem</code> (long-term memory), <code>:scratch</code> (this run&rsquo;s thoughts), <code>:run:&lt;id&gt;</code> (a run record), <code>:runs</code> (the index). Because the run record is written every step, a run survives a reload and <code>resume(runId)</code> picks it up. Switch <code>workspace</code> to keep separate bodies of work apart; with the companion present they persist across generators, else they fall back locally.</p>
@@ -93,6 +93,8 @@ a.<span class="c-f">registerTool</span>(\{ name: <span class="c-s">'roll'</span>
   <div class="note">Design rule, inherited from skybridge: do something reasonable with no companion, something better with one. The agent still runs (in-memory state, a reasoner you supply) when nothing is installed.</div>
 
   <h2>Changelog</h2>
+  <h3>1.1.0</h3>
+  <p>Reasoning now requests <strong>native JSON</strong> from your own model, so the one-JSON-object-per-step contract is enforced at the source. Added <code>web.search</code> (companion <code>search</code> capability) so an agent can <em>find</em> pages, not just fetch URLs it already knows. <code>web.fetch</code> extracts readable text from HTML and, given a <code>query</code>, keeps the query-relevant passages instead of head-truncating. <code>memory.search</code> now <strong>ranks</strong> results by relevance instead of returning unordered substring hits. The system prompt nudges a brief plan-first step on multi-step goals and a sanity-check before finalizing.</p>
   <h3>1.0.1</h3>
   <p>The built-in <code>web.fetch</code> tool now falls back to <code>weld.fetch</code> (the superFetch CORS-free proxy) when the companion doesn't provide a <code>fetch</code> capability &mdash; so an agent can browse the web today if the host imports <code>weld-fetch-plugin</code>, with no companion broker required. Response bodies are truncated to 8&nbsp;KB to keep the agent's context manageable.</p>
   <h3>1.0.0</h3>

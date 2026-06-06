@@ -26,16 +26,16 @@ $output() =>
   // message: { id, from, to, type, payload, corr?, t }   to = peerId | role | '*'
   // -----------------------------------------------------------------
 
-  var BUILD = 'swarm/2026-06-04.2';
+  var BUILD = 'swarm/2026-06-05.1';
 
   function uid(p) { return (p || 'm_') + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
-  // ---- transport: { send(msg), onMessage(fn) } -- auto-selected, or injected ----
+  // ---- transport: { send(msg), onMessage(fn) }, auto-selected or injected ----
   function pickTransport(opts) {
     if (opts && opts.transport) return opts.transport;
     var channel = (opts && opts.channel) || 'weld.swarm';
     var sb = window.weld && window.weld.skybridge;
-    // 1) companion bus (cross-generator, cross-tab) -- present once the companion exposes it
+    // 1) companion bus (cross-generator, cross-tab); present once the companion exposes it
     if (sb && sb.connected && typeof sb.has === 'function' && sb.has('bus') && sb.bus && typeof sb.bus.publish === 'function' && typeof sb.bus.subscribe === 'function') {
       return { kind: 'bus', send: function (m) { sb.bus.publish(channel, m); }, onMessage: function (fn) { return sb.bus.subscribe(channel, fn); } };
     }
@@ -96,22 +96,35 @@ $output() =>
       });
     }
 
-    // fan tasks out across live workers with bounded concurrency -> results in order
+    // fan tasks out across live workers with bounded concurrency -> results in order.
+    // Resilient: re-queries LIVE workers each cycle (so tabs that wake/recover rejoin and
+    // pruned/frozen ones drop out), and reassigns a timed-out or failed task to a different
+    // live worker up to `attempts` times, so one asleep tab doesn't lose its subtask.
     function dispatchMany(tasks, o) {
       o = o || {};
-      var workers = livePeers('worker');
-      if (!workers.length) return Promise.reject(new Error('no workers available'));
-      var limit = o.concurrency || workers.length;
-      var results = new Array(tasks.length); var done = 0; var next = 0; var active = 0;
+      var attempts = o.attempts || 3;
+      var timeoutMs = o.timeoutMs || 30000;
+      function live() { return livePeers('worker'); }
+      if (!live().length) return Promise.reject(new Error('no workers available'));
+      var results = new Array(tasks.length); var done = 0; var next = 0; var active = 0; var rr = 0;
       return new Promise(function (resolve) {
         function settle(idx, val) { results[idx] = val; done++; active--; if (done === tasks.length) resolve(results); else pump(); }
+        function attempt(idx, tries) {
+          var ws = live();
+          if (!ws.length) { return settle(idx, { error: 'no workers available' }); }
+          var w = ws[(rr++) % ws.length];
+          dispatch(w.peerId, tasks[idx], timeoutMs).then(
+            function (r) { settle(idx, r); },
+            function (e) {
+              // worker timed out / unreachable (e.g. a backgrounded, frozen tab) -> try another
+              if (tries + 1 < attempts && live().length) return attempt(idx, tries + 1);
+              settle(idx, { error: String(e && e.message || e) });
+            });
+        }
         function pump() {
+          var limit = o.concurrency || live().length || 1;
           while (active < limit && next < tasks.length) {
-            (function (idx) {
-              active++;
-              var w = workers[idx % workers.length];
-              dispatch(w.peerId, tasks[idx], o.timeoutMs).then(function (r) { settle(idx, r); }, function (e) { settle(idx, { error: String(e && e.message || e) }); });
-            })(next++);
+            (function (idx) { active++; attempt(idx, 0); })(next++);
           }
         }
         pump();
@@ -119,9 +132,15 @@ $output() =>
     }
 
     // worker convenience: auto-answer 'task' messages by running handler(payload) -> result
+    var served = null;        // single active task subscription (serve is idempotent, never stacks)
+    var handledCorrs = {};    // corr -> ts; drop duplicate deliveries of the same task
     function serve(handler) {
-      on('task', async function (msg) {
+      if (served) { try { served(); } catch (e) {} }   // replace any prior handler -> no double-handling
+      served = on('task', async function (msg) {
         if (!msg.corr) return;
+        if (handledCorrs[msg.corr]) return;             // already handled this task -> ignore the duplicate
+        handledCorrs[msg.corr] = now();
+        var keys = Object.keys(handledCorrs); if (keys.length > 1024) { delete handledCorrs[keys[0]]; }
         var out;
         try { out = await handler(msg.payload, msg); } catch (e) { out = { error: String(e && e.message || e) }; }
         raw('result', out, msg.from, { corr: msg.corr });
@@ -152,7 +171,7 @@ $output() =>
 
   window.weld.swarm = {
     create: createSwarm,
-    version: '1.1.0',
+    version: '1.2.1',
     build: BUILD
   };
 

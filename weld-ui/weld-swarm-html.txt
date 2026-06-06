@@ -37,9 +37,9 @@ td code{font-size:12px;}
 </style>
 <div id="page">
   <div class="hdr">
-    <div class="hdr-row"><h1>weld.swarm</h1><span class="ver">v1.1.0</span></div>
+    <div class="hdr-row"><h1>weld.swarm</h1><span class="ver">v1.2.1</span></div>
     <p class="lead">Generator-side multi-agent orchestration &mdash; the DSL companion to the orchestrator that lives in <strong>Weld Companion</strong>. A generator joins a <strong>swarm</strong> with a role (<code>worker</code> = a tab running weld.crew, <code>user</code> = the driver), peers discover each other, address messages by id or role, and the driver fans tasks out across workers <strong>in parallel</strong> with a concurrency cap, awaiting results. The same routing logic the companion uses, available client-side.</p>
-    <p class="lead" style="margin-bottom:0"><a href="https://perchance.org/weld-swarm-example">&rarr; Try the live demo</a> (a self-contained local run, plus a two-tab mode over weld.sync).</p>
+    <p class="lead" style="margin-bottom:0"><a href="https://perchance.org/weld-swarm-example">&rarr; Open SWARM // mission control (the live app)</a> (a self-contained local run, plus a two-tab mode over weld.sync).</p>
     <p class="toc">on this page: <a href="#why">concept</a> &middot; <a href="#use">quick start</a> &middot; <a href="#transport">transport</a> &middot; <a href="#api">api</a> &middot; <a href="#status">status</a></p>
   </div>
 
@@ -78,6 +78,10 @@ window.weld.swarm.<span class="c-f">create</span>(\{ role: <span class="c-s">'wo
   <p>Stage 1 of the orchestrator. The routing core (registry, addressing, parallel dispatch, concurrency cap, presence, timeouts) is built and tested. A live demo is at <a href="https://perchance.org/weld-swarm-example">weld-swarm-example</a> &mdash; a local run (driver + workers in one tab) and a two-tab Worker/User mode over weld.sync. Cross-generator operation rides the companion's <code>bus</code> capability (now shipped): when Weld Companion is installed, weld.swarm coordinates workers across <em>different</em> generators and tabs over the apex <code>BroadcastChannel</code>; with no companion it falls back to weld.sync (same-origin tabs).</p>
 
   <h2>Changelog</h2>
+  <h3>1.2.1</h3>
+  <p><code>serve()</code> is now idempotent (replaces its task handler instead of stacking a new one each call) and dedupes duplicate task deliveries by correlation id. Fixes workers running &mdash; and replying/streaming &mdash; a task twice when serve was re-invoked or the bus delivered a message more than once.</p>
+  <h3>1.2.0</h3>
+  <p>Resilient dispatch: <code>dispatchMany</code> now re-queries the live worker set each cycle and reassigns a timed-out or unreachable subtask to a different worker (up to <code>attempts</code>, default 3) &mdash; so a backgrounded, frozen tab no longer makes its subtask fail or vanish. Pairs with the app's keep-awake (silent audio) for Node tabs.</p>
   <h3>1.1.0</h3>
   <p>Cross-generator operation, for real: weld.swarm now rides the companion's <code>bus</code> capability when present, coordinating workers across <em>different</em> generators and tabs (previously limited to same-origin tabs over weld.sync). The transport guard requires a connected companion advertising <code>bus</code>; with none it falls back to weld.sync, then in-memory, so a single-tab demo still runs.</p>
   <h3>1.0.0</h3>

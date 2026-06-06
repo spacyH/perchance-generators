@@ -10,7 +10,7 @@ $output() =>
   if (window.weld.markdown) return window.weld.markdown;
 
   // -----------------------------------------------------------------
-  // HTML escape -- the foundation of safety
+  // HTML escape: the foundation of safety
   // -----------------------------------------------------------------
   function escapeHtml(s) {
     return String(s)
@@ -22,7 +22,7 @@ $output() =>
   }
 
   // -----------------------------------------------------------------
-  // URL sanitization -- reject javascript:, vbscript:, data: (except images)
+  // URL sanitization: reject javascript:, vbscript:, data: (except images)
   // -----------------------------------------------------------------
   var SAFE_URL_RE = /^(?:https?:|mailto:|tel:|\/|#|\.\/|\.\.\/|[a-zA-Z0-9_\-]+\.)/;
   var SAFE_IMG_URL_RE = /^(?:https?:|data:image\/(?:png|jpe?g|gif|webp|svg\+xml);|\/|\.\/|\.\.\/)/;
@@ -34,7 +34,7 @@ $output() =>
   }
 
   // -----------------------------------------------------------------
-  // Inline formatting: bold, italic, strikethrough -- applied to text
+  // Inline formatting: bold, italic, strikethrough, applied to text
   // where no HTML has been injected yet
   // -----------------------------------------------------------------
   function applyFormatting(text) {
@@ -50,7 +50,7 @@ $output() =>
   }
 
   // -----------------------------------------------------------------
-  // Inline parsing -- code, images, links, auto-links, then formatting
+  // Inline parsing: code, images, links, auto-links, then formatting
   // -----------------------------------------------------------------
   function parseInline(text) {
     var slots = [];
@@ -59,7 +59,7 @@ $output() =>
       return '\u0001S' + (slots.length - 1) + '\u0001';
     }
 
-    // 1. Code spans -- extract first, content escaped, no further processing
+    // 1. Code spans: extract first, content escaped, no further processing
     text = text.replace(/`([^`]+)`/g, function(_, code) {
       return slot('<code>' + escapeHtml(code) + '</code>');
     });
@@ -210,7 +210,7 @@ $output() =>
   }
 
   // -----------------------------------------------------------------
-  // Sanitize an arbitrary HTML string -- only allow safe tags/attrs
+  // Sanitize an arbitrary HTML string: only allow safe tags/attrs
   // -----------------------------------------------------------------
   var ALLOWED_TAGS = {
     p: 1, br: 1, hr: 1,

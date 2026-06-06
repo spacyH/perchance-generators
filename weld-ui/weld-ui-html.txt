@@ -72,15 +72,126 @@ li::before{content:'>';color:var(--muted);font-family:var(--mono);margin-right:1
 .footer a:hover{color:var(--accent);}
 </style>
 <div id="page">
-<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.ui<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-ui-index">GO TO THE INDEX &rarr; &rarr;</a></span></div>  <div class="hdr">
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.ui<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-ui-example">demo &rarr;</a></span></div>  <div class="hdr">
     <div class="hdr-row">
       <h1>weld.ui</h1>
-      <span class="ver">v1.0.0</span>
+      <span class="ver">v1.1.0</span>
     </div>
-    <p class="lead">Behold, the weld suite.</p></div><h2>Overview</h2><p>weld is plugin suite</p><br><br><br><br><p>there is more here to discover</p><br><br><br><br><p>welcome to the party</p><br><br><br><br><p><br><br><br><br><h3>(this page is an easter egg)</h3></p>
+    <p class="lead">Shared UI primitives — theme system, components, and design tokens. Loads CSS variables on init; foundation for the rest of the weld suite.</p>
+  </div>
+  <h2>Overview</h2>
+<p>weld.ui is the design-system foundation for the weld plugin suite. It injects CSS variables and component primitives that every other weld plugin uses, so the whole suite looks coherent and themes uniformly.</p>
+<p>Load this plugin and you immediately get:</p>
+<ul>
+  <li>CSS custom properties (<code>--w-bg</code>, <code>--w-accent</code>, etc.) on <code>:root</code></li>
+  <li>Component classes: <code>.w-btn</code>, <code>.w-input</code>, <code>.w-modal</code>, and so on</li>
+  <li>A JavaScript API for building DOM with these styles applied</li>
+</ul>
+<p>You can use just the CSS by adding classes to your own HTML, or use the JS factory functions to build elements programmatically.</p>
+<h2>Quick start</h2>
+<p>In your lists editor:</p>
+<pre data-codeid="code1"></pre>
 
+<p>Then in your HTML panel:</p>
+<pre data-codeid="code2"></pre>
+<h2>Theme</h2>
+<p>All visual choices are driven by CSS variables. Override them at any time with <code>ui.setTheme()</code> or by writing CSS that targets <code>:root</code>.</p>
+
+<div class="sig" data-codeid="sig3"></div>
+<p>Merges <code>updates</code> into the active theme and re-applies the CSS variables. Pass any subset of keys.</p>
+
+<pre data-codeid="code4"></pre>
+
+<div class="sig" data-codeid="sig5"></div>
+<p>Returns a copy of the current theme object.</p>
+
+<h4>Available theme keys</h4>
+<table>
+  <tr><th>Key</th><th>Default</th><th>Use</th></tr>
+  <tr><td><code>bg</code></td><td>#0d1117</td><td>page background</td></tr>
+  <tr><td><code>surface</code></td><td>#161b22</td><td>elevated surfaces (modals)</td></tr>
+  <tr><td><code>faint</code></td><td>#21262d</td><td>subtle backgrounds (cards)</td></tr>
+  <tr><td><code>ink</code></td><td>#e6edf3</td><td>primary text</td></tr>
+  <tr><td><code>muted</code></td><td>#7d8590</td><td>secondary text</td></tr>
+  <tr><td><code>accent</code></td><td>#4493f8</td><td>primary action color</td></tr>
+  <tr><td><code>green / red / yellow</code></td><td>—</td><td>status colors</td></tr>
+  <tr><td><code>radius / radiusSm / radiusLg</code></td><td>6 / 4 / 10 px</td><td>corner radii</td></tr>
+  <tr><td><code>font / fontMono</code></td><td>DM Sans / JetBrains Mono</td><td>font stacks</td></tr>
+</table>
+<h2>Components</h2>
+<p>All component factories return a DOM element you can append anywhere. They take a single options object.</p>
+<h3>button(opts)</h3>
+<div class="sig" data-codeid="sig6"></div>
+<pre data-codeid="code7"></pre>
+<p><code>variant</code>: <code>primary</code>, <code>danger</code>, <code>ghost</code>, or omit for default. <code>size</code>: <code>sm</code>, <code>lg</code>, or omit for medium.</p>
+<h3>input(opts)</h3>
+<div class="sig" data-codeid="sig8"></div>
+<pre data-codeid="code9"></pre>
+<p>Handlers receive <code>(value, event)</code>.</p>
+<h3>select(opts)</h3>
+<div class="sig" data-codeid="sig10"></div>
+<pre data-codeid="code11"></pre>
+<h3>textarea(opts)</h3>
+<div class="sig" data-codeid="sig12"></div>
+<h3>checkbox(opts)</h3>
+<div class="sig" data-codeid="sig13"></div>
+<pre data-codeid="code14"></pre>
+<h3>range(opts)</h3>
+<div class="sig" data-codeid="sig15"></div>
+<p>Handlers receive the parsed numeric value.</p>
+<h3>modal(opts)</h3>
+<div class="sig" data-codeid="sig16"></div>
+<pre data-codeid="code17"></pre>
+<p><code>content</code> can be a string of HTML or a DOM element. Action <code>onClick</code> handlers close the modal automatically; return <code>false</code> from the handler to keep it open (e.g. validation failed). <code>dismissable: false</code> disables Escape key and overlay-click dismissal.</p>
+<h3>spinner(opts)</h3>
+<div class="sig" data-codeid="sig18"></div>
+<p>A small animated spinner. <code>size</code>: <code>lg</code> for bigger.</p>
+<h3>icon(name, opts)</h3>
+<div class="sig" data-codeid="sig19"></div>
+<p>Returns an SVG element. Built-in icons:</p>
+<p><code>x</code>, <code>check</code>, <code>plus</code>, <code>minus</code>, <code>trash</code>, <code>edit</code>, <code>save</code>, <code>copy</code>, <code>download</code>, <code>upload</code>, <code>refresh</code>, <code>settings</code>, <code>info</code>, <code>warn</code>, <code>error</code>, <code>search</code>, <code>chevDown</code>, <code>chevUp</code>, <code>chevLeft</code>, <code>chevRight</code>, <code>external</code>.</p>
+
+<div class="sig" data-codeid="sig20"></div>
+<p>Register a custom icon. <code>pathD</code> is an SVG path d-attribute string for a 24x24 viewBox.</p>
+<pre data-codeid="code21"></pre>
+<h3>disclosure(opts)</h3>
+<div class="sig" data-codeid="sig22"></div>
+<p>Collapsible section. Uses native <code>&lt;details&gt;</code>.</p>
+<h3>tabs(opts)</h3>
+<div class="sig" data-codeid="sig23"></div>
+<pre data-codeid="code24"></pre>
+<p><code>content</code> can be a DOM element or a function returning one (lazy).</p>
+<h2>Layout helpers</h2>
+<div class="sig" data-codeid="sig25"></div> <div class="sig" data-codeid="sig26"></div> <div class="sig" data-codeid="sig27"></div>
+<p><code>row</code> is horizontal flex, <code>col</code> is vertical flex with small gap, <code>stack</code> is vertical with larger gap. All accept an array of elements.</p>
+
+<div class="sig" data-codeid="sig28"></div> <div class="sig" data-codeid="sig29"></div>
+<p>A card with subtle background, and a horizontal rule. <code>label(text)</code> returns a small uppercase label.</p>
+
+<pre data-codeid="code30"></pre>
+<h2>el() helper</h2>
+<div class="sig" data-codeid="sig31"></div>
+<p>A small DOM-creation helper. Useful for building custom elements that aren't covered by the component library.</p>
+<pre data-codeid="code32"></pre>
+<p>Attribute keys: <code>class</code> sets className. <code>style</code> with an object merges styles. <code>dataset</code> with an object sets data-* attrs. Keys starting with <code>on</code> register event listeners. <code>text</code> and <code>html</code> set textContent and innerHTML respectively.</p>
+<h2>Notes</h2>
+<div class="note">All weld plugins follow the same loading pattern: they create <code>window.weld</code> if needed, then attach themselves under a sub-key. Order of loading doesn't matter — the first plugin loaded creates the namespace.</div>
+<div class="note">Component classes (<code>.w-btn</code>, <code>.w-input</code>, etc.) are stable. You can hand-write HTML using these classes if you prefer, or mix them with the JS API.</div></div>
+<h2>Lightbox, clipboard &amp; CSS <span class="tag">v1.1.0</span></h2>
+<div class="sig" data-codeid="sig_extras"></div>
+<p><code>lightbox(opts)</code> opens an image (or any element) in a dismissable full-screen overlay. <code>clipboard(text, msg)</code> copies text and shows optional toast feedback. <code>injectCSS()</code> ensures the suite&rsquo;s shared stylesheet is present (called automatically by the other helpers; exposed for apps that build UI before any weld.ui call).</p>
+<pre data-codeid="extras_ex"></pre>
+<h2>Changelog</h2>
+<div class="changelog">
+<p class="cl-ver">v1.1.0</p>
+<ul>
+<li>lightbox overlay, clipboard with toast feedback, and injectCSS.</li>
+</ul>
+<p class="cl-ver">v1.0.0</p>
+<ul>
+<li>Initial release: buttons, inputs, panels, toasts.</li>
+</ul>
 </div>
-
 <script>
 (function(){
   var examples = {
