@@ -28,7 +28,7 @@ $output() =>
   //   :runs     index of run ids (most-recent-first)
   // -----------------------------------------------------------------
 
-  var BUILD = 'crew/2026-06-04.2';
+  var BUILD = 'crew/2026-06-06.10';
 
   // ---- storage: lean on skybridge (companion -> persist -> memory), else our own fallback ----
   function makeStore() {
@@ -81,6 +81,42 @@ $output() =>
     return null;
   }
 
+  // ---- HTML -> readable text (C1): drop scripts/styles/tags, decode common entities, collapse space ----
+  function htmlToText(html) {
+    var s = String(html || '');
+    var title = (s.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1] || '';
+    s = s.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<!--[\s\S]*?-->/g, ' ');
+    s = s.replace(/<\/(?:p|div|li|tr|h[1-6]|section|article|header|footer)>/gi, '\n').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, ' ');
+    s = s.replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&quot;/gi, '"').replace(/&#0*39;/g, "'").replace(/&#0*34;/g, '"');
+    s = s.replace(/[ \t\f\v]+/g, ' ').replace(/ *\n */g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+    return { title: String(title).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(), text: s };
+  }
+
+  // C4: when a long body must be truncated, keep the passages most relevant to the agent's query
+  // instead of blindly taking the head. No query (or short text) -> head truncation, as before.
+  function relevantExcerpt(text, query, max) {
+    var s = String(text == null ? '' : text); max = max || 8000;
+    if (s.length <= max) return s;
+    var q = String(query || '').toLowerCase().trim();
+    var terms = q ? q.split(/\s+/).filter(function (t) { return t.length > 2; }) : [];
+    if (!terms.length) return s.slice(0, max) + '\u2026[truncated]';
+    var paras = s.split(/\n{2,}/); if (paras.length < 2) paras = s.match(/[\s\S]{1,800}/g) || [String(s)];
+    var scored = paras.map(function (p, i) {
+      var lp = p.toLowerCase(), sc = 0;
+      for (var k = 0; k < terms.length; k++) { var idx = 0, t = terms[k]; while ((idx = lp.indexOf(t, idx)) !== -1) { sc++; idx += t.length; } }
+      return { i: i, p: p, sc: sc };
+    });
+    var picks = [{ i: 0, p: paras[0] }], used = paras[0].length;          // always keep the head (title/intro)
+    scored.slice(1).filter(function (x) { return x.sc > 0; })
+          .sort(function (a, b) { return b.sc - a.sc; })
+          .forEach(function (x) { if (used + x.p.length + 8 <= max) { picks.push(x); used += x.p.length + 8; } });
+    picks.sort(function (a, b) { return a.i - b.i; });
+    var out = '', last = -1;
+    for (var z = 0; z < picks.length; z++) { if (z > 0 && picks[z].i !== last + 1) out += '\n\u2026\n'; out += picks[z].p + '\n\n'; last = picks[z].i; }
+    out = out.trim(); if (out.length > max) out = out.slice(0, max) + '\u2026[truncated]';
+    return out + (picks.length < paras.length ? '\n\u2026[query-focused excerpt]' : '');
+  }
+
   // ---- the agent factory ----
   function createCrew(opts) {
     opts = opts || {};
@@ -89,7 +125,7 @@ $output() =>
     var extraSystem = opts.system || '';
     var aiOpts = opts.model || {};
     var store = makeStore();
-    var tools = {};            // name -> tool spec
+    var tools = {}; var fetchCache = {};            // name -> tool spec; C3: per-run web.fetch cache
     var stopped = false;
 
     function key(ns, k) { return 'crew:' + workspace + ':' + ns + (k ? (':' + k) : ''); }
@@ -106,12 +142,22 @@ $output() =>
       },
       search: async function (query, tags) {
         var all = await memory.list();
-        var q = String(query || '').toLowerCase();
-        return all.filter(function (m) {
-          var hitQ = !q || (m.text && m.text.toLowerCase().indexOf(q) !== -1);
-          var hitT = !tags || !tags.length || (m.tags && tags.some(function (t) { return m.tags.indexOf(t) !== -1; }));
-          return hitQ && hitT;
-        });
+        var q = String(query || '').toLowerCase().trim();
+        var terms = q ? q.split(/\s+/).filter(Boolean) : [];
+        var tagList = (tags && tags.length) ? tags : null;
+        // A6: rank by relevance (whole-phrase > per-term overlap > tag match), recency as tiebreak,
+        // instead of returning unranked substring hits. No query and no tags -> everything.
+        var scored = [];
+        for (var i = 0; i < all.length; i++) {
+          var m = all[i], text = (m.text || '').toLowerCase(), score = 0;
+          if (q && text.indexOf(q) !== -1) score += 5;
+          for (var j = 0; j < terms.length; j++) if (terms[j] && text.indexOf(terms[j]) !== -1) score += 1;
+          var tagHit = tagList && m.tags && tagList.some(function (t) { return m.tags.indexOf(t) !== -1; });
+          if (tagHit) score += 3;
+          if ((!terms.length && !tagList) || score > 0) scored.push({ m: m, score: score });
+        }
+        scored.sort(function (a, b) { return (b.score - a.score) || ((b.m.t || 0) - (a.m.t || 0)); });
+        return scored.map(function (s) { return s.m; });
       },
       clear: async function () { await store.set(key('mem'), []); return true; }
     };
@@ -163,25 +209,35 @@ $output() =>
       run: async function () { return new Date().toISOString(); } });
     // web.fetch: companion 'fetch' capability if present, else weld.fetch (superFetch
     // proxy, CORS-free) when the host imported it, else reports unavailable.
-    registerTool({ name: 'web.fetch', description: 'Fetch a URL. Uses the companion web-access capability if present, else weld.fetch (superFetch) if the host imported weld-fetch-plugin.', args: { url: 'string', method: 'string (optional)' },
+    registerTool({ name: 'web.fetch', description: 'Fetch a URL. Uses the companion web-access capability if present, else weld.fetch (superFetch) if the host imported weld-fetch-plugin. Pass query to focus a long page on relevant passages.', args: { url: 'string', method: 'string (optional)', query: 'string (optional) -- focus terms for excerpting a long page' },
       run: async function (a) {
         var sb = window.weld && window.weld.skybridge;
         if (sb && sb.connected && typeof sb.has === 'function' && sb.has('fetch') && typeof sb.request === 'function') {
           return await sb.request('fetch', { url: a.url, method: a.method || 'GET' });
         }
-        var wf = window.weld && window.weld.fetch;
+        var ck = (a.method || 'GET') + ' ' + a.url; if (fetchCache[ck]) return Object.assign({ cached: true }, fetchCache[ck]); var wf = window.weld && window.weld.fetch;
         if (wf && typeof wf.request === 'function') {
           try {
             var res = await wf.request(a.url, { method: a.method || 'GET' });
-            var body = '';
+            var ct = ''; try { var _h = res.headers; ct = _h ? ((typeof _h.get === 'function' ? _h.get('content-type') : (_h['content-type'] || _h['Content-Type'])) || '') : ''; } catch (e) {} if (ct && !/text|html|json|xml|javascript|csv|plain|urlencoded/i.test(ct)) { var nt = { ok: !!res.ok, status: res.status, url: res.url, via: res.via, contentType: ct, note: 'non-text content (' + ct + '); body omitted' }; fetchCache[ck] = nt; return nt; } var body = '';
             try { body = await res.text(); } catch (e) {}
-            if (typeof body === 'string' && body.length > 8000) body = body.slice(0, 8000) + '\u2026[truncated]';
-            return { ok: !!res.ok, status: res.status, url: res.url, via: res.via, body: body };
+            var _ht = null; if (typeof body === 'string' && (/html/i.test(ct) || (!ct && /^\s*<(?:!doctype|html)/i.test(body)))) { _ht = htmlToText(body); body = _ht.text; } if (typeof body === 'string' && body.length > 8000) body = relevantExcerpt(body, a.query, 8000);   // C4: query-aware truncation
+            var out = { ok: !!res.ok, status: res.status, url: res.url, via: res.via, title: _ht ? _ht.title : undefined, body: body }; if (out.ok) fetchCache[ck] = out; return out;
           } catch (e) {
             return { ok: false, reason: 'weld.fetch error: ' + (e && e.message ? e.message : String(e)) };
           }
         }
         return { ok: false, reason: 'web access unavailable (no companion fetch capability, and weld.fetch not imported)' };
+      } });
+
+    // web.search: companion 'search' capability if present, else reports unavailable.
+    registerTool({ name: 'web.search', description: 'Search the web for a query; returns a short list of results (title, url, snippet) to help you pick pages worth fetching. Requires the companion search capability.', args: { query: 'string', max: 'number (optional)' },
+      run: async function (a) {
+        var sb = window.weld && window.weld.skybridge;
+        if (sb && sb.connected && typeof sb.has === 'function' && sb.has('search') && typeof sb.request === 'function') {
+          return await sb.request('search', { query: a.query, max: a.max });
+        }
+        return { ok: false, reason: 'web search unavailable (no companion search capability)' };
       } });
 
     if (opts.tools && opts.tools.length) opts.tools.forEach(registerTool);
@@ -193,6 +249,7 @@ $output() =>
       if (sb && sb.connected && typeof sb.has === 'function' && sb.has('ai') && typeof sb.ai === 'function') {
         var aiArgs = { system: system };
         for (var k in aiOpts) if (aiOpts.hasOwnProperty(k)) aiArgs[k] = aiOpts[k];
+        if (aiArgs.json === undefined) aiArgs.json = true;   // D2: a crew step is always one JSON object -> ask the model for JSON mode
         var r = await sb.ai(prompt, aiArgs);
         if (r && r.ok) return r.value;
         throw new Error('model call failed: ' + (r && r.reason ? r.reason : 'unknown'));
@@ -219,6 +276,17 @@ $output() =>
         '',
         'Available tools:',
         toolDocs(),
+        '',
+        'Routing:',
+        '- If a tool can directly produce what the task asks for (an image, a fetched page, a dice roll, a pick), CALL that tool with concrete arguments -- do not describe in prose how it could be done.',
+        '- If the task is answerable from your own knowledge or reasoning, reply with a final answer; do not call tools you do not need.',
+        '- Prefer the most specific tool, and pass complete, self-contained arguments.',
+        '- If a tool result is unsatisfactory, call it again with adjusted arguments before finalizing.',
+        '',
+        'Approach:',
+        '- For a multi-step goal, take a brief planning step first (use think) before acting.',
+        '- Before finalizing, check your answer actually addresses the goal; do not finalize on weak or unverified evidence.',
+        '- Steps are limited: once you can answer, finalize promptly rather than over-exploring.',
         '',
         'Long-term memory (durable across runs):',
         (memText || '(empty)'),
@@ -247,7 +315,7 @@ $output() =>
         await scratchpad.clear();
       }
       await saveRun(rec);
-      onStep({ type: 'start', runId: rec.id, goal: rec.goal });
+      onStep({ type: 'start', runId: rec.id, goal: rec.goal }); var badParses = 0;
 
       while (rec.steps.length < cap) {
         if (stopped) { rec.status = 'stopped'; await saveRun(rec); return { ok: false, reason: 'stopped', runId: rec.id, steps: rec.steps }; }
@@ -259,10 +327,10 @@ $output() =>
 
         var transcript = 'GOAL: ' + rec.goal + '\n\n' + rec.steps.map(function (s, i) {
           var line = '[step ' + (i + 1) + '] thought: ' + (s.thought || '');
-          if (s.tool) line += '\naction: ' + s.tool + ' ' + JSON.stringify(s.args || {}) + '\nobservation: ' + JSON.stringify(s.observation);
+          if (s.tool) { var _o = JSON.stringify(s.observation), _cap = (i >= rec.steps.length - 2) ? 1000 : 200; if (typeof _o === 'string' && _o.length > _cap) _o = _o.slice(0, _cap) + '\u2026[+' + (_o.length - _cap) + ' chars]'; line += '\naction: ' + s.tool + ' ' + JSON.stringify(s.args || {}) + '\nobservation: ' + _o; }
           return line;
         }).join('\n\n');
-        transcript += '\n\nReply with the next JSON step.';
+        transcript += '\n\nSteps remaining: ' + (cap - rec.steps.length) + '. ' + ((cap - rec.steps.length) <= 1 ? 'Reply now with your final answer.' : 'Finalize as soon as you can answer; do not waste steps.') + '\n\nReply with the next JSON step.';
 
         var sysText = systemPrompt(memText, scratchText);
         onStep({ type: 'prompt', system: sysText, transcript: transcript, step: rec.steps.length + 1 });
@@ -273,11 +341,19 @@ $output() =>
         onStep({ type: 'raw', reply: String(reply) });
         var parsed = extractJSON(reply);
         if (!parsed) {
-          // model answered in prose -- treat as the final answer
+          if (badParses < 1) {
+            badParses++;
+            rec.steps.push({ thought: '', tool: '(format-reminder)', args: {}, observation: 'Your previous reply was not valid JSON. Reply with EXACTLY one JSON object and nothing else: either a tool call with keys thought, tool, args; or a final answer with keys thought, final.', t: Date.now() });
+            await saveRun(rec);
+            onStep({ type: 'observation', tool: '(format-reminder)', observation: 'invalid JSON; re-asking (attempt ' + badParses + ')' });
+            continue;
+          }
+          // retries exhausted: accept the prose reply as the final answer (original fallback)
           rec.status = 'done'; rec.result = String(reply).trim(); await saveRun(rec);
           onStep({ type: 'final', answer: rec.result });
           return { ok: true, answer: rec.result, runId: rec.id, steps: rec.steps };
         }
+        badParses = 0;
 
         var step = { thought: parsed.thought || '', tool: null, args: null, observation: null, t: Date.now() };
         if (parsed.thought) { await scratchpad.write(parsed.thought); onStep({ type: 'thought', thought: parsed.thought }); }
@@ -293,9 +369,9 @@ $output() =>
         if (!tool) {
           step.tool = name; step.observation = { error: 'unknown tool: ' + name + '. Pick from: ' + Object.keys(tools).join(', ') };
         } else {
-          step.tool = name; step.args = parsed.args || {};
+          step.tool = name; step.args = parsed.args || {}; var missingArgs = Object.keys(tool.args || {}).filter(function (ak) { return !/optional/i.test(String(tool.args[ak])) && step.args[ak] == null; });
           onStep({ type: 'action', tool: name, args: step.args });
-          try { step.observation = await tool.run(step.args || {}); }
+          if (missingArgs.length) { step.observation = { error: 'missing required arg(s) for ' + name + ': ' + missingArgs.join(', ') + '. Retry the call including: ' + missingArgs.join(', ') + '.' }; } else try { step.observation = await tool.run(step.args || {}); }
           catch (e) { step.observation = { error: String(e && e.message || e) }; }
         }
         onStep({ type: 'observation', tool: step.tool, observation: step.observation });
@@ -305,7 +381,7 @@ $output() =>
 
       rec.status = 'maxsteps'; await saveRun(rec);
       onStep({ type: 'maxsteps', steps: rec.steps.length });
-      return { ok: false, reason: 'maxsteps', runId: rec.id, steps: rec.steps };
+      return { ok: false, answer: '', reason: 'maxsteps', runId: rec.id, steps: rec.steps };
     }
 
     return {
