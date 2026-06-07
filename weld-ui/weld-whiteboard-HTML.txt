@@ -1,0 +1,555 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>weld-whiteboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bg:#0d1117; --surface:#161b22; --surface-2:#1c2230; --ink:#e6edf3; --muted:#7d8590;
+    --faint:#21262d; --accent:#4493f8; --green:#3fb950; --red:#f85149; --amber:#d29922;
+    --border:rgba(255,255,255,0.10); --font:'DM Sans',system-ui,sans-serif; --mono:'JetBrains Mono',monospace;
+    --shadow:0 14px 34px -16px rgba(0,0,0,.7);
+  }
+  *{box-sizing:border-box;margin:0;}
+  html,body{height:100%;}
+  body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);overflow:hidden;-webkit-font-smoothing:antialiased;}
+  a{color:var(--accent);text-decoration:none;}
+  .app{height:100%;display:flex;flex-direction:column;}
+
+  .breadcrumb{display:flex;justify-content:space-between;align-items:center;font:12px var(--mono);color:var(--muted);padding:12px 16px;border-bottom:1px solid var(--border);}
+  .breadcrumb a{color:var(--muted);} .breadcrumb a:hover{color:var(--accent);}
+  .breadcrumb .sep{color:var(--faint);margin:0 8px;} .breadcrumb .cur{color:var(--ink);}
+  .breadcrumb .act a{color:var(--accent);}
+
+  header{display:flex;align-items:center;gap:16px;padding:12px 16px;border-bottom:1px solid var(--border);}
+  .brand{display:flex;align-items:baseline;gap:10px;min-width:0;}
+  .brand h1{font:700 18px/1 var(--font);letter-spacing:-.01em;margin:0;}
+  .brand .tag{font:11px var(--mono);color:var(--muted);}
+  .spacer{flex:1;}
+  .status{display:flex;align-items:center;gap:8px;font:11px var(--mono);letter-spacing:.04em;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:6px 11px;background:var(--surface);}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--amber);}
+  .status.live .dot{background:var(--green);animation:pulse 1.8s infinite;}
+  .status.err .dot{background:var(--red);}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(63,185,80,.45)}70%{box-shadow:0 0 0 7px rgba(63,185,80,0)}100%{box-shadow:0 0 0 0 rgba(63,185,80,0)}}
+  .roster{display:flex;align-items:center;}
+  .chip{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:700 11px var(--font);color:#fff;margin-left:-7px;border:2px solid var(--bg);box-shadow:0 2px 6px -2px rgba(0,0,0,.6);transition:transform .15s;cursor:default;}
+  .chip:hover{transform:translateY(-2px) scale(1.06);}
+  .chip.me{box-shadow:0 0 0 2px var(--accent),0 2px 6px -2px rgba(0,0,0,.6);}
+
+  .stage{flex:1;position:relative;display:grid;place-items:center;padding:16px;min-height:0;}
+  .board-wrap{position:relative;box-shadow:var(--shadow);border-radius:8px;border:1px solid var(--border);}
+  canvas{display:block;background:#eef1f5;border-radius:7px;touch-action:none;cursor:crosshair;}
+  .cursors{position:absolute;inset:0;pointer-events:none;overflow:hidden;border-radius:7px;}
+  .cur{position:absolute;transform:translate(-2px,-2px);transition:left .12s linear,top .12s linear;will-change:left,top;}
+  .cur svg{display:block;filter:drop-shadow(0 1px 1px rgba(0,0,0,.4));}
+  .cur .tag{position:absolute;left:14px;top:14px;white-space:nowrap;font:700 10px var(--font);color:#fff;padding:2px 7px;border-radius:999px;box-shadow:0 2px 6px -2px rgba(0,0,0,.5);}
+
+  .dock{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:center;padding:12px 16px;border-top:1px solid var(--border);background:var(--surface);}
+  .group{display:flex;align-items:center;gap:8px;}
+  .group + .group{border-left:1px solid var(--border);padding-left:14px;}
+  .label{font:10px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);}
+  .swatch{width:24px;height:24px;border-radius:50%;border:2px solid var(--border);cursor:pointer;transition:transform .12s,box-shadow .12s;}
+  .swatch:hover{transform:scale(1.12);}
+  .swatch.on{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--accent);transform:scale(1.12);}
+  .size{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--bg);display:grid;place-items:center;cursor:pointer;transition:.12s;}
+  .size .nib{background:var(--ink);border-radius:50%;}
+  .size.on{border-color:var(--accent);background:var(--surface-2);}
+  .btn{font:600 12px var(--mono);letter-spacing:.02em;border:1px solid var(--border);background:var(--bg);color:var(--ink);border-radius:6px;padding:8px 12px;cursor:pointer;transition:.12s;}
+  .btn:hover{border-color:var(--muted);background:var(--surface-2);}
+  .btn.warn:hover{background:var(--red);border-color:var(--red);color:#fff;}
+  .btn.tool.on{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .btn.primary:hover{filter:brightness(1.1);}
+  a.btn{text-decoration:none;display:inline-block;}
+  .name-in{font:12px var(--mono);border:1px solid var(--border);background:var(--bg);border-radius:6px;padding:7px 10px;width:130px;color:var(--ink);}
+  .name-in:focus{outline:none;border-color:var(--accent);}
+  .hint{font:11px var(--mono);color:var(--muted);text-align:center;padding:0 16px 8px;}
+
+  .footer{padding:13px 16px;border-top:1px solid var(--border);font:12px var(--mono);color:var(--muted);text-align:center;}
+  .footer a{color:var(--muted);} .footer a:hover{color:var(--accent);}
+
+  .helper{position:absolute;inset:0;z-index:5;display:grid;place-items:center;padding:18px;border-radius:7px;background:radial-gradient(circle at center, rgba(13,17,23,.55), rgba(13,17,23,.86));}
+  .helper[hidden]{display:none;}
+  .helper-card{max-width:430px;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:24px 24px 18px;text-align:center;}
+  .helper-card .badge{font:700 10px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent);}
+  .helper-card h2{font:700 22px var(--font);margin:8px 0 9px;}
+  .helper-card p{font:13px/1.55 var(--font);color:var(--muted);margin:0 0 16px;}
+  .helper-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
+  .helper-card .repo{font:11px var(--mono);color:var(--muted);word-break:break-all;margin:14px 0 0;}
+</style>
+
+<div class="app">
+  <div class="breadcrumb">
+    <span><a href="https://perchance.org/weld-ui-index">weld</a><span class="sep">/</span><span class="cur">weld-whiteboard</span></span>
+    <span class="act"><a href="https://github.com/therealwestninja/weld-companion" target="_blank" rel="noopener">source &rarr;</a></span>
+  </div>
+  <header>
+    <div class="brand">
+      <h1>weld-whiteboard</h1>
+      <span class="tag">draw together, live</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="roster" id="roster" title="Everyone currently on the board"></div>
+    <div class="status" id="status"><span class="dot"></span><span id="statusText">connecting</span></div>
+  </header>
+  <div class="stage">
+    <div class="board-wrap" id="wrap">
+      <canvas id="board"></canvas>
+      <div class="cursors" id="cursors"></div>
+    </div>
+    <div class="helper" id="helper" hidden>
+      <div class="helper-card">
+        <div class="badge">online version</div>
+        <h2>Draw together, live</h2>
+        <p id="helperMsg"></p>
+        <div class="helper-actions">
+          <a class="btn primary" href="https://github.com/therealwestninja/weld-companion" target="_blank" rel="noopener noreferrer">Install Weld Companion ↗</a>
+          <button class="btn" id="helperDismiss">Keep drawing solo</button>
+        </div>
+        <p class="repo">github.com/therealwestninja/weld-companion</p>
+      </div>
+    </div>
+  </div>
+  <div class="dock">
+    <div class="group"><span class="label">you</span><input class="name-in" id="nameIn" maxlength="18" spellcheck="false"></div>
+    <div class="group" id="colors"></div>
+    <div class="group" id="sizes"></div>
+    <div class="group">
+      <button class="btn tool" id="penBtn" title="Pen (B)">✎ pen</button>
+      <button class="btn tool" id="eraseBtn" title="Eraser (E)">⌫ eraser</button>
+    </div>
+    <div class="group"><button class="btn warn" id="clearBtn" title="Clear the board for everyone">clear all</button></div>
+  </div>
+  <div class="hint" id="hint">Open in two windows (or share the link) and draw — strokes and cursors sync for everyone on the board.</div>
+  <footer class="footer"><span>&#169; 2026 therealwestninja.</span> &#183; <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183; <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a></footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ============================================================================
+  // CONFIG — the only thing you tune.
+  //   backend: 'auto' -> use CONFIG.restBase if set, else shared-storage (Claude
+  //                      artifact), else solo/local. No errors when unset.
+  //            'rest' -> your own backend (the Cloudflare Worker shipped beside
+  //                      this file). Set restBase to its URL. RELIABLE + TRUE
+  //                      REAL-TIME: the Worker long-polls, so strokes and cursors
+  //                      arrive the instant they happen. Recommended for the live
+  //                      generator (superFetch routes to Cloudflare cleanly).
+  //            'ntfy' -> public ntfy.sh relay. NOTE: superFetch returns HTTP 530
+  //                      (routing fail -> "Failed to fetch") for ntfy.sh, so this
+  //                      does NOT currently work through Perchance's proxy. Left
+  //                      here only for self-hosted ntfy or future use.
+  //   board:   shared room id — everyone with the same value sees the same board.
+  // ============================================================================
+  var CONFIG = {
+    backend: 'auto',
+    board: 'weld-whiteboard-main',
+    ntfyBase: 'https://ntfy.sh',
+    restBase: ''                       // e.g. 'https://weld-wb.yourname.workers.dev'  <-- set this for multiplayer
+  };
+
+  // ---- defensive plugin access (Perchance) -----------------------------------
+  function grab(name) {
+    try { if (typeof root !== 'undefined' && root[name] !== undefined) return root[name]; } catch (e) {}
+    try { if (window[name] !== undefined) return window[name]; } catch (e) {}
+    return undefined;
+  }
+
+  // ============================================================================
+  // TRANSPORT — one interface, three backends.
+  //   tx.label                     : string shown in the status pill
+  //   tx.send(kind, data)          : fire-and-forget publish ('stroke'|'presence'|'clear')
+  //   await tx.fetch()             : -> { strokes:[...new], presences:[...current], clearT:number }
+  // To move to your own infra, implement these three against your API — nothing
+  // else in the app changes. (That's the "swap four helpers" promise.)
+  // ============================================================================
+
+  // ntfy.sh pub/sub over superFetch (Perchance). Each event is one published
+  // message {k,d}; we poll the JSON endpoint for everything since last time and
+  // dedupe by message id. superFetch forwards POST bodies and follows the proxy,
+  // so no custom headers are needed (which is good — superFetch strips them).
+  function ntfyAdapter(sf, base, topic) {
+    var url = base.replace(/\/+$/, '') + '/' + encodeURIComponent(topic);
+    var seen = {}, sinceSec = 0, first = true;
+    function post(payload) {
+      try { var p = sf(url, { method: 'POST', body: JSON.stringify(payload) }); if (p && p.catch) p.catch(function () {}); } catch (e) {}
+    }
+    return {
+      label: 'live · ntfy',
+      send: function (kind, data) { post({ k: kind, d: data }); },
+      fetch: async function () {
+        var since = first ? 'all' : (sinceSec ? String(sinceSec) : 'all');
+        var res = await sf(url + '/json?poll=1&since=' + since + '&_=' + Date.now());
+        var text = await res.text();
+        var out = { strokes: [], presences: [], clearT: 0 };
+        text.split('\n').forEach(function (line) {
+          line = line.trim(); if (!line) return;
+          var env; try { env = JSON.parse(line); } catch (e) { return; }
+          if (env.event && env.event !== 'message') return;
+          if (!env.id || seen[env.id]) return; seen[env.id] = 1;
+          if (env.time) sinceSec = Math.max(sinceSec, env.time);
+          var msg; try { msg = JSON.parse(env.message); } catch (e) { return; }
+          if (msg.k === 'stroke') out.strokes.push(msg.d);
+          else if (msg.k === 'presence') out.presences.push(msg.d);
+          else if (msg.k === 'clear' && msg.d && msg.d.t > out.clearT) out.clearT = msg.d.t;
+        });
+        first = false;
+        return out;
+      }
+    };
+  }
+
+  // Your own REST backend over superFetch (Perchance) — the reliable, real-time
+  // path. Uses the Worker's long-poll: GET /poll parks server-side until anything
+  // changes, so fetch() returns the instant a stroke or cursor moves (near-zero
+  // latency) instead of fixed-interval polling. Matches weld-whiteboard-worker.js.
+  function restAdapter(sf, base) {
+    base = base.replace(/\/+$/, '');
+    var lastSeq = 0, lastV = 0;
+    function jx(res) { return res.text().then(function (t) { try { return JSON.parse(t); } catch (e) { return null; } }); }
+    return {
+      label: 'live · rest',
+      realtime: true,
+      send: function (kind, data) {
+        try {
+          var p = (kind === 'presence')
+            ? sf(base + '/presence', { method: 'POST', body: JSON.stringify(data) })
+            : sf(base + '/op', { method: 'POST', body: JSON.stringify(Object.assign({ kind: kind }, data)) });
+          if (p && p.catch) p.catch(function () {});
+        } catch (e) {}
+      },
+      fetch: async function () {
+        var out = { strokes: [], presences: [], clearT: 0 };
+        var r = await sf(base + '/poll?seq=' + lastSeq + '&v=' + lastV + '&wait=1&_=' + Date.now()).then(jx);
+        if (r) {
+          if (typeof r.version === 'number') lastV = r.version;
+          if (typeof r.seq === 'number') lastSeq = r.seq;
+          (r.ops || []).forEach(function (o) { if (o.kind === 'stroke') out.strokes.push(o); else if (o.kind === 'clear' && o.t > out.clearT) out.clearT = o.t; });
+          if (r.presence) out.presences = r.presence;
+        }
+        return out;
+      }
+    };
+  }
+
+  // Claude-artifact shared storage: one key per stroke, one per user, one clear.
+  function storageAdapter(store) {
+    var SH = true, seenKey = {};
+    function set(k, v) { try { return store.set(k, JSON.stringify(v), SH); } catch (e) {} }
+    function get(k) { return store.get(k, SH).then(function (r) { return r ? JSON.parse(r.value) : null; }).catch(function () { return null; }); }
+    function list(p) { return store.list(p, SH).then(function (r) { return (r && r.keys) || []; }).catch(function () { return []; }); }
+    var first = true;
+    return {
+      label: 'live · shared',
+      send: function (kind, data) {
+        if (kind === 'stroke') set('wb:s:' + data.t + '-' + Math.random().toString(36).slice(2, 6), data);
+        else if (kind === 'presence') set('wb:p:' + data.uid, data);
+        else if (kind === 'clear') set('wb:clear', data);
+      },
+      fetch: async function () {
+        var out = { strokes: [], presences: [], clearT: 0 };
+        var clr = await get('wb:clear'); if (clr && clr.t) out.clearT = clr.t;
+        var sk = await list('wb:s:'); if (first && sk.length > 300) sk = sk.sort().slice(-300);
+        var toFetch = sk.filter(function (k) { return !seenKey[k]; }).slice(0, first ? 300 : 60);
+        for (var i = 0; i < toFetch.length; i++) { var s = await get(toFetch[i]); seenKey[toFetch[i]] = 1; if (s) out.strokes.push(s); }
+        var pk = await list('wb:p:');
+        for (var j2 = 0; j2 < pk.length; j2++) { var p = await get(pk[j2]); if (p) out.presences.push(p); }
+        first = false;
+        return out;
+      }
+    };
+  }
+
+  function localAdapter(note) {
+    return { label: note ? ('local · ' + note) : 'offline · local', interval: 2500, send: function () {}, fetch: async function () { return { strokes: [], presences: [], clearT: 0 }; } };
+  }
+
+  // Weld Companion Skybridge client. When this page runs as a Perchance generator
+  // AND the Weld Companion userscript is installed, the top frame exposes a
+  // capability bus over postMessage (channel 'weld.skybridge'). We use its 'bus'
+  // capability — a BroadcastChannel-backed pub/sub the Companion brokers — for
+  // instant, zero-backend sync across the user's tabs/windows (no proxy, no CORS,
+  // no 530). The Companion prompts the user once to allow it. (Cross-machine sync
+  // still wants CONFIG.restBase; bus is same-browser.)
+  var SB = 'weld.skybridge', sbReady = false, sbWaiters = [], sbPending = {}, sbBusSink = null;
+  function sbClientInit() {
+    window.addEventListener('message', function (e) {
+      var d = e.data; if (!d || d.channel !== SB) return;
+      if (d.type === 'here') { if (!sbReady) { sbReady = true; sbWaiters.splice(0).forEach(function (fn) { fn(true); }); } }
+      else if (d.type === 'reply' && d.nonce && sbPending[d.nonce]) { if (d.result && d.result.partial) return; var r = sbPending[d.nonce]; delete sbPending[d.nonce]; r(d.result || { ok: false }); }
+      else if (d.type === 'bus' && sbBusSink) { try { sbBusSink(d.message); } catch (x) {} }
+    });
+    try { window.parent.postMessage({ channel: SB, type: 'hello' }, '*'); } catch (e) {}
+  }
+  function sbRequest(cap, payload) {
+    return new Promise(function (resolve) {
+      var nonce = 'n' + Math.random().toString(36).slice(2);
+      sbPending[nonce] = resolve;
+      try { window.parent.postMessage({ channel: SB, type: 'request', cap: cap, nonce: nonce, payload: payload }, '*'); }
+      catch (e) { delete sbPending[nonce]; resolve({ ok: false, reason: 'post-failed' }); }
+      setTimeout(function () { if (sbPending[nonce]) { delete sbPending[nonce]; resolve({ ok: false, reason: 'timeout' }); } }, 12000);
+    });
+  }
+  function sbWaitReady(ms) { return new Promise(function (resolve) { if (sbReady) return resolve(true); sbWaiters.push(resolve); setTimeout(function () { resolve(sbReady); }, ms || 1500); }); }
+
+  // bus transport: publish each event; accumulate inbound into stroke queue +
+  // presence map (so fetch() always returns the full current presence set, which
+  // is what renderPresence expects). Strokes dedupe by id upstream.
+  function skybridgeBusAdapter(channel) {
+    var strokeQ = [], presMap = {}, clearT = 0;
+    sbBusSink = function (msg) {
+      if (!msg) return;
+      if (msg.k === 'stroke') strokeQ.push(msg.d);
+      else if (msg.k === 'presence' && msg.d && msg.d.uid) presMap[msg.d.uid] = msg.d;
+      else if (msg.k === 'clear' && msg.d && msg.d.t > clearT) clearT = msg.d.t;
+    };
+    sbRequest('bus', { op: 'subscribe', channel: channel });   // prompts consent once
+    return {
+      label: 'live · companion',
+      interval: 90,
+      send: function (kind, data) { sbRequest('bus', { op: 'publish', channel: channel, message: { k: kind, d: data } }); },
+      fetch: async function () {
+        var s = strokeQ.splice(0, strokeQ.length);
+        return { strokes: s, presences: Object.keys(presMap).map(function (u) { return presMap[u]; }), clearT: clearT };
+      }
+    };
+  }
+
+  async function chooseTransport() {
+    // 1) Inside a Perchance generator frame with the Companion installed -> Skybridge bus.
+    if (window.parent !== window) {
+      sbClientInit();
+      if (await sbWaitReady(1600)) return skybridgeBusAdapter('wb:' + CONFIG.board);
+    }
+    // 2) Perchance without the Companion -> your own Worker (rest), else solo.
+    var sf = grab('superFetch');
+    if (sf) {
+      if (CONFIG.backend === 'ntfy') return ntfyAdapter(sf, CONFIG.ntfyBase, CONFIG.board);
+      if (CONFIG.restBase) return restAdapter(sf, CONFIG.restBase);
+      return localAdapter('install Weld Companion, or set CONFIG.restBase');
+    }
+    // 3) Claude artifact -> shared storage.
+    if (window.storage && window.storage.set) return storageAdapter(window.storage);
+    // 4) Plain page -> solo.
+    return localAdapter();
+  }
+  var tx = localAdapter();   // reassigned once chooseTransport() resolves
+
+  // ---- identity ---------------------------------------------------------------
+  var PALETTE = ['#241f1b', '#c4623d', '#2f6f6b', '#caa24a', '#3a5a9b', '#9b3a6b', '#4f8f3a', '#7a4fb0'];
+  var ADJ = ['swift', 'calm', 'bold', 'wry', 'keen', 'spry', 'sly', 'apt', 'lush', 'fond'];
+  var NOUN = ['otter', 'heron', 'fox', 'vole', 'crane', 'lynx', 'wren', 'hare', 'newt', 'moth'];
+  function rid() { return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7); }
+  var me = { uid: rid(), name: ADJ[(Math.random() * ADJ.length) | 0] + '-' + NOUN[(Math.random() * NOUN.length) | 0], color: PALETTE[(Math.random() * 4 | 0) + 1] };
+
+  // ---- board geometry (fixed virtual space so all clients agree) --------------
+  var VW = 1600, VH = 1000;
+  var canvas = document.getElementById('board'), ctx = canvas.getContext('2d');
+  var scale = 1, dpr = Math.max(1, window.devicePixelRatio || 1);
+  function fitBoard() {
+    var stage = canvas.parentElement.parentElement;
+    var maxW = stage.clientWidth - 36, maxH = stage.clientHeight - 36;
+    scale = Math.min(maxW / VW, maxH / VH);
+    var w = Math.round(VW * scale), h = Math.round(VH * scale);
+    canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    redrawAll();
+  }
+  function toBoard(e) { var r = canvas.getBoundingClientRect(); return [(e.clientX - r.left) / scale, (e.clientY - r.top) / scale]; }
+
+  // ---- stroke model + rendering ----------------------------------------------
+  var strokes = [], seen = {}, clearedAt = 0;
+  function applyStyle(s) {
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = s.size;
+    if (s.mode === 'erase') { ctx.globalCompositeOperation = 'destination-out'; ctx.strokeStyle = 'rgba(0,0,0,1)'; }
+    else { ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = s.color; }
+  }
+  function drawStroke(s) {
+    if (!s.pts || !s.pts.length) return;
+    ctx.save(); ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0); applyStyle(s);
+    if (s.pts.length === 1) { ctx.beginPath(); ctx.arc(s.pts[0][0], s.pts[0][1], s.size / 2, 0, Math.PI * 2); ctx.fillStyle = (s.mode === 'erase') ? 'rgba(0,0,0,1)' : s.color; ctx.fill(); ctx.restore(); return; }
+    ctx.beginPath(); ctx.moveTo(s.pts[0][0], s.pts[0][1]);
+    for (var i = 1; i < s.pts.length; i++) ctx.lineTo(s.pts[i][0], s.pts[i][1]);
+    ctx.stroke(); ctx.restore();
+  }
+  function redrawAll() {
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height);
+    strokes.sort(function (a, b) { return a.t - b.t; });
+    for (var i = 0; i < strokes.length; i++) drawStroke(strokes[i]);
+  }
+  function ingest(s) {
+    if (!s || !s.id || seen[s.id]) return false;
+    if (s.t < clearedAt) { seen[s.id] = true; return false; }
+    seen[s.id] = true; strokes.push(s); return true;
+  }
+
+  // ---- drawing input ----------------------------------------------------------
+  var tool = 'pen', size = 6, drawing = false, cur = null;
+  function startStroke(e) {
+    if (e.button != null && e.button !== 0) return;
+    drawing = true; try { canvas.setPointerCapture(e.pointerId); } catch (x) {}
+    cur = { id: me.uid + ':' + rid(), by: me.uid, color: me.color, size: size, mode: tool === 'erase' ? 'erase' : 'pen', pts: [toBoard(e)], t: Date.now() };
+  }
+  function moveStroke(e) {
+    if (!drawing || !cur) return;
+    var p = toBoard(e), last = cur.pts[cur.pts.length - 1];
+    if (last && Math.hypot(p[0] - last[0], p[1] - last[1]) < 1.5) return;
+    cur.pts.push(p);
+    ctx.save(); ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0); applyStyle(cur);
+    ctx.beginPath(); ctx.moveTo(last[0], last[1]); ctx.lineTo(p[0], p[1]); ctx.stroke(); ctx.restore();
+  }
+  function endStroke() {
+    if (!drawing) return; drawing = false;
+    if (cur && cur.pts.length) {
+      cur.pts = cur.pts.map(function (p) { return [Math.round(p[0]), Math.round(p[1])]; });   // shrink payload
+      ingest(cur); tx.send('stroke', cur);
+    }
+    cur = null;
+  }
+  canvas.addEventListener('pointerdown', startStroke);
+  canvas.addEventListener('pointermove', function (e) { queueCursor(e); moveStroke(e); });
+  window.addEventListener('pointerup', endStroke);
+  canvas.addEventListener('pointerleave', function () { if (!drawing) { myPos = null; sendPresence(); } });
+
+  // ---- presence ---------------------------------------------------------------
+  var lastPresence = 0, myPos = null;
+  function queueCursor(e) {
+    var r = canvas.getBoundingClientRect();
+    myPos = [(e.clientX - r.left) / scale, (e.clientY - r.top) / scale];
+    var now = Date.now(); if (now - lastPresence > 180) { lastPresence = now; sendPresence(); }
+  }
+  function sendPresence() {
+    tx.send('presence', { uid: me.uid, name: me.name, color: me.color, x: myPos ? Math.round(myPos[0]) : -99, y: myPos ? Math.round(myPos[1]) : -99, t: Date.now() });
+  }
+  var curEls = {}, cursorsLayer = document.getElementById('cursors');
+  function renderPresence(list) {
+    var latest = {}, nowT = Date.now();
+    list.forEach(function (p) { if (!p || p.uid === me.uid) return; if (!latest[p.uid] || p.t > latest[p.uid].t) latest[p.uid] = p; });
+    var live = {}, names = [];
+    Object.keys(latest).forEach(function (uid) {
+      var p = latest[uid]; if (nowT - p.t > 7000) return; live[uid] = 1; names.push(p);
+      var c = curEls[uid];
+      if (!c) {
+        var el = document.createElement('div'); el.className = 'cur';
+        el.innerHTML = "<svg width='22' height='22' viewBox='0 0 22 22'><path d='M3 2 L3 17 L7.5 13 L10.5 19.5 L13 18.3 L10 12 L16 12 Z' fill='" + p.color + "' stroke='white' stroke-width='1.2'/></svg><span class='tag'></span>";
+        cursorsLayer.appendChild(el); c = curEls[uid] = { el: el, tag: el.querySelector('.tag') };
+        c.tag.style.background = p.color; c.tag.textContent = p.name;
+      }
+      c.tag.textContent = p.name; c.tag.style.background = p.color;
+      var vis = p.x > -50; c.el.style.display = vis ? 'block' : 'none';
+      if (vis) { c.el.style.left = (p.x * scale) + 'px'; c.el.style.top = (p.y * scale) + 'px'; }
+    });
+    Object.keys(curEls).forEach(function (uid) { if (!live[uid]) { curEls[uid].el.remove(); delete curEls[uid]; } });
+    renderRoster(names);
+  }
+  function renderRoster(others) {
+    var roster = document.getElementById('roster');
+    var all = [{ uid: me.uid, name: me.name, color: me.color, me: true }].concat(others);
+    roster.innerHTML = '';
+    all.slice(0, 8).forEach(function (p) {
+      var d = document.createElement('div'); d.className = 'chip' + (p.me ? ' me' : '');
+      d.style.background = p.color; d.textContent = (p.name || '?').slice(0, 2).toUpperCase();
+      d.title = p.name + (p.me ? ' (you)' : ''); roster.appendChild(d);
+    });
+    if (statusEl.className.indexOf('err') === -1) {
+      if (/^(local|offline)/.test(tx.label)) setStatus('', tx.label);
+      else setStatus('live', all.length + ' here');
+    }
+  }
+
+  // ---- poll loop --------------------------------------------------------------
+  var statusEl = document.getElementById('status'), statusText = document.getElementById('statusText');
+  function setStatus(kind, text) { statusEl.className = 'status ' + kind; statusText.textContent = text; }
+  var polling = false, firstLoad = true, errs = 0;
+  async function poll() {
+    if (polling) return; polling = true;
+    try {
+      var u = await tx.fetch();
+      if (u.clearT > clearedAt) { clearedAt = u.clearT; strokes = strokes.filter(function (s) { return s.t >= clearedAt; }); redrawAll(); }
+      var fresh = [];
+      for (var i = 0; i < u.strokes.length; i++) if (ingest(u.strokes[i])) fresh.push(u.strokes[i]);
+      if (fresh.length) { if (firstLoad) redrawAll(); else fresh.sort(function (a, b) { return a.t - b.t; }).forEach(drawStroke); }
+      renderPresence(u.presences);
+      errs = 0; firstLoad = false;
+    } catch (e) {
+      errs++; console.warn('[whiteboard] poll error', e);
+      if (errs > 1) setStatus('err', 'reconnecting');
+    } finally { polling = false; }
+  }
+
+  // ---- toolbar ----------------------------------------------------------------
+  function buildColors() {
+    var box = document.getElementById('colors'); box.innerHTML = "<span class='label'>ink</span>";
+    PALETTE.forEach(function (c) {
+      var s = document.createElement('div'); s.className = 'swatch' + (c === me.color ? ' on' : '');
+      s.style.background = c; s.title = c;
+      s.onclick = function () { me.color = c; tool = 'pen'; syncTools(); sendPresence(); };
+      box.appendChild(s);
+    });
+  }
+  function buildSizes() {
+    var box = document.getElementById('sizes'); box.innerHTML = "<span class='label'>nib</span>";
+    [3, 6, 12, 22].forEach(function (n) {
+      var b = document.createElement('div'); b.className = 'size' + (n === size ? ' on' : '');
+      var nib = document.createElement('span'); nib.className = 'nib'; var d = Math.max(4, Math.min(18, n));
+      nib.style.width = d + 'px'; nib.style.height = d + 'px'; b.appendChild(nib); b.title = n + 'px';
+      b.onclick = function () { size = n; syncTools(); }; box.appendChild(b);
+    });
+  }
+  function syncTools() {
+    document.querySelectorAll('#colors .swatch').forEach(function (s) { s.classList.toggle('on', s.title === me.color && tool === 'pen'); });
+    document.querySelectorAll('#sizes .size').forEach(function (b) { b.classList.toggle('on', parseInt(b.title, 10) === size); });
+    document.getElementById('penBtn').classList.toggle('on', tool === 'pen');
+    document.getElementById('eraseBtn').classList.toggle('on', tool === 'erase');
+    canvas.style.cursor = tool === 'erase' ? 'cell' : 'crosshair';
+  }
+  document.getElementById('penBtn').onclick = function () { tool = 'pen'; syncTools(); };
+  document.getElementById('eraseBtn').onclick = function () { tool = 'erase'; syncTools(); };
+  document.getElementById('clearBtn').onclick = function () {
+    if (!confirm('Clear the board for everyone?')) return;
+    var t = Date.now(); clearedAt = t; strokes = []; redrawAll(); tx.send('clear', { t: t, by: me.uid });
+  };
+  var nameIn = document.getElementById('nameIn'); nameIn.value = me.name;
+  nameIn.addEventListener('input', function () { me.name = (nameIn.value || 'guest').trim().slice(0, 18) || 'guest'; });
+  nameIn.addEventListener('change', sendPresence);
+  window.addEventListener('keydown', function (e) {
+    if (e.target === nameIn) return;
+    if (e.key === 'b' || e.key === 'B') { tool = 'pen'; syncTools(); }
+    if (e.key === 'e' || e.key === 'E') { tool = 'erase'; syncTools(); }
+  });
+
+  // ---- boot -------------------------------------------------------------------
+  buildColors(); buildSizes(); syncTools();
+  fitBoard(); window.addEventListener('resize', fitBoard);
+  document.querySelector('.hint').textContent = 'Open in two windows (or share the link) and draw — strokes and cursors sync. Transport: ' + tx.label + '.';
+  function showInstallHelper() {
+    var onPerchance = (window.parent !== window);
+    var msg = onPerchance
+      ? 'You\u2019re drawing solo. To use the online version \u2014 draw with others in real time \u2014 install the free Weld Companion userscript, then reload this page. It bridges the board to a live sync channel that the page can\u2019t reach on its own.'
+      : 'You\u2019re drawing solo. The live, online version runs on Perchance with the free Weld Companion userscript installed \u2014 it lets everyone draw together in real time.';
+    var el = document.getElementById('helperMsg'); if (el) el.textContent = msg;
+    var h = document.getElementById('helper'); if (h) h.hidden = false;
+  }
+  (function () { var d = document.getElementById('helperDismiss'); if (d) d.onclick = function () { var h = document.getElementById('helper'); if (h) h.hidden = true; }; })();
+
+  function pollDelay() {
+    if (errs > 0) return Math.min(20000, 1000 * Math.pow(2, Math.min(errs - 1, 4)));     // backoff on failure
+    if (tx.realtime) return 0;                                                            // long-poll: re-issue immediately
+    return tx.interval || 700;
+  }
+  (async function boot() {
+    buildColors(); buildSizes(); syncTools();
+    fitBoard(); window.addEventListener('resize', fitBoard);
+    tx = await chooseTransport();
+    document.querySelector('.hint').textContent = 'Draw — synced via ' + tx.label + '. Open another tab or window to see it live.';
+    if (/^(local|offline)/.test(tx.label)) showInstallHelper();
+    setStatus('', 'connecting'); sendPresence();
+    (function loop() { poll().then(function () { setTimeout(loop, pollDelay()); }); })();
+    setInterval(function () { if (myPos || errs < 3) sendPresence(); }, 4000);
+  })();
+})();
+</script>
