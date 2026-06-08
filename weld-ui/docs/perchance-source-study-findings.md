@@ -145,5 +145,49 @@ The docs' own "Returning Objects or Arrays" plugin example returns `{ greet, far
 - The hub (`weld.ui-index`) statically imports 61 plugins and already pulls in `dynamic-import-plugin` — a candidate to move those imports onto dynamic-import to cut catalog load time.
 - `weld.kv` (server-side, cross-device, wrapping `kv-plugin`) exists but is *not* in skybridge's storage chain (companion → persist → memory, all same-device). Adding it as a tier would give companion-less users cross-device persistence.
 
+## Part E — The realtime/cross-device reality (canonical plugin-source trove, 2026-06)
+
+A trove of Perchance's *own* plugin sources was studied (the `kv-plugin`, `server-plugin`,
+`super-fetch-plugin`, `remember-plugin`, etc. as published on perchance.org). Two findings
+directly correct the suite's cross-device storage/realtime story — both are ground truth
+from the plugins' actual code, not inference.
+
+### E1. `server-plugin` is the *only* real cross-device primitive — and the suite never mentions it ★
+`server-plugin` is Perchance's **official realtime/multiplayer backend**: the plugin opens a
+**WebSocket** to `server-plugin.perchance.org`, joining a per-generator "universe" keyed by
+`window.generatorPublicId` (binary-framed protocol with multiplexed, bidirectional streams;
+`#forceUseWS=1` forces the WS path). It is the right — and essentially only — way for a
+sandboxed generator to share state **across devices/browsers**. The realtime ladder by reach:
+`BroadcastChannel` (same browser, same generator) → **`server-plugin`** (cross-device) →
+`superFetch` polling (request/response only; relays return HTTP 530 → `Failed to fetch`) →
+userscript bridge (arbitrary hosts / own-model AI). Its demo warns **do not fork it** — the
+plugin code is coupled to the server; import and wrap it instead.
+- **`weld.sync` now says so.** Its `$meta` and header previously implied "multiplayer" without
+  qualification; it is **same-browser only** (BroadcastChannel + namespaced localStorage, both
+  origin-scoped). Updated to state the scope explicitly and to point cross-device/multiplayer
+  needs at `server-plugin`. (weld.sync 1.0.1.) No behavior change — honesty + a pointer.
+
+### E2. `kv-plugin` is **local IndexedDB, not server-side** — `weld.kv` ships a false promise ★ highest-impact
+`weld.kv`'s `$meta` reads *"Server-side, cross-device key-value storage... kv data follows the
+user across devices... Everything is async (it hits the server)."* The canonical `kv-plugin`
+source contradicts every word of that:
+- It builds its store with `indexedDB.open(...)` via a bundled **idb-keyval**, and creates
+  `createStore(`${storeName}-db-${moduleName}`, ...)`.
+- Its own comment: *"each generator has its own subdomain, and hence its own partitioned
+  **IndexedDB** database."* The backend is the local `folder-db-kv-plugin` IndexedDB —
+  **local to the browser**, exactly like `weld.persist`. There is no server and no network hop.
+- Consequence: `weld.kv` data does **not** follow a user to another device. Anyone trusting it
+  to sync saves to their phone silently loses that guarantee. This also invalidates the D4
+  note that proposed adding `weld.kv` as skybridge's *cross-device* storage tier — same wrong
+  premise.
+
+**Remediation (a design call, not yet applied to `weld.kv` itself):**
+1. **Relabel as local.** Correct the `$meta`/comments to describe per-generator local
+   IndexedDB (a folder/namespaced API over the same scope as `weld.persist`), and drop the
+   cross-device claims. Lowest-risk; current behavior already matches this.
+2. **Re-implement on `server-plugin`.** Rebuild `weld.kv` (or a new `weld.cloud`) on the
+   official WebSocket backend to *actually* be cross-device, preserving the value prop. Larger;
+   the server-plugin call surface should be wrapped, not guessed, and not forked.
+
 ## Caveats
 These globals (`PERCH`, `modelTextEditor`, `saveGenerator`, `generatorDependenciesData`, `codeWarningsArray`) are Perchance internals, not a documented API — a userscript built on them must feature-detect each and degrade gracefully, because Perchance can rename them at any time. The engine escape set (A1) is the most durable finding and worth acting on regardless; the userscript hooks are powerful but should be written defensively, exactly as the existing studies advise for any platform-internal surface. The Part C topology facts (the `<hex>.perchance.org` child-iframe origin, the `__generatorLastEditTime` cache key, the sandbox `window`/`unsafeWindow` split) are equally internal and equally subject to change — treat origin checks, frame enumeration, and the handshake as defensive code that fails *soft* (fall back, never throw into the host page).

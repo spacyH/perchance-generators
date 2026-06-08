@@ -1,6 +1,6 @@
 $meta
   title       = weld.sync
-  description = Cross-tab BroadcastChannel + namespaced localStorage. Peer presence detection, reactive state, ephemeral pub/sub. Same-origin tabs sync instantly.
+  description = Cross-tab BroadcastChannel + namespaced localStorage. Peer presence detection, reactive state, ephemeral pub/sub. Same-origin tabs of the SAME generator sync instantly -- this is SAME-BROWSER only. For cross-device / true multiplayer use Perchance's official server-plugin (WebSocket relay); weld.sync does not reach other devices.
   tags        = weld, sync, broadcast, multiplayer, storage, plugin
 
 $output() =>
@@ -12,6 +12,13 @@ $output() =>
   // -----------------------------------------------------------------
   // Cross-tab sync: BroadcastChannel + namespaced localStorage.
   // Same-origin tabs of the same generator see each other's updates instantly.
+  //
+  // SCOPE: this is SAME-BROWSER only -- BroadcastChannel and localStorage are
+  // origin-scoped, so weld.sync does NOT reach other devices or browsers. For real
+  // cross-device multiplayer use Perchance's official server-plugin: a WebSocket relay
+  // to server-plugin.perchance.org with per-generator "universes" keyed by
+  // window.generatorPublicId. Don't fork that plugin -- import and wrap it; its wire
+  // protocol is coupled to the server.
   // -----------------------------------------------------------------
   function uid() {
     return Math.random().toString(36).slice(2, 10) + '_' + Date.now();
@@ -232,7 +239,7 @@ $output() =>
 
   window.weld.sync = {
     create: createSync,
-    version: '1.0.0'
+    version: '1.0.1'
   };
 
   return window.weld.sync;
