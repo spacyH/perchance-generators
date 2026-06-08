@@ -115,6 +115,11 @@ uses them when present, degrading cleanly when absent.
   script gaining network/storage powers it normally lacks is exactly what the sandbox is
   meant to prevent. Make it explicit and revocable.
 
+> For cross-device **realtime/multiplayer** specifically, prefer Perchance's official
+> `server-plugin` (WebSocket; see `platform.md` §6.4) rather than the bridge. The bridge is
+> for what the sandbox *cannot* reach at all: arbitrary cross-origin hosts, an own-model AI,
+> and durable storage beyond the quota.
+
 **Capability detection on the generator side (degrade gracefully):**
 
 ```js

@@ -974,6 +974,7 @@ entirely (faster, no header handling):
 - `*.catbox.moe`
 - `raw.githubusercontent.com`
 - `huggingface.co` URLs containing `/resolve/`
+- `blob:` and `data:` URLs (handled by direct `window.fetch`, never proxied)
 
 The upload origins (`user-uploads.perchance.org`, `user.uploads.dev`, `aigc.uploads.dev`)
 attempt a direct fetch first and fall back to the proxy on failure.
@@ -986,24 +987,35 @@ RFC-1918 ranges (`192.168.x.x`, `10.x.x.x`, `172.16.x.x`). The proxy attempts th
 but Cloudflare cannot route to private addresses. There is no SSRF exposure via
 `superFetch`.
 
-### 6.4 Realtime Reach & the Userscript Bridge [MEASURED — editor]
+### 6.4 Realtime Reach: the Server Plugin & the Userscript Bridge
 
-`superFetch` egresses from Cloudflare, so beyond the private-range failures in §6.3 it also
-will not sustain relay/realtime endpoints — long-lived WebSocket/SSE relays return HTTP 530,
-surfaced to the caller as `Failed to fetch`. A sandboxed generator therefore has three
-realtime options, in order of reach:
+`superFetch` proxies through Cloudflare at
+`https://fetch-plugin.perchance.org/proxy1/<encoded-url>?origin=https://<generatorPublicId>.perchance.org`.
+Beyond the private-range failures in §6.3 it will not sustain relay/realtime endpoints — an
+unroutable target or a long-lived WebSocket/SSE relay returns HTTP 530, which the plugin
+converts to `Failed to fetch` [confirmed in source]. So for live/shared state, a generator's
+options by reach are:
 
-1. **`BroadcastChannel`** — same-browser, cross-tab, zero backend. The best default for
-   syncing one user's own tabs.
-2. **`superFetch` polling** — cross-device but request/response only; no persistent
+1. **`BroadcastChannel`** — same browser, tabs of the *same* generator (which share one
+   sandbox subdomain). Zero backend. (The platform itself doesn't relay over it — §23 —
+   but a generator's own same-origin tabs can.)
+2. **`server-plugin`** — the **official realtime/multiplayer backend**: a WebSocket connection
+   to `server-plugin.perchance.org` with per-generator "universes" keyed by
+   `window.generatorPublicId` (binary framed protocol with multiplexed/bidi streams;
+   `#forceUseWS=1` forces the WS path). Use this for cross-device shared state / multiplayer
+   rather than rolling your own — and **don't fork it** (its code is coupled to the server;
+   wrap it via an importing plugin instead).
+3. **`superFetch` polling** — cross-device but request/response only; no persistent
    connection, and relays 530.
-3. **A userscript bridge** (a Tampermonkey/Greasemonkey companion on the editor/top frame) —
-   it has `GM_xmlhttpRequest`, which makes the cross-origin calls neither the sandbox nor
-   `superFetch` can, and can sustain a poll/relay on the generator's behalf.
+4. **A userscript bridge** (a Tampermonkey/Greasemonkey companion on the editor/top frame) —
+   `GM_xmlhttpRequest` makes the arbitrary cross-origin calls neither the sandbox nor
+   `superFetch` can. Best for capabilities the sandbox lacks entirely (arbitrary hosts,
+   own-model AI), or as a realtime fallback when `server-plugin` doesn't fit.
 
-A generator's effective cross-origin reach = (its own `superFetch`) ∪ (a userscript bridge,
-when present). Design realtime features to degrade in that order: bridge → BroadcastChannel
-→ polling → local-only. The bridge model is documented in `editor-and-userscripts.md` §4.
+Rule of thumb: shared/multiplayer state → `server-plugin`; one user's own tabs →
+`BroadcastChannel`; arbitrary-host or own-model needs → the userscript bridge
+(`editor-and-userscripts.md` §4). A generator's effective cross-origin reach = its own
+`superFetch` ∪ a userscript bridge, when present.
 
 ---
 
@@ -1128,6 +1140,29 @@ downloadGenerator?generatorName=NAME
 upload.perchance.org/api/fileInfo?url=URL (or ?id=ID)
   → { tags, extension }
 ```
+
+**Headless / server-side execution [CANONICAL — diy-perchance-api].** Because no API runs a
+generator's AI for you, the official "DIY API" runs the generator itself, headless: download
+its HTML and execute it under JSDOM, then drive its `root`:
+
+```js
+const { JSDOM } = require("jsdom");
+const html = await fetch(
+  `https://perchance.org/api/downloadGenerator?generatorName=${name}&__cacheBust=${Math.random()}`
+).then(r => r.text());
+const { window } = new JSDOM(html, { runScripts: "dangerously" });
+window.root.output.toString();                   // evaluate a list
+window.root.character.hitpoints = 10;            // set a property
+window.root.character.description.evaluateItem;  // pre-evaluated snapshot
+window.update();                                 // re-render
+```
+
+The first request is slow (the generator must warm the cache; cf. §1.3). **The AI plugins
+cannot run this way.** `ai-text-plugin` and `text-to-image-plugin` are funded by ads shown on
+the Perchance page, so they run only on `perchance.org` itself — a headless/JSDOM or
+self-hosted copy has no way to display the funding ads, and the plugins refuse to run. This
+is the hard reason the public API exposes source/metadata only and never drives generation
+(cf. the broker model, §1.2).
 
 **Backend API wire format** (from console log analysis of a live chat session):
 
@@ -2755,6 +2790,11 @@ sheetsSettings
 ```
 
 **`super-fetch-plugin`** — CORS-bypassing fetch (covered in §6).
+
+**`server-plugin`** — the official realtime/multiplayer backend (WebSocket to
+`server-plugin.perchance.org`, per-generator "universes" via `window.generatorPublicId`). The
+right tool for cross-device shared state; see §6.4. Tightly coupled to the server — import
+and wrap it, don't fork it.
 
 **`generator-stats-plugin-v2`** — read public view-count and last-edit time from
 `/api/getGeneratorStats`. Mounts a `<span>` and fills it asynchronously.

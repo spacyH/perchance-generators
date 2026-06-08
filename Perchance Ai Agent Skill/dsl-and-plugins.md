@@ -924,6 +924,22 @@ several surprises documented elsewhere in this skill:
 - **Object literals in a square block need parens:** write `\[({foo:1})\]`, not `\[{foo:1}\]`
   (otherwise `{…}` is read as a labelled statement).
 
+### 6.12 Navigation, URL & Viewer CSP
+
+The generator runs in an iframe, but these reach the top frame as expected:
+
+```js
+document.title = "New title";                 // tab / page title
+window.location.hash = "#section";            // URL hash
+history.replaceState({}, "", `/${generatorName}?foo=123`);  // query string
+// You CANNOT change the pathname (the generatorName segment) — blocked, to stop
+// one generator from spoofing another.
+```
+
+**Viewer-side CSP.** A *viewer* (not the author) can restrict which servers a generator may
+contact via `perchance.org/custom-content-security-policy?$csp` — a user-controlled
+content-security-policy over the generator's external requests.
+
 ## 7 · Plugin Authoring
 
 A Perchance plugin is just another generator that defines a magic name: **`$output`**.

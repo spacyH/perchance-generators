@@ -915,7 +915,12 @@ upload.perchance.org/api/fileInfo?url=... | ?id=...  → JSON file info
 **`generateList.php` is legacy:** it returned HTTP 404 in R8 for a real generator; avoid it.
 
 These endpoints cannot drive AI generation — `aiTextPlugin`/`textToImagePlugin` require the
-in-page broker, which needs a real browser on a real generator page.
+in-page broker, which needs a real browser on a real generator page. The AI plugins are
+**ad-funded** (the on-page ads pay for the GPU servers), so they run **only on
+perchance.org** — a self-hosted or JSDOM copy can't show the ads and the plugins refuse. A
+**non-AI** generator, though, can run headless: `downloadGenerator?generatorName=...` →
+`new JSDOM(html, { runScripts: "dangerously" })` → `window.root.<list>` / `window.update()`
+(the official "DIY API" pattern; see `platform.md` §8).
 
 **Platform-internal endpoints [OBSERVED R9]** — called by the generator page itself, not a
 stable API: `getCommunityData`, `checkGeneratorOwnership` (POST), and
