@@ -898,6 +898,32 @@ fizzwarble
 
 ---
 
+### 6.11 Canonical Engine Gotchas (from the author's known-bugs page)
+
+Straight from Perchance's own "Known Bugs/Gotchas" page — authoritative, and the root of
+several surprises documented elsewhere in this skill:
+
+- **HTML parsing gets priority.** The panel's `innerHTML` is set first; square/curly blocks
+  are evaluated *afterward* in the text nodes. So you **cannot put HTML inside a `[…]` block
+  in the HTML panel** — write `<` as `\u003c` (e.g. `\[p = "\u003cp>hi\u003c/p>"\]`), or
+  build the markup in the DSL panel. This is the same mechanism behind the brace-interception
+  in §4.3.
+- **`if`/`else` needs its own square block.** `\[n = num.selectOne, if(n==4){"a"} else {"b"}\]`
+  errors; split it: `\[n = num.selectOne, ""\]\[if(n==4){"a"} else {"b"}\]`.
+- **Square blocks always evaluate before "returning."** `foo = \["hi {1-100}"\]` then
+  `console.log(foo)` prints e.g. `"hi 87"`, not the raw template. For raw values use a
+  function: `foo() => return "hi {1-100}"`.
+- **`x = {[a]|[b]}` then `x.selectOne` yields plain text, not a list reference.** Use the
+  `random-select-plugin` if you need the chosen *list* object back.
+- **JS-function indentation is stripped in the lists (DSL) editor** — but NOT in the HTML
+  panel. Put indentation-sensitive JS (template literals, significant whitespace) in the HTML
+  panel, not in a top-editor function body.
+- **Backslash escaping is non-standard.** `\s` → space, `\[` → literal `[`, but `\o` stays
+  `\o` (the backslash is *not* removed before a non-escapable char), and a real backslash is
+  `\\`. Escape stripping also differs between `<script>` tags and `[…]` blocks.
+- **Object literals in a square block need parens:** write `\[({foo:1})\]`, not `\[{foo:1}\]`
+  (otherwise `{…}` is read as a labelled statement).
+
 ## 7 · Plugin Authoring
 
 A Perchance plugin is just another generator that defines a magic name: **`$output`**.

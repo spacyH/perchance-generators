@@ -201,6 +201,19 @@ invalidation is performed by the `clearCacheIfGeneratorOrImportsHaveBeenUpdated`
 
 ---
 
+### 1.4 Embedding & Offline [CANONICAL — FAQ]
+
+- **Embed** a generator on any site via the `null.perchance.org` subdomain in an iframe:
+  `<iframe src="https://null.perchance.org/<name>"></iframe>`.
+- **Download** a generator as a single self-contained HTML file from the editor's settings
+  → "download"; the downloaded file is itself editable by appending `#edit` to its URL and
+  reloading.
+- Generators are openly forkable/remixable; "make private" in settings removes a generator
+  from public lists but not from direct-URL access.
+- The boxed-String quirk (§3.2) traces back to the engine deliberately altering built-in
+  prototypes and using `valueOf`/`Symbol` operator-overloading to make the DSL work — so
+  plugin returns are wrapped objects, never primitives.
+
 ## 2 · Perchance DSL Fundamentals
 
 The top editor uses the Perchance domain-specific language: indentation-structured lists,
@@ -972,6 +985,25 @@ Requests to internal and private addresses fail immediately (`Failed to fetch`, 
 RFC-1918 ranges (`192.168.x.x`, `10.x.x.x`, `172.16.x.x`). The proxy attempts the request,
 but Cloudflare cannot route to private addresses. There is no SSRF exposure via
 `superFetch`.
+
+### 6.4 Realtime Reach & the Userscript Bridge [MEASURED — editor]
+
+`superFetch` egresses from Cloudflare, so beyond the private-range failures in §6.3 it also
+will not sustain relay/realtime endpoints — long-lived WebSocket/SSE relays return HTTP 530,
+surfaced to the caller as `Failed to fetch`. A sandboxed generator therefore has three
+realtime options, in order of reach:
+
+1. **`BroadcastChannel`** — same-browser, cross-tab, zero backend. The best default for
+   syncing one user's own tabs.
+2. **`superFetch` polling** — cross-device but request/response only; no persistent
+   connection, and relays 530.
+3. **A userscript bridge** (a Tampermonkey/Greasemonkey companion on the editor/top frame) —
+   it has `GM_xmlhttpRequest`, which makes the cross-origin calls neither the sandbox nor
+   `superFetch` can, and can sustain a poll/relay on the generator's behalf.
+
+A generator's effective cross-origin reach = (its own `superFetch`) ∪ (a userscript bridge,
+when present). Design realtime features to degrade in that order: bridge → BroadcastChannel
+→ polling → local-only. The bridge model is documented in `editor-and-userscripts.md` §4.
 
 ---
 

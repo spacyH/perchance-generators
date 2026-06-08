@@ -125,6 +125,8 @@ JS array indexing (`arr[i]`, `state.prompts[i]`) and JS object literals (`{x: 1}
 generally safe because they don't match the DSL pattern shape. The parser intercepts
 only `[identifier]`, `[identifier:expr]`, `[expr|expr]`, and `{identifier}` style patterns.
 
+**[CANONICAL — engine known-bugs page] Why this happens, and one more case.** The engine sets the panel's `innerHTML` first and only *then* evaluates square/curly blocks in the resulting text nodes ("HTML parsing gets priority"). A direct consequence: you **cannot put HTML inside a `[…]` square block in the HTML panel** — e.g. `\[p = "<p>hi</p>"\]` breaks. Write each `<` as the JS unicode escape `\u003c`: `\[p = "\u003cp>hi\u003c/p>"\]` (or build the markup in the DSL/top panel). Full author gotcha list: `dsl-and-plugins.md` §6.11.
+
 ### 0.6 Plugin `$output` functions are NOT auto-invoked on import [VERIFIED]
 
 Importing a plugin does NOT run its `$output` block:
@@ -1452,8 +1454,38 @@ try {
 
 ---
 
+## 19 · Editor & Userscript Environment
+
+The sections above describe the generator **runtime** (the sandboxed iframe). The
+**authoring side** — the `perchance.org` editor and any browser userscript/companion that
+augments it — is a separate environment with its own surfaces:
+
+- Userscripts run in the **top frame** (`@noframes`); the generator is a nested
+  separate-origin iframe.
+- The code panes are **CodeMirror 6** views (DSL pane = `modelText`, HTML pane =
+  `outputTemplate`); insert via `view.state.replaceSelection(text)`.
+- Save state is read from `window.userOwnsThisGenerator`, the `#edit:collab=<KEY>` hash, and
+  `localStorage['perchance_generatorEditKey_<name>']`. Saves write **in place** with no
+  platform version history; propagation is gated by the CDN edge cache (§1.3).
+- A userscript has `GM_xmlhttpRequest` — the cross-origin/realtime reach the sandbox and
+  `superFetch` lack — which is the basis of a consent-gated capability **bridge** for
+  generators.
+- AI lint endpoint: `POST editor-copilot.perchance.org/api/findBugsInCode` (cookie-auth).
+
+Full detail in `editor-and-userscripts.md`.
+
+---
+
 ## Reference Files
 
-- `references/data-model.md` — complete DB schema with upgrade/migration patterns
-- `references/message-format.md` — full message serialization spec with edge cases
-- `references/plugin-api.md` — ai-text-plugin and text-to-image-plugin extended docs
+- `platform.md` — full runtime reference: sandbox identity, the postMessage broker model,
+  `ai-text` / `text-to-image` / `upload` / `super-fetch` plugins, the `root` proxy, plus a
+  community-plugins catalog and the pre-built word-list tier. **The single canonical
+  runtime reference.**
+- `dsl-and-plugins.md` — DSL syntax, list/property accessors, inline `[…]` JS, the rules of
+  DSL execution semantics, and plugin authoring (`$output` as function/block).
+- `ai-chat-app.md` — character-chat application patterns: DB/character/message/thread
+  schemas, the AI wire format, hierarchical summarization, memory & lore, share links, init.
+- `editor-and-userscripts.md` — the `perchance.org` **editor** environment and
+  userscript/companion patterns: CodeMirror panes, ownership/save-state detection, the
+  `editor-copilot` lint endpoint, and the userscript-bridge capability model.
