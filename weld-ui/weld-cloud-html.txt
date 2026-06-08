@@ -1,0 +1,136 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#0d1117; --surface:#161b22; --ink:#e6edf3; --muted:#7d8590; --faint:#21262d;
+  --accent:#4493f8; --green:#3fb950; --red:#f85149; --yellow:#d29922; --border:rgba(255,255,255,0.10);
+  --font:'DM Sans',system-ui,sans-serif; --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 var(--font);-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+.breadcrumb{display:flex;justify-content:space-between;align-items:center;max-width:720px;margin:0 auto;padding:20px 24px 0;font:13px var(--mono);}
+.breadcrumb .crumb a{color:var(--muted);}
+.breadcrumb .crumb a:hover{color:var(--accent);}
+.breadcrumb .crumb-sep{color:var(--faint);margin:0 8px;}
+.breadcrumb .crumb-cur{color:var(--ink);}
+.breadcrumb .crumb-action a{color:var(--accent);}
+#page{max-width:720px;margin:0 auto;padding:32px 24px 64px;}
+.hdr{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+.hdr-row{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;}
+.hdr h1{font-size:30px;font-weight:700;letter-spacing:-0.5px;font-family:var(--mono);}
+.hdr .ver{font:600 11px var(--mono);color:var(--muted);background:var(--faint);padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+.hdr .lead{color:var(--muted);font-size:15px;max-width:640px;}
+.toc{font:13px var(--mono);color:var(--muted);margin-top:8px;}
+.toc a{color:var(--muted);}.toc a:hover{color:var(--accent);}
+h2{font-size:20px;font-weight:600;margin:48px 0 16px;letter-spacing:-0.2px;padding-top:24px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+h3{font-size:15px;font-weight:600;margin:28px 0 10px;color:var(--ink);font-family:var(--mono);}
+h4{font-size:13px;font-weight:600;margin:20px 0 8px;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+p{margin-bottom:14px;color:#c9d1d9;}
+strong{color:var(--ink);font-weight:600;}
+ul{margin:0 0 14px 22px;color:#c9d1d9;}li{margin-bottom:6px;}
+code{font-family:var(--mono);font-size:13px;color:var(--accent);background:var(--faint);padding:1px 6px;border-radius:3px;}
+pre{background:var(--faint);border:1px solid var(--border);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:14px 0;font-family:var(--mono);font-size:12.5px;line-height:1.55;color:#c9d1d9;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.c-c{color:var(--muted);}.c-k{color:#ff7b72;}.c-s{color:#a5d6ff;}.c-n{color:#d2a8ff;}.c-f{color:#79c0ff;}
+.sig{font-family:var(--mono);font-size:13px;color:var(--accent);background:var(--faint);padding:8px 12px;border-radius:4px;border-left:3px solid var(--accent);margin:8px 0 12px;display:block;}
+.note{background:rgba(68,147,248,0.07);border-left:3px solid var(--accent);padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+.warn{background:rgba(210,153,34,0.08);border-left:3px solid var(--yellow);padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0;font-size:14px;color:#c9d1d9;}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;}
+th{color:var(--muted);font:600 12px var(--mono);text-transform:uppercase;letter-spacing:.05em;}
+td code{font-size:12px;}
+.footer{text-align:center;font-family:var(--mono);max-width:720px;margin:64px auto 24px;padding:24px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;}
+.footer span,.footer a{color:var(--muted);}
+.footer a{margin:0 2px;}
+.footer a:hover{color:var(--accent);}
+</style>
+
+<div class="breadcrumb"><span class="crumb"><a href="https://perchance.org/weld-ui-index">weld</a><span class="crumb-sep">/</span>weld.cloud<span class="crumb-sep">/</span><span class="crumb-cur">docs</span></span><span class="crumb-action"><a href="https://perchance.org/weld-skybridge-plugin">skybridge &rarr;</a></span></div>
+
+<div id="page">
+  <div class="hdr">
+    <div class="hdr-row"><h1>weld.cloud</h1><span class="ver">v0.1.5 &middot; preview</span></div>
+    <p class="lead">Genuinely cross-device key&ndash;value storage for Perchance. It rides <strong>Weld Companion</strong>&rsquo;s <code>fetch</code> capability to a backend <em>you</em> configure, so saves can follow a user across devices &mdash; and it reports its real scope honestly, never claiming sync it cannot deliver.</p>
+    <p class="toc">on this page: <a href="#why">why</a> &middot; <a href="#use">quick start</a> &middot; <a href="#api">api</a> &middot; <a href="#backend">backend</a> &middot; <a href="#scope">scope &amp; honesty</a> &middot; <a href="#status">status</a> &middot; <a href="#log">changelog</a></p>
+  </div>
+
+  <h2 id="why">Why this exists</h2>
+  <p>Perchance&rsquo;s own cross-device options aren&rsquo;t usable as a durable store from a normal generator today. <code>kv-plugin</code> (what <code>weld.kv</code> wraps) is <strong>local IndexedDB</strong>, partitioned per generator &mdash; one device. <code>server-plugin</code> is a relay whose embed endpoint is currently returning HTTP&nbsp;526, so it won&rsquo;t even connect. Skybridge&rsquo;s <code>storage</code> capability is shared across generators but is still <em>one device</em> (the companion&rsquo;s storage is local to that browser).</p>
+  <p>The one primitive that genuinely reaches another device is the companion&rsquo;s <strong><code>fetch</code></strong> capability: the userscript runs in the top frame and can make arbitrary cross-origin requests. weld.cloud rides it to a backend <em>you</em> own &mdash; your server, or a tiny Cloudflare Worker / Deno&nbsp;Deploy KV. Cross-device works exactly when (a)&nbsp;the companion is installed on each device and (b)&nbsp;each device is configured with the same backend &mdash; and <code>mode()</code> tells you the truth either way.</p>
+
+  <h2 id="use">Quick start</h2>
+  <p>Import the plugin (it needs <code>weld-skybridge-plugin</code> for the bridge), configure your backend once at boot, then use foldered get/set:</p>
+  <pre><code><span class="c-c">// lists panel: cloud = \{import:weld-cloud-plugin\}, plus \{import:weld-skybridge-plugin\}</span>
+<span class="c-k">var</span> cloud = window.weld.cloud;
+
+<span class="c-c">// once at boot &mdash; point at YOUR backend (public HTTPS, header auth)</span>
+cloud.<span class="c-f">configure</span>(\{
+  baseUrl: <span class="c-s">'https://my-worker.example.workers.dev'</span>,
+  headers: \{ Authorization: <span class="c-s">'Bearer '</span> + MY_TOKEN \}
+\});
+
+<span class="c-k">var</span> saves = cloud.<span class="c-f">folder</span>(<span class="c-s">'save-data'</span>);
+<span class="c-k">await</span> saves.<span class="c-f">set</span>(<span class="c-s">'slot1'</span>, \{ level: <span class="c-n">4</span>, gold: <span class="c-n">120</span> \});   <span class="c-c">// durable + cross-device when mode()==='cloud'</span>
+<span class="c-k">var</span> s = <span class="c-k">await</span> saves.<span class="c-f">get</span>(<span class="c-s">'slot1'</span>, \{\});
+
+<span class="c-c">// be honest with users about scope</span>
+<span class="c-k">if</span> (cloud.<span class="c-f">isCrossDevice</span>()) <span class="c-f">showSyncBadge</span>();</code></pre>
+
+  <h2 id="api">API</h2>
+  <span class="sig">window.weld.cloud</span>
+  <table>
+    <tr><th>Member</th><th>What it does</th></tr>
+    <tr><td><code>configure(opts)</code></td><td>Set the backend. <code>opts</code>: <code>baseUrl</code> (public HTTPS), <code>headers</code> (auth &mdash; cookies are never sent), <code>namespace</code> (defaults to <code>generatorPublicId</code>), <code>adapter</code> (<code>'rest'</code>). Persisted per device in <code>localStorage</code>. Returns the active config.</td></tr>
+    <tr><td><code>config()</code></td><td>The current config (<code>baseUrl</code>, <code>namespace</code>, <code>adapter</code>, <code>hasAuth</code>) &mdash; never the secret.</td></tr>
+    <tr><td><code>folder(name, opts?)</code></td><td>A namespaced store. <code>opts.mirror=false</code> disables the local mirror. Returns <code>\{ set, get, has, delete, keys, getMany \}</code>.</td></tr>
+    <tr><td><code>mode()</code></td><td><code>'cloud'</code> (backend configured + companion fetch available) or <code>'memory'</code> (in-memory mirror). Honest &mdash; never reports cloud when it can&rsquo;t reach one.</td></tr>
+    <tr><td><code>isCrossDevice()</code></td><td>Boolean &mdash; <code>true</code> only when <code>mode()==='cloud'</code>. Check it before promising a user their data syncs.</td></tr>
+    <tr><td><code>status()</code></td><td>Snapshot: <code>\{ mode, crossDevice, configured, bridgeFetch, config, version \}</code>.</td></tr>
+    <tr><td><code>version</code></td><td>This plugin&rsquo;s semver.</td></tr>
+  </table>
+  <h4>folder methods</h4>
+  <table>
+    <tr><th>Method</th><th>Resolves</th></tr>
+    <tr><td><code>set(key, value)</code></td><td><code>\{ ok, value, synced, mode \}</code> &mdash; <code>synced:true</code> only when the write reached the backend. JSON value of any type.</td></tr>
+    <tr><td><code>get(key, default?)</code></td><td>The stored value, else <code>default</code>. Reads the backend; on miss/offline/oversize falls back to the mirror.</td></tr>
+    <tr><td><code>has(key)</code></td><td>Boolean.</td></tr>
+    <tr><td><code>delete(key)</code></td><td>Removes locally and on the backend.</td></tr>
+    <tr><td><code>keys()</code></td><td>Array of keys in the folder.</td></tr>
+    <tr><td><code>getMany(keyList)</code></td><td>An object mapping each key to its value.</td></tr>
+  </table>
+
+  <h2 id="backend">The backend contract</h2>
+  <p>weld.cloud&rsquo;s default <code>rest</code> adapter maps each operation to a small REST shape that <em>you</em> implement (auth via your configured headers; values are wrapped as <code>\{"v": ...\}</code> so any JSON type round-trips):</p>
+  <pre><code>PUT    \{baseUrl\}/\{ns\}/\{folder\}/\{key\}    body: \{"v": ...\}    <span class="c-c">-&gt; 2xx</span>
+GET    \{baseUrl\}/\{ns\}/\{folder\}/\{key\}                       <span class="c-c">-&gt; \{"v": ...\}  (404 = absent)</span>
+DELETE \{baseUrl\}/\{ns\}/\{folder\}/\{key\}                       <span class="c-c">-&gt; 2xx</span>
+GET    \{baseUrl\}/\{ns\}/\{folder\}                             <span class="c-c">-&gt; \["key1","key2", ...\]</span></code></pre>
+  <div class="warn"><strong>Three constraints from the fetch capability:</strong> the backend must be <strong>public HTTPS</strong> (private/loopback hosts are blocked); <strong>auth goes in a header</strong>, never a cookie (requests are anonymous); and responses are <strong>capped at ~200KB</strong> &mdash; an oversize read is treated as unreliable and served from the local mirror.</div>
+  <p>A ~20-line Cloudflare Worker over KV satisfies this contract; see the design notes for a copy-paste reference and a JSONBin/Supabase no-server path.</p>
+
+  <h2 id="scope">Scope &amp; honesty</h2>
+  <p>This plugin exists because the previous cross-device story in the suite was wrong: <code>weld.kv</code> once advertised &ldquo;follows the user across devices&rdquo; while actually writing to local IndexedDB. weld.cloud will not repeat that. It carries no implicit promise &mdash; the only way to get cross-device behaviour is to configure a real shared backend, and the plugin reports exactly what it&rsquo;s doing:</p>
+  <ul>
+    <li><code>mode()==='cloud'</code> &mdash; a backend is configured and the companion can fetch; writes are durable and shared across devices that share the config.</li>
+    <li><code>mode()==='memory'</code> &mdash; no backend (or no companion); the API still works against a per-session in-memory mirror, but nothing leaves the tab.</li>
+  </ul>
+  <div class="note">Design rule: behave reasonably with no backend, and <em>better</em> with one &mdash; and always tell the truth about which you&rsquo;re in.</div>
+
+  <h2 id="status">Status</h2>
+  <p>weld.cloud is a <strong>v0.1 preview</strong>. The local path (folder API, in-memory mirror, honest mode reporting, ~200KB truncation fallback) is verified end-to-end. The cross-device path is implemented and depends only on a configured backend. Slated for <strong>v0.2</strong>: a durable local tier (via <code>weld.persist</code> or the skybridge <code>storage</code> capability, once verified), value chunking above 200KB, and a corrected <code>delete()</code> return in memory mode.</p>
+
+  <h2 id="log">Changelog</h2>
+  <h3>0.1.5</h3>
+  <p>Mirrors are cached per folder name, so every <code>folder('x')</code> call shares one store &mdash; fixes a round-trip bug where <code>set</code> and <code>get</code> hit different in-memory maps.</p>
+  <h3>0.1.3</h3>
+  <p>Config now persists via <code>localStorage</code>, and the mirror is self-contained. Removed the dependency on <code>weld.kv</code>, which could not reach <code>kv-plugin</code> in practice (<code>root.kv</code> surfaced as the unevaluated list), so it threw on every op.</p>
+  <h3>0.1.0</h3>
+  <p>Initial preview: cross-device key&ndash;value over the skybridge <code>fetch</code> capability to a user-configured backend; <code>folder</code> API with <code>set</code>/<code>get</code>/<code>has</code>/<code>keys</code>/<code>delete</code>/<code>getMany</code>; write-through local mirror; honest <code>mode()</code> / <code>isCrossDevice()</code>.</p>
+</div>
+
+<footer class="footer">
+  <span>&#169; 2026 therealwestninja.</span> &#183;
+  <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">DeviantArt</a> &#183;
+  <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">GitHub</a>
+</footer>
