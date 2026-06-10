@@ -1,0 +1,759 @@
+<!--
+  AICC Save Recovery — standalone Perchance generator (HTML panel).
+
+  Recovers broken AI Character Chat exports without any userscript or external
+  service. Everything runs locally in this sandboxed iframe; no file is uploaded.
+
+  Two AICC .gz formats are handled, plus graceful fallbacks for damage:
+    • Full DB export  ai-character-chat-db-raw-export-v1.cbor.gz
+        = gzip( CBOR( { meta:{type,dbName}, stores:{characters,threads,messages,...} } ) )
+    • Character share .gz
+        = gzip( JSON( { addCharacter:{...}, quickAdd:true } ) )
+
+  Recovery pipeline (each step falls back instead of giving up):
+    1. Read bytes. Try gzip-decompress; if that throws, assume already-decompressed.
+    2. Try CBOR decode; if that throws, try UTF-8 + JSON.parse; if THAT throws,
+       try to scavenge JSON objects out of the partial text.
+    3. Normalize into AICC store arrays, salvage rows AICC's own importer would
+       keep (characters need id+name; threads recover characterId from messages),
+       drop unrecoverable rows, and report exactly what happened.
+    4. Re-export a clean file: full DB as .cbor.gz (re-importable by AICC) OR
+       per-character JSON, plus a human-readable summary.
+
+  DSL-trap note: this panel's raw source is scanned by Perchance for templating
+  patterns inside string literals (curly-brace identifiers, square-bracket
+  identifiers, plugin-import expressions), so any braces in displayed text are
+  built with String.fromCharCode(123/125), never written literally. Array
+  indexing and object literals in code are unaffected.
+-->
+<div id="app">
+  <header>
+    <h1>AICC Save Recovery</h1>
+    <p class="sub">Repair broken AI Character Chat exports &mdash; <code>.cbor.gz</code> full backups and <code>.gz</code> character share files. Paste a share link, or drop a file. Everything runs in your browser; nothing is uploaded.</p>
+  </header>
+
+  <section id="drop" class="drop">
+    <input type="file" id="file" accept=".gz,.cbor,.json,application/gzip,application/cbor,application/json" hidden>
+    <div class="dropInner">
+      <div class="big">Drop a file here, or <button id="pick" class="link">choose a file</button></div>
+      <div class="hint">Accepts <code>.cbor.gz</code>, <code>.gz</code>, <code>.cbor</code>, or <code>.json</code> &mdash; even partially corrupt ones.</div>
+    </div>
+  </section>
+
+  <div class="orDivider"><span>or paste a link</span></div>
+
+  <section id="urlSection">
+    <div class="urlRow">
+      <input id="urlInput" type="url" class="urlField"
+        placeholder="https://perchance.org/ai-character-chat?data=NAME~FILEID.gz  &mdash;  or a direct user.uploads.dev/file/… link"
+        autocomplete="off" spellcheck="false">
+      <button id="urlSubmit" class="btn primary">Fetch &amp; recover</button>
+    </div>
+    <div class="hint" style="margin-top:6px;">
+      Accepts share links (<code>?data=NAME~FILEID.gz</code>), direct upload links (<code>user.uploads.dev/file/…</code>), or just the file&nbsp;ID.
+    </div>
+    <div id="urlOriginal" hidden style="margin-top:8px;"></div>
+  </section>
+
+  <section id="status" class="status" hidden></section>
+
+  <section id="report" class="report" hidden>
+    <h2>Recovery result</h2>
+    <div id="reportBody"></div>
+    <div id="actions" class="actions"></div>
+  </section>
+
+  <section id="contents" class="contents" hidden>
+    <h2>Recovered characters</h2>
+    <div id="contentsBody"></div>
+  </section>
+
+  <footer>
+    <p>Standalone recovery tool &middot; pairs with <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">Weld Companion</a>. Made by <a href="https://www.deviantart.com/west-ninja" target="_blank" rel="noopener">west-ninja</a>.</p>
+  </footer>
+</div>
+
+<style>
+  :root { color-scheme: light dark; --bg:#f5f2ec; --ink:#1f1b16; --dim:#6b6358; --line:rgba(0,0,0,.12); --card:#fff; --accent:#c4601a; --good:#1d8a5c; --bad:#c0392b; --warn:#b9770e; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14171c; --ink:#e9e5dd; --dim:#9aa1ab; --line:rgba(255,255,255,.12); --card:#1b1f26; --accent:#ff8a3d; --good:#4ee0a0; --bad:#ff6b5e; --warn:#ffb454; } }
+  * { box-sizing: border-box; }
+  body { margin:0; }
+  #app { max-width: 720px; margin: 0 auto; padding: 22px 16px 40px; font: 15px/1.55 system-ui, sans-serif; color: var(--ink); background: var(--bg); min-height: 100vh; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .05em; color: var(--accent); margin: 22px 0 10px; }
+  .sub { color: var(--dim); font-size: 13px; margin: 0 0 18px; }
+  code { background: rgba(127,127,127,.16); padding: 1px 5px; border-radius: 4px; font-size: .9em; }
+  .drop { border: 2px dashed var(--line); border-radius: 14px; padding: 30px 18px; text-align: center; background: var(--card); transition: border-color .15s, background .15s; }
+  .drop.over { border-color: var(--accent); background: rgba(196,96,26,.06); }
+  .dropInner .big { font-size: 16px; margin-bottom: 6px; }
+  .hint { color: var(--dim); font-size: 12.5px; }
+  .link { appearance: none; background: none; border: 0; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; padding: 0; }
+  .status { margin-top: 16px; padding: 12px 14px; border-radius: 10px; background: var(--card); border: 1px solid var(--line); font-size: 13.5px; }
+  .status .step { display: flex; gap: 8px; align-items: baseline; padding: 2px 0; }
+  .status .ok { color: var(--good); } .status .er { color: var(--bad); } .status .wn { color: var(--warn); }
+  .report, .contents { margin-top: 8px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 11px; padding: 13px 15px; margin-bottom: 12px; }
+  .stat { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; font-size: 13.5px; }
+  .stat .n { font-variant-numeric: tabular-nums; font-weight: 700; }
+  .actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 12px; }
+  .btn { appearance: none; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 9px; padding: 9px 14px; font: 600 13px system-ui; cursor: pointer; }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .charRow { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+  .charRow:first-child { border-top: 0; }
+  .av { width: 34px; height: 34px; border-radius: 8px; object-fit: cover; flex: none; background: rgba(127,127,127,.18); }
+  .charRow .meta { flex: 1; min-width: 0; }
+  .charRow .nm { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .charRow .sm { color: var(--dim); font-size: 11.5px; }
+  .tag { display:inline-block; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; }
+  .tag.corrupt { background: rgba(192,57,43,.16); color: var(--bad); }
+  .tag.ok { background: rgba(29,138,92,.16); color: var(--good); }
+  footer { margin-top: 30px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--dim); font-size: 12px; }
+  footer a { color: var(--accent); }
+  .orDivider { display: flex; align-items: center; gap: 10px; margin: 14px 0 12px; color: var(--dim); font-size: 12px; }
+  .orDivider::before, .orDivider::after { content: ''; flex: 1; border-top: 1px solid var(--line); }
+  .urlRow { display: flex; gap: 8px; align-items: stretch; }
+  .urlField { flex: 1; min-width: 0; background: var(--card); border: 1px solid var(--line); color: var(--ink); border-radius: 9px; padding: 9px 12px; font: 13.5px system-ui, sans-serif; transition: border-color .15s; }
+  .urlField:focus { outline: none; border-color: var(--accent); }
+  .urlField::placeholder { color: var(--dim); opacity: .7; font-size: 12px; }
+</style>
+
+<script>
+(function () {
+  "use strict";
+
+  // Braces for any displayed text that must show literal { } — keeps the
+  // Perchance HTML-panel parser from intercepting them in source.
+  var LB = String.fromCharCode(123), RB = String.fromCharCode(125);
+
+  var DEFAULT_EMBEDDING_MODEL = "Xenova/bge-base-en-v1.5";
+  var EXPORT_TYPE = "ai-character-chat-db-raw-export-v1";
+  var CBOR_URL = "https://user.uploads.dev/file/4cc84b2c503aad595e5c6e9fffe24602.js";
+
+  var fileInput = document.getElementById("file");
+  var pickBtn = document.getElementById("pick");
+  var drop = document.getElementById("drop");
+  var statusEl = document.getElementById("status");
+  var reportEl = document.getElementById("report");
+  var reportBody = document.getElementById("reportBody");
+  var actionsEl = document.getElementById("actions");
+  var contentsEl = document.getElementById("contents");
+  var contentsBody = document.getElementById("contentsBody");
+
+  var CBOR = null;
+  function loadCBOR() {
+    if (CBOR) return Promise.resolve(CBOR);
+    // cbor-x exposes a default export with encode/decode. Same module AICC uses.
+    return import(CBOR_URL).then(function (m) { CBOR = m && m.default ? m.default : m; return CBOR; })
+      .catch(function () {
+        return import("https://unpkg.com/cbor-x@1.6.0/dist/index.js").then(function () {
+          CBOR = self.CBOR; return CBOR;
+        });
+      });
+  }
+
+  // ---- UI helpers ----------------------------------------------------------
+  function el(tag, attrs, kids) {
+    var n = document.createElement(tag);
+    attrs = attrs || {};
+    for (var k in attrs) {
+      if (k === "text") n.textContent = attrs[k];
+      else if (k === "html") n.innerHTML = attrs[k];
+      else if (k === "class") n.className = attrs[k];
+      else if (/^on/.test(k)) n.addEventListener(k.slice(2), attrs[k]);
+      else n.setAttribute(k, attrs[k]);
+    }
+    (kids || []).forEach(function (c) { if (c) n.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
+    return n;
+  }
+  function resetStatus() { statusEl.hidden = false; statusEl.innerHTML = ""; }
+  function step(kind, msg) {
+    var cls = kind === "ok" ? "ok" : (kind === "er" ? "er" : (kind === "wn" ? "wn" : ""));
+    var glyph = kind === "ok" ? "\u2713" : (kind === "er" ? "\u2717" : (kind === "wn" ? "\u26A0" : "\u00B7"));
+    statusEl.appendChild(el("div", { class: "step" }, [el("span", { class: cls, text: glyph }), el("span", { text: msg })]));
+  }
+
+  // ---- decompression / decoding with fallbacks -----------------------------
+  function gunzip(arrayBuffer) {
+    // Returns a Promise<Uint8Array>. Tries gzip; on failure resolves the
+    // original bytes (the file may already be decompressed, e.g. a raw .cbor
+    // or .json that lost its .gz).
+    if (typeof DecompressionStream === "undefined") {
+      return Promise.resolve(new Uint8Array(arrayBuffer));
+    }
+    try {
+      var ds = new DecompressionStream("gzip");
+      var blob = new Blob([arrayBuffer]);
+      return new Response(blob.stream().pipeThrough(ds)).arrayBuffer()
+        .then(function (buf) { return new Uint8Array(buf); })
+        .catch(function () { return new Uint8Array(arrayBuffer); });
+    } catch (e) {
+      return Promise.resolve(new Uint8Array(arrayBuffer));
+    }
+  }
+
+  function looksGzip(bytes) { return bytes.length > 2 && bytes[0] === 0x1f && bytes[1] === 0x8b; }
+
+  function tryDecode(bytes) {
+    // Returns { obj, how } or throws. Order: CBOR, then JSON, then scavenge.
+    var errors = [];
+    // CBOR
+    if (CBOR && typeof CBOR.decode === "function") {
+      try { return { obj: CBOR.decode(bytes), how: "CBOR" }; }
+      catch (e) { errors.push("CBOR: " + e.message); }
+    }
+    // JSON
+    var text = "";
+    try { text = new TextDecoder("utf-8", { fatal: false }).decode(bytes); } catch (e) { text = ""; }
+    if (text) {
+      try { return { obj: JSON.parse(text), how: "JSON" }; }
+      catch (e) { errors.push("JSON: " + e.message); }
+      // Scavenge: pull the largest brace-balanced object out of partial text.
+      var salv = scavengeJson(text);
+      if (salv) return { obj: salv, how: "JSON (salvaged from partial text)" };
+    }
+    var err = new Error("Could not decode as CBOR or JSON. " + errors.join(" | "));
+    err.partialText = text;
+    throw err;
+  }
+
+  function scavengeJson(text) {
+    // Walk to the first '{', then track brace depth to find a complete object.
+    var open = String.fromCharCode(123), close = String.fromCharCode(125);
+    var start = text.indexOf(open);
+    if (start < 0) return null;
+    var depth = 0, inStr = false, esc = false;
+    for (var i = start; i < text.length; i++) {
+      var ch = text[i];
+      if (inStr) {
+        if (esc) esc = false;
+        else if (ch === "\\") esc = true;
+        else if (ch === "\"") inStr = false;
+      } else {
+        if (ch === "\"") inStr = true;
+        else if (ch === open) depth++;
+        else if (ch === close) { depth--; if (depth === 0) {
+          var slice = text.slice(start, i + 1);
+          try { return JSON.parse(slice); } catch (e) { return null; }
+        } }
+      }
+    }
+    return null;
+  }
+
+  // ---- normalize into AICC store arrays ------------------------------------
+  function clone(x) { try { return JSON.parse(JSON.stringify(x)); } catch (e) { return null; } }
+  function isUuid(s) { return typeof s === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(s); }
+  function uuidV4() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    var b = new Uint8Array(16); (window.crypto || {}).getRandomValues ? crypto.getRandomValues(b) : b.forEach(function (_, i) { b[i] = Math.floor(Math.random() * 256); });
+    b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+    var h = []; for (var j = 0; j < 16; j++) h.push((b[j] + 0x100).toString(16).slice(1));
+    return h[0]+h[1]+h[2]+h[3]+"-"+h[4]+h[5]+"-"+h[6]+h[7]+"-"+h[8]+h[9]+"-"+h[10]+h[11]+h[12]+h[13]+h[14]+h[15];
+  }
+
+  // Pull store arrays from whatever shape decoded. Handles:
+  //   full export: { meta, stores:{...} }
+  //   bare stores: { characters:[...], threads:[...], ... }
+  //   share file:  { addCharacter:{...} } or a raw character object
+  function extractStores(obj) {
+    var out = { characters: [], threads: [], messages: [], misc: [], summaries: [], memories: [], lore: [], dbName: "chatbot-ui-v1", source: "unknown" };
+    if (!obj || typeof obj !== "object") return out;
+
+    if (obj.stores && typeof obj.stores === "object") {
+      out.source = "full-db-export";
+      if (obj.meta && obj.meta.dbName) out.dbName = obj.meta.dbName;
+      copyStores(obj.stores, out);
+      return out;
+    }
+    if (obj.addCharacter) {
+      out.source = "character-share";
+      out.characters = [obj.addCharacter];
+      return out;
+    }
+    // bare stores object?
+    var storeKeys = ["characters", "threads", "messages", "misc", "summaries", "memories", "lore"];
+    var hasAny = storeKeys.some(function (k) { return Array.isArray(obj[k]); });
+    if (hasAny) { out.source = "bare-stores"; copyStores(obj, out); return out; }
+    // single raw character?
+    if (obj.name || obj.roleInstruction || obj.systemMessage || obj.avatar || obj.avatarUrl) {
+      out.source = "single-character"; out.characters = [obj]; return out;
+    }
+    return out;
+  }
+  function copyStores(src, out) {
+    ["characters", "threads", "messages", "misc", "summaries", "memories", "lore"].forEach(function (k) {
+      if (Array.isArray(src[k])) out[k] = src[k];
+    });
+  }
+
+  // ---- salvage (AICC corruptItemReplacer parity) ---------------------------
+  function normalizeCharacter(input) {
+    var c = input, changed = [];
+    function set(k, v) { c[k] = v; changed.push(k); }
+    if (c.initialMessages === undefined && c.firstMessage !== undefined) { c.initialMessages = [{ author: "ai", content: c.firstMessage }]; delete c.firstMessage; changed.push("initialMessages"); }
+    if (!Array.isArray(c.initialMessages)) { c.initialMessages = c.initialMessages ? [c.initialMessages] : []; }
+    if (c.customCode === undefined) set("customCode", "");
+    if (c.modelVersion) { c.modelName = c.modelVersion; delete c.modelVersion; changed.push("modelName"); }
+    if (c.textEmbeddingModelName === undefined) { c.textEmbeddingModelName = c.associativeMemoryEmbeddingModelName != null ? c.associativeMemoryEmbeddingModelName : DEFAULT_EMBEDDING_MODEL; delete c.associativeMemoryEmbeddingModelName; changed.push("textEmbeddingModelName"); }
+    if (c.userCharacter === undefined) set("userCharacter", {});
+    if (c.avatar === undefined) { c.avatar = { url: c.avatarUrl, size: 1, shape: "square" }; changed.push("avatar"); }
+    if (Object.prototype.hasOwnProperty.call(c, "avatarUrl")) delete c.avatarUrl;
+    if (c.scene === undefined) set("scene", { background: {}, music: {} });
+    if (c.streamingResponse === undefined) set("streamingResponse", true);
+    if (c.roleInstruction === undefined) { c.roleInstruction = c.systemMessage != null ? c.systemMessage : ""; delete c.systemMessage; changed.push("roleInstruction"); }
+    if (c.folderPath === undefined) set("folderPath", "");
+    if (c.customData === undefined) set("customData", {});
+    if (c.systemCharacter === undefined) set("systemCharacter", { avatar: {} });
+    if (c.loreBookUrls === undefined) set("loreBookUrls", []);
+    if (c.associativeMemoryMethod !== undefined) { c.autoGenerateMemories = c.associativeMemoryMethod; delete c.associativeMemoryMethod; changed.push("autoGenerateMemories"); }
+    if (c.autoGenerateMemories === undefined) set("autoGenerateMemories", "none");
+    if (c.maxTokensPerMessage === undefined) set("maxTokensPerMessage", null);
+    if (!c.uuid || !isUuid(c.uuid)) { c.uuid = uuidV4(); changed.push("uuid"); }
+    if (!c.name) { c.name = "CORRUPT"; changed.push("name(placeholder)"); }
+    return { character: c, changed: changed };
+  }
+
+  function salvage(stores) {
+    var chars = (stores.characters || []).map(clone);
+    var threads = (stores.threads || []).map(clone);
+    var messages = (stores.messages || []).map(clone);
+    var lore = (stores.lore || []).map(clone);
+    var stats = { charsKept: 0, charsNormalized: 0, charsDropped: 0, threadsKept: 0, threadsRecovered: 0, threadsDropped: 0, messagesKept: 0, messagesDropped: 0, loreKept: 0, loreDropped: 0 };
+    var notes = [];
+
+    // Share files and single-character files legitimately have no id (AICC
+    // assigns one on import), so for those sources we mint a synthetic id
+    // rather than dropping. For full-DB exports a missing id means real
+    // corruption, so we drop and count it (it can't be a valid Dexie row).
+    var mintIds = (stores.source === "character-share" || stores.source === "single-character" || stores.source === "unknown");
+    var nextId = 1;
+    chars.forEach(function (c) { if (c && typeof c === "object" && typeof c.id === "number" && c.id >= nextId) nextId = c.id + 1; });
+
+    var keptChars = [];
+    chars.forEach(function (c) {
+      if (c == null || typeof c !== "object") { stats.charsDropped++; return; }
+      if (c.id == null) {
+        if (mintIds) { c.id = nextId++; notes.push("Assigned a new id to an id-less character (normal for share files)."); }
+        else { stats.charsDropped++; notes.push("Dropped a character with no id (cannot be a valid row)."); return; }
+      }
+      var r = normalizeCharacter(c);
+      if (r.changed.length) stats.charsNormalized++;
+      keptChars.push(r.character); stats.charsKept++;
+    });
+    var charById = {}; keptChars.forEach(function (c) { charById[c.id] = c; });
+    var anyChar = keptChars.length ? keptChars[0].id : null;
+
+    var keptThreads = [];
+    threads.forEach(function (t) {
+      if (t == null || typeof t !== "object" || t.id == null) { stats.threadsDropped++; return; }
+      var cid = t.characterId;
+      var valid = cid === -1 || cid === -2 || charById[cid];
+      if (!valid) {
+        var firstReal = messages.find(function (m) { return m && m.threadId === t.id && m.characterId >= 0; });
+        var rec = firstReal ? firstReal.characterId : anyChar;
+        if (rec != null) { t.characterId = rec; if (!t.name) t.name = "CORRUPT"; stats.threadsRecovered++; }
+        else { stats.threadsDropped++; return; }
+      }
+      keptThreads.push(t); stats.threadsKept++;
+    });
+    var threadById = {}; keptThreads.forEach(function (t) { threadById[t.id] = t; });
+
+    var keptMessages = [];
+    messages.forEach(function (m) {
+      if (m == null || typeof m !== "object" || m.id == null) { stats.messagesDropped++; return; }
+      if (m.threadId != null && !threadById[m.threadId]) { stats.messagesDropped++; return; }
+      if (!m.variants) m.variants = [null];
+      keptMessages.push(m); stats.messagesKept++;
+    });
+
+    var keptLore = [];
+    lore.forEach(function (l) {
+      if (l == null || typeof l !== "object" || l.id == null) { stats.loreDropped++; return; }
+      keptLore.push(l); stats.loreKept++;
+    });
+
+    return {
+      stats: stats, notes: notes,
+      stores: {
+        characters: keptChars, threads: keptThreads, messages: keptMessages, lore: keptLore,
+        misc: stores.misc || [], summaries: stores.summaries || [], memories: stores.memories || []
+      }
+    };
+  }
+
+  // ---- re-export -----------------------------------------------------------
+  function gzipBlob(bytesOrBlob) {
+    var blob = bytesOrBlob instanceof Blob ? bytesOrBlob : new Blob([bytesOrBlob]);
+    if (typeof CompressionStream === "undefined") return Promise.resolve(blob);
+    return new Response(blob.stream().pipeThrough(new CompressionStream("gzip"))).blob();
+  }
+  function dl(filename, blob) {
+    var url = URL.createObjectURL(blob);
+    var a = el("a", { href: url, download: filename });
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { a.remove(); URL.revokeObjectURL(url); }, 1500);
+  }
+
+  function exportFullDb(result, dbName) {
+    return loadCBOR().then(function (cbor) {
+      var payload = { meta: { type: EXPORT_TYPE, dbName: dbName || "chatbot-ui-v1", recoveredBy: "aicc-save-recovery" }, stores: result.stores };
+      if (cbor && cbor.encode) {
+        var bytes = cbor.encode(payload);
+        return gzipBlob(bytes).then(function (b) { dl("recovered." + EXPORT_TYPE + ".cbor.gz", b); });
+      }
+      // CBOR unavailable: fall back to a gzipped JSON the Companion can import.
+      return gzipBlob(new Blob([JSON.stringify(payload)])).then(function (b) { dl("recovered.aicc-db.json.gz", b); });
+    });
+  }
+  function exportCharactersJson(result) {
+    var bundle = { format: "aicc-characters", formatVersion: 1, recoveredBy: "aicc-save-recovery", exportedAt: new Date().toISOString(), count: result.stores.characters.length, characters: result.stores.characters };
+    dl("recovered-characters.json", new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" }));
+  }
+  function exportShareEnvelope(character) {
+    var stripped = clone(character);
+    delete stripped.id; delete stripped.creationTime; delete stripped.lastMessageTime; delete stripped.folderPath;
+    stripped.folderName = "";
+    var env = { addCharacter: stripped, quickAdd: true };
+    var safe = (character.name || "character").replace(/[^A-Za-z0-9._-]+/g, "_");
+    dl(safe + ".aicc-share.json", new Blob([JSON.stringify(env, null, 2)], { type: "application/json" }));
+  }
+
+  // ---- render --------------------------------------------------------------
+  function renderReport(result, meta) {
+    reportEl.hidden = false; reportBody.innerHTML = ""; actionsEl.innerHTML = "";
+    var s = result.stats;
+    var totalKept = s.charsKept + s.threadsKept + s.messagesKept + s.loreKept;
+
+    if (totalKept === 0) {
+      reportBody.appendChild(el("div", { class: "card", html: "<strong>Nothing recoverable was found.</strong> The file may be too damaged, or not an AICC export. If it still has readable text inside, the raw decoded view below may help you copy data out by hand." }));
+      return;
+    }
+
+    // ---- PRIMARY: download card — first thing the user sees ----------------
+    var dlCard = el("div", { class: "card", style: "border-color:var(--good);background:rgba(29,138,92,.06);" });
+    dlCard.appendChild(el("div", { style: "font-weight:700;font-size:15px;margin-bottom:4px;color:var(--good);", text: "\u2713 Recovery complete \u2014 save your file" }));
+    var summary = [];
+    if (s.charsKept) summary.push(s.charsKept + " character" + (s.charsKept === 1 ? "" : "s"));
+    if (s.threadsKept) summary.push(s.threadsKept + " thread" + (s.threadsKept === 1 ? "" : "s"));
+    if (s.messagesKept) summary.push(s.messagesKept + " message" + (s.messagesKept === 1 ? "" : "s"));
+    dlCard.appendChild(el("div", { style: "color:var(--dim);font-size:13px;margin-bottom:12px;", text: summary.join(" \u00b7 ") + " recovered." }));
+
+    var btnRow = el("div", { style: "display:flex;flex-wrap:wrap;gap:9px;align-items:center;" });
+
+    // Primary: full .cbor.gz (always shown when there's anything to export)
+    var mainBtn = el("button", { class: "btn primary", text: "\u2913 Save full backup (.cbor.gz)" });
+    mainBtn.title = "Re-importable by AICC directly. This is the format to use.";
+    mainBtn.addEventListener("click", function () {
+      mainBtn.disabled = true; mainBtn.textContent = "working\u2026";
+      exportFullDb(result, meta.dbName)
+        .then(function () { mainBtn.textContent = "\u2713 Saved! Import this file in AICC."; })
+        .catch(function (err) { mainBtn.disabled = false; mainBtn.textContent = "\u2913 Save full backup (.cbor.gz)"; alert("Download failed: " + err.message); });
+    });
+    btnRow.appendChild(mainBtn);
+
+    // Secondary: characters-only JSON (only if characters were recovered)
+    if (s.charsKept) {
+      var charBtn = el("button", { class: "btn", text: "\u2913 Characters only (.json)" });
+      charBtn.title = "A lighter file with just the character definitions. Useful if you only need to re-add characters.";
+      charBtn.addEventListener("click", function () { exportCharactersJson(result); });
+      btnRow.appendChild(charBtn);
+    }
+
+    dlCard.appendChild(btnRow);
+    dlCard.appendChild(el("div", { style: "font-size:11.5px;color:var(--dim);margin-top:8px;", html: "Import the <code>.cbor.gz</code> backup through AICC\u2019s own <em>import</em> button (Settings \u2192 Import). Or import into Smart Story via Import \u2192 File." }));
+    reportBody.appendChild(dlCard);
+
+    // ---- SECONDARY: stats card --------------------------------------------
+    var statsCard = el("div", { class: "card", style: "margin-top:6px;" });
+    function row(label, n, drop) {
+      statsCard.appendChild(el("div", { class: "stat" }, [
+        el("span", { text: label }),
+        el("span", { class: "n", text: drop ? (n + " kept \u00b7 " + drop + " dropped") : String(n) })
+      ]));
+    }
+    statsCard.appendChild(el("div", { class: "stat" }, [el("span", { text: "Source format" }), el("span", { class: "n", text: meta.source })]));
+    row("Characters", s.charsKept, s.charsDropped);
+    if (s.charsNormalized) statsCard.appendChild(el("div", { class: "stat" }, [el("span", { text: "\u2003\u21B3 normalized to bootable shape" }), el("span", { class: "n", text: String(s.charsNormalized) })]));
+    row("Threads", s.threadsKept, s.threadsDropped);
+    if (s.threadsRecovered) statsCard.appendChild(el("div", { class: "stat" }, [el("span", { text: "\u2003\u21B3 characterId recovered" }), el("span", { class: "n", text: String(s.threadsRecovered) })]));
+    row("Messages", s.messagesKept, s.messagesDropped);
+    row("Lore", s.loreKept, s.loreDropped);
+    reportBody.appendChild(statsCard);
+
+    if (result.notes.length) {
+      var nc = el("div", { class: "card" });
+      nc.appendChild(el("div", { style: "color:var(--dim);font-size:12.5px;margin-bottom:6px;", text: "Notes" }));
+      result.notes.slice(0, 8).forEach(function (n) { nc.appendChild(el("div", { style: "font-size:12.5px;", text: "\u2022 " + n })); });
+      reportBody.appendChild(nc);
+    }
+  }
+
+  function renderContents(result) {
+    contentsEl.hidden = false; contentsBody.innerHTML = "";
+    var chars = result.stores.characters;
+    if (!chars.length) { contentsBody.appendChild(el("div", { class: "sm", text: "No characters recovered." })); return; }
+    var card = el("div", { class: "card" });
+
+    // Per-character rows
+    chars.slice(0, 100).forEach(function (c) {
+      var corrupt = c.name === "CORRUPT";
+      var av = c.avatar && c.avatar.url ? c.avatar.url : "";
+      var threadCount = result.stores.threads.filter(function (t) { return t.characterId === c.id; }).length;
+      card.appendChild(el("div", { class: "charRow" }, [
+        av ? el("img", { class: "av", src: av, loading: "lazy", referrerpolicy: "no-referrer", onerror: function (e) { e.target.style.visibility = "hidden"; } }) : el("div", { class: "av" }),
+        el("div", { class: "meta" }, [
+          el("div", { class: "nm" }, [document.createTextNode((c.name || "unnamed") + " "), el("span", { class: "tag " + (corrupt ? "corrupt" : "ok"), text: corrupt ? "placeholder" : "ok" })]),
+          el("div", { class: "sm", text: (threadCount ? threadCount + " thread" + (threadCount === 1 ? "" : "s") + " \u00b7 " : "") + (c.modelName || "no model") + " \u00b7 uuid " + (c.uuid ? c.uuid.slice(0, 8) : "\u2014") })
+        ]),
+        el("div", { style: "display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:40%;" }, [
+          el("button", { class: "btn", style: "font-size:11px;padding:4px 8px;", text: "\u2913 .json", title: "Download this character as a share-envelope .json (re-importable by AICC)", onclick: function () { exportShareEnvelope(c); } })
+        ])
+      ]));
+    });
+    contentsBody.appendChild(card);
+    if (chars.length > 100) contentsBody.appendChild(el("div", { class: "sm", text: "\u2026 " + (chars.length - 100) + " more characters in the download." }));
+  }
+
+  // ---- main flow -----------------------------------------------------------
+  function handleFile(file) {
+    resetStatus();
+    reportEl.hidden = true; contentsEl.hidden = true;
+    step("", "Reading " + file.name + " (" + Math.round(file.size / 1024) + " KB)\u2026");
+
+    file.arrayBuffer().then(function (buf) {
+      var raw = new Uint8Array(buf);
+      // Offer a save-original link as soon as we have the bytes, before any
+      // processing — so the user can keep the unmodified file for comparison.
+      // Shown quietly for local files (user already has it); the URL fetch path
+      // shows a more prominent version of this same link.
+      var isFetched = !file.lastModified;   // fake files from handleUrl have no lastModified
+      if (!isFetched) {
+        var origA = document.createElement("a");
+        origA.textContent = "\u2913 Save a copy of original";
+        origA.title = "Download the file as-is before recovery runs, for comparison or safe-keeping.";
+        origA.style.cssText = "font-size:12px;color:var(--dim);text-decoration:underline;cursor:pointer;display:block;margin:2px 0 4px 20px;";
+        var origUrl = URL.createObjectURL(new Blob([buf]));
+        origA.href = origUrl;
+        origA.download = file.name || "original";
+        origA.addEventListener("click", function () { setTimeout(function () { URL.revokeObjectURL(origUrl); }, 60000); });
+        statusEl.appendChild(origA);
+      }
+      var gz = looksGzip(raw);
+      step(gz ? "ok" : "wn", gz ? "gzip header detected." : "No gzip header \u2014 will try to read as-is.");
+      return loadCBOR().then(function () { return gunzip(buf); });
+    }).then(function (bytes) {
+      window.__lastBytes = bytes;
+      step("ok", "Decompressed to " + Math.round(bytes.length / 1024) + " KB.");
+
+      // GUARD: the single most common bad file is a saved Perchance web page
+      // (Save Page As) instead of the character file. Detect it before running
+      // the decoders/scavenger over megabytes of HTML, and give the same guided
+      // remediation Smart Story does \u2014 including a recovered direct link.
+      var peek = "";
+      try { peek = new TextDecoder("utf-8", { fatal: false }).decode(bytes.slice(0, 4096)); } catch (e) { peek = ""; }
+      var headLc = peek.slice(0, 200).toLowerCase();
+      var isHtml = headLc.indexOf("<!doctype") === 0 || headLc.indexOf("<html") === 0 || (headLc.indexOf("<head") !== -1 && headLc.indexOf("<title") !== -1);
+      if (isHtml) {
+        var isPerchance = peek.indexOf("perchance.org") !== -1;
+        step("er", isPerchance ? "This is a saved Perchance web page, not a character file." : "This is an HTML web page, not character data.");
+        renderRemediation(file.name, bytes.length, isPerchance);
+        return;
+      }
+
+      var decoded;
+      try { decoded = tryDecode(bytes); }
+      catch (e) {
+        step("er", "Decode failed: " + e.message);
+        if (e.partialText) showRawText(e.partialText);
+        throw e;
+      }
+      step("ok", "Decoded as " + decoded.how + ".");
+      var stores = extractStores(decoded.obj);
+      step(stores.source === "unknown" ? "wn" : "ok", "Recognized as: " + stores.source + ".");
+      var result = salvage(stores);
+      var tot = result.stats.charsKept + result.stats.threadsKept + result.stats.messagesKept + result.stats.loreKept;
+      step(tot ? "ok" : "wn", "Salvage complete \u2014 " + tot + " rows recovered.");
+      renderReport(result, stores);
+      renderContents(result);
+    }).catch(function (err) {
+      step("er", "Recovery stopped: " + err.message);
+    });
+  }
+
+  // Recover the real upload id from a filename or share URL: the part after the
+  // last "~", or any long hex token ending in .gz.
+  function recoverFileUrl(hint) {
+    var s = String(hint || "");
+    var m = s.match(/~([a-z0-9]{16,}\.gz)/i) || s.match(/([a-f0-9]{24,}\.gz)/i);
+    return m ? ("https://user.uploads.dev/file/" + m[1]) : "";
+  }
+
+  // The guided help block shown when the file is a saved web page rather than a
+  // character. Mirrors Smart Story's remediation so both tools speak as one.
+  function renderRemediation(fileName, byteLen, isPerchance, quarantined) {
+    reportEl.hidden = false; reportBody.innerHTML = ""; actionsEl.innerHTML = "";
+    var fileUrl = recoverFileUrl(fileName);
+
+    var card = el("div", { class: "card" });
+    if (quarantined) {
+      card.appendChild(el("div", { style: "font-weight:700;margin-bottom:6px;color:var(--bad);", text: "\u26A0 This file could not be fetched \u2014 it may have been removed or quarantined." }));
+      card.appendChild(el("div", { class: "sm", style: "color:var(--dim);margin-bottom:10px;", text: "user.uploads.dev returned a page instead of the file, which usually means the upload no longer exists." }));
+      var ol = el("ol", { style: "margin:4px 0 0;padding-left:20px;font-size:13px;line-height:1.5;" });
+      [
+        "Check whether the file was quarantined: open perchance.org/quarantined-files",
+        "Ask whoever shared the character for a fresh export.",
+        "If you already have a saved copy of the file on disk, drop it into the zone above."
+      ].forEach(function (t) { ol.appendChild(el("li", { style: "margin-bottom:6px;", text: t })); });
+      card.appendChild(ol);
+    } else {
+      card.appendChild(el("div", { style: "font-weight:700;margin-bottom:6px;color:var(--bad);", text: "\u26A0 " + (isPerchance ? "This is a saved Perchance web page, not your character." : "This is an HTML web page, not character data.") }));
+      card.appendChild(el("div", { class: "sm", style: "color:var(--dim);margin-bottom:10px;", text: "The file is " + (Math.round(byteLen / 1048576 * 10) / 10) + " MB of page HTML \u2014 it was almost certainly saved with the browser\u2019s \u201cSave Page As\u201d instead of downloading the character file. Your character is not inside it." }));
+      var steps = [
+        "Best fix: paste the share link into the URL box above and click Fetch & recover \u2014 this tool will download and decode the real file for you.",
+        (fileUrl ? "Or download the real file directly: right-click the link below and choose \u201cSave Link As\u201d, then drop it here." : "Or open the share link and right-click the download, choosing \u201cSave Link As\u201d (not \u201cSave Page As\u201d)."),
+        "A correct character file is small (usually a few KB) and starts with gzip bytes. If you downloaded 2\u20133 MB, you grabbed the page again.",
+        "If the direct link shows a page or a 404, the upload was removed or quarantined \u2014 check perchance.org/quarantined-files or ask for a fresh export."
+      ];
+      var ol = el("ol", { style: "margin:4px 0 0;padding-left:20px;font-size:13px;line-height:1.5;" });
+      steps.forEach(function (t) { ol.appendChild(el("li", { style: "margin-bottom:6px;", text: t })); });
+      card.appendChild(ol);
+    }
+    reportBody.appendChild(card);
+
+    if (!quarantined && fileUrl) {
+      var a = el("a", { class: "btn primary", href: fileUrl, target: "_blank", rel: "noopener", text: "\u2913 Download the real character file" });
+      a.setAttribute("download", "");
+      a.title = "Right-click \u2192 Save Link As to download the actual file, then drop it here.";
+      actionsEl.appendChild(a);
+      reportBody.appendChild(el("div", { class: "sm", style: "color:var(--dim);font-size:12px;margin-top:6px;", html: "Recovered from the filename: <code>" + fileUrl.replace(/[<>&]/g, "") + "</code>" }));
+    }
+    // Always offer to view the raw HTML in case the user wants to inspect it.
+    actionsEl.appendChild(el("button", { class: "btn", text: "View raw page text", onclick: function () {
+      var dec = ""; try { dec = new TextDecoder("utf-8").decode(window.__lastBytes || new Uint8Array()); } catch (e) {}
+      showRawText(dec || "");
+    } }));
+  }
+
+  function showRawText(text) {
+    contentsEl.hidden = false; contentsBody.innerHTML = "";
+    contentsBody.appendChild(el("div", { class: "sm", style: "margin-bottom:6px;color:var(--dim);", text: "Raw decoded text (first 4000 chars) \u2014 you may be able to copy data out by hand:" }));
+    var ta = el("textarea", { style: "width:100%;min-height:220px;font:12px ui-monospace,monospace;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px;" });
+    ta.value = text.slice(0, 4000);
+    ta.readOnly = true;
+    contentsBody.appendChild(ta);
+  }
+
+  // ---- URL import ----------------------------------------------------------
+  // Accepts any of:
+  //   • perchance.org/…?data=NAME~FILEID.gz  (share link)
+  //   • https://user.uploads.dev/file/FILEID  (direct upload link)
+  //   • FILEID alone (bare hex id, with or without .gz)
+  function extractFileId(raw) {
+    var s = String(raw || "").trim();
+    // share link: ?data=NAME~FILEID
+    var m = s.match(/[?&]data=[^~]*~([a-z0-9]{16,}(?:\.gz)?)/i);
+    if (m) return m[1].replace(/\.gz$/i, "") + ".gz";
+    // direct upload URL
+    m = s.match(/user\.uploads\.dev\/file\/([a-z0-9]{16,}(?:\.gz)?)/i);
+    if (m) return m[1].replace(/\.gz$/i, "") + ".gz";
+    // bare hex id
+    m = s.match(/^([a-f0-9]{24,})(?:\.gz)?$/i);
+    if (m) return m[1] + ".gz";
+    return null;
+  }
+
+  function handleUrl(raw) {
+    var urlInput = document.getElementById("urlInput");
+    var urlSubmit = document.getElementById("urlSubmit");
+    var s = String(raw || "").trim();
+    if (!s) { urlInput && urlInput.focus(); return; }
+
+    var fileId = extractFileId(s);
+    if (!fileId) {
+      resetStatus();
+      statusEl.hidden = false;
+      step("er", "Could not find a file ID in that input. Paste a full share link, a user.uploads.dev URL, or just the hex file ID.");
+      return;
+    }
+
+    var fetchUrl = "https://user.uploads.dev/file/" + fileId;
+    resetStatus();
+    statusEl.hidden = false;
+    var origSlot = document.getElementById("urlOriginal");
+    if (origSlot) { origSlot.hidden = true; origSlot.innerHTML = ""; }
+    if (urlSubmit) { urlSubmit.disabled = true; urlSubmit.textContent = "Fetching\u2026"; }
+    step("", "Fetching " + fetchUrl + "\u2026");
+
+    fetch(fetchUrl)
+      .then(function (res) {
+        if (!res.ok) {
+          // A non-OK response from user.uploads.dev usually means the file was
+          // removed, quarantined, or the ID is wrong. Fetch the body anyway so
+          // we can check if it is an HTML page (quarantine page) vs a true 404.
+          return res.text().then(function (body) {
+            var isHtml = body.trim().slice(0, 9).toLowerCase().indexOf("<!doctype") === 0 ||
+                         body.trim().slice(0, 5).toLowerCase() === "<html";
+            if (isHtml) {
+              throw { code: "quarantined", message: "HTTP " + res.status + " — the server returned a web page. The file was likely removed or quarantined.", fileId: fileId };
+            }
+            throw new Error("HTTP " + res.status + " — file not found (ID: " + fileId + ")");
+          });
+        }
+        return res.arrayBuffer();
+      })
+      .then(function (buf) {
+        if (urlSubmit) { urlSubmit.disabled = false; urlSubmit.textContent = "Fetch \u0026 recover"; }
+
+        // Show save-original link in its own persistent slot — lives outside
+        // #status so handleFile's resetStatus() can never wipe it.
+        var origSlot = document.getElementById("urlOriginal");
+        if (origSlot) {
+          origSlot.hidden = false;
+          origSlot.innerHTML = "";
+          var origUrl = URL.createObjectURL(new Blob([buf]));
+          var origA = document.createElement("a");
+          origA.textContent = "\u2913 Save original file before recovery";
+          origA.href = origUrl;
+          origA.download = fileId;
+          origA.title = "Download the raw fetched file as-is \u2014 keep it to compare before/after, or as a backup of the source.";
+          origA.style.cssText = "display:inline-flex;align-items:center;gap:5px;color:var(--accent);font-weight:600;font-size:13px;text-decoration:underline;cursor:pointer;";
+          origA.addEventListener("click", function () {
+            setTimeout(function () { URL.revokeObjectURL(origUrl); }, 60000);
+          });
+          origSlot.appendChild(origA);
+          origSlot.appendChild(Object.assign(document.createElement("span"), { textContent: " \u00b7 " + Math.round(buf.byteLength / 1024) + " KB", style: "color:var(--dim);font-size:12px;" }));
+        }
+
+        step("ok", "Downloaded " + Math.round(buf.byteLength / 1024) + " KB. Running recovery\u2026");
+        // Feed straight into the same pipeline as a dropped file.
+        var fakeFile = { name: fileId, size: buf.byteLength,
+          arrayBuffer: function () { return Promise.resolve(buf); } };
+        handleFile(fakeFile);
+      })
+      .catch(function (err) {
+        if (urlSubmit) { urlSubmit.disabled = false; urlSubmit.textContent = "Fetch \u0026 recover"; }
+        if (err && err.code === "quarantined") {
+          step("er", err.message);
+          renderRemediation(fileId, 0, false, true);
+        } else {
+          step("er", "Fetch failed: " + ((err && err.message) || String(err)));
+        }
+      });
+  }
+  pickBtn.addEventListener("click", function () { fileInput.click(); });
+  fileInput.addEventListener("change", function () { if (fileInput.files && fileInput.files[0]) handleFile(fileInput.files[0]); });
+  document.getElementById("urlSubmit").addEventListener("click", function () {
+    handleUrl(document.getElementById("urlInput").value);
+  });
+  document.getElementById("urlInput").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") handleUrl(document.getElementById("urlInput").value);
+  });
+  ["dragenter", "dragover"].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add("over"); }); });
+  ["dragleave", "drop"].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove("over"); }); });
+  drop.addEventListener("drop", function (e) {
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+})();
+</script>

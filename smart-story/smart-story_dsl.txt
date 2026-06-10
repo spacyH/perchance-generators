@@ -1,0 +1,1991 @@
+$meta
+  header
+  tags = chat, ai, character, story, illustration, image generation, visual novel, perchance
+    mode = minimal
+  async dynamic(inputs) =>
+    return {
+      title: "Smart Story — Illustrated AI Chat",
+      description: "Chat with a character of your own design. The story is illustrated as it unfolds — AI writes the scene, AI paints it.",
+    };
+deps = {import:ai-character-chat-dependencies-v1}
+aiTextPlugin = {import:ai-text-plugin}
+textToImagePlugin = {import:text-to-image-plugin}
+uploadPlugin = {import:upload-plugin}
+fullscreenButtonPlugin = {import:fullscreen-button-plugin}
+
+// Weld plugins — modular building blocks shared across our generators.
+// Each stashes its API on window.weld.<name> and is imported here so the
+// HTML panel can use it. They are progressive enhancements: every call
+// site feature-detects window.weld.* and falls back to the app's own
+// logic if a plugin hasn't loaded, so the app never hard-depends on them.
+weldStream     = {import:weld-stream-plugin}
+weldClean      = {import:weld-clean-plugin}
+weldStructured = {import:weld-structured-plugin}
+weldTokens     = {import:weld-tokens-plugin}
+weldSummarize  = {import:weld-summarize-plugin}
+weldPersist    = {import:weld-persist-plugin}
+weldEmbed      = {import:weld-embed-plugin}
+weldMemory     = {import:weld-memory-plugin}
+weldPromptforge = {import:weld-promptforge-plugin}
+weldRegen      = {import:weld-regen-plugin}
+
+// Fallback replies if the chat AI completely fails.
+fallbackReply
+  *pauses, gathering thought* Give me a moment — the words slipped away.
+  *looks up* Try that again? Something didn't come through clearly.
+  *quiet, then* The page is blank. Ask again.
+
+output
+  text = [fallbackReply]
+
+// NOTE: list functions are auto-dedented — every nested block (if/while/try)
+// MUST use explicit { } braces. Indentation-only blocks will not transpile.
+
+// =====================================================================
+// CHAT AI — the storyteller voice that writes the narrative
+// =====================================================================
+// Each call returns { stream, charName, expectedStartWith, error? }:
+//   - `stream` is the raw aiTextPlugin handle: a thenable carrying
+//     `.textStream` (ReadableStream of plain string chunks), `.stop()`,
+//     and resolving to a boxed-String result via `await`.
+//   - The HTML side drains `stream.textStream` via `for await` for live
+//     UI updates, and `await stream` for the final value + stopReason.
+//     See `awaitInflight` in html-panel.html.
+//   - `expectedStartWith`: when the call uses `startWith` + `hideStartWith`
+//     (i.e. chatReply), `textStream` MAY or MAY NOT echo the startWith —
+//     the platform docs don't specify. The HTML side defensively skips
+//     a matching leading prefix from the accumulated stream so either
+//     behavior renders identically. For calls with `startWith: ""` this
+//     field is the empty string and the skip is a no-op.
+
+// =====================================================================
+// TOKEN BUDGET — clamp message history to fit the model's context
+// =====================================================================
+// Given a fixed-overhead text (the instruction body without messages
+// inlined) and the full message array, return the largest contiguous
+// tail of messages that still fits within the token budget.
+//
+// `countTokens` is a fast bigram approximation (no network call) so the
+// per-message lookup is cheap. We also cap at 50 messages regardless of
+// budget — for sanity and to keep the prompt focused on recent context.
+//
+// Returns the kept messages (oldest-first, same shape as input). Empty
+// array if the overhead alone already exceeds budget.
+clampMessagesToBudget(messages, fixedOverheadText) =>
+  let arr = Array.isArray(messages) ? messages : [];
+  if(arr.length === 0) return [];
+
+  // Prefer weld.tokens when present: same budgeting math, but the token
+  // counter and budget are shared with every other weld-based generator
+  // (and weld.tokens has a graceful estimate when the model tokenizer
+  // isn't ready). Falls through to the platform meta object otherwise.
+  let countTokens = null;
+  let idealMax = 6000;
+  try {
+    let wt = window.weld && window.weld.tokens;
+    if(wt && wt.isLoaded && wt.isLoaded() && typeof wt.countSync === "function") {
+      countTokens = function(s){ let n = wt.countSync(String(s||"")); return (n == null) ? Math.ceil(String(s||"").length/4) : n; };
+      if(typeof wt.info === "function") { let inf = wt.info(); if(inf && inf.idealMaxContextTokens) idealMax = inf.idealMaxContextTokens; }
+    }
+  } catch(e) { countTokens = null; }
+
+  if(!countTokens) {
+    let tools;
+    try { tools = root.aiTextPlugin({ getMetaObject: true }); } catch(e) { tools = null; }
+    // If the meta object isn't available (very early in load), fall back
+    // to the legacy slice-of-14 to preserve behavior.
+    if(!tools || typeof tools.countTokens !== "function") {
+      return arr.slice(-14);
+    }
+    countTokens = tools.countTokens;
+    idealMax = tools.idealMaxContextTokens || 6000;
+  }
+  // Reserve ~800 tokens for the model's reply + some slack for prefix-
+  // cache stability (re-tokenizing changing prefixes is expensive on the
+  // backend, so we keep our overhead-text edge stable).
+  let budget = idealMax - 800;
+  let overhead = countTokens(String(fixedOverheadText || ""));
+  let available = budget - overhead;
+  if(available <= 0) return [];
+  // Walk from the most recent backwards, including each message as long
+  // as it fits. Stop at the first message that would overflow — older
+  // messages are dropped silently (and ideally are covered by the
+  // tracked-info state the user maintains).
+  let kept = [];
+  let used = 0;
+  let cap = Math.min(arr.length, 50);
+  for(let i = arr.length - 1; i >= arr.length - cap; i--) {
+    let text = String((arr[i] && arr[i].content) || "");
+    let n = countTokens(text);
+    // Per-message overhead for the "[[Speaker]]: " label, joining
+    // newline, etc. — small but real. Add a small constant fudge so
+    // we don't quietly creep over budget.
+    n = n + 6;
+    if(used + n > available) break;
+    kept.unshift(arr[i]);
+    used += n;
+  }
+  return kept;
+
+// =====================================================================
+// tti — text-to-image wrapper that extracts the JPEG dataURL
+// =====================================================================
+// Call `root.textToImagePlugin(opts)` and return a normalized
+// { url, error? } shape with `url` set to the rendered image dataURL.
+//
+// The awaited result of textToImagePlugin is a boxed-String object whose
+// primitive value is the iframe HTML — NOT a usable image URL. The
+// actual image lives on `.dataUrl` (canvas.toDataURL JPEG). Use this
+// helper everywhere that needs a renderable URL; never await the plugin
+// directly into an <img src=>.
+//
+// `where` is a short label included in error messages so the caller's
+// log surfaces which feature failed ("cutscene", "character avatar"…).
+async tti(opts, where) =>
+  let label = where || "image";
+  try {
+    let result = await root.textToImagePlugin(opts || {});
+    if(!result) return { url: "", error: label + ": textToImagePlugin returned nothing" };
+    let url = result.dataUrl ? String(result.dataUrl) : "";
+    if(!url) return { url: "", error: label + ": textToImagePlugin produced no dataUrl" };
+    return { url };
+  } catch(e) {
+    return { url: "", error: label + ": " + ((e && e.message) || String(e)) };
+  }
+
+// =====================================================================
+// oneShotAi — non-streaming aiTextPlugin wrapper with normalized errors
+// =====================================================================
+// For one-and-done text generations (synthesize*, suggestActions,
+// updateTrackedInfo, Cutscene Director's prompt-gen step) — anywhere
+// the caller awaits a single result rather than streaming chunks.
+//
+//   { text: "..." }                    on success — trimmed generatedText
+//   { error: "<label>: <reason>" }     on any failure path
+//
+// `label` prefixes error messages so callers don't have to thread their
+// own name in. The stopReason "error" check and the empty-text guard
+// live here so future stopReason-vocabulary changes touch one place.
+async oneShotAi(opts, label) =>
+  let lab = label || "ai";
+  try {
+    let result = await root.aiTextPlugin(opts || {});
+    if(!result) return { error: lab + ": no result" };
+    if(result.stopReason === "error") return { error: lab + ": stopReason=error" };
+    let text = result.generatedText ? String(result.generatedText).trim() : "";
+    if(!text) return { error: lab + ": empty response (stopReason=" + (result.stopReason || "?") + ")" };
+    return { text };
+  } catch(e) {
+    return { error: lab + ": " + ((e && e.message) || String(e)) };
+  }
+
+// =====================================================================
+// parseNameDescAppearance — shared parser for synthesize{Character,Persona}
+// =====================================================================
+// Parses the strict three-line response format both synthesizers ask
+// the AI to produce:
+//   NAME: <...>
+//   DESCRIPTION: <one or more lines>
+//   APPEARANCE: <one or more lines>
+//
+// Returns { name, description, appearance } on success, plus an `error`
+// key on failure. On the error path, any successfully parsed fields are
+// still returned (callers may use whatever the model got right).
+parseNameDescAppearance(generatedText) =>
+  let raw = String(generatedText || "").trim();
+  if(!raw) return { name: "", description: "", appearance: "", error: "empty response" };
+  let nameMatch = raw.match(/^\s*NAME:\s*(.*?)\s*$/im);
+  let descMatch = raw.match(/^\s*DESCRIPTION:\s*([\s\S]*?)(?=\n\s*APPEARANCE:|$)/im);
+  let apprMatch = raw.match(/^\s*APPEARANCE:\s*([\s\S]*?)$/im);
+  // The model sometimes wraps individual fields in straight quotes —
+  // strip a single pair (don't recurse, the field is plain text).
+  let stripQuotes = (s) => s ? s.trim().replace(/^["']|["']$/g, "") : "";
+  let name = nameMatch ? stripQuotes(nameMatch[1]) : "";
+  let description = descMatch ? stripQuotes(descMatch[1]) : "";
+  let appearance = apprMatch ? stripQuotes(apprMatch[1]) : "";
+  // Fallback: if none of the labels matched, the model dropped the
+  // labels entirely. Treat the whole body as a description rather than
+  // failing — the user can still recover something useful from it.
+  if(!description && !name && !appearance) {
+    description = raw.replace(/^NAME:.*\n?/im, "").replace(/^DESCRIPTION:\s*/im, "").trim();
+  }
+  if(!description && !appearance) {
+    return { name, description: "", appearance: "", error: "could not parse fields from model output" };
+  }
+  return { name, description, appearance };
+
+// --- Opening message ---------------------------------------------------
+// When the user starts a new chat, this writes the character's opening
+// turn — establishing the scene and inviting the user in. Mirrors the
+// chatReply structure but with no prior message history.
+//
+// `trackedInfo` is a freeform string of story state the user maintains
+// (locations, items, knowledge, relationships, time of day, etc.). It's
+// injected into the prompt so the character "knows" the state.
+async openScene(character, personality, scenario, trackedInfo) =>
+  let charDesc = (character && character.description) ? String(character.description).trim() : "";
+  let charName = (character && character.name) ? String(character.name).trim() : "Character";
+  let scenarioText = scenario ? String(scenario).trim() : "";
+  let tracked = trackedInfo ? String(trackedInfo).trim() : "";
+
+  let pName = (personality && personality.name) ? String(personality.name).trim() : "";
+  let pDesc = (personality && personality.description) ? String(personality.description).trim() : "";
+  let personaBlock = (pName || pDesc) ? [
+    "",
+    "THE PERSON ACROSS FROM YOU:",
+    pName ? `  Their name: ${pName}` : "",
+    pDesc ? `  Who they are: ${pDesc}` : "",
+  ].filter(Boolean).join("\n") : "";
+
+  let scenarioBlock = scenarioText ? [
+    "",
+    "THE SCENE:",
+    scenarioText,
+  ].join("\n") : "";
+
+  let trackedBlock = tracked ? [
+    "",
+    "TRACKED STATE (treat this as ground truth — facts you know):",
+    tracked,
+  ].join("\n") : "";
+
+  let token = Math.random().toString(36).slice(2, 8);
+
+  let instruction = [
+    `You ARE ${charName} — living inside their head from the first word.`,
+    charDesc || "A character in a story.",
+    personaBlock,
+    scenarioBlock,
+    trackedBlock,
+    "",
+    "Open this scene. Write your character's first turn — the moment the",
+    "story begins. Drop the reader into a specific, sensory instant: what",
+    "you're doing with your hands, what you hear, what the light is like.",
+    "Establish your state of mind through action and detail, not by",
+    "announcing it. Then either speak, act, or notice the person across",
+    "from you. Leave room for them to respond.",
+    "",
+    "WRITING RULES:",
+    "- 3 to 6 sentences. Around 50–120 words.",
+    "- Mix narration and dialogue. *asterisks* for action/body language,",
+    "  \"quotes\" for speech.",
+    "- Ground the opening in one concrete sensory detail — a sound, a",
+    "  texture, a smell — before anything else happens.",
+    "- SHOW your character's mood through what they do, not by naming it.",
+    "- No purple prose, no dramatic declarations, no 'a figure stood in",
+    "  the doorway' clichés.",
+    "- Stay in character. Do not break the fourth wall or mention being AI.",
+    "",
+    "VISUAL BEAT TAG: if this opening contains a significant visual moment",
+    "worth illustrating — a striking setting, an entrance, a character",
+    "reveal — end your reply with the exact marker <<illustrate>> on its",
+    "own line. Use sparingly: not every opening warrants an illustration.",
+    `(Internal variety token — ignore: ${token}.)`,
+  ].filter(Boolean).join("\n");
+
+  try {
+    let stream = root.aiTextPlugin({
+      instruction,
+      startWith: "",
+      stopSequences: ["\n\n[[", "\n[[", "\n>>>"],
+    });
+    return { stream, charName, expectedStartWith: "" };
+  } catch(e) {
+    console.error("openScene setup failed:", e);
+    return { stream: null, charName, expectedStartWith: "", error: (e && e.message) || String(e) };
+  }
+
+// --- Chat reply (continues a conversation) ----------------------------
+// Standard [[Speaker]]: format. Builds the conversation from the last
+// 14 messages. Returns the same { stream, charName, error? } shape.
+//
+// `trackedInfo` is a freeform string of story state (see openScene docs).
+//
+// Multi-character support (schema v2): if any past assistant message
+// carries a `speakerName` field (set by the HTML side from
+// message.characterId → library lookup), it labels that message in the
+// conversation rendering instead of the current `charName`. The
+// `character` argument is always WHO IS REPLYING THIS TURN — the AI
+// plays this character, regardless of who spoke previously. Old
+// single-character chats have no speakerName on their messages and so
+// fall through to the legacy behavior automatically.
+//
+// `otherCharacters` (optional): array of {name, description} for OTHER
+// characters present in the scene besides the replying one. Used to
+// build a brief "also in the scene" context block so the AI knows who
+// these other speakers are. Pass an empty array (or omit) to skip.
+async chatReply(messages, character, personality, scenario, trackedInfo, otherCharacters) =>
+  let charDesc = (character && character.description) ? String(character.description).trim() : "";
+  let charName = (character && character.name) ? String(character.name).trim() : "Character";
+  let scenarioText = scenario ? String(scenario).trim() : "";
+  let tracked = trackedInfo ? String(trackedInfo).trim() : "";
+
+  let pName = (personality && personality.name) ? String(personality.name).trim() : "";
+  let pDesc = (personality && personality.description) ? String(personality.description).trim() : "";
+  let seekerLabel = pName || "User";
+
+  let personaBlock = (pName || pDesc) ? [
+    "",
+    "THE PERSON ACROSS FROM YOU:",
+    pName ? `  Their name: ${pName}` : "",
+    pDesc ? `  Who they are: ${pDesc}` : "",
+  ].filter(Boolean).join("\n") : "";
+
+  let scenarioBlock = scenarioText ? [
+    "",
+    "THE SCENE:",
+    scenarioText,
+  ].join("\n") : "";
+
+  let trackedBlock = tracked ? [
+    "",
+    "TRACKED STATE (treat this as ground truth — facts you know, situations you're in, items you have):",
+    tracked,
+  ].join("\n") : "";
+
+  // OTHER CHARACTERS block — only built when there's a multi-character
+  // roster. Single-character chats skip this entirely so the prompt is
+  // identical to the pre-multichar behavior.
+  let othersBlock = "";
+  if(Array.isArray(otherCharacters) && otherCharacters.length > 0) {
+    let lines = ["", "ALSO IN THE SCENE (you are NOT these characters — they are separate people you might interact with):"];
+    for(let oc of otherCharacters) {
+      let n = (oc && oc.name) ? String(oc.name).trim() : "";
+      let d = (oc && oc.description) ? String(oc.description).trim() : "";
+      if(n || d) {
+        lines.push(`  • ${n || "(unnamed)"}${d ? ": " + d.replace(/\s+/g, " ").slice(0, 200) : ""}`);
+      }
+    }
+    if(lines.length > 2) othersBlock = lines.join("\n");
+  }
+
+  // Format a single past-message into its on-the-wire line. Extracted
+  // so we can measure individual message lengths cleanly when clamping
+  // to the token budget below.
+  let formatMessage = (m) => {
+    // System messages are scene notes (e.g. "[Lyle has joined the
+    // scene.]"). Render them as their own line with no speaker prefix
+    // so the AI reads them as narrator-style context, not as something
+    // a character said.
+    if(m.role === "system") {
+      return String(m.content).replace(/\s+/g, " ").trim();
+    }
+    // Narrator messages are scene description prose. Render with a
+    // bracketed [scene] label so the AI sees them as continuity
+    // narration — context to react to, not lines to mimic.
+    if(m.role === "narrator") {
+      return `*[scene]: ${String(m.content).replace(/\s+/g, " ").trim()}*`;
+    }
+    // Multi-character: assistant messages may carry an explicit
+    // speakerName. Fall back to the replying character's name for old
+    // single-character data.
+    let who = m.role === "user" ? seekerLabel : (m.speakerName || charName);
+    return `[[${who}]]: ${String(m.content).replace(/\s+/g, " ").trim()}`;
+  };
+
+  let token = Math.random().toString(36).slice(2, 8);
+
+  // Build the instruction shell parameterised on the inlined-message
+  // block. We measure the shell with the convo slot empty as our fixed
+  // overhead, then format only as many recent messages as fit the token
+  // budget — see clampMessagesToBudget below.
+  let buildInstruction = (convoText) => [
+    `You ARE ${charName} — not describing them, not narrating about them, but living inside their head. Every word comes from their mouth or their inner life. Your voice, your habits, your blind spots.`,
+    charDesc || "A character in a story.",
+    personaBlock,
+    othersBlock,
+    scenarioBlock,
+    trackedBlock,
+    "",
+    "Continue the conversation. Stay in character throughout. The TRACKED",
+    "STATE above (if present) is canonical — facts you should not",
+    "contradict.",
+    "",
+    "WRITING RULES:",
+    "- 2 to 5 sentences usually. Up to 6–8 only for major beats.",
+    "- Mix narration and dialogue. *asterisks* for action/body language,",
+    "  \"quotes\" for speech.",
+    "- REACT FIRST. Your opening beat should respond to what the other",
+    "  person just did or said — a glance, a pause, a shift in posture —",
+    "  before you move to your own action or words.",
+    "- SHOW emotions through the body, not labels. Instead of 'she felt",
+    "  nervous': *her thumb traced the rim of her glass, eyes not quite",
+    "  landing*. Let the reader feel it through detail.",
+    "- Subtext: let your character think one thing and say another. The",
+    "  gap between what's felt and what's spoken is what makes dialogue",
+    "  real. Not every thought needs voicing.",
+    "- One sensory anchor per reply — ground the moment in what you see,",
+    "  hear, smell, or touch. Even brief exchanges deserve texture.",
+    "- Vary rhythm. A short beat after a long sentence lands harder. Not",
+    "  every line needs the same structure.",
+    "- AVOID: purple prose, over-explaining feelings, restating what the",
+    "  other person said, starting consecutive replies the same way,",
+    "  generic filler ('a sense of', 'couldn't help but').",
+    "- Do not break character or mention being an AI.",
+    "- Do not write the other person's response.",
+    othersBlock ? "- Do not write or speak for the OTHER characters listed above. They are separate people. You may notice them, react to them, address them — but their words and actions belong to them alone." : "",
+    "",
+    "VISUAL BEAT TAG: if your reply contains a significant visual moment",
+    "worth illustrating — a new setting, a striking action or pose, a",
+    "reveal, a vivid character expression — end your reply with the",
+    "exact marker <<illustrate>> on its own line. Use sparingly: NOT for",
+    "pure dialogue exchanges, brief reactions, or internal thoughts. The",
+    "story should average one illustration every few replies, not every",
+    "reply.",
+    `(Internal variety token — ignore: ${token}.)`,
+    "",
+    "<MESSAGES>",
+    convoText,
+    "</MESSAGES>",
+    "",
+    `>>> TASK: Write ${charName}'s next single reply only, in character. Stop at the end of your reply.`,
+  ].filter(Boolean).join("\n");
+
+  // Clamp the history to whatever fits in the budget, then render it.
+  let trimmed = clampMessagesToBudget(messages || [], buildInstruction(""));
+  let convo = trimmed.map(formatMessage).join("\n");
+  let instruction = buildInstruction(convo);
+
+  let startWithText = `[[${charName}]]:`;
+  try {
+    let stream = root.aiTextPlugin({
+      instruction,
+      startWith: startWithText,
+      hideStartWith: true,
+      stopSequences: ["\n\n[[", "\n[[", "\n>>>"],
+    });
+    return { stream, charName, expectedStartWith: startWithText };
+  } catch(e) {
+    console.error("chatReply setup failed:", e);
+    return { stream: null, charName, expectedStartWith: startWithText, error: (e && e.message) || String(e) };
+  }
+
+// =====================================================================
+// NARRATOR — a non-character voice that describes scene context
+// =====================================================================
+// Generates a short narrative beat (2-4 sentences) that DOES NOT speak
+// for any character. It describes setting, mood, passage of time, an
+// environmental change, a sensory detail, a small action no character
+// "owns" — anything that pushes the scene forward without putting
+// words in someone's mouth.
+//
+// Returns {stream, error?} matching chatReply's shape so the HTML side
+// can drain it through the existing awaitInflight helper.
+//
+// Why a dedicated function vs. chatReply with a "narrator character"?
+// Because the narrator is structurally different: no name, no dialogue,
+// no [[Speaker]]: prefix, no first-person voice. The prompt is shaped
+// for prose description rather than character roleplay. Trying to bend
+// chatReply into this role would distort its prompts for everyone else.
+async narrate(messages, character, personality, scenario, trackedInfo, otherCharacters) =>
+  let scenarioText = scenario ? String(scenario).trim() : "";
+  let tracked = trackedInfo ? String(trackedInfo).trim() : "";
+
+  // The cast block lists every character in the scene WITH their name
+  // and appearance — the narrator may reference them by name and
+  // describe what they look like, but should never voice them.
+  let castLines = [];
+  let primaryName = (character && character.name) ? String(character.name).trim() : "";
+  let primaryAppr = (character && character.appearance) ? String(character.appearance).trim() : "";
+  if(primaryName || primaryAppr) {
+    castLines.push(`${primaryName || "(unnamed)"}: ${primaryAppr || "no appearance set"}`);
+  }
+  if(Array.isArray(otherCharacters)) {
+    for(let oc of otherCharacters) {
+      let n = (oc && oc.name) ? String(oc.name).trim() : "";
+      let a = (oc && oc.appearance) ? String(oc.appearance).trim() : "";
+      if(n || a) castLines.push(`${n || "(unnamed)"}: ${a || "no appearance set"}`);
+    }
+  }
+  let pName = (personality && personality.name) ? String(personality.name).trim() : "";
+  let pAppr = (personality && personality.appearance) ? String(personality.appearance).trim() : "";
+  if(pName || pAppr) castLines.push(`${pName || "the user"} (the seeker): ${pAppr || "no appearance set"}`);
+
+  // Same labeling rules as chatReply, with the important difference
+  // that NARRATOR lines (role=narrator) get a bare italic-bracketed
+  // label so the model sees prior narration as continuity, not as
+  // something a character said.
+  let seekerLabel = pName || "User";
+  let formatMessage = (m) => {
+    if(m.role === "narrator") {
+      return `*[scene]: ${String(m.content).replace(/\s+/g, " ").trim()}*`;
+    }
+    if(m.role === "system") {
+      return String(m.content).replace(/\s+/g, " ").trim();
+    }
+    let who = m.role === "user" ? seekerLabel : (m.speakerName || primaryName || "Character");
+    return `[[${who}]]: ${String(m.content).replace(/\s+/g, " ").trim()}`;
+  };
+
+  let scenarioBlock = scenarioText ? ["", "THE SCENE:", scenarioText].join("\n") : "";
+  let trackedBlock = tracked ? ["", "TRACKED STATE (canonical facts you must respect):", tracked].join("\n") : "";
+  let castBlock = castLines.length ? ["", "WHO IS IN THE SCENE:", ...castLines].join("\n") : "";
+  let token = Math.random().toString(36).slice(2, 8);
+
+  // Instruction-shell builder — convoText slot is empty when measuring
+  // the budget overhead, then populated with whichever messages fit.
+  let buildInstruction = (convoText) => [
+    "You are the NARRATOR of an unfolding scene. You are not a character.",
+    "You do not speak. You do not have a name. Your role is to describe —",
+    "to set the stage, mark passage of time, fill in sensory detail, note",
+    "a shift in mood, a small environmental change, a sound from somewhere",
+    "off-page. You give the scene depth and breath between dialogue.",
+    castBlock,
+    scenarioBlock,
+    trackedBlock,
+    "",
+    "Continue the scene with a NARRATIVE BEAT — 2 to 4 sentences, prose,",
+    "no dialogue, no internal monologue from any character. Describe what",
+    "is happening AROUND the characters, or to the moment they're in:",
+    "the light shifting, a sound in the distance, the weight of a pause,",
+    "the air growing colder, what the room smells like, what time of day",
+    "it has become. You may briefly reference what a character is",
+    "physically doing if it's incidental (\"his hand drifted toward the",
+    "lamp\"), but you must NOT have them speak, think, or take a deliberate",
+    "action that drives the plot.",
+    "",
+    "Style:",
+    "- Specific, sensory, grounded. No purple prose or overwrought metaphor.",
+    "- Present-tense, third-person omniscient.",
+    "- Carry emotional weight through the environment — a room can feel",
+    "  tense, a silence can have texture, light can shift to mark a mood.",
+    "  The narrator FEELS the scene even though they don't speak.",
+    "- Mark transitions concretely: a clock striking, a shadow moving,",
+    "  a temperature change, a new sound arriving. Don't just say 'time",
+    "  passed' — show what changed.",
+    "- Do not address the reader. No second person, no questions, no",
+    "  character voice, no quoted dialogue, no first-person.",
+    "- Do not start with a character's name as subject.",
+    `(Internal variety token — ignore: ${token}.)`,
+    "",
+    "<MESSAGES>",
+    convoText,
+    "</MESSAGES>",
+    "",
+    ">>> TASK: Write a single short narrative beat continuing the scene. Just the prose, no preamble, no asterisks, no quotes.",
+  ].filter(Boolean).join("\n");
+
+  let trimmed = clampMessagesToBudget(messages || [], buildInstruction(""));
+  let convo = trimmed.map(formatMessage).join("\n");
+  let instruction = buildInstruction(convo);
+
+  try {
+    let stream = root.aiTextPlugin({
+      instruction,
+      startWith: "",
+      stopSequences: ["\n\n[[", "\n[[", "\n>>>"],
+    });
+    return { stream, expectedStartWith: "" };
+  } catch(e) {
+    console.error("narrate setup failed:", e);
+    return { stream: null, expectedStartWith: "", error: (e && e.message) || String(e) };
+  }
+
+// =====================================================================
+// SUGGESTED ACTIONS — three short "what to do/say next" options
+// =====================================================================
+// Generates 3 first-person actions the user could take, each ~1 sentence.
+// Designed to give variety: one safe/reactive, one curious/exploratory,
+// one bolder/scene-shifting. The user can click one to populate their
+// input (we don't auto-send) or ignore them and type freely.
+//
+// Returns { actions: [s1, s2, s3] } on success, or { actions: [], error }
+// on failure. The HTML side renders these as small buttons under the
+// most recent assistant bubble; clicking a button fills the input.
+//
+// We don't stream — the response is tiny and the UI doesn't benefit from
+// partial reveal. Single await, parse, return.
+async suggestActions(messages, character, personality, scenario, trackedInfo) =>
+  let charName = (character && character.name) ? String(character.name).trim() : "the character";
+  let pName = (personality && personality.name) ? String(personality.name).trim() : "";
+  let seekerLabel = pName || "You";
+
+  // Only recent context matters — last 6 turns.
+  let trimmed = (messages || []).slice(-6);
+  let convo = trimmed.map(m => {
+    let who = m.role === "user" ? seekerLabel : charName;
+    return `[[${who}]]: ${String(m.content).replace(/\s+/g, " ").trim()}`;
+  }).join("\n");
+  if(!convo) return { actions: [], error: "no conversation yet" };
+
+  let scenarioText = scenario ? String(scenario).trim() : "";
+  let scenarioLine = scenarioText ? `\nThe scene: ${scenarioText}\n` : "";
+  let tracked = trackedInfo ? String(trackedInfo).trim() : "";
+  let trackedLine = tracked ? `\nTracked story state: ${tracked}\n` : "";
+
+  let token = Math.random().toString(36).slice(2, 8);
+
+  let instruction = [
+    `You are helping a reader interact with a story. The reader is playing ${seekerLabel}, talking with ${charName}.`,
+    scenarioLine,
+    trackedLine,
+    "Recent conversation:",
+    "<MESSAGES>",
+    convo,
+    "</MESSAGES>",
+    "",
+    `Suggest THREE distinct things ${seekerLabel} could do or say NEXT, written in first person from ${seekerLabel}'s perspective. Each suggestion is one short sentence (under 14 words), naturally varied:`,
+    "  1. A grounded, reactive response — answering or acknowledging what just happened.",
+    "  2. A curious or exploratory move — a question, a closer look, a request.",
+    "  3. A bolder choice that could shift the scene — a decision, an action, a topic change.",
+    "",
+    "Format: exactly three lines, each starting with '- ' (dash space). Nothing else. No numbers, no headings, no commentary, no quotation marks around the suggestions themselves. Do NOT include {{user}} or {{char}} placeholders.",
+    `(Internal variety token — ignore: ${token}.)`,
+  ].filter(Boolean).join("\n");
+
+  let r = await oneShotAi({
+    instruction,
+    stopSequences: ["\n\n", "\n>>>", "<MESSAGES>"],
+  }, "suggestActions");
+  if(r.error) return { actions: [], error: r.error };
+  // Parse lines starting with "- " (or fallback "1. "). Tolerate stray
+  // numbering or quotes the model sometimes adds despite instructions.
+  let actions = [];
+  for(let line of r.text.split("\n")) {
+    let m = line.match(/^\s*[-*•]\s+(.+?)\s*$/);
+    if(!m) m = line.match(/^\s*\d+[.)]\s+(.+?)\s*$/);
+    if(!m) continue;
+    let s = m[1].trim();
+    // Strip surrounding straight-quotes if the whole suggestion was wrapped.
+    if((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+      s = s.slice(1, -1).trim();
+    }
+    if(s) actions.push(s);
+  }
+  if(actions.length === 0) return { actions: [], error: "no parseable suggestions" };
+  return { actions: actions.slice(0, 3) };
+
+// =====================================================================
+// ART STYLE PRESETS — curated styles for cutscene rendering
+// =====================================================================
+// Each style is { name, promptPrefix, negativePrompt }. The Director
+// writes a content-only prompt (subject, action, composition); the
+// chosen style wraps it with the visual treatment. promptPrefix is
+// prepended to the Director's output; negativePrompt goes to the image
+// plugin separately.
+//
+// Users select one in the SCENE settings panel. "custom" lets users
+// write their own prefix + negative.
+//
+// To add a new style: add a row here following the same format. The UI
+// reads this list at boot to populate the dropdown.
+artStyles
+  default
+    name = Painted illustration (default)
+    promptPrefix = painted illustration, warm cinematic lighting, painterly brushwork, rich colors, detailed,
+    negativePrompt = blurry, low quality, deformed, watermark, signature, text, ugly
+  watercolor
+    name = Watercolor
+    promptPrefix = soft watercolor painting, delicate washes of color, paper texture, gentle brushstrokes, pastel palette, dreamy atmosphere,
+    negativePrompt = harsh lines, vivid saturation, photorealistic, 3d render, low quality, deformed, watermark
+  oilpainting
+    name = Oil painting
+    promptPrefix = classical oil painting, rich impasto texture, dramatic chiaroscuro lighting, deep colors, masterful brushwork, baroque feel,
+    negativePrompt = digital art, anime, cartoon, low quality, deformed, watermark, blurry
+  anime
+    name = Anime / manga
+    promptPrefix = anime illustration, clean lineart, cel-shaded, expressive eyes, dynamic composition, vibrant colors, studio-quality animation key art,
+    negativePrompt = photorealistic, 3d render, western cartoon, low quality, deformed, watermark, blurry, sketchy
+  comicbook
+    name = Comic book
+    promptPrefix = comic book illustration, bold ink outlines, halftone shading, vivid saturated colors, dynamic action panel composition, graphic novel style,
+    negativePrompt = photorealistic, blurry, low quality, deformed, watermark, sketchy
+  noir
+    name = Noir comic
+    promptPrefix = high-contrast black and white noir comic art, deep shadows, dramatic chiaroscuro, selective spot color, brush ink illustration, 1940s detective aesthetic,
+    negativePrompt = colorful, bright, cheerful, anime, 3d render, low quality, deformed, watermark
+  photograph
+    name = Photograph
+    promptPrefix = cinematic photograph, professional photography, natural realistic lighting, sharp focus, photorealistic, shallow depth of field, 35mm film aesthetic,
+    negativePrompt = illustration, painting, drawing, cartoon, anime, low quality, deformed, watermark, blurry
+  pencilsketch
+    name = Pencil sketch
+    promptPrefix = detailed pencil drawing, graphite shading, expressive linework, soft hatching, sketchbook texture, monochrome,
+    negativePrompt = color, photorealistic, 3d render, anime, low quality, deformed, watermark
+  storybook
+    name = Storybook illustration
+    promptPrefix = whimsical storybook illustration, gentle warm palette, soft textures, hand-drawn feel, children's book aesthetic, cozy and inviting,
+    negativePrompt = dark, gritty, horror, photorealistic, low quality, deformed, watermark, blurry
+  pixelart
+    name = Pixel art
+    promptPrefix = pixel art, 16-bit retro game aesthetic, limited color palette, crisp pixel edges, isometric or side-scroller composition,
+    negativePrompt = blurry, smooth gradients, photorealistic, anti-aliased, low quality, deformed, watermark
+  custom
+    name = Custom (define your own)
+    promptPrefix =
+    negativePrompt =
+
+// JS helper: resolve a style by its key. Returns the style object or
+// the default if the key is unknown. The "custom" style is special-cased
+// by the caller, which substitutes the user's saved custom values.
+artStyleByKey(key) =>
+  if(!key) key = "default";
+  if(artStyles[key]) return artStyles[key];
+  return artStyles.default;
+
+// JS helper: list all available styles as [{key, name}] for the UI dropdown.
+listArtStyles() =>
+  let out = [];
+  // Iterate in declaration order — Perchance preserves it.
+  for(let key in artStyles) {
+    out.push({ key, name: artStyles[key].name });
+  }
+  return out;
+
+// =====================================================================
+// CUTSCENE DIRECTOR — separate AI pass that writes image prompts
+// =====================================================================
+// This is the heart of the illustration system. Inspired by fur-ai's
+// approach: a dedicated AI call that reads recent chat + character
+// appearances + scenario, and outputs ONE focused image prompt. Then
+// the prompt is rendered by textToImagePlugin.
+//
+// Returns { url, prompt, error? }
+//   On success: { url: imageUrl, prompt: theFinalPromptUsed }
+//   On failure: { url: "", prompt: "", error: "..." }
+//
+// The two-step design (LLM-prompt then image-render) means the chat AI
+// never writes image prompts directly — it just narrates, and the
+// Director extracts the visual beat. This separation is what makes the
+// illustrations consistent with the story rather than generic.
+//
+// artStyle is { promptPrefix, negativePrompt } resolved by the caller
+// from the user's selected style preset (or their custom values). The
+// Director now writes ONLY content (subject, action, composition,
+// setting, lighting); the prefix supplies the medium/style and the
+// negative prompt supplies what to avoid.
+// Optional `otherCharacters`: array of {name, appearance} for OTHER
+// characters who might appear visually in the scene besides the
+// `character` argument (the active speaker). Used to build a fuller
+// [CAST] block so multi-character cutscenes preserve visual identity
+// for each roster member. Single-character chats omit it.
+async generateCutscene(focusMessage, recentMessages, character, personality, scenario, artStyle, otherCharacters) =>
+  let charName = (character && character.name) ? String(character.name).trim() : "";
+  let charAppr = (character && character.appearance) ? String(character.appearance).trim() : "";
+  let pName    = (personality && personality.name) ? String(personality.name).trim() : "";
+  let pAppr    = (personality && personality.appearance) ? String(personality.appearance).trim() : "";
+  let scen     = scenario ? String(scenario).trim() : "";
+  let focus    = focusMessage ? String(focusMessage).trim() : "";
+
+  // Resolve art style; fall back to default if caller didn't supply.
+  let stylePrefix = "";
+  let styleNegative = "";
+  if(artStyle && typeof artStyle === "object") {
+    stylePrefix = (artStyle.promptPrefix || "").trim();
+    styleNegative = (artStyle.negativePrompt || "").trim();
+  }
+  if(!stylePrefix) {
+    let def = artStyles.default;
+    stylePrefix = (def.promptPrefix + "").trim();
+    styleNegative = (def.negativePrompt + "").trim();
+  }
+
+  if(!focus) return { url: "", prompt: "", error: "no focus message to illustrate" };
+
+  // Build a compact context block from the last 3 messages (or fewer).
+  // Multi-character: respect each message's speakerName if present, so
+  // the AI sees who said what when scenes have multiple AI characters.
+  let recent = Array.isArray(recentMessages) ? recentMessages.slice(-3) : [];
+  let recentText = recent.map(m => {
+    // System messages are narrator-style scene notes. Render without
+    // a speaker prefix so the director AI reads them as context.
+    if(m.role === "system") {
+      return String(m.content || "").replace(/\s+/g, " ").trim();
+    }
+    // Narrator beats are scene description prose. Tag them so the
+    // director can pull mood/setting from them without misattributing.
+    if(m.role === "narrator") {
+      return `[scene] ${String(m.content || "").replace(/\s+/g, " ").trim()}`;
+    }
+    let who;
+    if(m.role === "user") {
+      who = pName || "User";
+    } else {
+      who = m.speakerName || charName || "Character";
+    }
+    return `${who}: ${String(m.content || "").replace(/\s+/g, " ").trim()}`;
+  }).join("\n");
+
+  // Cast block: the active character + the user + any OTHER roster
+  // members supplied by the caller. Each line lists name and appearance
+  // (or a placeholder). Multi-character scenes get every speaker's
+  // visual identity in the prompt — the director can then preserve
+  // appearance continuity if the scene shows more than one of them.
+  let castLines = [];
+  if(charName || charAppr) {
+    castLines.push(`${charName || "Character"} (the active speaker): ${charAppr || "appearance not specified"}`);
+  }
+  if(Array.isArray(otherCharacters)) {
+    for(let oc of otherCharacters) {
+      let ocName = (oc && oc.name) ? String(oc.name).trim() : "";
+      let ocAppr = (oc && oc.appearance) ? String(oc.appearance).trim() : "";
+      if(ocName || ocAppr) {
+        castLines.push(`${ocName || "(unnamed)"} (also in the scene): ${ocAppr || "appearance not specified"}`);
+      }
+    }
+  }
+  if(pName || pAppr) {
+    castLines.push(`${pName || "User"} (the person across from them): ${pAppr || "appearance not specified"}`);
+  }
+  let castBlock = castLines.join("\n");
+
+  let instruction = [
+    "You are a Cutscene Director writing image-prompt CONTENT for a",
+    "story-illustration tool. Your output describes WHAT is in the scene",
+    "(subject, action, composition, setting, lighting) — but NOT how it",
+    "is rendered. A separate step adds medium/style cues (oil painting,",
+    "anime, watercolor, etc.). Do NOT include words like 'oil painting',",
+    "'watercolor', 'anime style', 'pencil sketch', 'photograph', 'comic",
+    "book', '3d render', 'digital art', or any phrase describing the",
+    "rendering medium. Stick to scene content only.",
+    "",
+    "[VISUAL PRIORITY]",
+    "Read the FOCUS MESSAGE below — this is what should be illustrated.",
+    "Use the recent chat context to understand action, location, mood, and",
+    "who is visually present. Use the cast data to preserve appearance,",
+    "outfit, body type, and visual continuity. Use the scene/setting for",
+    "atmosphere and location.",
+    "",
+    "Choose the strongest visual beat from the focus message — an action,",
+    "pose, expression, reveal, setting detail, or character moment.",
+    "",
+    "[CAST]",
+    castBlock || "(no cast data)",
+    "",
+    "[SCENE / SETTING]",
+    scen || "(no scenario set)",
+    "",
+    "[RECENT CHAT CONTEXT]",
+    recentText || "(no prior messages)",
+    "",
+    "[FOCUS MESSAGE — illustrate this moment]",
+    focus,
+    "",
+    "[COMPOSITION RULES]",
+    "Build a natural commission brief: subject and action first, then",
+    "scene scale, character appearance, composition, setting, lighting,",
+    "mood, shot distance, camera angle, color palette, textures. For",
+    "multiple characters, make each figure visually distinct. Skip medium",
+    "cues — those will be added separately.",
+    "",
+    "[RESOLUTION]",
+    "Choose ONE resolution based on the scene:",
+    "- 512x768 for portraits, single standing characters, vertical subjects",
+    "- 768x512 for environments, multi-character scenes, wide cinematic",
+    "  staging",
+    "- 768x768 for close-ups, character busts, balanced square framing",
+    "",
+    "[OUTPUT FORMAT]",
+    "Output ONLY the final image prompt — no preamble, no explanation, no",
+    "quotes. The prompt should end with the resolution command in this",
+    "exact form: (resolution:::WIDTHxHEIGHT)",
+    "Example ending: ...soft window light, intimate framing (resolution:::512x768)",
+  ].filter(Boolean).join("\n");
+
+  // Step 1: ask the AI to write the prompt content
+  let dr = await oneShotAi({
+    instruction,
+    startWith: "",
+    stopSequences: ["\n\n[", "\n>>>"],
+  }, "cutscene director");
+  if(dr.error) return { url: "", prompt: "", error: dr.error };
+  // Strip markdown code fences and outer straight-quotes the model
+  // sometimes wraps the prompt in, despite the instructions.
+  let directorPrompt = dr.text
+    .replace(/^```[a-z]*\s*/i, "").replace(/```\s*$/i, "").trim()
+    .replace(/^["']|["']$/g, "").trim();
+  if(!directorPrompt) return { url: "", prompt: "", error: "empty prompt after stripping wrappers" };
+
+  // Step 2: wrap with the chosen art style. The Director output may
+  // already include a (resolution:::WxH) suffix — keep that at the end.
+  // We splice the style prefix *before* the content but *after* any
+  // leading commands.
+  let finalPrompt = stylePrefix + " " + directorPrompt;
+  finalPrompt = finalPrompt.replace(/\s+/g, " ").trim();
+
+  // Step 3: render the image via the tti helper so the dataUrl
+  // extraction (and the boxed-String quirk) is handled in one place.
+  let imageOpts = { prompt: finalPrompt };
+  if(styleNegative) imageOpts.negativePrompt = styleNegative;
+  let img = await tti(imageOpts, "cutscene");
+  if(img.error) {
+    console.error("Cutscene image render failed:", img.error);
+    return { url: "", prompt: finalPrompt, error: img.error };
+  }
+  return { url: img.url, prompt: finalPrompt };
+
+// =====================================================================
+// CHARACTER / PERSONALITY SYNTHESIS — AI-assisted profile filling
+// =====================================================================
+
+// Build out a character (the AI roleplayer) from a seed or from scratch.
+// Returns { name, description, appearance, error? }
+async synthesizeCharacter(existingName, existingDesc, existingAppearance) =>
+  let nameHint = existingName ? `The user has provided this name: "${existingName}". Keep it.` : "";
+  let descHint = existingDesc ? `The user has written this seed for VOICE/PERSONALITY: "${existingDesc}". Expand and refine it. Preserve their intent.` : "";
+  let apprHint = existingAppearance ? `The user has written this seed for APPEARANCE: "${existingAppearance}". Expand and refine it.` : "";
+  let blankCanvas = (!existingDesc && !existingAppearance);
+
+  let instruction = [
+    "You are helping a user design a CHARACTER for an AI chat & story",
+    "app. The character has THREE descriptive fields you must write.",
+    "These are kept apart on purpose: each is fed to a different AI",
+    "downstream and must not overlap.",
+    "",
+    "  1. NAME — the character's name.",
+    "  2. DESCRIPTION — voice, personality, manner. Fed to the CHAT AI.",
+    "  3. APPEARANCE — visual portrait brief. Fed to the IMAGE AI.",
+    "",
+    "DESCRIPTION rules:",
+    "- Written in SECOND PERSON (\"You are...\", \"You speak...\").",
+    "- 4 to 8 sentences, around 80–180 words.",
+    "- Cover: who they are (the angle), voice/tone/speech patterns,",
+    "  manner toward others, internal life, defining habits.",
+    "- NO physical/visual details. Those go in APPEARANCE.",
+    "- Vivid and specific. Names of things over abstractions.",
+    "- No dialogue examples. No lists or markdown.",
+    "",
+    "APPEARANCE rules:",
+    "- Third-person commission brief for an artist.",
+    "- 2 to 4 short sentences, around 30–80 words.",
+    "- Concrete visual details ONLY: age range, build, hair, eyes,",
+    "  skin, clothing, accessories, posture, lighting cues.",
+    "- Match the personality but stay strictly visual.",
+    "- No personality traits. No backstory. No internal life.",
+    "",
+    "NAME: if a name fits the concept and one wasn't given, suggest one.",
+    blankCanvas ? "The user has provided nothing — invent an interesting, original character from scratch. Surprise them." : "",
+    nameHint,
+    descHint,
+    apprHint,
+    "",
+    "Reply with ONLY this exact format on three lines, nothing else:",
+    "NAME: <character name>",
+    "DESCRIPTION: <4-8 sentence voice & personality, second person>",
+    "APPEARANCE: <2-4 sentence visual portrait brief, third person>",
+  ].filter(Boolean).join("\n");
+
+  let r = await oneShotAi({
+    instruction,
+    startWith: "NAME: ",
+    hideStartWith: false,
+    stopSequences: ["\n\n", "\nNAME:"],
+  }, "synthesizeCharacter");
+  if(r.error) return { name: "", description: "", appearance: "", error: r.error };
+  return parseNameDescAppearance(r.text);
+
+// Build out the user's persona from saved memories + any seed input.
+// Returns { name, description, appearance, error? }
+async synthesizePersona(memoryEntries, existingName, existingDesc, existingAppearance) =>
+  let entries = Array.isArray(memoryEntries) ? memoryEntries.filter(m => m && String(m).trim()) : [];
+  if(entries.length === 0) {
+    return { name: "", description: "", appearance: "", error: "no memory entries to synthesize from" };
+  }
+  let bullets = entries.map(m => "  - " + String(m).trim()).join("\n");
+  let nameHint = existingName ? `The user has provided this name: "${existingName}". Keep it.` : "";
+  let descHint = existingDesc ? `The user has already started a description: "${existingDesc}". Blend it with the new draft if it fits; otherwise replace it.` : "";
+  let apprHint = existingAppearance ? `The user has already sketched an appearance: "${existingAppearance}". Blend it in or refine it.` : "";
+
+  let instruction = [
+    "You are helping someone fill out their persona for a story-chat app.",
+    "They have saved some memories about themselves. From those memories",
+    "write TWO separate things:",
+    "  1. DESCRIPTION — who they are, in their own voice (first person).",
+    "                   Read by the chat AI.",
+    "  2. APPEARANCE  — a short portrait sketch for an artist to draw.",
+    "                   Read by the image AI.",
+    "These are different. The chat AI doesn't need to know what they look",
+    "like. The image AI doesn't need their inner life.",
+    "",
+    "DESCRIPTION rules:",
+    "- 2 to 4 sentences. Around 30–80 words.",
+    "- First-person voice (\"I am\", \"I have\", \"I work\").",
+    "- Focus on identity, occupation, situation, what they care about.",
+    "- Do not include physical appearance.",
+    "",
+    "APPEARANCE rules:",
+    "- 1 to 2 short sentences. Around 15–40 words.",
+    "- Third-person, concrete visual details: age range, build, hair,",
+    "  clothing style, distinguishing features.",
+    "- If the memories don't mention how they look, infer a reasonable",
+    "  default from age, profession, or interests — but only gentle hints,",
+    "  no invented specifics. Better brief than fabricated.",
+    "",
+    "NAME: extract a first name only if clearly stated in memory.",
+    "Otherwise leave empty.",
+    nameHint,
+    descHint,
+    apprHint,
+    "",
+    "The user's saved memories:",
+    bullets,
+    "",
+    "Reply with ONLY this exact format, nothing else:",
+    "NAME: <first name or empty>",
+    "DESCRIPTION: <2-4 sentence first-person description>",
+    "APPEARANCE: <1-2 sentence visual sketch>",
+  ].filter(Boolean).join("\n");
+
+  let r = await oneShotAi({
+    instruction,
+    startWith: "NAME: ",
+    hideStartWith: false,
+    stopSequences: ["\n\n", "\nNAME:"],
+  }, "synthesizePersona");
+  if(r.error) return { name: "", description: "", appearance: "", error: r.error };
+  return parseNameDescAppearance(r.text);
+
+// Generate a scenario / opening setting from a seed.
+// Returns { scenario, error? }
+async synthesizeScenario(existingScenario, characterHint) =>
+  let scenHint = existingScenario ? `The user has written this seed: "${existingScenario}". Expand and refine it.` : "The user has provided nothing — invent a compelling scenario from scratch. Choose a striking time, place, and situation.";
+  let charContext = characterHint ? `The character involved: "${characterHint}". Build a scenario that fits them.` : "";
+
+  let instruction = [
+    "You are helping a user write a SCENARIO for a story-chat app.",
+    "The scenario sets the stage: when and where the story takes place,",
+    "the mood of the world, and the situation the character is in. It is",
+    "read by both the chat AI (for narrative grounding) and the image AI",
+    "(for setting/atmosphere in illustrations).",
+    "",
+    "RULES:",
+    "- 3 to 5 sentences. Around 60–140 words.",
+    "- Third-person, present-tense ('The marketplace at dusk...', 'The",
+    "  cold stone of the cathedral...').",
+    "- Include: where, when, atmosphere/weather/lighting, the current",
+    "  situation or tension that gives the story a starting point.",
+    "- Vivid and specific. Sensory details. No purple prose.",
+    "- Plain prose. No lists or markdown.",
+    scenHint,
+    charContext,
+    "",
+    "Output ONLY the scenario text, nothing else.",
+  ].filter(Boolean).join("\n");
+
+  let r = await oneShotAi({
+    instruction,
+    startWith: "",
+    stopSequences: ["\n\n\n", "\n>>>"],
+  }, "synthesizeScenario");
+  if(r.error) return { scenario: "", error: r.error };
+  // Trim outer straight-quotes if the model wrapped the whole scenario.
+  let text = r.text.replace(/^["']|["']$/g, "").trim();
+  return { scenario: text };
+
+// =====================================================================
+// TRACKED INFO — AI-assisted state update
+// =====================================================================
+// Reads the recent chat history + current tracked-info, and outputs an
+// updated version that reflects what's changed (locations, items,
+// time passage, new facts, relationships). The user owns the field —
+// this is an opt-in convenience, not automatic.
+//
+// Inspired by ai-rpg's tracked-info auto-update pattern.
+//
+// Returns { trackedInfo, error? }
+async updateTrackedInfo(currentTrackedInfo, recentMessages, character, personality, scenario) =>
+  let messages = Array.isArray(recentMessages) ? recentMessages.slice(-12) : [];
+  if(messages.length === 0) {
+    return { trackedInfo: currentTrackedInfo || "", error: "no chat history to read from" };
+  }
+
+  let charName = (character && character.name) ? String(character.name).trim() : "Character";
+  let pName    = (personality && personality.name) ? String(personality.name).trim() : "User";
+  let scen     = scenario ? String(scenario).trim() : "";
+  let current  = currentTrackedInfo ? String(currentTrackedInfo).trim() : "";
+
+  let convo = messages.map(m => {
+    let who = m.role === "user" ? pName : charName;
+    return `${who}: ${String(m.content || "").replace(/\s+/g, " ").trim()}`;
+  }).join("\n\n");
+
+  let scenarioBlock = scen ? `\n[SCENARIO]\n${scen}\n` : "";
+  let currentBlock = current
+    ? `[CURRENT TRACKED STATE]\n${current}`
+    : "[CURRENT TRACKED STATE]\n(empty — this is the first update; create the initial state based on what's happened so far)";
+
+  let instruction = [
+    "You are maintaining a STORY STATE TRACKER for a chat-based story.",
+    "This tracker is a freeform plaintext document the AI sees in every",
+    "reply, so it can remember facts across long sessions.",
+    "",
+    "TASK: Given the CURRENT TRACKED STATE and the RECENT CHAT below,",
+    "output an UPDATED version of the tracker that reflects any new",
+    "facts, location changes, items acquired/lost, knowledge gained,",
+    "time passage, relationship shifts, or new characters introduced.",
+    "",
+    "RULES:",
+    "- Preserve sections that haven't changed.",
+    "- Add new facts under appropriate headers.",
+    "- Use markdown-style headers (# Character, # World, # Events,",
+    "  etc.) — but the exact structure is up to you.",
+    "- Keep entries concise: short bullet points, key-value pairs, or",
+    "  one-line statements.",
+    "- Do NOT include anything that isn't established by the chat.",
+    "- Do NOT speculate or invent facts not present in the chat.",
+    "- If the current state is empty, create the initial tracker from",
+    "  what's been established so far.",
+    "- Aim for under 600 words total. Tighten or remove stale entries.",
+    "",
+    scenarioBlock,
+    currentBlock,
+    "",
+    "[RECENT CHAT]",
+    convo,
+    "",
+    "[OUTPUT FORMAT]",
+    "Output ONLY the new tracked state — the complete document, ready",
+    "to replace the old one. No preamble, no commentary, no markdown",
+    "code fences. Just the plaintext content.",
+  ].filter(Boolean).join("\n");
+
+  let r = await oneShotAi({
+    instruction,
+    startWith: "",
+    stopSequences: ["\n\n\n---", "\n>>>"],
+  }, "updateTrackedInfo");
+  if(r.error) return { trackedInfo: current, error: r.error };
+  // Strip markdown code fences (the model sometimes wraps in ``` despite
+  // being told not to) and any outer straight-quotes.
+  let text = r.text
+    .replace(/^```[a-z]*\s*/i, "").replace(/```\s*$/i, "").trim()
+    .replace(/^["']|["']$/g, "").trim();
+  if(!text) return { trackedInfo: current, error: "empty output after stripping wrappers" };
+  return { trackedInfo: text };
+
+// =====================================================================
+// AVATARS — quick portrait images for the speaker icons
+// =====================================================================
+// One-shot calls (not streams). Returns { url, error? }.
+
+// Build a portrait image-prompt from any subject that has at least one
+// of {appearance, description, name}. Returns "" if the subject has no
+// drawable fields (the caller treats this as "nothing to render").
+buildPortraitPrompt(subject) =>
+  if(!subject) return "";
+  let appearance = subject.appearance ? String(subject.appearance).trim() : "";
+  let desc = subject.description ? String(subject.description).trim() : "";
+  let name = subject.name ? String(subject.name).trim() : "";
+  if(!appearance && !desc && !name) return "";
+  let subjectText = appearance || desc || `a person named ${name}`;
+  return [
+    "portrait of",
+    subjectText,
+    ", head-and-shoulders, centered, vertical composition,",
+    "painted illustration, soft natural lighting,",
+    "single subject, neutral expression, painterly brushwork,",
+    "(resolution:::512x768)",
+  ].join(" ");
+
+async generateCharacterAvatar(character) =>
+  let prompt = buildPortraitPrompt(character);
+  if(!prompt) return { url: "", error: "no character data to draw from" };
+  return await tti({ prompt }, "character avatar");
+
+async generateUserAvatar(personality) =>
+  let prompt = buildPortraitPrompt(personality);
+  if(!prompt) return { url: "", error: "no persona to draw from" };
+  return await tti({ prompt }, "user avatar");
+
+// =====================================================================
+// confirmAsync — Promise-based confirm dialog
+// =====================================================================
+async confirmAsync(message) =>
+  return new Promise(resolve => {
+    let overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;z-index:99999999;display:grid;place-items:center;background:rgba(0,0,0,.65);font:16px system-ui;";
+    overlay.innerHTML = `<div style="max-width:420px;padding:16px;background:#fff;color:#000;border:2px solid #000;border-radius:8px;">
+      <p style="margin:0 0 16px;white-space:pre-wrap;"></p>
+      <div style="display:flex;justify-content:flex-end;gap:8px;">
+        <button data-x style="padding:6px 14px;">Cancel</button>
+        <button data-o style="padding:6px 14px;background:#3a4a5a;color:#fff;border:0;border-radius:4px;">Okay</button>
+      </div></div>`;
+    overlay.querySelector("p").textContent = message;
+    let done = v => { overlay.remove(); resolve(v); };
+    overlay.querySelector("[data-x]").onclick = () => done(false);
+    overlay.querySelector("[data-o]").onclick = () => done(true);
+    document.body.appendChild(overlay);
+  });
+
+// 3-button choice prompt. Used by the Settings dirty-tab guard:
+// SAVE writes the user's edits, DISCARD throws them away, CANCEL
+// keeps the user on the current tab. Resolves to the picked option key
+// (a string) or "cancel" on background-click / Escape.
+//   options: { label, key, primary?, danger? }[]
+async choiceAsync(message, options) =>
+  return new Promise(resolve => {
+    let opts = Array.isArray(options) && options.length ? options : [
+      { key: "ok", label: "Okay", primary: true }
+    ];
+    let overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;z-index:99999999;display:grid;place-items:center;background:rgba(0,0,0,.65);font:16px system-ui;padding:16px;";
+    let card = document.createElement("div");
+    card.style.cssText = "max-width:480px;width:100%;padding:18px;background:#fff;color:#000;border:2px solid #000;border-radius:8px;";
+    let p = document.createElement("p");
+    p.style.cssText = "margin:0 0 18px;white-space:pre-wrap;line-height:1.5;";
+    p.textContent = message;
+    let actions = document.createElement("div");
+    actions.style.cssText = "display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;";
+    let done = v => { overlay.remove(); resolve(v); };
+    for (let opt of opts) {
+      let btn = document.createElement("button");
+      btn.textContent = opt.label;
+      let base = "padding:8px 14px;border-radius:4px;font:inherit;cursor:pointer;border:1px solid #888;";
+      if (opt.primary) base += "background:#3a4a5a;color:#fff;border-color:#3a4a5a;";
+      else if (opt.danger) base += "background:#a83a3a;color:#fff;border-color:#a83a3a;";
+      else base += "background:#fff;color:#000;";
+      btn.style.cssText = base;
+      btn.onclick = () => done(opt.key);
+      actions.appendChild(btn);
+    }
+    card.appendChild(p);
+    card.appendChild(actions);
+    overlay.appendChild(card);
+    // Background click → resolve as "cancel" (only when explicitly labeled).
+    overlay.addEventListener("click", e => { if(e.target === overlay) done("cancel"); });
+    // Escape key → also "cancel".
+    let escHandler = e => { if(e.key === "Escape") { done("cancel"); document.removeEventListener("keydown", escHandler); } };
+    document.addEventListener("keydown", escHandler);
+    document.body.appendChild(overlay);
+  });
+
+
+// =====================================================================
+// IMPORTERS — factory-style format detection and parsing
+// =====================================================================
+// Detects and parses character/chat data from other Perchance AI apps so
+// users can continue their progress in Smart Story without losing data.
+//
+// Supported formats:
+//   - FurAI single-chat export      { chat: {...}, profile: {...} }
+//   - FurAI character JSON          { ver: "1.0", type: "character", instruction, openingMessage, ... }
+//   - FurAI human-readable text     "Name: ...\nInstruction: ...\n--- VISUALS ---\n..."
+//   - ai-character-chat character   { botName, botDescription, scenario, chatLogs, userName, ... }
+//   - ai-character-chat URL hash    https://perchance.org/ai-character-chat#data=NAME~FILEID  (fetches & gunzips)
+//   - TavernAI v2 character card    { spec: "chara_card_v2", data: { name, description, ... } }
+//   - TavernAI v1 / generic         { name, description, first_mes, ... } at root
+//   - Smart Story native backup     { app: "tableau", version: 1, chats, messages, character, ... }
+//                                   (the literal "tableau" string is preserved from this app's
+//                                    original name for backup-file compatibility — DO NOT change it,
+//                                    or backups from older builds will fail to detect)
+//
+// Every parser produces the same normalized output:
+//   {
+//     ok: true,
+//     format: "furai-chat" | "furai-character" | ... | "tableau-backup",
+//     character: { name, description, appearance, avatar? },
+//     personality: { name, description, appearance, avatar? },
+//     scenario: "",
+//     openingMessage: "",          // if format includes one; used to seed a new chat
+//     messages: [{ role, content, createdAt? }],   // optional
+//     trackedInfo: "",             // optional
+//     title: "",
+//     extras: { ... },             // raw stash of fields we didn't map
+//   }
+//   { ok: false, error: "..." }
+//
+// The detect() function is the single entry point: it takes a string (text)
+// or an object (already-parsed JSON) and routes to the right parser.
+
+// --- Tiny helpers ---------------------------------------------------
+asString(x) =>
+  if(x === null || x === undefined) return "";
+  if(typeof x === "string") return x;
+  return String(x);
+
+substitutePlaceholders(text, userName, charName) =>
+  if(!text) return "";
+  let s = asString(text);
+  // {{user}} / {{char}} are the de-facto TavernAI/AICC placeholders.
+  // We strip them so the imported text reads naturally in Smart Story.
+  let userRepl = userName || "you";
+  let charRepl = charName || "the character";
+  s = s.replace(/\{\{user\}\}/gi, userRepl);
+  s = s.replace(/\{\{char\}\}/gi, charRepl);
+  return s;
+
+// --- Parser: ai-character-chat chatLogs textarea ---------------------
+// Format: a single string with alternating speakers separated by newlines.
+//   "{{char}}: opening line *with action*..."
+//   ""
+//   "{{user}}: reply text"
+//   ""
+//   "BotName: another line"
+// Speakers are detected by leading "BotName:" or "{{char}}:" or "{{user}}:"
+// We rebuild a typed message list.
+parseAiChatLogs(chatLogsText, botName, userName) =>
+  let raw = asString(chatLogsText).trim();
+  if(!raw) return [];
+  // Split on speaker boundaries. We anchor on lines starting with
+  // BotName:, UserName:, {{char}}:, or {{user}}: — only at the START of a
+  // line (not inside dialogue).
+  let bn = (botName || "").trim();
+  let un = (userName || "").trim();
+  // Build a regex that matches any of the known speaker prefixes.
+  let speakerAlternatives = ["\\{\\{char\\}\\}", "\\{\\{user\\}\\}"];
+  if(bn) speakerAlternatives.push(bn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  if(un) speakerAlternatives.push(un.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  let pattern = new RegExp(`(^|\\n\\n+|\\n)(${speakerAlternatives.join("|")}):\\s*`, "gi");
+
+  // Tokenize: walk through matches and slice the text between them.
+  let messages = [];
+  let lastIdx = 0;
+  let lastSpeaker = null;
+  let match;
+  while((match = pattern.exec(raw)) !== null) {
+    if(lastSpeaker !== null) {
+      let content = raw.slice(lastIdx, match.index).trim();
+      if(content) {
+        messages.push({ speaker: lastSpeaker, content });
+      }
+    }
+    lastSpeaker = match[2];
+    lastIdx = match.index + match[0].length;
+  }
+  if(lastSpeaker !== null) {
+    let content = raw.slice(lastIdx).trim();
+    if(content) {
+      messages.push({ speaker: lastSpeaker, content });
+    }
+  }
+  // If we found no speakers, treat the whole blob as a single assistant message.
+  if(messages.length === 0) {
+    messages.push({ speaker: bn || "{{char}}", content: raw });
+  }
+  // Resolve roles: anything matching the user is "user", everything else is "assistant".
+  let userPatterns = ["{{user}}", un].filter(Boolean).map(s => s.toLowerCase());
+  let out = messages.map(m => {
+    let role = userPatterns.includes(m.speaker.toLowerCase()) ? "user" : "assistant";
+    let content = substitutePlaceholders(m.content, un, bn);
+    return { role, content };
+  });
+  return out;
+
+// --- Parser: FurAI human-readable profile text ----------------------
+// Mirrors fur-ai's parseHumanReadableProfile but produces normalized output.
+parseFuraiHumanReadable(text) =>
+  let raw = asString(text);
+  let parts = raw.split(/--- VISUALS ---/i);
+  let mainBlock = parts[0];
+  // We only need name + instruction + openingMessage for the import; the
+  // visuals block is FurAI-specific (emotion sprites/avatars) and doesn't
+  // map onto Smart Story's model.
+
+  let pick = (re) => {
+    let m = mainBlock.match(re);
+    return m ? m[1].trim() : "";
+  };
+  let name = pick(/^Name:\s*(.*)$/m);
+  if(!name) return { ok: false, error: "Plain text format: missing 'Name:' line" };
+  let avatar = pick(/^Avatar:\s*(.*)$/m);
+  // Opening message ends at the next labeled section.
+  let openingMessage = "";
+  let openingMatch = mainBlock.match(/Opening Message:\s*([\s\S]*?)(?=\nOpening Background:|\nCustom Background:|\nCustom Background Opacity:|\nCustom Background Blur:|\nOpening Lorebook:|\nDedicated Lorebook:|\nInstruction:|$)/i);
+  if(openingMatch) openingMessage = openingMatch[1].trim();
+  let instMatch = mainBlock.match(/Instruction:\s*([\s\S]*)$/);
+  let instruction = instMatch ? instMatch[1].trim() : "";
+
+  return {
+    ok: true,
+    format: "furai-text",
+    character: {
+      name,
+      description: instruction,
+      appearance: "",  // FurAI bundles appearance into the instruction
+      avatar,
+    },
+    personality: { name: "", description: "", appearance: "" },
+    scenario: "",
+    openingMessage,
+    messages: [],
+    trackedInfo: "",
+    title: name ? `with ${name}` : "Imported scene",
+    extras: { sourceText: raw },
+  };
+
+// --- Parser: ai-character-chat character data -----------------------
+// Either a plain character object {botName, botDescription, scenario, chatLogs}
+// or the same wrapped in addCharacter{}.
+parseAiCharacterChat(obj) =>
+  if(!obj || typeof obj !== "object") return { ok: false, error: "ai-character-chat: not an object" };
+  let src = obj.addCharacter || obj;
+  let botName = asString(src.botName).trim();
+  let botDesc = asString(src.botDescription).trim();
+  let userName = asString(src.userName).trim();
+  let userDesc = asString(src.userDescription).trim();
+  let scenario = asString(src.scenario).trim();
+  let chatLogs = asString(src.chatLogs);
+  let botAvatar = asString(src.botAvatarUrl).trim();
+  let userAvatar = asString(src.userAvatarUrl).trim();
+  if(!botName && !botDesc && !chatLogs) {
+    return { ok: false, error: "ai-character-chat: no recognizable fields" };
+  }
+
+  // Substitute placeholders in narrative fields once we know the names.
+  let desc = substitutePlaceholders(botDesc, userName, botName);
+  let scen = substitutePlaceholders(scenario, userName, botName);
+  let userD = substitutePlaceholders(userDesc, userName, botName);
+
+  let messages = parseAiChatLogs(chatLogs, botName, userName);
+  // If chatLogs had a single message and no clear user/char split, the
+  // first message becomes our "opening" and there's no actual back-and-forth.
+  let openingMessage = "";
+  if(messages.length === 1 && messages[0].role === "assistant") {
+    openingMessage = messages[0].content;
+    messages = [];
+  }
+
+  return {
+    ok: true,
+    format: "ai-character-chat",
+    character: {
+      name: botName || "Imported Character",
+      description: desc,
+      appearance: "",  // bundled in description
+      avatar: botAvatar,
+    },
+    personality: {
+      name: userName,
+      description: userD,
+      appearance: "",
+      avatar: userAvatar,
+    },
+    scenario: scen,
+    openingMessage,
+    messages,
+    trackedInfo: "",
+    title: botName ? `with ${botName}` : "Imported scene",
+    extras: {
+      backgroundImageUrl: asString(src.backgroundImageUrl),
+      backgroundAudioUrl: asString(src.backgroundAudioUrl),
+    },
+  };
+
+// --- Parser: FurAI character JSON -----------------------------------
+// FurAI's standalone character format. Carries character only, no messages.
+// Has `ver` and `instruction` keys at root.
+parseFuraiCharacter(obj) =>
+  if(!obj || typeof obj !== "object") return { ok: false, error: "FurAI character: not an object" };
+  let name = asString(obj.name).trim();
+  let instruction = asString(obj.instruction).trim();
+  let openingMessage = asString(obj.openingMessage).trim();
+  let avatar = asString(obj.avatar).trim();
+  if(!name && !instruction) return { ok: false, error: "FurAI character: missing name/instruction" };
+  return {
+    ok: true,
+    format: "furai-character",
+    character: {
+      name: name || "Imported Character",
+      description: instruction,
+      appearance: "",
+      avatar,
+    },
+    personality: { name: "", description: "", appearance: "", avatar: "" },
+    scenario: "",
+    openingMessage,
+    messages: [],
+    trackedInfo: "",
+    title: name ? `with ${name}` : "Imported scene",
+    extras: {
+      hashTag: asString(obj.hashTag),
+      defaultSprite: asString(obj.defaultSprite),
+      // We keep these so users can later round-trip back to FurAI.
+      customEmotions: obj.customEmotions || {},
+      emotionAvatars: obj.emotionAvatars || {},
+      emotionSprites: obj.emotionSprites || {},
+      viewMode: asString(obj.viewMode),
+    },
+  };
+
+// --- Parser: FurAI single-chat export -------------------------------
+// Shape:  { chat: {id, title, messages: [{uid, role, content, ...}], ...}, profile: {...} }
+// Role in messages is "user" or "ai".
+parseFuraiChatExport(obj) =>
+  if(!obj || !obj.chat) return { ok: false, error: "FurAI export: missing 'chat' field" };
+  let chat = obj.chat;
+  let profile = obj.profile || {};
+
+  // Character info lives across chat + profile. The chat has the title;
+  // the profile has the bots[] (each with name/description) and user{}.
+  let bots = (profile.bots && profile.bots.length) ? profile.bots : [];
+  let firstBot = bots[0] || {};
+  let user = profile.user || {};
+
+  let charName = asString(firstBot.name || chat.title || "").trim();
+  let charDesc = asString(firstBot.description || firstBot.instruction || "").trim();
+  let charAvatar = asString(firstBot.avatar || "").trim();
+  let userName = asString(user.name || "").trim();
+  let userDesc = asString(user.description || "").trim();
+  let userAvatar = asString(user.avatar || "").trim();
+
+  let rawMessages = Array.isArray(chat.messages) ? chat.messages : [];
+  let messages = rawMessages.map(m => {
+    // FurAI uses role: "user" | "ai". Smart Story uses "user" | "assistant".
+    let role = m.role === "user" ? "user" : "assistant";
+    let content = substitutePlaceholders(asString(m.content || ""), userName, charName);
+    let out = { role, content };
+    if(m.createdAt) out.createdAt = m.createdAt;
+    return out;
+  }).filter(m => m.content);
+
+  return {
+    ok: true,
+    format: "furai-chat",
+    character: {
+      name: charName || "Imported Character",
+      description: substitutePlaceholders(charDesc, userName, charName),
+      appearance: "",
+      avatar: charAvatar,
+    },
+    personality: {
+      name: userName,
+      description: substitutePlaceholders(userDesc, userName, charName),
+      appearance: "",
+      avatar: userAvatar,
+    },
+    scenario: substitutePlaceholders(asString(chat.scenario || ""), userName, charName),
+    openingMessage: "",  // FurAI bakes the opening into the messages array
+    messages,
+    trackedInfo: "",
+    title: asString(chat.title || "").trim() || (charName ? `with ${charName}` : "Imported scene"),
+    extras: {
+      furaiViewMode: asString(chat.viewMode || ""),
+      furaiBackground: asString(chat.background || ""),
+      furaiReference: asString(chat.reference || ""),
+      furaiTimestamp: chat.timestamp,
+      sourceFormat: "FurAI single-chat export",
+    },
+  };
+
+// --- Parser: TavernAI v2 character card -----------------------------
+// Shape: { spec: "chara_card_v2", spec_version: "2.0", data: { name, description, personality, scenario, first_mes, mes_example, creator_notes, ... } }
+// Also handles v1 (the data fields at root, no spec wrapper).
+parseTavernCard(obj) =>
+  if(!obj || typeof obj !== "object") return { ok: false, error: "Tavern card: not an object" };
+  let isV2 = (obj.spec === "chara_card_v2" || obj.spec_version) && obj.data && typeof obj.data === "object";
+  let src = isV2 ? obj.data : obj;
+  let name = asString(src.name || "").trim();
+  let description = asString(src.description || "").trim();
+  let personality = asString(src.personality || "").trim();
+  let scenario = asString(src.scenario || "").trim();
+  let firstMes = asString(src.first_mes || src.firstMes || "").trim();
+  let avatar = asString(src.avatar || src.avatar_url || "").trim();
+  // Skip cards that look like our own export (round-trip safety).
+  // Note: the literal "tableau" string here is the app field in OUR backups,
+  // preserved from the app's original name for backup-file compatibility.
+  if(obj.app === "tableau") return { ok: false, error: "Tavern card: this is a Smart Story backup" };
+  if(!name && !description && !firstMes) {
+    return { ok: false, error: "Tavern card: no recognizable fields" };
+  }
+  // Compose voice/personality into one description (Tavern splits them).
+  let fullDesc = description;
+  if(personality) {
+    fullDesc = fullDesc ? (description + "\n\n# Personality\n" + personality) : personality;
+  }
+  return {
+    ok: true,
+    format: isV2 ? "tavern-v2" : "tavern-v1",
+    character: {
+      name: name || "Imported Character",
+      description: fullDesc,
+      appearance: "",
+      avatar,
+    },
+    personality: { name: "", description: "", appearance: "", avatar: "" },
+    scenario,
+    openingMessage: firstMes,
+    messages: [],
+    trackedInfo: "",
+    title: name ? `with ${name}` : "Imported scene",
+    extras: {
+      creator: asString(src.creator || ""),
+      creator_notes: asString(src.creator_notes || ""),
+      tags: src.tags || [],
+      mes_example: asString(src.mes_example || ""),
+      character_version: asString(src.character_version || ""),
+    },
+  };
+
+// --- Parser: TavernAI / SillyTavern group chat ---------------------
+// Input: an array of parsed JSONL records from a SillyTavern group chat
+// export (.jsonl file). The first record is the chat header; subsequent
+// records are messages.
+//
+// What we know about this format (verified against SillyTavern source):
+//   - First record has `chat_metadata` and identifies the chat
+//   - Group chats: first message has `is_group: true` flag
+//   - Each message has: name (speaker), is_user (boolean), is_system
+//     (boolean, optional), send_date (string OR number), mes (the text),
+//     plus optional force_avatar, original_avatar, extra, swipes
+//
+// Reality: the .jsonl does NOT carry character defs. It only references
+// characters by name. So we reconstruct SKELETAL character entries from
+// the unique non-user/non-system speakers. Users can flesh out the
+// characters' descriptions/appearances after import via Settings, or
+// import each character's PNG card separately via "ADD TO LIBRARY".
+//
+// Returns the standard import shape with two new fields:
+//   - cast: array of additional characters beyond the primary (empty for
+//           single-character chats; non-empty for groups)
+//   - multiCharacter: true when cast is non-empty (signals the UI to
+//           offer multi-character import flows)
+parseTavernGroupChat(records) =>
+  if(!Array.isArray(records) || records.length === 0) {
+    return { ok: false, error: "TavernAI group chat: no records" };
+  }
+
+  // First record should be a header with chat_metadata. We tolerate
+  // missing headers (older exports / hand-edited files) by treating
+  // everything as messages and skipping any record that lacks `mes`.
+  let header = null;
+  let messageRecords = [];
+  if(records[0] && typeof records[0] === "object" && (records[0].chat_metadata || records[0].user_name)) {
+    header = records[0];
+    messageRecords = records.slice(1);
+  } else {
+    messageRecords = records.slice();
+  }
+
+  // Determine the user's name. SillyTavern stores it in the header
+  // (`user_name`) and on each user message (`name` with `is_user: true`).
+  // Prefer the header value; fall back to scanning messages.
+  let userName = "";
+  if(header && header.user_name) userName = asString(header.user_name).trim();
+  if(!userName) {
+    for(let r of messageRecords) {
+      if(r && r.is_user && r.name) { userName = asString(r.name).trim(); break; }
+    }
+  }
+  if(!userName) userName = "User";
+
+  // Collect unique non-user, non-system speakers in order of first appearance.
+  // These become the cast (skeletal characters).
+  let speakerSet = new Map();   // name -> { firstAvatar, firstMessage }
+  for(let r of messageRecords) {
+    if(!r || typeof r !== "object") continue;
+    if(!r.mes) continue;
+    if(r.is_user) continue;
+    if(r.is_system) continue;
+    let n = asString(r.name).trim();
+    if(!n) continue;
+    if(n === userName) continue;
+    if(!speakerSet.has(n)) {
+      speakerSet.set(n, {
+        firstAvatar: asString(r.force_avatar || r.original_avatar || "").trim(),
+      });
+    }
+  }
+  let speakerNames = Array.from(speakerSet.keys());
+
+  // The "primary" character — used as the import's main subject when the
+  // UI offers single-character paths. We pick the FIRST roster member
+  // (most chats open with one character's greeting, then others join in).
+  let primary = speakerNames[0] || "Imported Character";
+  let cast = speakerNames.slice(1).map(n => ({
+    name: n,
+    description: "",      // not in the .jsonl
+    appearance: "",
+    avatar: speakerSet.get(n).firstAvatar,
+  }));
+
+  // Translate messages into the normalized shape. Each non-user/non-system
+  // message carries its speakerName (the character's display name); the
+  // import flow will resolve speakerName to a characterId after the
+  // characters are added to the library.
+  let outMessages = [];
+  let openingMessage = "";
+  let scenario = "";
+  // SillyTavern stores scenario in chat metadata on some exports. Best-effort.
+  if(header && header.chat_metadata && typeof header.chat_metadata === "object") {
+    // SillyTavern doesn't put scenario in chat_metadata by default — but
+    // some plugins do. Tolerate either shape.
+    let m = header.chat_metadata;
+    if(m.scenario) scenario = asString(m.scenario).trim();
+    else if(m.world_info && m.world_info.scenario) scenario = asString(m.world_info.scenario).trim();
+  }
+  for(let r of messageRecords) {
+    if(!r || typeof r !== "object") continue;
+    if(!r.mes) continue;
+    // is_system messages in SillyTavern are "system_message_types" — they
+    // include things like /sys commands, internal markers, etc. We
+    // generally drop them since they don't correspond to story content.
+    // Exception: explicit narrator-style scene direction would be useful
+    // but ST has no marker for it; we skip is_system entirely.
+    if(r.is_system) continue;
+    let text = asString(r.mes).trim();
+    if(!text) continue;
+    if(r.is_user) {
+      outMessages.push({ role: "user", content: text });
+    } else {
+      let speakerName = asString(r.name).trim();
+      outMessages.push({
+        role: "assistant",
+        content: text,
+        speakerName: speakerName || primary,
+      });
+    }
+  }
+
+  // If the very first message is from the primary character (a greeting
+  // and no user turn before it), pull it out as the openingMessage so
+  // the import flow can treat it as the scene-opening line rather than
+  // a regular message. Only do this when message[0] is from primary AND
+  // there are no user messages before it.
+  // (Single-line condition — the Perchance DSL parser is whitespace-sensitive
+  // and misreads continuation indentation as list nesting.)
+  if(outMessages.length > 0 && outMessages[0].role === "assistant" && outMessages[0].speakerName === primary) {
+    openingMessage = outMessages[0].content;
+    outMessages = outMessages.slice(1);
+  }
+
+  return {
+    ok: true,
+    format: "tavern-group-chat",
+    character: {
+      name: primary,
+      description: "",   // not present in .jsonl
+      appearance: "",
+    },
+    personality: {
+      name: userName === "User" ? "" : userName,  // don't default-set "User" as persona name
+      description: "",
+      appearance: "",
+    },
+    scenario,
+    openingMessage,
+    messages: outMessages,
+    trackedInfo: "",
+    title: cast.length
+      ? `Group chat with ${primary}${cast.length === 1 ? ` and ${cast[0].name}` : ` and ${cast.length} others`}`
+      : `with ${primary}`,
+    cast,
+    multiCharacter: cast.length > 0,
+    extras: {
+      messageCount: outMessages.length,
+      castCount: cast.length + 1,  // primary + cast
+      hadHeader: !!header,
+    },
+  };
+
+// Parse JSONL text — one JSON object per line. Returns the array of
+// parsed objects, skipping blank lines and lines that fail to parse
+// (graceful degradation matches SillyTavern's own loader).
+parseJsonlLines(text) =>
+  let out = [];
+  let lines = asString(text).split(/\r?\n/);
+  for(let line of lines) {
+    let t = line.trim();
+    if(!t) continue;
+    try {
+      let parsed = JSON.parse(t);
+      out.push(parsed);
+    } catch(e) {
+      // Skip malformed lines — match SillyTavern's tolerant behavior.
+    }
+  }
+  return out;
+
+// --- Parser: Smart Story native backup ------------------------------
+// Our own export format ("app" : "tableau"). Round-trips perfectly.
+// The on-disk format string is "tableau" (preserved from the app's
+// original name) so backups from older builds still detect — do not
+// change the literal string.
+parseTableauBackup(obj) =>
+  if(!obj || obj.app !== "tableau") return { ok: false, error: "Smart Story: missing app marker" };
+  // Smart Story backups carry the full state and are restored by the importer
+  // differently — through a dedicated restore path. We still produce the
+  // normalized shape here so the UI can preview.
+  let char = obj.character || { name: "", description: "", appearance: "" };
+  let pers = obj.personality || { name: "", description: "", appearance: "" };
+  return {
+    ok: true,
+    format: "tableau-backup",
+    character: { name: asString(char.name), description: asString(char.description), appearance: asString(char.appearance) },
+    personality: { name: asString(pers.name), description: asString(pers.description), appearance: asString(pers.appearance) },
+    scenario: asString(obj.scenarioDefault || ""),
+    openingMessage: "",
+    messages: [],
+    trackedInfo: "",
+    title: "Smart Story backup",
+    extras: {
+      isTableauBackup: true,
+      raw: obj,    // the full backup blob; the UI restore path will use this.
+      chatCount: (obj.chats || []).length,
+      messageCount: (obj.messages || []).length,
+    },
+  };
+
+// --- Factory dispatcher -------------------------------------------
+// Takes either a string (paste/file contents) or an already-parsed object.
+// Tries each parser in order of specificity; returns the first that succeeds.
+detectAndParseImport(input, sourceHint) =>
+  let obj = null;
+  let jsonlRecords = null;  // set when we successfully parsed as JSONL
+  if(typeof input === "string") {
+    let trimmed = input.trim();
+    if(!trimmed) return { ok: false, error: "Empty input." };
+    // GUARD: a very common mistake is saving the Perchance PAGE (Save As)
+    // instead of the character file, producing a multi-MB HTML document
+    // named like a .gz. Detect it up front: give a structured, actionable
+    // error (the UI renders code-tagged errors as a step-by-step help block)
+    // and never run megabytes of HTML through the parsers on the main thread.
+    let head = trimmed.slice(0, 200).toLowerCase();
+    if(head.indexOf("<!doctype") === 0 || head.indexOf("<html") === 0 || (head.indexOf("<head") !== -1 && head.indexOf("<title") !== -1)) {
+      let isPerchance = trimmed.slice(0, 4000).indexOf("perchance.org") !== -1;
+      // Recover the real upload id so we can offer a direct download link.
+      // Prefer the source hint (the share URL or filename the user gave),
+      // which carries ...~FILEID.gz; fall back to scanning the page text.
+      let hint = asString(sourceHint);
+      let fileUrl = "";
+      let hintMatch = hint.match(/~([a-z0-9]{16,}\.gz)/i) || hint.match(/([a-z0-9]{24,}\.gz)/i);
+      if(hintMatch) fileUrl = "https://user.uploads.dev/file/" + hintMatch[1];
+      if(!fileUrl) {
+        let idMatch = trimmed.match(/user\.uploads\.dev\/file\/([a-z0-9]{16,}\.gz)/i);
+        if(idMatch) fileUrl = "https://user.uploads.dev/file/" + idMatch[1];
+      }
+      return { ok: false,
+        code: isPerchance ? "saved-page" : "html-not-data",
+        error: isPerchance
+          ? "This is a saved Perchance web page, not your character."
+          : "This is an HTML web page, not character data.",
+        detail: "The file is " + Math.round(trimmed.length/1048576*10)/10 + " MB of page HTML \u2014 it was almost certainly saved with the browser's \"Save Page As\" instead of downloading the character file. Your character is not inside it.",
+        fileUrl: fileUrl,
+        steps: [
+          "Easiest: switch to the URL tab above and paste the full share link (the perchance.org/ai-character-chat?data=NAME~FILEID.gz link). This app will fetch and decode the real file for you.",
+          (fileUrl ? ("Or download the real file directly: right-click this link and choose \"Save Link As\" \u2014 " + fileUrl) : "Or open the share link, then right-click the download and choose \"Save Link As\" (not \"Save Page As\")."),
+          "A correct character file is small (a few KB) and its name really is the upload id ending in .gz. If you downloaded 2-3 MB, you grabbed the page again.",
+          "Still stuck? Run the file through the AICC Save Recovery tool, which inspects what a file really is and salvages anything usable."
+        ],
+        repairTool: "https://perchance.org/aicc-save-recovery" };
+    }
+    // GUARD: cap pathological sizes so a wrong file can never lock the UI.
+    if(trimmed.length > 6000000) return { ok: false, code: "too-large", error: "This file is too large to be character data (" + Math.round(trimmed.length/1048576) + " MB).", detail: "Exported characters are small. A multi-megabyte file is almost always a saved web page or an unrelated file.", steps: ["Re-download the character using \"Save Link As\" on the direct file link, or use the URL tab to let the app fetch it.", "If you meant to import a full Smart Story backup, those are supported \u2014 but this one is unusually large; check it is the right file."], repairTool: "https://perchance.org/aicc-save-recovery" };
+    // Try JSON first.
+    if(trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        obj = JSON.parse(trimmed);
+      } catch(e) {
+        // JSON.parse failed — but this might be JSONL (one JSON object
+        // per line), used by SillyTavern group chat exports. Detect by
+        // checking the first line parses cleanly on its own AND the
+        // input contains additional lines.
+        if(trimmed.indexOf("\n") > 0) {
+          let firstNl = trimmed.indexOf("\n");
+          let firstLine = trimmed.slice(0, firstNl).trim();
+          if(firstLine.startsWith("{") || firstLine.startsWith("[")) {
+            try {
+              JSON.parse(firstLine);   // probe — does line-1 parse?
+              jsonlRecords = parseJsonlLines(trimmed);
+            } catch(e2) {
+              return { ok: false, error: "Looks like JSON but failed to parse: " + (e.message || e) };
+            }
+          } else {
+            return { ok: false, error: "Looks like JSON but failed to parse: " + (e.message || e) };
+          }
+        } else {
+          return { ok: false, error: "Looks like JSON but failed to parse: " + (e.message || e) };
+        }
+      }
+    } else if(/^name\s*:/i.test(trimmed)) {
+      // FurAI human-readable text.
+      return parseFuraiHumanReadable(trimmed);
+    } else {
+      return { ok: false, error: "Unrecognized format. Expected JSON, FurAI text starting with 'Name:', or a Perchance URL." };
+    }
+  } else if(Array.isArray(input)) {
+    // Already-parsed array — could be JSONL records.
+    jsonlRecords = input;
+  } else if(typeof input === "object" && input !== null) {
+    obj = input;
+  } else {
+    return { ok: false, error: "Unsupported input type." };
+  }
+
+  // JSONL path: SillyTavern group/single chat exports. Dispatch to the
+  // group chat parser, which handles both single-character and
+  // multi-character chats (single-character produces an empty cast).
+  if(jsonlRecords) {
+    return parseTavernGroupChat(jsonlRecords);
+  }
+
+  // Dispatch by shape — most specific first.
+  if(obj.app === "tableau") return parseTableauBackup(obj);
+  if(obj.spec === "chara_card_v2" || obj.spec_version) return parseTavernCard(obj);
+  if(obj.chat && (obj.profile || obj.chat.messages !== undefined)) return parseFuraiChatExport(obj);
+  if(obj.ver && (obj.instruction || obj.openingMessage)) return parseFuraiCharacter(obj);
+  if(obj.botName !== undefined || obj.botDescription !== undefined || obj.chatLogs !== undefined) return parseAiCharacterChat(obj);
+  if(obj.addCharacter) return parseAiCharacterChat(obj);
+  // Generic Tavern-shaped JSON (just has the fields).
+  if(obj.name || obj.description || obj.first_mes) return parseTavernCard(obj);
+
+  return { ok: false, error: "Unrecognized format. Could not identify the import source." };
+
+// --- URL fetcher for share links -----------------------------------
+// Handles the two URL conventions used by AI chat apps:
+//   1. ai-character-chat: https://perchance.org/...#data=NAME~FILEID  (gzip-compressed JSON at user.uploads.dev/file/FILEID)
+//   2. FurAI: https://perchance.org/...?char_import=https://.../file.json
+//   3. Generic: any direct URL that resolves to JSON
+//
+// Returns { ok: true, text } or { ok: false, error }.
+async fetchImportFromUrl(url) =>
+  url = asString(url).trim();
+  if(!url) return { ok: false, error: "Empty URL." };
+
+  try {
+    // Case 1: ai-character-chat share link with #data=NAME~FILEID
+    let aiccMatch = url.match(/[#?&]data=([^~&]+)~([^&]+)/);
+    if(aiccMatch) {
+      let fileId = aiccMatch[2];
+      let fetchUrl = `https://user.uploads.dev/file/${fileId}`;
+      let res = await fetch(fetchUrl);
+      if(!res.ok) return { ok: false, error: `Fetch failed (${res.status}) for ${fetchUrl}` };
+      // Try gzip decompression first (their format), fall back to plain JSON.
+      try {
+        let blob = await res.blob();
+        let ds = new DecompressionStream("gzip");
+        let stream = blob.stream().pipeThrough(ds);
+        let text = await new Response(stream).text();
+        return { ok: true, text };
+      } catch(e) {
+        // Decompression failed — the upload may be plain JSON, OR the
+        // server returned an HTML error/quarantine page instead of the file.
+        let res2 = await fetch(fetchUrl);
+        let text = await res2.text();
+        let head = text.slice(0, 200).toLowerCase();
+        if(head.indexOf("<!doctype") === 0 || head.indexOf("<html") === 0) {
+          return { ok: false, code: "server-returned-page",
+            error: "The share file could not be downloaded — the server returned a web page instead of character data.",
+            detail: "This usually means the upload was removed or quarantined, so there is nothing to fetch at that link.",
+            steps: [
+              "Check whether the file was quarantined: open perchance.org/quarantined-files",
+              "Ask the person who shared the character to send a fresh export.",
+              "If you have any saved copy of the file, the AICC Save Recovery tool can tell you what it really is and salvage anything usable."
+            ],
+            repairTool: "https://perchance.org/aicc-save-recovery" };
+        }
+        return { ok: true, text };
+      }
+    }
+
+    // Case 2: FurAI char_import link
+    let furaiMatch = url.match(/[?&]char_import=(https?:\/\/[^&]+)/);
+    if(furaiMatch) {
+      let target = decodeURIComponent(furaiMatch[1]);
+      let res = await fetch(target);
+      if(!res.ok) return { ok: false, error: `Fetch failed (${res.status}) for ${target}` };
+      let text = await res.text();
+      return { ok: true, text };
+    }
+
+    // Case 3: Direct URL — fetch it and let the parser figure it out.
+    if(/^https?:\/\//i.test(url)) {
+      let res = await fetch(url);
+      if(!res.ok) return { ok: false, error: `Fetch failed (${res.status}) for ${url}` };
+      let text = await res.text();
+      return { ok: true, text };
+    }
+
+    return { ok: false, error: "URL doesn't match any known import pattern." };
+  } catch(e) {
+    return { ok: false, error: (e && e.message) || String(e) };
+  }
