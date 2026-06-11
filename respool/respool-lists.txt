@@ -1,0 +1,162 @@
+TITLE
+  respool — replay an AI character chat's memories
+TAGS
+  ai, ai-chat, ai-character-chat, chatbot, memory, summary, visualizer, replay, tool, perchance, roleplay, utility
+DESCRIPTION 
+  Load an ai-character-chat export or share link, pick a thread and watch its long-term Memories rebuild in chronological order — either regenerated live by the AI or replayed straight from the file. Scrub the playhead, change the time scale, and export the replay as a shareable link.
+
+
+aiTextPlugin = {import:ai-text-plugin}                       // regenerate summaries + memory entries
+superFetch = {import:super-fetch-plugin}                     // fetch share/file links server-side (bypasses CORS)
+uploadPlugin = {import:upload-plugin}                        // store an exported session, get back a share URL
+fullscreenButtonPlugin = {import:fullscreen-button-plugin}   // optional fullscreen toggle in the header
+
+
+// ---- share-preview / SEO metadata ------------------------------------------
+$meta
+  header
+    mode = minimal
+  async dynamic(inputs) =>
+    let defaults = {
+      title: `respool — replay an AI character chat's memories`,
+      description: `Rewind an ai-character-chat session and watch its long-term Memories re-form in order, as the conversation replays. Free, online, no sign-up. Made with respool on Perchance.`,
+    };
+    try {
+      let dataParam = inputs.urlParams && inputs.urlParams.data;
+      if(!dataParam) return defaults;
+      let fileName = dataParam.split("~").slice(-1)[0];
+      if(!fileName) return defaults;
+      let fileUrl = "https://user.uploads.dev/file/" + fileName;
+      let resp = await fetch(fileUrl, { signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : null });
+      if(!resp || !resp.ok) return defaults;
+      let blob = await resp.blob();
+      let text;
+      if(fileName.endsWith(".gz")) {
+        const ds = new DecompressionStream("gzip");
+        let decompressed = await new Response(blob.stream().pipeThrough(ds)).blob();
+        text = await decompressed.text();
+      } else {
+        text = await blob.text();
+      }
+      let data = JSON.parse(text);
+      let tables = (data && data.data && data.data.data) ? data.data.data : [];
+      let threadsT = tables.find(t => t.tableName === "threads");
+      let charsT = tables.find(t => t.tableName === "characters");
+      let thread = threadsT && threadsT.rows && threadsT.rows[0];
+      let character = charsT && charsT.rows && charsT.rows[0];
+      let charName = (character && character.name) || (thread && thread.character && thread.character.name) || "";
+      let threadName = (thread && (thread.name || (thread.character && thread.character.name))) || charName || "an AI character chat";
+      let avatar = (character && (character.avatarUrl || (character.avatar && character.avatar.url)))
+        || (thread && thread.character && thread.character.avatar && thread.character.avatar.url) || undefined;
+      return {
+        title: `Replaying “${threadName}” — respool`,
+        description: `Watch the memories of ${charName ? (charName + "’s chat") : "this AI character chat"} re-form in order as the conversation replays. Made on Perchance.`,
+        image: avatar,
+      };
+    } catch(e) {
+      console.error("respool $meta.dynamic:", e);
+      return defaults;
+    }
+
+
+// ---- IMPORT side: fetch + decompress a cloud-stored session ----------------
+async loadSessionFromUrl(url) =>
+  if(!url) throw new Error("No URL provided.");
+  // normalise a ?data=Name~hash share link to its uploads.dev file
+  try {
+    let u = new URL(url);
+    let dataParam = u.searchParams.get("data");
+    if(dataParam) {
+      let fileName = dataParam.split("~").slice(-1)[0];
+      if(fileName) url = "https://user.uploads.dev/file/" + fileName;
+    }
+  } catch(e) { }
+  let resp = null;
+  if(typeof superFetch === "function") {
+    try { resp = await superFetch(url); } catch(e) { resp = null; }
+  }
+  if(!resp || !resp.ok) {
+    resp = await fetch(url);
+  }
+  if(!resp || !resp.ok) throw new Error("Could not fetch that link (status " + (resp ? resp.status : "no response") + ").");
+  let blob = await resp.blob();
+  let bytes = new Uint8Array(await blob.arrayBuffer());
+  let isGzip = bytes.length > 2 && bytes[0] === 31 && bytes[1] === 139;
+  let text;
+  if(isGzip) {
+    let decompressedBlob = await decompressBlobWithGzip(blob);
+    text = await decompressedBlob.text();
+  } else {
+    text = await blob.text();
+  }
+  return JSON.parse(text);
+
+
+// ---- EXPORT side: gzip + upload a session, return a shareable respool link --
+async generateShareLinkForSession(sessionJson) =>
+  if(!window.CompressionStream) {
+    return { error: "Your browser doesn't support the compression feature share links need. Try a recent Chrome, Edge or Firefox." };
+  }
+  try {
+    let jsonString = JSON.stringify(sessionJson);
+    let blob = new Blob([jsonString], { type: "application/json" });
+    let compressedBlob = await compressBlobWithGzip(blob);
+    let uploadResult = await uploadPlugin(compressedBlob);
+    let uploadError = uploadResult && uploadResult.error;
+    if(uploadError) return { error: String(uploadError) };
+    let url = String((uploadResult && uploadResult.url) ? uploadResult.url : uploadResult);
+    if(!url || url === "undefined") return { error: "Upload failed — no URL was returned." };
+    let fileName = url.replace("https://user.uploads.dev/file/", "");
+    let label = "session";
+    try {
+      let tables = sessionJson.data.data;
+      let threadsT = tables.find(t => t.tableName === "threads");
+      let nm = threadsT && threadsT.rows[0] && (threadsT.rows[0].name || (threadsT.rows[0].character && threadsT.rows[0].character.name));
+      if(nm) label = nm.replace(/\s+/g, "_").replaceAll("~", "");
+    } catch(e) { }
+    let shareUrl = `https://perchance.org/${window.generatorName}?data=${label}~${fileName}`;
+    return { shareUrl: shareUrl, url: url };
+  } catch(e) {
+    console.error("respool export:", e);
+    return { error: String(e && e.message ? e.message : e) };
+  }
+
+
+// ---- gzip helpers (mirror the ai-character-chat originals) -----------------
+async compressBlobWithGzip(blob) =>
+  const cs = new CompressionStream("gzip");
+  const compressedStream = blob.stream().pipeThrough(cs);
+  let outputBlob = await new Response(compressedStream).blob();
+  return new Blob([outputBlob], { type: "application/gzip" });
+
+async decompressBlobWithGzip(blob) =>
+  const ds = new DecompressionStream("gzip");
+  const decompressedStream = blob.stream().pipeThrough(ds);
+  return await new Response(decompressedStream).blob();
+
+
+// ---- flavour lists + a small generator (used by the panel's loader) --------
+loadingLines
+  Rewinding the tape
+  Re-spooling the conversation
+  Finding where the story bends
+  Winding back through the chat
+  Letting the context fill up
+  Catching the moments worth keeping
+  Condensing the long way round
+  Threading the memories back in
+
+randomLoadingLine() => loadingLines.selectOne
+
+// A couple more lists, kept for reuse / future surfaces.
+emptyStateTips
+  This chat may be too short to need summarising yet — try Simple timing.
+  Memories appear in bursts, only when the context fills up.
+  Scrub the playhead to jump to any moment in the rebuild.
+
+randomTip() => emptyStateTips.selectOne
+
+
+// ---- $output: text fallback for non-panel contexts -------------------------
+$output
+  respool — [loadingLines]… open the app to replay an AI chat's memories.

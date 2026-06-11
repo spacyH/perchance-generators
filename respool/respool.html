@@ -1,0 +1,1870 @@
+<!--
+  respool  —  Perchance generator HTML panel
+  Regenerate / replay the "Memories" of an ai-character-chat session, in order,
+  as if the chat were being replayed, with a scrubbable playhead and a live
+  time-scale slider.
+
+  by west-ninja  ·  deviantart.com/west-ninja  ·  github.com/therealwestninja
+
+  Pairs with the top-editor lists in respool-lists.txt
+  (it imports ai-text-plugin, super-fetch-plugin and fullscreen-button-plugin).
+
+  NOTE ON THE PERCHANCE PARSER: this panel's raw source is scanned for
+  template-style brace/bracket patterns before JS runs, and that scan includes
+  comments and strings. Template substitutions written with a leading dollar
+  sign are SAFE (the live chat panel uses them 500+ times). We never write a
+  standalone single-word brace or square-bracket token. The chat wire-format
+  double-square brackets, the doubled-brace user/char vars, the letter-labelled
+  block markers A/B/C and the triple-backtick code fences are all built from
+  char codes at runtime (see engine.js BR and the C constants below).
+-->
+
+<div id="app">
+  <header id="topbar">
+    <div class="brand">
+      <span class="logo">🧠⟲</span>
+      <div>
+        <h1>respool</h1>
+        <p class="sub">Rewind an ai-character-chat session and watch its memories re-form, in order.</p>
+      </div>
+    </div>
+    <div id="fullscreenSlot"></div>
+  </header>
+
+  <!-- STAGE 1: load -->
+  <section id="loadStage" class="card">
+    <h2>1 · Load a chat</h2>
+    <p class="muted">Paste an ai-character-chat share/file link, or drop an exported
+      <code>.cbor.gz</code> / <code>.gz</code> / <code>.zip</code> / <code>.json</code> save.</p>
+
+    <div class="row">
+      <input id="urlInput" type="text" spellcheck="false"
+        placeholder="https://user.uploads.dev/file/…  or  https://perchance.org/ai-character-chat?data=Name~hash.gz" />
+      <button id="loadUrlBtn" class="primary">Load link</button>
+    </div>
+
+    <div id="dropZone" class="dropzone">
+      <input id="fileInput" type="file" accept=".gz,.cbor.gz,.zip,.json,application/json,application/gzip,application/zip" hidden />
+      <span>Drop a save file here, or <button id="pickFileBtn" class="link">choose a file</button></span>
+    </div>
+
+    <div id="loadStatus" class="status" hidden></div>
+  </section>
+
+  <!-- STAGE 2: pick a thread -->
+  <section id="pickStage" class="card" hidden>
+    <h2>2 · Choose a thread to replay</h2>
+    <p class="muted" id="pickSummary"></p>
+    <div id="threadList" class="thread-list"></div>
+    <div class="row right">
+      <button id="backToLoadBtn" class="link">← load a different file</button>
+    </div>
+  </section>
+
+  <!-- STAGE 3: replay -->
+  <section id="replayStage" hidden>
+    <div class="stage-head">
+      <button id="backToThreadsBtn" class="link back-btn" title="Pick a different thread/character from this file">← Threads</button>
+      <span class="muted tiny" id="replayThreadName"></span>
+    </div>
+    <div class="card controls">
+      <div class="ctl-line">
+        <button id="playBtn" class="primary" title="Play / pause">▶ Play</button>
+        <button id="restartBtn" title="Back to start">⟲</button>
+
+        <label class="seg" title="How memories are produced">
+          Source
+          <select id="sourceSel">
+            <option value="ai">Regenerate (live AI)</option>
+            <option value="file">Replay from file</option>
+          </select>
+        </label>
+
+        <label class="seg" title="When memories appear">
+          Timing
+          <select id="timingSel">
+            <option value="faithful">Faithful (bursts)</option>
+            <option value="simple">Simple (every ~1500 chars)</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="ctl-line">
+        <label class="grow">
+          Time scale <span id="speedLabel" class="badge">8 msg/s</span>
+          <input id="speedSlider" type="range" min="0" max="100" value="62" />
+          <span class="ends"><span>slow</span><span>instant</span></span>
+        </label>
+      </div>
+
+      <div class="ctl-line">
+        <label class="grow">
+          Playhead <span id="posLabel" class="badge">0 / 0</span>
+          <input id="scrub" type="range" min="0" max="0" value="0" />
+        </label>
+      </div>
+
+      <div id="genBar" class="genbar" hidden>
+        <div class="genbar-fill" id="genFill"></div>
+        <span id="genText" class="genbar-text"></span>
+      </div>
+
+      <div class="ctl-line">
+        <button id="exportToggle" title="Save the regenerated memories back out">💾 Save / export ▾</button>
+      </div>
+
+      <div id="exportPanel" class="export-panel" hidden>
+        <p class="muted tiny">Writes the regenerated memories back into the data. Generate them first for a complete file.</p>
+        <div class="ctl-line">
+          <button id="genAllBtn">⚙ Generate all memories</button>
+          <span id="genAllNote" class="muted tiny"></span>
+        </div>
+
+        <div class="export-opt lore-step">
+          <div class="eo-head">✦ Promote memories to Lore <span class="muted tiny">— consolidate them into a lorebook with trigger keywords</span></div>
+          <div class="ctl-line">
+            <button id="promoteLoreBtn">✦ Promote to lore</button>
+            <span id="loreNote" class="muted tiny"></span>
+          </div>
+          <div id="loreList" class="lore-list" hidden></div>
+          <div class="ctl-line" id="loreActions" hidden>
+            <button id="dlLoreTxt">⬇ lorebook .txt</button>
+          </div>
+        </div>
+
+        <div class="export-opt">
+          <div class="eo-head">① Single character <span class="muted tiny">— a portable character that already knows the learned facts</span></div>
+          <div class="ctl-line">
+            <button id="dlCharGz" class="primary">⬇ download .gz</button>
+            <button id="dlCharJson">⬇ download .json</button>
+            <button id="upChar">⇪ upload &amp; link</button>
+          </div>
+          <label class="seg" id="charLoreOpt" hidden><input type="checkbox" id="charAttachLore" checked /> attach promoted lore as a lorebook (uploads a file)</label>
+        </div>
+
+        <div class="export-opt">
+          <div class="eo-head">② Back into the file <span class="muted tiny">— the whole save, with memories written in</span></div>
+          <div class="ctl-line">
+            <label class="seg"><input type="radio" name="fileMode" value="replace" checked /> replace this thread</label>
+            <label class="seg"><input type="radio" name="fileMode" value="append" /> append as a copy</label>
+          </div>
+          <label class="seg" id="fileLoreOpt" hidden><input type="checkbox" id="fileIncludeLore" checked /> also write promoted lore into the file</label>
+          <div class="ctl-line">
+            <button id="dlFile" class="primary">⬇ download updated save</button>
+            <button id="upFile">⇪ upload &amp; link</button>
+          </div>
+        </div>
+
+        <div id="exportOut" class="share-out" hidden>
+          <input id="exportUrl" type="text" readonly spellcheck="false" />
+          <button id="exportCopy" class="link">copy</button>
+        </div>
+        <div id="exportStatus" class="muted tiny"></div>
+
+        <div class="ctl-line" style="margin-top:12px; border-top:1px solid var(--line-soft); padding-top:12px;">
+          <button id="anotherCharBtn">← Process another character from this file</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="split">
+      <div class="card transcript-wrap">
+        <h3>Transcript <span class="muted" id="transcriptMeta"></span></h3>
+        <div id="transcript" class="transcript"></div>
+      </div>
+
+      <div class="card memories-wrap">
+        <h3>Memories <span class="badge" id="memCount">0</span></h3>
+        <p class="muted tiny">Timeless facts condensed from the chat as context fills up.</p>
+        <div id="memories" class="memories"></div>
+      </div>
+    </div>
+  </section>
+
+  <footer id="footer">
+    <span>respool</span> · made by
+    <a href="https://deviantart.com/west-ninja" target="_blank" rel="noopener">west-ninja</a> ·
+    <a href="https://github.com/therealwestninja" target="_blank" rel="noopener">github.com/therealwestninja</a>
+  </footer>
+</div>
+
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0f1216;
+    --bg-grad: radial-gradient(1100px 520px at 50% -8%, #1a1f29 0%, #0f1216 60%);
+    --card: #171b22;
+    --card2: #1e232c;
+    --line: #2a313d;
+    --line-soft: #232a34;
+    --ink: #e9ecf1;          /* soft white, not pure */
+    --ink-dim: #c4cad4;
+    --muted: #9098a6;        /* readable muted */
+    --accent: #9d8bff;
+    --accent-2: #6f5cff;
+    --accent-ink: #0f1216;
+    --user: #5fd9c2;
+    --ai: #b3a6ff;
+    --sys: #e6b85c;
+    --mem: #ff9e78;
+    --lore: #7ec8ff;
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 28px rgba(0,0,0,.28);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 15.5px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  body { background: var(--bg-grad); background-attachment: fixed; }
+  #app { max-width: 1080px; margin: 0 auto; padding: 16px 16px 48px; }
+  ::selection { background: color-mix(in srgb, var(--accent) 40%, transparent); }
+
+  #topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  .brand { display: flex; align-items: center; gap: 13px; }
+  .logo { font-size: 30px; filter: saturate(1.1); }
+  h1 { font-size: 21px; margin: 0; letter-spacing: -0.015em; font-weight: 700; }
+  .sub { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
+
+  .card { background: var(--card); border: 1px solid var(--line-soft);
+    border-radius: var(--radius); padding: 17px 18px; margin-bottom: 14px; box-shadow: var(--shadow); }
+  h2 { font-size: 15.5px; margin: 0 0 7px; font-weight: 650; }
+  h3 { font-size: 14px; margin: 0 0 9px; display: flex; align-items: center; gap: 8px; font-weight: 650; color: var(--ink); }
+  .muted { color: var(--muted); font-size: 13px; }
+  .tiny { font-size: 12px; }
+  code { background: var(--card2); padding: 1px 5px; border-radius: 5px; font-size: 12px; color: var(--ink-dim); }
+
+  .row { display: flex; gap: 8px; margin-top: 10px; align-items: center; }
+  .row.right { justify-content: flex-end; }
+  .grow { flex: 1; }
+  input[type=text] { flex: 1; min-width: 0; padding: 11px 13px; border-radius: 10px;
+    border: 1px solid var(--line); background: #12161c; color: var(--ink); font: inherit; }
+  input[type=text]::placeholder { color: #6b7280; }
+  input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+
+  button { font: inherit; cursor: pointer; border-radius: 10px; padding: 9px 14px;
+    border: 1px solid var(--line); background: #232932; color: var(--ink); transition: border-color .12s, background .12s, transform .04s; }
+  button:hover { border-color: var(--accent); background: #2a313c; }
+  button:active { transform: translateY(1px); }
+  button.primary { background: linear-gradient(180deg, var(--accent), var(--accent-2));
+    color: var(--accent-ink); border-color: transparent; font-weight: 650; }
+  button.primary:hover { filter: brightness(1.06); border-color: transparent; }
+  button:disabled { opacity: .5; cursor: default; }
+  button.link { background: none; border: none; color: var(--accent); padding: 4px; text-decoration: underline; }
+  button.link:hover { background: none; color: #c2b6ff; }
+  button.ghost { background: transparent; }
+
+  .dropzone { margin-top: 12px; border: 1.5px dashed var(--line); border-radius: 12px;
+    padding: 22px; text-align: center; color: var(--muted); transition: .15s; background: #12161c; }
+  .dropzone.drag { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, #12161c); color: var(--ink); }
+  .dropzone button.link { color: var(--accent); }
+
+  .status { margin-top: 12px; padding: 11px 13px; border-radius: 10px; background: var(--card2);
+    font-size: 13px; white-space: pre-wrap; color: var(--ink-dim); border: 1px solid var(--line-soft); }
+  .status.err { background: color-mix(in srgb, #e5484d 16%, var(--card2)); color: #ffb1b3; border-color: color-mix(in srgb, #e5484d 35%, transparent); }
+  .status.ok { background: color-mix(in srgb, #2ea043 15%, var(--card2)); color: #9ff0b4; border-color: color-mix(in srgb, #2ea043 30%, transparent); }
+
+  .thread-list { display: grid; gap: 9px; margin-top: 8px; }
+  .thread-item { display: flex; align-items: center; gap: 13px; padding: 11px 13px; border: 1px solid var(--line-soft);
+    border-radius: 12px; background: var(--card2); cursor: pointer; text-align: left; width: 100%; transition: border-color .12s, transform .05s; }
+  .thread-item:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .thread-item .av { width: 42px; height: 42px; border-radius: 9px; flex: none; object-fit: cover;
+    background: #2a313c; display: grid; place-items: center; font-size: 19px; }
+  .thread-item .meta { flex: 1; min-width: 0; }
+  .thread-item .meta b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14.5px; }
+  .thread-item .meta small { color: var(--muted); }
+  .thread-item .go { color: var(--accent); font-weight: 650; font-size: 13px; }
+
+  .controls .ctl-line { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 11px; }
+  .controls .ctl-line:last-child { margin-bottom: 0; }
+  .seg { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  .seg select { font: inherit; padding: 8px 9px; border-radius: 9px; border: 1px solid var(--line);
+    background: #12161c; color: var(--ink); }
+  label.grow { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--muted); }
+  label.grow input[type=range] { width: 100%; accent-color: var(--accent); height: 5px; }
+  .ends { display: flex; justify-content: space-between; font-size: 11px; opacity: .65; }
+  .badge { background: color-mix(in srgb, var(--accent) 26%, transparent); color: #d8cfff;
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+    border-radius: 20px; padding: 1px 10px; font-size: 12px; font-weight: 650; }
+
+  .genbar { position: relative; height: 24px; border-radius: 8px; background: #12161c; overflow: hidden; border: 1px solid var(--line-soft); }
+  .genbar-fill { position: absolute; inset: 0 100% 0 0; background: linear-gradient(90deg, var(--accent-2), var(--accent)); transition: right .25s; opacity: .55; }
+  .genbar-text { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; color: var(--ink); }
+
+  .share-out { display: flex; gap: 6px; align-items: center; flex: 1; min-width: 0; }
+  .share-out input { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--line);
+    background: #12161c; color: var(--ink); font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; }
+
+  .export-panel { border-top: 1px solid var(--line); margin-top: 6px; padding-top: 12px; }
+  .export-opt { border: 1px solid var(--line-soft); border-radius: 12px; padding: 12px 13px; margin: 9px 0; background: #12161c; }
+  .export-opt .eo-head { font-size: 13.5px; font-weight: 650; margin-bottom: 8px; }
+  .export-opt .ctl-line { margin-bottom: 8px; }
+  .export-opt .ctl-line:last-child { margin-bottom: 0; }
+  .export-panel .seg input { accent-color: var(--accent); margin-right: 4px; }
+  #exportStatus { margin-top: 7px; min-height: 1em; }
+  .lore-step { border: 1px solid color-mix(in srgb, var(--lore) 35%, var(--line-soft)); }
+  .lore-list { display: flex; flex-direction: column; gap: 7px; margin-top: 8px; max-height: 34vh; overflow: auto; }
+  .lore-entry { padding: 9px 11px; border-radius: 10px; background: var(--card2); border-left: 3px solid var(--lore); }
+  .lore-entry .lt { font-size: 13.5px; color: var(--ink); }
+  .lore-entry .tg { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .lore-entry .tg span { font-size: 11px; padding: 1px 7px; border-radius: 12px;
+    background: color-mix(in srgb, var(--lore) 18%, transparent); color: var(--lore);
+    border: 1px solid color-mix(in srgb, var(--lore) 30%, transparent); }
+
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+  @media (max-width: 760px) { .split { grid-template-columns: 1fr; } }
+
+  .transcript, .memories { max-height: 60vh; overflow: auto; display: flex; flex-direction: column; gap: 8px;
+    padding-right: 4px; }
+  .msg { padding: 9px 12px; border-radius: 11px; background: var(--card2); border-left: 3px solid var(--line);
+    opacity: .58; transition: opacity .25s, transform .25s, box-shadow .2s; }
+  .msg.seen { opacity: 1; }
+  .msg.current { transform: translateX(2px); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 60%, transparent); }
+  .msg .who { font-weight: 650; font-size: 12px; margin-bottom: 3px; letter-spacing: .01em; }
+  .msg.user { border-left-color: var(--user); } .msg.user .who { color: var(--user); }
+  .msg.ai   { border-left-color: var(--ai); }   .msg.ai .who { color: var(--ai); }
+  .msg.system { border-left-color: var(--sys); } .msg.system .who { color: var(--sys); }
+  .msg .body { font-size: 14px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; color: var(--ink); }
+
+  .mem { padding: 10px 12px; border-radius: 11px; background: var(--card2); border-left: 3px solid var(--mem);
+    animation: pop .35s ease; }
+  .mem.lvl2 { border-left-style: dashed; }
+  .mem .src { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+  .mem .txt { font-size: 13.5px; color: var(--ink); line-height: 1.5; }
+  .mem.pending .txt { color: var(--muted); font-style: italic; }
+  @keyframes pop { from { opacity: 0; transform: translateY(-6px) scale(.98); } to { opacity: 1; } }
+
+  .empty { color: var(--muted); font-size: 13px; padding: 22px; text-align: center; line-height: 1.55; }
+
+  .stage-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+  .back-btn { font-size: 13px; }
+
+  #footer { margin-top: 26px; text-align: center; color: var(--muted); font-size: 12px; }
+  #footer a { color: var(--accent); text-decoration: none; }
+  #footer a:hover { text-decoration: underline; color: #c2b6ff; }
+</style>
+
+<!-- ===== ENGINE (pure logic, Node-tested) ===== -->
+<script>
+/* engine.js is inlined here verbatim. */
+/* ============================================================================
+ * Memory Replay Engine  —  pure, side-effect-free logic.
+ *
+ * Runs in Node (for tests) and in the Perchance HTML panel (browser).
+ * NOTE: This file is embedded inside a script tag in the Perchance panel,
+ * whose source is scanned by the DSL preprocessor for template-style
+ * brace/bracket patterns BEFORE JS runs. Therefore this file must contain NO
+ * literal single-token bracket/brace DSL patterns, even in comments. We
+ * construct the chat wire-format double-square brackets and the double-brace
+ * template vars from char codes (see BR below) so the preprocessor never sees
+ * them. The big AI prompt strings live in the panel, not here.
+ * ==========================================================================*/
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.RM = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  // Bracket/brace chars built from codes so the Perchance source scan can't
+  // mistake them for DSL list/template patterns.
+  var BR = {
+    lb: String.fromCharCode(91),  // open square
+    rb: String.fromCharCode(93),  // close square
+    lc: String.fromCharCode(123), // open curly
+    rc: String.fromCharCode(125)  // close curly
+  };
+  var LBLB = BR.lb + BR.lb; // double open square
+  var RBRB = BR.rb + BR.rb; // double close square
+
+  // ---- token estimation fallback ------------------------------------------
+  // The real platform exposes countTokens via aiTextPlugin getMetaObject.
+  // When unavailable (tests / cold load) we approximate ~4 chars per token.
+  function approxCountTokens(str) {
+    if (!str) return 0;
+    return Math.ceil(str.length / 4);
+  }
+
+  // ---- author / name resolution -------------------------------------------
+  // characterId: -1 = user, -2 = system, >=0 = an AI character.
+  function authorOf(m) {
+    if (m.author) return m.author; // some formats store author directly
+    if (m.characterId === -1) return 'user';
+    if (m.characterId === -2) return 'system';
+    return 'ai';
+  }
+
+  // Strip inline hidden-from-ai sections, exactly as the chat does.
+  function stripHiddenFromAi(text) {
+    if (!text) return '';
+    var startTag = '<!--hidden-from-ai-start-->';
+    var endTag = '<!--hidden-from-ai-end-->';
+    var out = text;
+    var s = out.indexOf(startTag);
+    while (s !== -1) {
+      var e = out.indexOf(endTag, s);
+      if (e === -1) { out = out.slice(0, s); break; }
+      out = out.slice(0, s) + out.slice(e + endTag.length);
+      s = out.indexOf(startTag);
+    }
+    return out;
+  }
+
+  function applyTemplateVars(text, userName, characterName) {
+    if (!text) return '';
+    // The doubled-brace user/char template vars, built from char codes so the
+    // source scan stays clean.
+    var uVar = BR.lc + BR.lc + 'user' + BR.rc + BR.rc;
+    var cVar = BR.lc + BR.lc + 'char' + BR.rc + BR.rc;
+    return text.split(uVar).join(userName || 'User')
+               .split(cVar).join(characterName || 'Character');
+  }
+
+  /**
+   * Convert raw message rows for one thread into the prepared, AI-visible
+   * message list (mirrors prepareMessagesForBot's essentials):
+   *  - sorted by `order` (fallback id)
+   *  - drop messages hidden from the AI
+   *  - resolve display name and apply template vars / inline hidden stripping
+   * Returns: [{ id, name, content, author, rawIndex }]
+   */
+  function prepareMessages(rawMessages, opts) {
+    opts = opts || {};
+    var userName = opts.userName || 'User';
+    var characterName = opts.characterName || 'Character';
+    var charIdToName = opts.charIdToName || {};
+
+    var msgs = rawMessages.slice(0).sort(function (a, b) {
+      var ao = (a.order != null ? a.order : a.id);
+      var bo = (b.order != null ? b.order : b.id);
+      return ao - bo;
+    });
+
+    var out = [];
+    for (var i = 0; i < msgs.length; i++) {
+      var m = msgs[i];
+      var hidden = Array.isArray(m.hiddenFrom) && m.hiddenFrom.indexOf('ai') !== -1;
+      if (hidden) continue;
+
+      var author = authorOf(m);
+      var name;
+      if (author === 'user') name = userName;
+      else if (author === 'system') name = m.name || 'System';
+      else name = m.name || charIdToName[m.characterId] || characterName;
+
+      var raw = m.message != null ? m.message : (m.content != null ? m.content : '');
+      var content = applyTemplateVars(stripHiddenFromAi(raw), userName, characterName).trim();
+      if (!content) continue;
+
+      out.push({
+        id: m.id,
+        name: name,
+        content: content,
+        author: author,
+        rawIndex: i
+      });
+    }
+    return out;
+  }
+
+  // Wire-format line for a prepared message: double-open-square Name
+  // double-close-square then ": " then content.
+  function wireLine(pm) {
+    return LBLB + pm.name + RBRB + ': ' + pm.content;
+  }
+
+  /**
+   * Faithful burst-timing simulation.
+   *
+   * Re-creates the platform's behaviour: walk the chat message-by-message,
+   * maintaining a "context" of units (raw messages or summary placeholders).
+   * Whenever the context token count exceeds `budgetTokens`, peel the oldest
+   * raw messages (~charsPerBlock chars) into a level-1 block (summary + up to
+   * 3 memories) and replace them with one summary placeholder. If only summary
+   * units remain and we're still over budget, fold the oldest summaries into a
+   * level-2 summary (no memories) to keep context bounded.
+   *
+   * This does NOT call the AI. It produces the *plan*: an ordered list of
+   * blocks, each tagged with the playback index at which it fires. The panel
+   * fills in summary/memory text (live AI) or reads it from the file.
+   *
+   * params:
+   *   prepared       : output of prepareMessages
+   *   countTokens    : fn(str)->number  (platform's, or approxCountTokens)
+   *   budgetTokens   : number  (idealMaxContextTokens - 800)
+   *   charsPerBlock  : number  (default 1500, matches numCharsToSummarizeAtATime)
+   *   simpleMode     : bool    (ignore budget; fire a block every charsPerBlock)
+   *
+   * returns: {
+   *   blocks: [{ id, level, fireAtIndex, msgIds, inputText, priorSummaryUnitIds }],
+   *   totalMessages, totalBlocks
+   * }
+   */
+  function planBuild(prepared, params) {
+    params = params || {};
+    var countTokens = params.countTokens || approxCountTokens;
+    var budgetTokens = params.budgetTokens || 5200;
+    var charsPerBlock = params.charsPerBlock || 1500;
+    var simpleMode = !!params.simpleMode;
+
+    var blocks = [];
+    var blockSeq = 0;
+
+    if (simpleMode) {
+      // Memory pass every ~charsPerBlock chars of cumulative chat text.
+      var acc = [];
+      var accChars = 0;
+      for (var i = 0; i < prepared.length; i++) {
+        acc.push(prepared[i]);
+        accChars += wireLine(prepared[i]).length;
+        if (accChars >= charsPerBlock) {
+          blocks.push(makeBlock(blockSeq++, 1, i, acc.slice(0), []));
+          acc = [];
+          accChars = 0;
+        }
+      }
+      // trailing remainder is intentionally NOT summarized (matches the app:
+      // the final, unsummarized block stays as live context).
+      return { blocks: blocks, totalMessages: prepared.length, totalBlocks: blocks.length };
+    }
+
+    // Faithful mode: compress consecutive spans of the chat in chronological
+    // order. We work in characters (token budget converted at ~4 chars/token)
+    // so the plan is deterministic and testable without the platform's
+    // countTokens. The platform's real token budget is still respected via the
+    // conversion; the goal is realistic *burst timing*, not token-exact context.
+    var budgetChars = (params.budgetChars != null) ? params.budgetChars : budgetTokens * 4;
+
+    var summaries = [];          // [{ id, msgIds, estChars }]
+    var summaryChars = 0;        // running estimated size of all summaries
+    var summarizedUpTo = 0;      // index into `prepared` already folded away
+
+    // Precompute wire-line lengths and a running prefix sum for fast tail size.
+    var lineLen = new Array(prepared.length);
+    var prefix = new Array(prepared.length + 1);
+    prefix[0] = 0;
+    for (var li = 0; li < prepared.length; li++) {
+      lineLen[li] = wireLine(prepared[li]).length;
+      prefix[li + 1] = prefix[li] + lineLen[li];
+    }
+    function tailChars(fromIdx, toIdxInclusive) {
+      if (toIdxInclusive < fromIdx) return 0;
+      return (prefix[toIdxInclusive + 1] - prefix[fromIdx]);
+    }
+
+    function foldOldestSummaries() {
+      // Light level-2 proxy: merge the two oldest summaries, halving size.
+      // Produces NO memories (matches the app: memories only at level 1).
+      if (summaries.length < 2) return false;
+      var a = summaries.shift();
+      var b = summaries.shift();
+      var mergedEst = Math.max(1, Math.round((a.estChars + b.estChars) * 0.5));
+      summaryChars += mergedEst - a.estChars - b.estChars;
+      summaries.unshift({ id: blockSeq++, msgIds: a.msgIds.concat(b.msgIds), estChars: mergedEst, level: 2 });
+      return true;
+    }
+
+    for (var mi = 0; mi < prepared.length; mi++) {
+      var guard = 0;
+      while (guard < 5000) {
+        guard++;
+        var ctxChars = summaryChars + tailChars(summarizedUpTo, mi);
+        if (ctxChars <= budgetChars) break;
+
+        // Keep summary bloat bounded on very long chats (level-2 fold).
+        if (summaryChars > budgetChars * 0.6) {
+          if (foldOldestSummaries()) continue;
+        }
+
+        // Gather the next span starting at summarizedUpTo, up to charsPerBlock,
+        // but always leave at least the just-added message as live context.
+        var take = [];
+        var chars = 0;
+        var k = summarizedUpTo;
+        while (k < mi && chars < charsPerBlock) {
+          take.push(prepared[k]);
+          chars += lineLen[k];
+          k++;
+        }
+        if (take.length === 0) break; // nothing summarizable without eating the tail
+
+        var priorIds = summaries.map(function (s) { return s.id; });
+        var blk = makeBlock(blockSeq++, 1, mi, take, priorIds);
+        blocks.push(blk);
+
+        var est = Math.max(1, Math.round(chars * 0.5)); // summary ~half the text
+        summaries.push({ id: blk.id, msgIds: blk.msgIds, estChars: est, level: 1 });
+        summaryChars += est;
+        summarizedUpTo = k;
+      }
+    }
+
+    return { blocks: blocks, totalMessages: prepared.length, totalBlocks: blocks.length };
+  }
+
+  function makeBlock(id, level, fireAtIndex, pmArray, priorSummaryIds) {
+    // inputText mirrors `messagesSummarizedText`: "(1) line (2) line ..."
+    var inputText = pmArray.map(function (pm, i) {
+      return '(' + (i + 1) + ') ' + wireLine(pm).replace(/\n/g, ' ').trim();
+    }).join(' ');
+    return {
+      id: id,
+      level: level,
+      fireAtIndex: fireAtIndex,
+      msgIds: pmArray.map(function (pm) { return pm.id; }),
+      pmCount: pmArray.length,
+      inputText: inputText,
+      priorSummaryIds: priorSummaryIds || []
+    };
+  }
+
+  // Post-process raw model output for the memory call into clean entries.
+  // Mirrors: ("1."+text).split lines, keep "N. ...", strip the "N. " prefix.
+  function parseMemories(generatedText) {
+    var withLead = '1.' + (generatedText || '');
+    var lines = withLead.split('\n');
+    var out = [];
+    var numLine = /^[0-9]\. .+/;
+    for (var i = 0; i < lines.length; i++) {
+      var l = lines[i].trim();
+      if (l && numLine.test(l)) {
+        out.push(l.replace(/^[0-9]\. /, '').trim());
+      }
+    }
+    return out;
+  }
+
+  // Clean a raw summary model output (mirrors the DSL post-processing).
+  function cleanSummary(generatedText) {
+    return (generatedText || '').trim()
+      .replace(/\n+/g, ' ').trim()
+      .replace(/---$/, '')
+      .split('>>> FULL TEXT').join('')
+      .split('FULL TEXT').join('')
+      .trim();
+  }
+
+  // ---- existing-memory extraction (no AI) ---------------------------------
+  // Read memoriesEndingHere already stored on messages, anchored to the
+  // playback index of the message they end on.
+  function extractExistingMemories(prepared, rawById) {
+    var idToIndex = {};
+    for (var i = 0; i < prepared.length; i++) idToIndex[prepared[i].id] = i;
+    var events = [];
+    var seq = 0;
+    // iterate in prepared order so events come out chronologically
+    for (var p = 0; p < prepared.length; p++) {
+      var raw = rawById[prepared[p].id];
+      if (!raw || !raw.memoriesEndingHere) continue;
+      var levels = Object.keys(raw.memoriesEndingHere).sort(function (a, b) { return Number(a) - Number(b); });
+      for (var li = 0; li < levels.length; li++) {
+        var arr = raw.memoriesEndingHere[levels[li]] || [];
+        var texts = [];
+        for (var a = 0; a < arr.length; a++) {
+          var t = (arr[a] && arr[a].text) ? arr[a].text : (typeof arr[a] === 'string' ? arr[a] : null);
+          if (t) texts.push(t);
+        }
+        if (texts.length) {
+          events.push({
+            id: seq++, level: Number(levels[li]),
+            fireAtIndex: idToIndex[prepared[p].id],
+            memories: texts
+          });
+        }
+      }
+    }
+    return events;
+  }
+
+  // ---- bake regenerated memories back onto messages (pure) ----------------
+  // Build messageId -> { summariesEndingHere, memoriesEndingHere } from the
+  // completed blocks. Each block attaches to the LAST message it covers, in the
+  // exact schema ai-character-chat reads back.
+  function bakeUpdates(plan, blockState, prepared) {
+    var updates = {};
+    (plan.blocks || []).forEach(function (b) {
+      var st = blockState[b.id];
+      if (!st || st.status !== 'done') return;
+      var level = b.level || 1;
+      var anchorId;
+      if (b.msgIds && b.msgIds.length) anchorId = b.msgIds[b.msgIds.length - 1];
+      else { var pm = prepared[b.fireAtIndex]; anchorId = pm ? pm.id : null; }
+      if (anchorId == null) return;
+      var u = updates[anchorId] || (updates[anchorId] = { summariesEndingHere: {}, memoriesEndingHere: {} });
+      if (st.summary) u.summariesEndingHere[level] = st.summary;
+      if (st.memories && st.memories.length) {
+        u.memoriesEndingHere[level] = (u.memoriesEndingHere[level] || [])
+          .concat(st.memories.map(function (t) { return { text: t, embedding: null }; }));
+      }
+    });
+    return updates;
+  }
+
+  // Apply baked updates onto a COPY of a messages array. clean=true strips any
+  // existing summaries/memories first (for a faithful "replace").
+  function applyUpdates(messages, updates, clean) {
+    return messages.map(function (m) {
+      var u = updates[m.id];
+      var copy = Object.assign({}, m);
+      if (clean) { delete copy.summariesEndingHere; delete copy.memoriesEndingHere; }
+      if (!u) return copy;
+      var sk = Object.keys(u.summariesEndingHere);
+      if (sk.length) copy.summariesEndingHere = Object.assign({}, (clean ? {} : (m.summariesEndingHere || {})), u.summariesEndingHere);
+      var mk = Object.keys(u.memoriesEndingHere);
+      if (mk.length) {
+        copy.memoriesEndingHere = Object.assign({}, (clean ? {} : (m.memoriesEndingHere || {})));
+        for (var i = 0; i < mk.length; i++) copy.memoriesEndingHere[mk[i]] = u.memoriesEndingHere[mk[i]];
+      }
+      return copy;
+    });
+  }
+
+  // ---- lore promotion (pure) ----------------------------------------------
+  // Parse the AI "promote to lore" output. Each entry is on its own line as:
+  //   <fact text> ||| keyword1, keyword2, ...
+  // The triggers half is optional. Returns an array of objects, each with a
+  // text string and a triggers array.
+  function promoteParse(generatedText) {
+    var sep = String.fromCharCode(124); // |
+    var triple = sep + sep + sep;
+    var out = [];
+    var lines = (generatedText || '').split('\n');
+    for (var i = 0; i < lines.length; i++) {
+      var raw = lines[i].trim();
+      if (!raw) continue;
+      // strip a leading bullet or "N." enumerator
+      raw = raw.replace(/^[-*\u2022]\s+/, '').replace(/^[0-9]+[.)]\s+/, '').trim();
+      if (!raw) continue;
+      var text = raw, triggers = [];
+      var idx = raw.indexOf(triple);
+      if (idx !== -1) {
+        text = raw.slice(0, idx).trim();
+        triggers = raw.slice(idx + triple.length).split(',')
+          .map(function (s) { return s.trim(); })
+          .filter(function (s) { return s.length > 0; });
+      }
+      // also tolerate a "Triggers:" suffix form
+      if (!triggers.length) {
+        var tm = text.match(/\b[Tt]riggers?\s*:\s*(.+)$/);
+        if (tm) { triggers = tm[1].split(',').map(function (s) { return s.trim(); }).filter(Boolean); text = text.slice(0, tm.index).trim(); }
+      }
+      text = text.replace(/[\s\-:|]+$/, '').trim();
+      if (text) out.push({ text: text, triggers: triggers });
+    }
+    return out;
+  }
+
+  // Build ai-character-chat `lore` table rows from promoted entries.
+  //   bookId = thread.id (the thread's lorebook id), embeddings recomputed on use.
+  function buildLoreEntries(loreItems, bookId, startId) {
+    var id = startId || 1;
+    return (loreItems || []).map(function (it) {
+      return {
+        id: id++,
+        bookId: bookId,
+        bookUrl: null,
+        text: it.text,
+        embedding: null,
+        triggers: Array.isArray(it.triggers) ? it.triggers : []
+      };
+    });
+  }
+
+  // Plain-text lorebook (one entry per line) for character.loreBookUrls files.
+  function loreToText(loreItems) {
+    return (loreItems || []).map(function (it) { return it.text; }).filter(Boolean).join('\n');
+  }
+
+  return {
+    BR: BR,
+    approxCountTokens: approxCountTokens,
+    authorOf: authorOf,
+    stripHiddenFromAi: stripHiddenFromAi,
+    applyTemplateVars: applyTemplateVars,
+    prepareMessages: prepareMessages,
+    wireLine: wireLine,
+    planBuild: planBuild,
+    parseMemories: parseMemories,
+    cleanSummary: cleanSummary,
+    bakeUpdates: bakeUpdates,
+    applyUpdates: applyUpdates,
+    promoteParse: promoteParse,
+    buildLoreEntries: buildLoreEntries,
+    loreToText: loreToText,
+    extractExistingMemories: extractExistingMemories
+  };
+});
+
+</script>
+
+<!-- ===== APP ===== -->
+<script>
+(function () {
+  'use strict';
+  var RM = window.RM;
+  var $ = function (id) { return document.getElementById(id); };
+
+  // Char-code constants so the Perchance source scan never sees DSL patterns.
+  var C = {
+    bt: String.fromCharCode(96),                 // backtick
+    A: RM.BR.lb + 'A' + RM.BR.rb,                // square-A square
+    B: RM.BR.lb + 'B' + RM.BR.rb,                // square-B square
+    Cc: RM.BR.lb + 'C' + RM.BR.rb                // square-C square
+  };
+  C.fence = C.bt + C.bt + C.bt;                  // triple backtick
+
+  // ---------- defensive plugin access ----------
+  function grab(name) {
+    try { if (typeof root !== 'undefined' && root[name] !== undefined) return root[name]; } catch (e) {}
+    try { if (window[name] !== undefined) return window[name]; } catch (e) {}
+    return undefined;
+  }
+  var aiTextPlugin = grab('aiTextPlugin');
+  var superFetch = grab('superFetch');
+
+  // token utilities (fall back to engine approximation)
+  var countTokens = RM.approxCountTokens;
+  var idealMaxContextTokens = 6000;
+  try {
+    if (typeof aiTextPlugin === 'function') {
+      var meta = aiTextPlugin({ getMetaObject: true });
+      if (meta && typeof meta.countTokens === 'function') countTokens = meta.countTokens;
+      if (meta && meta.idealMaxContextTokens) idealMaxContextTokens = meta.idealMaxContextTokens;
+    }
+  } catch (e) { console.warn('getMetaObject failed, using approx tokens', e); }
+  var budgetTokens = idealMaxContextTokens - 800;
+
+  // ---------- state ----------
+  var DB = null;            // { characters, threads, messages, charIdToName }
+  var SESSION = null;       // active replay session
+
+  // ============================================================
+  //  STAGE 1 — loading & parsing
+  // ============================================================
+  function setStatus(msg, kind) {
+    var el = $('loadStatus');
+    el.hidden = false;
+    el.textContent = msg;
+    el.className = 'status' + (kind ? ' ' + kind : '');
+  }
+
+  async function fetchBytes(url) {
+    // Normalise a perchance share link: ?data=Name~hash[.gz] -> uploads.dev file
+    try {
+      var u = new URL(url);
+      var dataParam = u.searchParams.get('data');
+      if (dataParam) {
+        var fileName = dataParam.split('~').slice(-1)[0];
+        if (fileName) url = 'https://user.uploads.dev/file/' + fileName;
+      }
+    } catch (e) { /* not a full URL, use as-is */ }
+
+    var resp = null;
+    if (typeof superFetch === 'function') {
+      try { resp = await superFetch(url + (url.indexOf('?') === -1 ? '?' : '&') + '_=' + Date.now()); } catch (e) { resp = null; }
+    }
+    if (!resp || !resp.ok) {
+      try { resp = await fetch(url); } catch (e) { resp = null; }
+    }
+    if (!resp || !resp.ok) throw new Error('Could not fetch the link (status ' + (resp ? resp.status : 'no response') + '). If it is a private/CORS-blocked URL, download the file and drop it in instead.');
+    return new Uint8Array(await resp.arrayBuffer());
+  }
+
+  // ---- decompression / format libs (lazy, from jsDelivr — on the proxy bypass list) ----
+  var _fflate = null, _cbor = null;
+  async function getFflate() {
+    if (_fflate) return _fflate;
+    _fflate = await import('https://cdn.jsdelivr.net/npm/fflate@0.8.2/esm/browser.js');
+    return _fflate;
+  }
+  async function getCBOR() {
+    if (_cbor) return _cbor;
+    function pick(mod) {
+      if (!mod) return null;
+      if (typeof mod.decode === 'function' && typeof mod.encode === 'function') return mod;
+      if (mod.default && typeof mod.default.decode === 'function') return mod.default;
+      return null;
+    }
+    try { _cbor = pick(await import('https://cdn.jsdelivr.net/npm/cbor-x@1.6.0/dist/index.js')); } catch (e) {}
+    if (!_cbor) {
+      try { var m = await import('https://unpkg.com/cbor-x@1.6.0/dist/index.js'); _cbor = pick(m) || pick(self.CBOR); } catch (e) {}
+    }
+    if (!_cbor || !_cbor.decode) throw new Error('Could not load the CBOR codec needed for .cbor.gz files.');
+    return _cbor;
+  }
+  async function gunzip(bytes) {
+    if (typeof DecompressionStream === 'function') {
+      var blob = new Blob([bytes]);
+      var ds = new DecompressionStream('gzip');
+      return new Uint8Array(await new Response(blob.stream().pipeThrough(ds)).arrayBuffer());
+    }
+    var f = await getFflate();
+    return f.gunzipSync(bytes);
+  }
+  async function gzip(bytes) {
+    if (typeof CompressionStream === 'function') {
+      var blob = new Blob([bytes]);
+      var cs = new CompressionStream('gzip');
+      return new Uint8Array(await new Response(blob.stream().pipeThrough(cs)).arrayBuffer());
+    }
+    var f = await getFflate();
+    return f.gzipSync(bytes);
+  }
+
+  function isGzip(b) { return b.length > 2 && b[0] === 0x1f && b[1] === 0x8b; }
+  function isZip(b) { return b.length > 2 && b[0] === 0x50 && b[1] === 0x4b; }
+  var dec = new TextDecoder('utf-8');
+
+  // Turn raw bytes (any supported format) into normalised DB tables.
+  async function parseAny(bytes, filename) {
+    filename = (filename || '').toLowerCase();
+
+    if (isZip(bytes)) {
+      var f = await getFflate();
+      var entries = f.unzipSync(bytes);
+      // pick the most promising entry
+      var names = Object.keys(entries);
+      var pick = names.find(function (n) { return /\.cbor\.gz$|\.gz$|\.json$|\.cbor$/i.test(n); }) || names[0];
+      if (!pick) throw new Error('The zip is empty.');
+      return parseAny(entries[pick], pick);
+    }
+
+    if (isGzip(bytes)) {
+      var inner = await gunzip(bytes);
+      // gz of CBOR (raw db export) or gz of JSON (dexie/share)
+      if (filename.indexOf('.cbor') !== -1 || !looksLikeText(inner)) {
+        try {
+          var CBOR = await getCBOR();
+          return normalise(CBOR.decode(inner));
+        } catch (e) {
+          // maybe it was actually gzipped JSON without .cbor in the name
+        }
+      }
+      return normalise(JSON.parse(dec.decode(inner)));
+    }
+
+    // plain text / json
+    var txt = dec.decode(bytes);
+    return normalise(JSON.parse(txt));
+  }
+
+  function looksLikeText(bytes) {
+    var n = Math.min(bytes.length, 64), printable = 0;
+    for (var i = 0; i < n; i++) { var c = bytes[i]; if (c === 9 || c === 10 || c === 13 || (c >= 32 && c < 127)) printable++; }
+    return n > 0 && printable / n > 0.85;
+  }
+
+  // Accepts: raw-db-export (CBOR), dexie export (json), or a single-character share.
+  function normalise(obj) {
+    var characters = [], threads = [], messages = [], format = 'unknown';
+
+    if (obj && obj.meta && /ai-character-chat-db-raw-export/.test(obj.meta.type || '') && obj.stores) {
+      characters = obj.stores.characters || [];
+      threads = obj.stores.threads || [];
+      messages = obj.stores.messages || [];
+      format = 'rawexport';
+    } else if (obj && obj.formatName === 'dexie' && obj.data && obj.data.data) {
+      var find = function (t) { var e = obj.data.data.find(function (d) { return d.tableName === t; }); return e ? (e.rows || []) : []; };
+      characters = find('characters');
+      threads = find('threads');
+      messages = find('messages');
+      format = 'dexie';
+    } else if (obj && obj.addCharacter) {
+      // a character share link — no thread to replay
+      characters = [obj.addCharacter];
+      threads = [];
+      messages = [];
+      format = 'share';
+    } else {
+      throw new Error('Unrecognised file. Expected an ai-character-chat export (.cbor.gz raw export, a Dexie .gz/.json, or a share link).');
+    }
+
+    var charIdToName = {};
+    characters.forEach(function (c) { if (c && c.id != null) charIdToName[c.id] = c.name; });
+    return { characters: characters, threads: threads, messages: messages, charIdToName: charIdToName, _raw: obj, _format: format };
+  }
+
+  async function loadFromBytes(bytes, filename) {
+    var flavor = '';
+    try { var rl = grab('randomLoadingLine'); if (typeof rl === 'function') flavor = String(rl()); } catch (e) {}
+    setStatus((flavor ? flavor + ' — ' : '') + 'parsing ' + (filename || 'data') + ' …');
+    DB = await parseAny(bytes, filename);
+    if (!DB.threads.length) {
+      if (DB.characters.length) {
+        setStatus('That file contains a character but no chat threads, so there is no session to replay. Export a thread (or a full backup) from ai-character-chat instead.', 'err');
+      } else {
+        setStatus('No threads found in that file.', 'err');
+      }
+      return;
+    }
+    setStatus('Loaded ' + DB.threads.length + ' thread(s), ' + DB.messages.length + ' message(s), ' + DB.characters.length + ' character(s).', 'ok');
+    showThreadPicker();
+  }
+
+  // wire up loading UI
+  $('loadUrlBtn').addEventListener('click', async function () {
+    var url = $('urlInput').value.trim();
+    if (!url) { setStatus('Paste a link first.', 'err'); return; }
+    try { var bytes = await fetchBytes(url); await loadFromBytes(bytes, url.split('/').pop().split('?')[0]); }
+    catch (e) { console.error(e); setStatus('' + (e && e.message ? e.message : e), 'err'); }
+  });
+  $('urlInput').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('loadUrlBtn').click(); });
+
+  $('pickFileBtn').addEventListener('click', function () { $('fileInput').click(); });
+  $('fileInput').addEventListener('change', async function (e) {
+    var file = e.target.files[0]; if (!file) return;
+    try { var bytes = new Uint8Array(await file.arrayBuffer()); await loadFromBytes(bytes, file.name); }
+    catch (err) { console.error(err); setStatus('' + (err && err.message ? err.message : err), 'err'); }
+  });
+  var dz = $('dropZone');
+  ['dragenter', 'dragover'].forEach(function (ev) { dz.addEventListener(ev, function (e) { e.preventDefault(); dz.classList.add('drag'); }); });
+  ['dragleave', 'drop'].forEach(function (ev) { dz.addEventListener(ev, function (e) { e.preventDefault(); dz.classList.remove('drag'); }); });
+  dz.addEventListener('drop', async function (e) {
+    var file = e.dataTransfer.files[0]; if (!file) return;
+    try { var bytes = new Uint8Array(await file.arrayBuffer()); await loadFromBytes(bytes, file.name); }
+    catch (err) { console.error(err); setStatus('' + (err && err.message ? err.message : err), 'err'); }
+  });
+
+  // ============================================================
+  //  STAGE 2 — thread picker
+  // ============================================================
+  function showThreadPicker() {
+    $('loadStage').hidden = true;
+    $('replayStage').hidden = true;
+    $('pickStage').hidden = false;
+
+    var counts = {};
+    DB.messages.forEach(function (m) { counts[m.threadId] = (counts[m.threadId] || 0) + 1; });
+
+    var threads = DB.threads.slice(0).sort(function (a, b) {
+      return (b.lastMessageTime || 0) - (a.lastMessageTime || 0);
+    });
+
+    $('pickSummary').textContent = threads.length + ' thread(s) found. Pick one to replay its memory build.';
+    var list = $('threadList');
+    list.innerHTML = '';
+    threads.forEach(function (t) {
+      var charName = (DB.charIdToName[t.characterId]) || (t.character && t.character.name) || 'Character';
+      var n = counts[t.id] || 0;
+      var btn = document.createElement('button');
+      btn.className = 'thread-item';
+      var av = document.createElement('div'); av.className = 'av'; av.textContent = '💬';
+      var url = (t.character && t.character.avatar && t.character.avatar.url) || '';
+      if (url) { av.textContent = ''; var img = document.createElement('img'); img.src = url; img.className = 'av'; img.alt = ''; av.replaceWith(img); av = img; }
+      var meta = document.createElement('div'); meta.className = 'meta';
+      var name = (t.name && t.name.trim()) || (charName + ' chat');
+      meta.innerHTML = '<b></b><small></small>';
+      meta.querySelector('b').textContent = name;
+      meta.querySelector('small').textContent = charName + ' · ' + n + ' message' + (n === 1 ? '' : 's');
+      var go = document.createElement('span'); go.className = 'go'; go.textContent = 'Replay →';
+      btn.appendChild(av); btn.appendChild(meta); btn.appendChild(go);
+      btn.disabled = n === 0;
+      if (n === 0) { btn.style.opacity = '.5'; go.textContent = '(empty)'; }
+      btn.addEventListener('click', function () { startSession(t); });
+      list.appendChild(btn);
+    });
+  }
+  $('backToLoadBtn').addEventListener('click', function () {
+    $('pickStage').hidden = true; $('loadStage').hidden = false;
+  });
+
+  // Return to the thread picker to process another character from the same file.
+  function backToThreads() {
+    if (SESSION) { stopPlayback(); SESSION.genToken++; }
+    showThreadPicker();
+  }
+  $('backToThreadsBtn').addEventListener('click', backToThreads);
+
+  // ============================================================
+  //  STAGE 3 — replay session
+  // ============================================================
+  function startSession(thread) {
+    var rawForThread = DB.messages.filter(function (m) { return m.threadId === thread.id; });
+    var rawById = {}; rawForThread.forEach(function (m) { rawById[m.id] = m; });
+
+    var character = DB.characters.find(function (c) { return c.id === thread.characterId; }) || {};
+    var userName = (thread.userCharacter && thread.userCharacter.name) || (character.userCharacter && character.userCharacter.name) || 'User';
+    var characterName = (thread.character && thread.character.name) || character.name || 'Character';
+
+    var prepared = RM.prepareMessages(rawForThread, {
+      userName: userName, characterName: characterName, charIdToName: DB.charIdToName
+    });
+
+    if (prepared.length < 2) { setStatus('That thread has too few visible messages to build memories.', 'err'); $('pickStage').hidden = true; $('loadStage').hidden = false; return; }
+
+    var roleInstruction = (character.roleInstruction || '')
+      .split(RM.BR.lc + RM.BR.lc + 'char' + RM.BR.rc + RM.BR.rc).join(characterName)
+      .split(RM.BR.lc + RM.BR.lc + 'user' + RM.BR.rc + RM.BR.rc).join(userName);
+    var extraContext = roleInstruction ? ('In case it is useful here is a description of the ' + characterName + ' character: ' + roleInstruction.replace(/\n+/g, ' ')) : '';
+
+    SESSION = {
+      thread: thread, prepared: prepared, rawById: rawById,
+      characterName: characterName, userName: userName, extraContext: extraContext,
+      plan: null, blockState: {}, // id -> { status:'pending'|'done', memories:[], summary:'', level }
+      pos: 0, playing: false, revealed: {}, memCount: 0,
+      source: $('sourceSel').value, timing: $('timingSel').value,
+      timer: null, genToken: 0
+    };
+
+    $('loadStage').hidden = true; $('pickStage').hidden = true; $('replayStage').hidden = false;
+    $('exportPanel').hidden = true; $('exportOut').hidden = true; $('exportUrl').value = '';
+    $('exportToggle').textContent = '💾 Save / export ▾';
+    $('genAllNote').textContent = ''; exStatus('');
+    $('replayThreadName').textContent = (thread.name || characterName || '') + ' · ' + characterName;
+    SESSION.lore = null;
+    $('loreList').hidden = true; $('loreList').innerHTML = ''; $('loreActions').hidden = true;
+    $('loreNote').textContent = ''; $('charLoreOpt').hidden = true; $('fileLoreOpt').hidden = true;
+    renderTranscript();
+    rebuildPlan();
+  }
+
+  // build / rebuild the plan when timing or source changes
+  function rebuildPlan() {
+    var s = SESSION;
+    stopPlayback();
+    s.source = $('sourceSel').value;
+    s.timing = $('timingSel').value;
+    s.blockState = {}; s.revealed = {}; s.memCount = 0; s.pos = 0;
+    $('memories').innerHTML = '';
+    $('memCount').textContent = '0';
+
+    if (s.source === 'file') {
+      // events from memoriesEndingHere already stored on messages
+      var events = RM.extractExistingMemories(s.prepared, s.rawById);
+      s.plan = { blocks: events.map(function (ev) {
+        return { id: ev.id, level: ev.level, fireAtIndex: ev.fireAtIndex, msgIds: [], inputText: '', priorSummaryIds: [], _fileMemories: ev.memories };
+      }), totalMessages: s.prepared.length, totalBlocks: events.length };
+      events.forEach(function (ev) {
+        s.blockState[ev.id] = { status: 'done', memories: ev.memories, summary: '', level: ev.level };
+      });
+      if (!events.length) {
+        $('memories').innerHTML = '<div class="empty">This thread has no stored memories. Switch Source to “Regenerate (live AI)” to build them.</div>';
+      }
+    } else {
+      s.plan = RM.planBuild(s.prepared, {
+        countTokens: countTokens, budgetTokens: budgetTokens,
+        charsPerBlock: 1500, simpleMode: s.timing === 'simple'
+      });
+      s.plan.blocks.forEach(function (b) { s.blockState[b.id] = { status: 'idle', memories: [], summary: '', level: b.level }; });
+      if (!s.plan.blocks.length) {
+        $('memories').innerHTML = '<div class="empty">This chat is short enough that the real app would not summarise it yet, so no memories would be created. Try a longer thread, or switch Timing to “Simple”.</div>';
+      }
+    }
+
+    // scrub range
+    var scrub = $('scrub');
+    scrub.max = String(s.prepared.length);
+    scrub.value = '0';
+    updatePosLabel();
+    renderTranscript();
+    $('transcriptMeta').textContent = '· ' + s.prepared.length + ' messages · ' + s.plan.blocks.length + ' memory point' + (s.plan.blocks.length === 1 ? '' : 's');
+  }
+
+  $('sourceSel').addEventListener('change', rebuildPlan);
+  $('timingSel').addEventListener('change', rebuildPlan);
+
+  function renderTranscript() {
+    var s = SESSION, host = $('transcript');
+    host.innerHTML = '';
+    s._msgEls = [];
+    s.prepared.forEach(function (pm, i) {
+      var d = document.createElement('div');
+      d.className = 'msg ' + pm.author + (i < s.pos ? ' seen' : '') + (i === s.pos - 1 ? ' current' : '');
+      var who = document.createElement('div'); who.className = 'who'; who.textContent = pm.name;
+      var body = document.createElement('div'); body.className = 'body'; body.textContent = pm.content;
+      d.appendChild(who); d.appendChild(body);
+      host.appendChild(d);
+      s._msgEls.push(d);
+    });
+  }
+
+  // ----- speed slider: maps 0..100 -> msgs/sec (log scale), 100 = instant -----
+  function sliderToRate(v) {
+    v = Number(v);
+    if (v >= 100) return Infinity;            // instant / "without delay"
+    // 0 -> 0.4 msg/s, 99 -> ~60 msg/s, log-ish
+    var minR = 0.4, maxR = 60;
+    return minR * Math.pow(maxR / minR, v / 99);
+  }
+  function rateLabel(r) { return r === Infinity ? 'instant' : (r >= 10 ? Math.round(r) : r.toFixed(1)) + ' msg/s'; }
+
+  function updateSpeedLabel() { $('speedLabel').textContent = rateLabel(sliderToRate($('speedSlider').value)); }
+  $('speedSlider').addEventListener('input', function () {
+    updateSpeedLabel();
+    if (SESSION && SESSION.playing) { stopTimer(); scheduleTick(); } // re-pace immediately
+  });
+  updateSpeedLabel();
+
+  function updatePosLabel() {
+    $('posLabel').textContent = SESSION.pos + ' / ' + SESSION.prepared.length;
+  }
+
+  // scrub: jump to a position (reveals all memory points up to it)
+  $('scrub').addEventListener('input', function () {
+    stopPlayback();
+    seekTo(Number(this.value));
+  });
+
+  function seekTo(pos) {
+    var s = SESSION;
+    pos = Math.max(0, Math.min(pos, s.prepared.length));
+    // transcript highlight
+    for (var i = 0; i < s._msgEls.length; i++) {
+      s._msgEls[i].classList.toggle('seen', i < pos);
+      s._msgEls[i].classList.toggle('current', i === pos - 1);
+    }
+    if (pos > 0 && s._msgEls[pos - 1]) s._msgEls[pos - 1].scrollIntoView({ block: 'nearest' });
+    // reveal all blocks whose fireAtIndex < pos; hide those >= pos
+    rebuildMemoryList(pos);
+    s.pos = pos;
+    $('scrub').value = String(pos);
+    updatePosLabel();
+    // if regenerating live, make sure due blocks are being generated
+    if (s.source === 'ai') ensureBlocksGenerated(pos);
+  }
+
+  function rebuildMemoryList(pos) {
+    var s = SESSION, host = $('memories');
+    var due = s.plan.blocks.filter(function (b) { return b.fireAtIndex < pos; });
+    // only rebuild if the visible set changed (avoids flicker during play)
+    var key = due.map(function (b) { return b.id; }).join(',');
+    if (s._memKey === key && pos >= s.pos) return;
+    s._memKey = key;
+    host.innerHTML = '';
+    s.memCount = 0;
+    if (!due.length) {
+      var hint = s.source === 'file'
+        ? 'No memories stored before this point.'
+        : 'No memories yet — they appear once the conversation grows enough to need summarising.';
+      host.innerHTML = '<div class="empty">' + hint + '</div>';
+      $('memCount').textContent = '0';
+      return;
+    }
+    due.forEach(function (b) { appendBlockMemories(b); });
+  }
+
+  function appendBlockMemories(b) {
+    var s = SESSION, host = $('memories'), st = s.blockState[b.id];
+    var span = s.prepared[b.fireAtIndex] ? (b.fireAtIndex + 1) : '?';
+    if (s.source === 'file') {
+      (st.memories || []).forEach(function (txt) { addMemEl(txt, b.level, 'at message ' + span, false); });
+      return;
+    }
+    if (st.status === 'done') {
+      if (!st.memories.length) { addMemEl('(no new timeless facts in this span)', b.level, 'at message ' + span, false, true); }
+      else st.memories.forEach(function (txt) { addMemEl(txt, b.level, 'at message ' + span, false); });
+    } else {
+      addMemEl('condensing memories from messages ' + (b.msgIds.length ? '(' + b.pmCount + ' msgs)' : '') + ' …', b.level, 'at message ' + span, true);
+    }
+  }
+
+  function addMemEl(text, level, src, pending, faint) {
+    var s = SESSION, host = $('memories');
+    var d = document.createElement('div');
+    d.className = 'mem' + (level >= 2 ? ' lvl2' : '') + (pending ? ' pending' : '');
+    var sr = document.createElement('div'); sr.className = 'src'; sr.textContent = src + (level >= 2 ? ' · higher-level' : '');
+    var tx = document.createElement('div'); tx.className = 'txt'; tx.textContent = text;
+    if (faint) tx.style.opacity = '.6';
+    d.appendChild(sr); d.appendChild(tx);
+    host.appendChild(d);
+    if (!pending && !faint) { s.memCount++; $('memCount').textContent = String(s.memCount); }
+  }
+
+  // ----- playback -----
+  function stopTimer() { if (SESSION.timer) { clearTimeout(SESSION.timer); SESSION.timer = null; } }
+  function stopPlayback() { SESSION.playing = false; stopTimer(); $('playBtn').textContent = '▶ Play'; }
+
+  $('playBtn').addEventListener('click', function () {
+    var s = SESSION;
+    if (s.playing) { stopPlayback(); return; }
+    if (s.pos >= s.prepared.length) seekTo(0);
+    s.playing = true; $('playBtn').textContent = '⏸ Pause';
+    scheduleTick();
+  });
+  $('restartBtn').addEventListener('click', function () { stopPlayback(); seekTo(0); });
+
+  function scheduleTick() {
+    var s = SESSION;
+    var rate = sliderToRate($('speedSlider').value);
+    if (rate === Infinity) {
+      // instant: jump to end, revealing everything that is ready
+      if (s.source === 'ai') ensureBlocksGenerated(s.prepared.length);
+      stepTo(s.prepared.length);
+      stopPlayback();
+      return;
+    }
+    var delay = 1000 / rate;
+    s.timer = setTimeout(function () {
+      if (!s.playing) return;
+      stepTo(s.pos + 1);
+      if (s.pos >= s.prepared.length) { stopPlayback(); return; }
+      scheduleTick();
+    }, delay);
+  }
+
+  function stepTo(pos) {
+    var s = SESSION;
+    pos = Math.min(pos, s.prepared.length);
+    // advance highlight incrementally (no full rebuild for smoothness)
+    for (var i = s.pos; i < pos; i++) {
+      if (s._msgEls[i]) { s._msgEls[i].classList.add('seen'); }
+      if (i > 0 && s._msgEls[i - 1]) s._msgEls[i - 1].classList.remove('current');
+    }
+    if (pos > 0 && s._msgEls[pos - 1]) { s._msgEls[pos - 1].classList.add('current'); s._msgEls[pos - 1].scrollIntoView({ block: 'nearest' }); }
+    // reveal any newly-due blocks
+    var newlyDue = s.plan.blocks.filter(function (b) { return b.fireAtIndex >= s.pos && b.fireAtIndex < pos; });
+    s.pos = pos;
+    s._memKey = s.plan.blocks.filter(function (b) { return b.fireAtIndex < pos; }).map(function (b) { return b.id; }).join(',');
+    if (newlyDue.length) {
+      var emptyEl = $('memories').querySelector('.empty'); if (emptyEl) emptyEl.remove();
+      newlyDue.forEach(function (b) { appendBlockMemories(b); });
+    }
+    if (s.source === 'ai') ensureBlocksGenerated(pos);
+    $('scrub').value = String(pos);
+    updatePosLabel();
+  }
+
+  // ----- live AI regeneration -----
+  // Generate (in order) every block that is due by `uptoPos`, and a little ahead.
+  async function ensureBlocksGenerated(uptoPos) {
+    var s = SESSION;
+    if (s.source !== 'ai') return;
+    if (s._generating) return;
+    s._generating = true;
+    var token = s.genToken;
+    try {
+      var lookahead = 3;
+      var blocks = s.plan.blocks;
+      for (var i = 0; i < blocks.length; i++) {
+        if (token !== s.genToken) return; // plan changed, abandon
+        var b = blocks[i];
+        if (b.fireAtIndex >= uptoPos + 0 && i > 0) {
+          // only generate blocks at/just-ahead of the playhead; stop once far ahead
+          var ahead = blocks.filter(function (x, j) { return j < i && s.blockState[x.id].status === 'done'; }).length;
+          if (b.fireAtIndex > uptoPos && (i - ahead) > lookahead) break;
+        }
+        var st = s.blockState[b.id];
+        if (st.status === 'idle') {
+          st.status = 'running';
+          updateGenBar();
+          await generateBlock(b);   // sequential = in order, "without delay" between calls
+          st.status = 'done';
+          updateGenBar();
+          // if this block is already revealed, replace its pending text
+          if (b.fireAtIndex < s.pos) { refreshRevealedBlock(b); }
+        }
+      }
+    } catch (e) { console.error('generation loop error', e); }
+    finally { s._generating = false; }
+    // keep going if the playhead moved on while we were busy
+    if (token === s.genToken) {
+      var stillDue = s.plan.blocks.some(function (b) { return b.fireAtIndex < s.pos + lookahead && s.blockState[b.id].status === 'idle'; });
+      if (stillDue) ensureBlocksGenerated(s.pos);
+    }
+  }
+
+  function refreshRevealedBlock(b) {
+    // Rebuild the visible memory list for current position (simplest correct path).
+    var s = SESSION;
+    s._memKey = null;
+    rebuildMemoryList(s.pos);
+  }
+
+  function updateGenBar() {
+    var s = SESSION;
+    if (s.source !== 'ai' || !s.plan.blocks.length) { $('genBar').hidden = true; return; }
+    var done = s.plan.blocks.filter(function (b) { return s.blockState[b.id].status === 'done'; }).length;
+    var total = s.plan.blocks.length;
+    $('genBar').hidden = false;
+    $('genFill').style.right = (100 - (done / total * 100)) + '%';
+    $('genText').textContent = 'memories generated: ' + done + ' / ' + total;
+  }
+
+  // One block = summary call + memory call (run in parallel; they are independent).
+  async function generateBlock(b) {
+    var s = SESSION;
+    if (typeof aiTextPlugin !== 'function') {
+      // no AI available — produce a graceful placeholder so the UI still works
+      s.blockState[b.id].memories = ['(AI text plugin unavailable — run this on perchance.org with ai-text-plugin imported)'];
+      return;
+    }
+    var sharedPrefix = buildSharedPrefix(s.extraContext, b);
+    var results = await Promise.all([
+      callSummary(sharedPrefix, b).catch(function (e) { console.warn('summary fail', e); return ''; }),
+      callMemories(sharedPrefix, b).catch(function (e) { console.warn('memory fail', e); return []; })
+    ]);
+    s.blockState[b.id].summary = results[0];
+    s.blockState[b.id].memories = results[1] || [];
+  }
+
+  function priorSummaryTexts(b) {
+    var s = SESSION;
+    return (b.priorSummaryIds || []).map(function (id) {
+      return (s.blockState[id] && s.blockState[id].summary) ? s.blockState[id].summary : '';
+    }).filter(Boolean);
+  }
+
+  function buildSharedPrefix(extraContext, b) {
+    // mirrors sharedContextPrefixText from the real pipeline
+    var lines = [
+      'Below is' + (extraContext ? ' some context, plus' : '') + ' a summary of some events. You must use this information to complete the @@@ TASK specified at the bottom of this instruction.',
+      (extraContext ? ('\n# Potentially Useful Context (may or may not be relevant):\n' + extraContext + '\n') : ''),
+      '# Summary of Previous Events:'
+    ];
+    var prior = priorSummaryTexts(b);
+    var priorBlock = prior.length ? prior.join('\n') : '(None.)';
+    return lines.join('\n').trim() + '\n' + priorBlock;
+  }
+
+  async function callSummary(sharedPrefix, b) {
+    // startWith primes the model with the FULL TEXT of the final block.
+    var startWith = '>>> FULL TEXT of ' + C.A + ': ' + b.inputText.replace(/\n/g, ' ').trim()
+      + '\n>>> SUMMARY of ' + C.A + ' (full, natural, readable sentences with correct grammar):';
+    var task = [
+      '@@@ TASK: Your task is to generate some text and then a SUMMARY of that text. Above are the characters and the initial scenario, and a summary of earlier events. Write a single-paragraph summary of the FULL TEXT below, roughly half its original size.',
+      'Use this format/template for your response:',
+      C.fence,
+      '>>> FULL TEXT of ' + C.A + ': <some text>',
+      '>>> SUMMARY of ' + C.A + ': <a one-paragraph summary of the ' + C.A + ' text>',
+      C.fence,
+      'Each summary should be a single paragraph which summarizes the new text to roughly half its original length. Do not add flowery prose. Summary text should contain only the most important information, using well-phrased sentences with natural structure and correct grammar.',
+      'NOTE: Do not append any other commentary/notes. Just do the task and then end your response.',
+      'IMPORTANT: Avoid repetition. If there are erroneously repeated elements in the full text, remove or ignore them in your summary.'
+    ].join('\n');
+    var result = await aiTextPlugin({
+      instruction: sharedPrefix + '\n\n' + task,
+      startWith: startWith,
+      stopSequences: ['\n\n', '\n---', '\n>>> FULL TEXT', 'FULL TEXT']
+    });
+    if (result && result.stopReason === 'error') return '';
+    return RM.cleanSummary(result && result.generatedText ? result.generatedText : String(result));
+  }
+
+  async function callMemories(sharedPrefix, b) {
+    var task = [
+      '@@@ TASK: Your task is to condense the *NEW_TEXT* below into a series of up to 3 lore/memory/fact entries which can be added to a database of facts about this story/world/roleplay/chat. You must extract "timeless facts", not temporary facts.',
+      '- An example of a timeless fact is "<char> was born in <town>". A temporary fact is "<char> is hungry right now". We only want timeless facts — things likely to always be true.',
+      '- Make each entry fully self-contained, with enough surrounding context that it makes sense read on its own.',
+      '- Give enough context that there is no ambiguity about what/who is referenced.',
+      '- Each entry should be no more than 3 sentences.',
+      '- Use actual names instead of pronouns. Instead of "He said to her" write "Bob said to Alice". Instead of "this town" write the full name.',
+      '- If unsure whether a fact is timeless, add more context. Instead of "Bob is kind to Alice" write "Bob was kind to Alice when he first met her."',
+      '',
+      'IMPORTANT: Do NOT write about already-known things from the context/previous events or character descriptions. Only add NEW things learned from the NEW_TEXT.',
+      '',
+      '# NEW_TEXT:',
+      b.inputText,
+      '',
+      'Use this format/template for your response:',
+      '',
+      '# Lore/memory entries from NEW_TEXT:',
+      '1. <something we can deduce directly from NEW_TEXT>',
+      '2. <something else we can deduce directly from NEW_TEXT>',
+      '3. <another thing we can deduce directly from NEW_TEXT>'
+    ].join('\n');
+    var startWith = '# Lore/memory entries from NEW_TEXT:\n1.';
+    var result = await aiTextPlugin({
+      instruction: sharedPrefix + '\n\n' + task,
+      startWith: startWith,
+      stopSequences: ['\n4.']
+    });
+    if (result && result.stopReason === 'error') return [];
+    return RM.parseMemories(result && result.generatedText ? result.generatedText : String(result));
+  }
+
+  // ============================================================
+  //  SAVE / EXPORT — bake regenerated memories back into the data
+  // ============================================================
+
+  // Bake completed blocks via the engine (pure, Node-tested): each block's
+  // summary + memories attach to the LAST message it covers, in the exact schema
+  // ai-character-chat reads back.
+  function bakeUpdates() {
+    return RM.bakeUpdates(SESSION.plan, SESSION.blockState, SESSION.prepared);
+  }
+
+  function countBaked(updates) {
+    var sums = 0, mems = 0;
+    Object.keys(updates).forEach(function (id) {
+      sums += Object.keys(updates[id].summariesEndingHere).length;
+      Object.keys(updates[id].memoriesEndingHere).forEach(function (lvl) { mems += updates[id].memoriesEndingHere[lvl].length; });
+    });
+    return { sums: sums, mems: mems, anchors: Object.keys(updates).length };
+  }
+
+  // Apply baked updates onto a copy of a messages array (engine, pure).
+  function applyUpdates(messages, updates, clean) {
+    return RM.applyUpdates(messages, updates, clean);
+  }
+
+  function threadMessagesRaw() {
+    return DB.messages.filter(function (m) { return m.threadId === SESSION.thread.id; });
+  }
+  function safeName() {
+    return (SESSION.thread.name || SESSION.characterName || 'session').replace(/[^a-z0-9_\- ]/gi, '').trim().replace(/\s+/g, '-').slice(0, 50) || 'session';
+  }
+
+  // ----- ① single character (carries the learned facts in its instruction) ---
+  function buildSingleCharacter() {
+    var character = DB.characters.find(function (c) { return c.id === SESSION.thread.characterId; })
+      || (SESSION.thread.character) || { name: SESSION.characterName, roleInstruction: '' };
+    var ch = JSON.parse(JSON.stringify(character)); // deep clone
+
+    // collect every baked memory fact, in chronological order
+    var facts = [];
+    var updates = bakeUpdates();
+    SESSION.prepared.forEach(function (pm) {
+      var u = updates[pm.id]; if (!u) return;
+      Object.keys(u.memoriesEndingHere).forEach(function (lvl) {
+        u.memoriesEndingHere[lvl].forEach(function (e) { if (e.text) facts.push(e.text); });
+      });
+    });
+
+    if (facts.length) {
+      var header = '\n\n# Remembered facts (from a previous conversation):\n';
+      var body = facts.map(function (f, i) { return (i + 1) + '. ' + f; }).join('\n');
+      ch.roleInstruction = (ch.roleInstruction || '') + header + body;
+    }
+    // make it a valid share/import object
+    ch.quickAdd = true;
+    if (ch.creationTime == null) ch.creationTime = Date.now();
+    ch.lastMessageTime = Date.now();
+    return { addCharacter: ch, factsCount: facts.length, name: (ch.name || SESSION.characterName) };
+  }
+
+  // ----- ② back into the original file ---------------------------------------
+  // Returns a fresh top-level object in the SAME envelope the user loaded,
+  // with the thread's messages updated (replace) or duplicated (append).
+  function buildUpdatedFile(mode) {
+    var updates = bakeUpdates();
+    var raw = JSON.parse(JSON.stringify(DB._raw)); // deep clone original envelope
+    var threadId = SESSION.thread.id;
+
+    function getStore(name) {
+      if (DB._format === 'rawexport') return raw.stores[name] || (raw.stores[name] = []);
+      if (DB._format === 'dexie') {
+        var t = raw.data.data.find(function (d) { return d.tableName === name; });
+        if (!t) { t = { tableName: name, rows: [] }; raw.data.data.push(t); }
+        return t.rows;
+      }
+      return null;
+    }
+    function setStore(name, rows) {
+      if (DB._format === 'rawexport') raw.stores[name] = rows;
+      else if (DB._format === 'dexie') {
+        var t = raw.data.data.find(function (d) { return d.tableName === name; });
+        if (t) t.rows = rows; else raw.data.data.push({ tableName: name, rows: rows });
+      }
+    }
+
+    if (DB._format === 'share') {
+      // no thread in a share file — fall back to a fresh dexie export
+      return buildFreshDexie(updates, mode);
+    }
+
+    var allMsgs = getStore('messages');
+    var threadsRows = getStore('threads');
+
+    if (mode === 'append') {
+      var newThreadId = Date.now();
+      var srcThread = threadsRows.find(function (t) { return t.id === threadId; }) || SESSION.thread;
+      var newThread = JSON.parse(JSON.stringify(srcThread));
+      newThread.id = newThreadId;
+      newThread.name = ((srcThread.name || SESSION.characterName || 'Chat') + ' (respool)');
+      newThread.lastMessageTime = Date.now();
+      threadsRows.push(newThread);
+
+      var srcMsgs = allMsgs.filter(function (m) { return m.threadId === threadId; });
+      var baked = applyUpdates(srcMsgs, updates, true); // clean clone
+      var base = Date.now() + 1;
+      baked.forEach(function (m, i) {
+        m.id = base + i;            // fresh unique ids
+        m.threadId = newThreadId;
+      });
+      // re-anchor baked memories onto the NEW ids (updates keyed by old id)
+      reanchor(srcMsgs, baked, updates);
+      setStore('messages', allMsgs.concat(baked));
+    } else {
+      // replace: rewrite this thread's messages in place (clean + baked)
+      var rewritten = allMsgs.map(function (m) {
+        if (m.threadId !== threadId) return m;
+        return applyUpdates([m], updates, true)[0];
+      });
+      setStore('messages', rewritten);
+    }
+    return raw;
+  }
+
+  // When appending, the baked clones got new ids; re-apply memory anchors by
+  // position so they land on the cloned messages too.
+  function reanchor(srcMsgs, clones, updates) {
+    for (var i = 0; i < srcMsgs.length; i++) {
+      var u = updates[srcMsgs[i].id];
+      if (!u) continue;
+      var c = clones[i];
+      if (Object.keys(u.summariesEndingHere).length) c.summariesEndingHere = Object.assign({}, u.summariesEndingHere);
+      if (Object.keys(u.memoriesEndingHere).length) { c.memoriesEndingHere = {}; for (var lvl in u.memoriesEndingHere) c.memoriesEndingHere[lvl] = u.memoriesEndingHere[lvl]; }
+    }
+  }
+
+  function buildFreshDexie(updates, mode) {
+    var msgs = applyUpdates(threadMessagesRaw(), updates, true);
+    var chars = DB.characters.filter(function (c) { return c.id === SESSION.thread.characterId; });
+    return {
+      formatName: 'dexie',
+      data: { databaseName: 'chatbot-ui-v1', data: [
+        { tableName: 'characters', rows: chars },
+        { tableName: 'threads', rows: [SESSION.thread] },
+        { tableName: 'messages', rows: msgs }
+      ] }
+    };
+  }
+
+  // ----- serialise an object to bytes in a chosen container ------------------
+  async function objToBytes(obj, container) {
+    var json = JSON.stringify(obj);
+    if (container === 'json') return new TextEncoder().encode(json);
+    if (container === 'cbor') {
+      var CBOR = await getCBOR();
+      return await gzip(CBOR.encode(obj));
+    }
+    // default: gzipped json
+    return await gzip(new TextEncoder().encode(json));
+  }
+
+  function downloadBytes(bytes, filename, mime) {
+    var blob = new Blob([bytes], { type: mime || 'application/octet-stream' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+  }
+
+  function exStatus(msg) { $('exportStatus').textContent = msg || ''; }
+
+  // ----- generate-all action -------------------------------------------------
+  $('genAllBtn').addEventListener('click', async function () {
+    var s = SESSION;
+    if (s.source !== 'ai') { $('genAllNote').textContent = 'File mode already has its memories — nothing to generate.'; return; }
+    this.disabled = true; $('genAllNote').textContent = 'generating…';
+    s.genToken++; // reset any in-flight loop to take over cleanly
+    await ensureBlocksGenerated(s.prepared.length);
+    var done = s.plan.blocks.filter(function (b) { return s.blockState[b.id].status === 'done'; }).length;
+    $('genAllNote').textContent = done + ' / ' + s.plan.blocks.length + ' blocks done.';
+    this.disabled = false;
+  });
+
+  // ----- export toggle -------------------------------------------------------
+  $('exportToggle').addEventListener('click', function () {
+    var p = $('exportPanel'); p.hidden = !p.hidden;
+    this.textContent = p.hidden ? '💾 Save / export ▾' : '💾 Save / export ▴';
+  });
+
+  // ----- ① single character --------------------------------------------------
+  async function doCharDownload(container) {
+    try {
+      var c = buildSingleCharacter();
+      var ext = container === 'json' ? 'json' : 'gz';
+      var bytes = await objToBytes({ addCharacter: c.addCharacter }, container === 'json' ? 'json' : 'gzjson');
+      downloadBytes(bytes, 'respool-' + safeName() + '-character.' + ext, container === 'json' ? 'application/json' : 'application/gzip');
+      exStatus('Saved character “' + c.name + '”' + (c.factsCount ? ' with ' + c.factsCount + ' remembered fact(s).' : ' (no memories baked yet — generate them first).'));
+    } catch (e) { console.error(e); exStatus('Export failed: ' + (e.message || e)); }
+  }
+  $('dlCharGz').addEventListener('click', function () { doCharDownload('gz'); });
+  $('dlCharJson').addEventListener('click', function () { doCharDownload('json'); });
+  $('upChar').addEventListener('click', async function () {
+    var c = buildSingleCharacter();
+    var ch = c.addCharacter;
+    if (SESSION.lore && SESSION.lore.length && $('charAttachLore') && $('charAttachLore').checked) {
+      exStatus('uploading lorebook…');
+      var loreUrl = await uploadLorebookTxt();
+      if (loreUrl) { ch.loreBookUrls = (ch.loreBookUrls || []).concat([loreUrl]); exStatus('lorebook attached, uploading character…'); }
+      else { exStatus('lorebook upload unavailable — facts remain in the character instruction.'); }
+    }
+    doUpload({ addCharacter: ch }, safeName() + '-character');
+  });
+
+  // ----- ② back into the file ------------------------------------------------
+  function currentFileMode() {
+    var r = document.querySelector('input[name="fileMode"]:checked');
+    return r ? r.value : 'replace';
+  }
+  function builtFormat() { return (DB._format === 'rawexport') ? 'rawexport' : 'dexie'; }
+  function maybeInjectLore(obj, fmt) {
+    if (SESSION.lore && SESSION.lore.length && $('fileIncludeLore') && $('fileIncludeLore').checked) injectLoreIntoFile(obj, fmt);
+    return obj;
+  }
+  $('dlFile').addEventListener('click', async function () {
+    try {
+      var mode = currentFileMode();
+      var obj = buildUpdatedFile(mode);
+      var fmt = (DB._format === 'share') ? 'dexie' : DB._format;
+      maybeInjectLore(obj, fmt);
+      var container = (fmt === 'rawexport') ? 'cbor' : 'gzjson';
+      var ext = (fmt === 'rawexport') ? 'cbor.gz' : 'gz';
+      var bytes = await objToBytes(obj, container);
+      downloadBytes(bytes, 'respool-' + safeName() + '-' + mode + '.' + ext, 'application/gzip');
+      var b = countBaked(bakeUpdates());
+      var loreN = (SESSION.lore && SESSION.lore.length && $('fileIncludeLore').checked) ? (' + ' + SESSION.lore.length + ' lore') : '';
+      exStatus('Saved updated file (' + mode + ') — ' + b.mems + ' memories across ' + b.anchors + ' message(s)' + loreN + '.');
+    } catch (e) { console.error(e); exStatus('Export failed: ' + (e.message || e)); }
+  });
+  $('upFile').addEventListener('click', function () {
+    try {
+      var mode = currentFileMode();
+      var obj = buildUpdatedFile(mode);
+      // share links must be JSON for the loader/$meta; send a dexie/json envelope
+      var shareObj = (DB._format === 'rawexport') ? buildFreshDexie(bakeUpdates(), mode) : obj;
+      maybeInjectLore(shareObj, 'dexie');
+      doUpload(shareObj, safeName() + '-' + mode);
+    } catch (e) { console.error(e); exStatus('Upload failed: ' + (e.message || e)); }
+  });
+
+  // ----- ③ upload to Perchance (shared by char + file) -----------------------
+  async function doUpload(obj, label) {
+    var maker = grab('uploadObjectAsShareLink');
+    if (typeof maker !== 'function') { exStatus('Uploading needs the live perchance.org page (upload plugin unavailable here).'); return; }
+    exStatus('uploading…');
+    try {
+      var res = await maker(obj, label);
+      if (res && res.error) { exStatus('Upload failed: ' + res.error); return; }
+      if (res && res.shareUrl) {
+        $('exportUrl').value = String(res.shareUrl);
+        $('exportOut').hidden = false;
+        $('exportUrl').focus(); $('exportUrl').select();
+        exStatus('Uploaded — share link ready.');
+      } else { exStatus('Upload failed (no URL returned).'); }
+    } catch (e) { console.error(e); exStatus('Upload failed: ' + (e.message || e)); }
+  }
+
+  $('exportCopy').addEventListener('click', function () {
+    var inp = $('exportUrl'); inp.select();
+    try { navigator.clipboard.writeText(inp.value); } catch (e) { try { document.execCommand('copy'); } catch (e2) {} }
+    var b = this, t = b.textContent; b.textContent = 'copied ✓';
+    setTimeout(function () { b.textContent = t; }, 1500);
+  });
+
+  // ============================================================
+  //  PROMOTE TO LORE — consolidate memories into lorebook entries
+  // ============================================================
+  function collectAllFacts() {
+    var updates = bakeUpdates(), facts = [];
+    SESSION.prepared.forEach(function (pm) {
+      var u = updates[pm.id]; if (!u) return;
+      Object.keys(u.memoriesEndingHere).forEach(function (lvl) {
+        u.memoriesEndingHere[lvl].forEach(function (e) { if (e.text) facts.push(e.text); });
+      });
+    });
+    return facts;
+  }
+
+  async function callPromoteLore(facts) {
+    if (typeof aiTextPlugin !== 'function') {
+      // no AI — fall back to a 1:1 promotion (each memory becomes a lore entry)
+      return facts.map(function (t) { return { text: t, triggers: [] }; });
+    }
+    var sep = String.fromCharCode(124); // |
+    var triple = sep + sep + sep;
+    var numbered = facts.map(function (f, i) { return (i + 1) + '. ' + f; }).join('\n');
+    var instruction = [
+      'You are curating a lorebook for a story/roleplay. Below is a list of remembered facts extracted from a conversation. Consolidate them into a clean, de-duplicated set of lore entries.',
+      '- Merge duplicates and near-duplicates into a single entry.',
+      '- Keep each entry self-contained, using real names rather than pronouns.',
+      '- For each entry, list 1 to 5 trigger keywords (names, places, things) that should surface this lore when mentioned.',
+      '',
+      'Output one entry per line, in exactly this format (no numbering, no extra commentary):',
+      'FACT TEXT ' + triple + ' keyword1, keyword2, keyword3',
+      '',
+      '# Remembered facts:',
+      numbered,
+      '',
+      '# Lorebook entries:'
+    ].join('\n');
+    var result = await aiTextPlugin({
+      instruction: instruction,
+      startWith: '',
+      stopSequences: ['\n\n\n']
+    });
+    if (result && result.stopReason === 'error') return facts.map(function (t) { return { text: t, triggers: [] }; });
+    var text = result && result.generatedText ? result.generatedText : String(result);
+    var parsed = RM.promoteParse(text);
+    return parsed.length ? parsed : facts.map(function (t) { return { text: t, triggers: [] }; });
+  }
+
+  function renderLore() {
+    var host = $('loreList'); host.innerHTML = '';
+    (SESSION.lore || []).forEach(function (it) {
+      var d = document.createElement('div'); d.className = 'lore-entry';
+      var lt = document.createElement('div'); lt.className = 'lt'; lt.textContent = it.text;
+      d.appendChild(lt);
+      if (it.triggers && it.triggers.length) {
+        var tg = document.createElement('div'); tg.className = 'tg';
+        it.triggers.forEach(function (t) { var s = document.createElement('span'); s.textContent = t; tg.appendChild(s); });
+        d.appendChild(tg);
+      }
+      host.appendChild(d);
+    });
+    host.hidden = false;
+  }
+
+  $('promoteLoreBtn').addEventListener('click', async function () {
+    var facts = collectAllFacts();
+    if (!facts.length) { $('loreNote').textContent = 'No memories yet — generate them first.'; return; }
+    var btn = this; btn.disabled = true; $('loreNote').textContent = 'consolidating ' + facts.length + ' facts…';
+    try {
+      SESSION.lore = await callPromoteLore(facts);
+      renderLore();
+      $('loreActions').hidden = false;
+      $('charLoreOpt').hidden = false;
+      $('fileLoreOpt').hidden = false;
+      $('loreNote').textContent = SESSION.lore.length + ' lore entr' + (SESSION.lore.length === 1 ? 'y' : 'ies') + ' from ' + facts.length + ' memories.';
+    } catch (e) { console.error(e); $('loreNote').textContent = 'Promotion failed: ' + (e.message || e); }
+    finally { btn.disabled = false; }
+  });
+
+  $('dlLoreTxt').addEventListener('click', function () {
+    if (!SESSION.lore || !SESSION.lore.length) return;
+    var txt = RM.loreToText(SESSION.lore);
+    downloadBytes(new TextEncoder().encode(txt), 'respool-' + safeName() + '-lorebook.txt', 'text/plain');
+    exStatus('Saved lorebook .txt (' + SESSION.lore.length + ' entries).');
+  });
+
+  // Inject promoted lore as `lore` table rows (bookId = thread id) into a built file.
+  function injectLoreIntoFile(rawObj, format) {
+    if (!SESSION.lore || !SESSION.lore.length) return rawObj;
+    var bookId = SESSION.thread.id;
+    var rows;
+    if (format === 'rawexport') { rawObj.stores.lore = rawObj.stores.lore || []; rows = rawObj.stores.lore; }
+    else if (format === 'dexie') {
+      var t = rawObj.data.data.find(function (d) { return d.tableName === 'lore'; });
+      if (!t) { t = { tableName: 'lore', rows: [] }; rawObj.data.data.push(t); }
+      rows = t.rows;
+    } else return rawObj;
+    var startId = rows.reduce(function (mx, e) { return Math.max(mx, e.id || 0); }, 0) + 1;
+    var entries = RM.buildLoreEntries(SESSION.lore, bookId, startId);
+    entries.forEach(function (e) { rows.push(e); });
+    return rawObj;
+  }
+
+  // upload a lorebook .txt and return its URL (for character.loreBookUrls)
+  async function uploadLorebookTxt() {
+    var up = grab('uploadPlugin');
+    if (typeof up !== 'function') return null;
+    try {
+      var txt = RM.loreToText(SESSION.lore);
+      var blob = new Blob([txt], { type: 'text/plain' });
+      var res = await up(blob);
+      var url = String((res && res.url) ? res.url : res);
+      return (url && url !== 'undefined') ? url : null;
+    } catch (e) { console.error('lorebook upload', e); return null; }
+  }
+
+  $('anotherCharBtn').addEventListener('click', backToThreads);
+
+  // mount fullscreen button if the plugin is present
+  try {
+    var fsb = grab('fullscreenButtonPlugin');
+    if (typeof fsb === 'function') { var el = fsb(); if (el && el.nodeType) $('fullscreenSlot').appendChild(el); }
+  } catch (e) {}
+
+})();
+</script>
