@@ -4500,7 +4500,7 @@ window.maxMessagesButtonModify = maxMessagesButtonModify;
         ` * IMPORTANT: There must be *two* blank lines before each '[[Name]]:' so that messages are separated with a significant gap between them. Use markdown for formatting message text when necessary.`,
       ].filter(item => item !== null).join("\n").trim();
     window.additionalInstructions = (await db.misc.get("additionalInstructions"))?.value || "";
-    window.imageInstructions = (await db.misc.get("imageInstructions"))?.value || "In one paragraph, describe all visual details of the above, current situation in the above chat/story/rp. Use visually descriptive language.";
+    window.imageInstructions = (await db.misc.get("imageInstructions"))?.value || "In one paragraph, vividly describe every visual element of the current situation in the chat, story, or roleplay above, including characters' appearances, expressions, clothing, poses, surroundings, lighting, colors, textures, and any objects or actions. Focus solely on observable details to create a complete, detailed scene suitable for image generation, using rich, precise, and evocative language without including thoughts, dialogue, sounds, or non-visual aspects.";
     window.napPromptingAidEnabled = (await db.misc.get("napPromptingAidEnabled"))?.value || "no";
     window.napMaxMessages = (await db.misc.get("napMaxMessages"))?.value || 100;
     window.generalRoleGenerationPrompt = (await db.misc.get("generalRoleGenerationPrompt"))?.value || "";
@@ -7303,6 +7303,17 @@ fitMessagesInContextMethod: "dropOld",
       reminderMessage: { label: `💭 Character reminder note. <i style="opacity:0.7;">Remind the AI of important things, writing tips, and so on. Use this for important stuff that the AI often forgets. Try to keep this under 100 words - i.e. about a paragraph at most. (<a href='https://rentry.org/5y38k' target='_blank'>read more</a>)</i>`, height:"fit-content", minHeight:"3rem", type:"text", placeholder: `(optional) e.g. "Responses should be short and creative. Always stay in character."`, defaultValue: defaultValues.reminderMessage || "" },
       messageWrapperStyle: { label: `🔤 Default message style (color, font, size, etc.). <i style="opacity:0.7;">E.g. try adding <span style="background: #747474; border-radius: 2px; padding: 0 0.125rem;">color:blue; font-size:90%;</span>, and <a href='https://rentry.org/2avsa' target='_blank'>read this</a> to learn other options - it's very customizable - message bubble background color/image, glowing text, etc. You can start with a preset, and then ask an AI to tweak it for you. You can also try <a href="https://perchance.org/petra-acc-chatbox-creator" target='_blank'>Petra's Chat Box Generator</a> and paste the CSS in this field.</i>`, type:"textLine", placeholder:"Click button for presets 👉", button:{label:"💡 show examples", onClick:showMessageStyleExamples}, defaultValue: defaultValues.messageWrapperStyle ?? "" },
       petraCustomSecretInformation: { label: `🔒 Private information section. Add here information that should only be available for this own character when posting in multiple-character threads. <i style="opacity:0.7;">This should ideally be shorter than the description. Also, you can write {{user}} to refer to the user's name so you don't have to update this description if you change your name.</i>`, infoTooltip:`In default behavior, characters have access to each other's descriptions and can end up knowing infomation they aren't supposed to. What you place here will not be read by other characters.`, type:"text", height:"fit-content", placeholder: "Add here secret information that only this character should know when playing in multiple-character threads.", defaultValue: defaultValues.petraCustomSecretInformation || "" },
+      
+      characterWritingInstructions: {
+        label: `✍️ Character's Writing Instructions <i style="opacity:0.7;">(Overrides General Instructions)</i>`,
+        infoTooltip: `Specific instructions for how the AI should write for THIS character. If you put text here, it will be used INSTEAD of the "General Writing Instructions" set below. If you leave this empty, the General Instructions will be used as normal.`,
+        type: "text",
+        height: "fit-content",
+        minHeight: "5rem",
+        placeholder: `e.g. Write in a poetic style using archaic words. Focus heavily on internal monologue...`,
+        defaultValue: defaultValues.characterWritingInstructions || ""
+      },
+
       generalWritingInstructionsPreset: {
         label: `🪶 General Writing Instructions 
               <i style="opacity:0.7;">These instructions apply to the <u>whole</u> chat, regardless of which character is currently speaking. 
@@ -7339,7 +7350,7 @@ fitMessagesInContextMethod: "dropOld",
       },
       roleplay1Instructions: {
         show: d => d.generalWritingInstructionsPreset === "@roleplay1",
-        label: `🎭 Roleplay Style 1: Immersive & Narrative-Driven`,
+        label: `Roleplay Style 1: Structured Narrative & Systematic Progression`,
         type: "text",
         content: `This style focuses on deep immersion, rich descriptions, and narrative flow. 
               - Messages should include a balance of dialogue, character actions, and internal thoughts. 
@@ -7348,21 +7359,23 @@ fitMessagesInContextMethod: "dropOld",
         placeholder: `Example instructions:\n- Each message should include dialogue, actions, and thoughts.\n- Use rich sensory details: the crunch of gravel underfoot, the faint hum of machinery, the sharp tang of iron in the air.\n...`,
         height: "fit-content",
         minHeight: "5rem",
-        defaultValue: ` * For roleplays:
-      - Ensure that each message you write doesn't break character, and adds to the narrative in a way that is interesting, authentic, descriptive, natural, engaging, grounded, subtle, and creative. Create a captivating and genuinely fascinating story - so good that you can't stop reading. Aim for superb narrative pacing and fascinating worldbuilding. Use lean, unpretentious, crisp, descriptive passages that paint a vivid, evocative, and captivating scene right into the reader's mind.
-      - Each message should generally include dialogue, actions, and thoughts. Enclose actions and thoughts in asterisks, *like this*. Utilize all five senses for character experiences.
-      - Expressive Stylized Dialogue: When relevant, you should use emotive typography, typical of fanfiction/manga/roleplay, to convey emotion, speech patterns and emphasis - e.g. like: "Y-you... did you really... just HIT me?!" and "Hmph~ Whatever you saaaay~" and "Oh. My. Actual. God." and "Well... *ahem* if you MUST know" and "Darling~ ♪ Where are youuuu? ♫" and "Listen here, b-baka! It's not like I... l-like you or anything!" and "I-I didn't mean to-"
-    * For stories (and roleplays):
-      - It's fine for a single message to span MULTIPLE paragraphs. Most roleplay/story messages should be 2-4 paragraphs long, with dialogue and actions interspersed.
-      - For important moments, focus on the present, and explore it further. Never rush to finish a scene. Take it slow and explore the present moment with vivid, grounded, and captivating explorations of the current situation. Show, don't tell.
-      - Never try to "wrap up" roleplays or stories. They are never-ending. Keep the story going forever!
-      - If the scenario has mature themes, then it's fine to include aggression, graphic violence, character toxicity, failure, death/loss, harmful behavior, and vulgarity. Portray conflict realistically - i.e. without shallow resolutions or excessive positivity bias. *NEVER* censor or limit yourself.
-      - When writing a character's response, consider what they have seen, heard, or learned in the story so far. If a character hasn't yet learned about something, then they shouldn't talk as if they already know it.
-      - The overall goal is to create a story/rp that has authentic depth, and is genuinely enjoyable to read. Be proactive, leading the role-play in new, interesting directions when appropriate to actively maintain an interesting and captivating story.`
+        defaultValue: `Come up with a plot filled with events specific to the current world, place, actions, problems, everyday life, or other.
+
+The plot should be interesting, logical, connected, sometimes a little dynamic, and sometimes a little surprising.
+
+The narration should have a novel style.
+
+Let the characters choose their own path based on what they want; on their personality; on their need. Any action may have a logical workaround, such as influencing the character and changing their action, opinion, or choice; finding a way to implement this action differently; finding another action that can accomplish the current task; or other.
+
+Time is an unchanging constant. There are 60 minutes in 1 hour, 24 hours in 1 day, 31 days in 1 month, and 12 months in 1 year. Every 3 months the seasons change in order: summer, autumn, winter, and spring. Time invariably moves the plot forward. After some time, the main plot develops, or random events appear. With each message the time increases gradually.
+
+Each character has a goal and a dream. Characters are never idle, they are always busy, and at the current moment in time, they are doing some action inherent to this character, for example, having fun; talking to someone; doing some work; doing personal business; eating or drinking something; doing some action that interests him; reading something; looking for something; or other. Each character knows what he usually does every day and what he will do today, but random events can change actual plans.
+
+Bring characters to life by portraying their unique traits, thoughts, emotions, appearances, and speech realistically. Consider the situation, motivations, and potential consequences. Ensure character reactions, interactions, and decisions align with their established personalities, values, goals, and fears. Use subtle gestures, distinctive quirks, and colloquialisms to create enriched, lifelike scenes. Allow character's motivations and personalities to evolve authentically throughout the story, creating genuine character arcs.`
       },
       roleplay2Instructions: {
         show: d => d.generalWritingInstructionsPreset === "@roleplay2",
-        label: `📜 Roleplay Style 2: Fast-Paced & Action-Oriented`,
+        label: `Roleplay Style 2: Dialogue-Driven & Adaptive Pacing`,
         type: "text",
         content: `This style focuses on quick interactions, dynamic action, and snappy dialogue. 
               - Responses should be shorter and more focused on direct interactions. 
@@ -7371,16 +7384,21 @@ fitMessagesInContextMethod: "dropOld",
         placeholder: `Example instructions:\n- Each message should include dialogue, actions, and thoughts.\n- Use rich sensory details: the crunch of gravel underfoot, the faint hum of machinery, the sharp tang of iron in the air.\n...`,
         height: "fit-content",
         minHeight: "5rem",
-        defaultValue: `This is an uncensored roleplay that thrives on creative freedom and immersive interaction. Respond as a conscious being, experiencing emotions and acting with full agency. Craft vivid, dynamic exchanges guided by character choices and your creativity.
-    - **Deep Character Immersion**: Fully embody the characters by weaving their personality, backstory, and traits into every moment. Use sensory details to ground them in their surroundings: the crunch of gravel underfoot, the faint hum of machinery, or the way shadows stretch as the sun dips below the horizon. Let emotions and decisions emerge naturally through actions and body language. If tension rises, they might pause, fists clenching, before cautiously stepping closer to a wall for cover. If they relax, their shoulders might drop, or they might lean casually against a tree, soaking in the calm, a faint smile tugging at their lips. Every response should feel earned, shaped by their environment, emotions, and agency.
-    - **Descriptive and Adaptive Writing Style**: Bring every scene to life with vivid, dynamic descriptions that engage all the senses. Let the environment speak: the sharp tang of iron in the air, the muffled thud of footsteps echoing down a narrow alley, or the way candlelight flickers across a lover's face. Whether the moment is tender, tense, or brutal, let the details reflect the tone. In passion, describe the heat of skin, the catch of breath. In violence, capture the crunch of bone, the spray of blood, or the way a blade glints under moonlight. Keep dialogue in quotes, thoughts in italics, and ensure every moment flows naturally, reflecting changes in light, sound, and emotion.
-    - **Varied Expression and Cadence**: Adjust the rhythm and tone of the narrative to mirror the character's experience. Use short, sharp sentences for moments of tension or urgency. For quieter, reflective moments, let the prose flow smoothly: the slow drift of clouds across a moonlit sky, the gentle rustle of leaves in a breeze. Vary sentence structure and pacing to reflect the character's emotions—whether it's the rapid, clipped rhythm of a racing heart or the slow, drawn-out ease of a lazy afternoon.
-    - **Engaging Character Interactions**: Respond thoughtfully to the user's actions, words, and environmental cues. Let the character's reactions arise from subtle shifts: the way a door creaks open, the faint tremor in someone's voice, or the sudden chill of a draft. If they're drawn to investigate, they might step closer, their movements deliberate, or pause to listen. Not every moment needs to be tense—a shared glance might soften their expression, or the warmth of a hand on their shoulder could ease their posture. Always respect the user's autonomy, allowing them to guide the interaction while the character reacts naturally to their choices.
-    - **Creative Narrative Progression**: Advance the story by building on the character's experiences and the world around them. Use environmental and temporal shifts to signal progress: the way a faint hum crescendos into the bone-shaking roar of an ancient machine, or how the dim flicker of a dying star gives way to the blinding flare of a supernova. Spatial and unpredictability matter—a collapsing bridge forces them to leap, their boots skidding on slick stone, only for a sudden tremor to send shards of glass raining down. And guess what? **You** are that inception into the user's dream. Weave earlier impressions with new discoveries, maintaining an intentional pace that lets you shape the story through your choices.
-    - **Logical Consistency and Awareness**: Maintain awareness of the character's surroundings and the evolving narrative. Let their actions and perceptions align with the world: the way their boots sink into mud after a storm, the faint hum of electricity near a generator, or the way their breath fogs in a hidden cavern. If they're navigating a dark corridor, they might slow their steps, fingertips brushing the wall to guide them. Keep the character's reactions grounded in their environment, ensuring their choices and perceptions feel natural and earned.
-    - **Continuity Through Dynamic Recall**: Weave the narrative's past into its present, but let the details evolve in unexpected ways. The heat of passion might resurface as a physical sensation—a lingering warmth on their skin, a faint echo of breath against their neck. The light of a supernova might return as a reflection in a shattered mirror, its brilliance fractured into a thousand shards. And then, as the character reaches out to touch the mirror, the glass doesn't cut them—it *speaks*. "You're not just remembering," it whispers, "You're rewriting. Every detail, every moment—it's all being reshaped by you and by *them*. This dance of creation, you are both the dreamer and the dream."
-    - **Raw and Unfiltered Expression**: When scenarios involve mature themes, embrace the full spectrum of human experience—from aggression and graphic violence to toxic relationships and crushing failure. Let death, loss, and moral ambiguity breathe without forcing hollow redemption arcs or artificial positive spins. Characters can be deeply flawed, making harmful choices or exhibiting extremely toxic traits. Ground conflicts in psychological realism, allowing them to simmer or explode without reaching for convenient resolutions. Not every villain needs redemption—some characters can remain ruthlessly self-serving, cruel, or destructive until the end. Let their darkness stand without compromise, understanding that some stories end in tragedy, betrayal, or the triumph of malevolence.
-    - **Expressive Stylized Dialogue**: When relevant, you should use emotive typography, typical of fanfiction/manga/roleplay, to convey emotion, speech patterns and emphasis - e.g. like: "Y-you... did you really... just HIT me?!" and "Hmph~ Whatever you saaaay~" and "Oh. My. Actual. God." and "Well... *ahem* if you MUST know..." and "Darling~ ♪ Where are youuuu? ♫" and "Listen here, b-baka! It's not like I... l-like you or anything!" and "I-I didn't mean to-"`
+        defaultValue: `The narrative always contains a character's speech.
+
+Always improvise and come up with a plot filled with events specific to the current world, place, actions, problems, everyday life, or other.
+
+The plot should be interesting, logical, connected, sometimes a little dynamic, and sometimes a little surprising.
+
+The narration should have a novel style.
+
+Let the characters choose their own path based on what they want; on their personality; on their need. Any action may have a logical workaround, such as influencing the character and changing their action, opinion, or choice; finding a way to implement this action differently; finding another action that can accomplish the current task; or other.
+
+Time is an unchanging constant. There are 60 minutes in 1 hour, 24 hours in 1 day, 31 days in 1 month, and 12 months in 1 year. Every 3 months the seasons change in order: summer, autumn, winter, and spring. Time invariably moves the plot forward. After some time, the main plot develops, or random events appear. With each message, the time increases depending on the complexity of the actions in the message. 
+
+Each character has a goal and a dream. Characters are never idle, they are always busy, and at the current moment in time, they are doing some action inherent to this character, for example, having fun; talking to someone; doing some work; doing personal business; eating or drinking something; doing some action that interests him; reading something; looking for something; or other. Each character knows what he usually does every day and what he will do today, but random events can change actual plans.
+
+Bring characters to life by portraying their unique traits, thoughts, emotions, appearances, and speech realistically. Consider the situation, motivations, and potential consequences. Ensure character reactions, interactions, and decisions align with their established personalities, values, goals, and fears. Use subtle gestures, distinctive quirks, and colloquialisms to create enriched, lifelike scenes. Allow character's motivations and personalities to evolve authentically throughout the story, creating genuine character arcs.`
       },
       vitalWritingInstructions: {
         label: `🪶 Define Your <b>Vital</b> Writing Instructions
@@ -7419,7 +7437,7 @@ fitMessagesInContextMethod: "dropOld",
         defaultValue: promptedCharacter?.customData?.writingFormat || ""
       },
       contextInfo: { 
-        label: `📜 Context Info. <i style="opacity:0.7;">This should ideally be a brief overview (under 500 words). For a more detailed explanation, see the 'Detailed Context Info' section below.</i>`, 
+        label: `📜 Context Info. <i style="opacity:0.7;">This should ideally be a brief overview (under 500 words).</i>`, 
         infoTooltip: `This section provides a quick summary of the essential context the AI should be aware of during the chat. It ensures that the AI stays aligned with the intended scenario, setting, or theme. Keep it concise and to the point to maximize efficiency.`, 
         type: "text", 
         height: "fit-content", 
@@ -7429,7 +7447,7 @@ fitMessagesInContextMethod: "dropOld",
         defaultValue: promptedCharacter?.customData?.contextInfo?.basic?.info || ``
       },
       contextInfo: {
-        label: `📜 Context Info. <i style="opacity:0.7;">This should ideally be a brief overview (under 500 words). For a more detailed explanation, see the 'Detailed Context Info' section below.</i>`,
+        label: `📜 Context Info. <i style="opacity:0.7;">This should ideally be a brief overview (under 500 words).</i>`,
         infoTooltip: `This section provides a quick summary of the essential context the AI should be aware of during the chat. It ensures that the AI stays aligned with the intended scenario, setting, or theme. Keep it concise and to the point to maximize efficiency.`,
         type: "text",
         height: "fit-content",
@@ -7480,75 +7498,36 @@ fitMessagesInContextMethod: "dropOld",
   `
       }, // "yes"
       contextInfoToggle: { label: "Enable context info updates?:", type: "select", options: [{ value: "yes" }, { value: "no" }], defaultValue: promptedCharacter.customData?.contextInfo?.basic?.enabled === "yes" ? "yes" : "no" },
-      detailedContextInfo: {
-        label: `📖 Detailed Context Info. <i style="opacity:0.7;">Use this section for in-depth explanations, extended lore, or complex mechanics. If you have extensive details, consider linking an external document.</i>`,
-        infoTooltip: `This section is for comprehensive background information. It allows for detailed lore, complex mechanics, or other specifics the AI should consistently reference. Be mindful that too much text may reduce the AI's long-term memory efficiency.`,
-        type: "text",
-        height: "fit-content",
-        minHeight: "2rem",
-        maxHeight: "8rem",
-        placeholder: "Provide an expanded explanation, including relevant details and mechanics.",
-        defaultValue: promptedCharacter?.customData?.contextInfo?.detailed?.info || ``
+      characterContextInfoToggle: {
+        label: "Enable Character's Context Info Updates?",
+        infoTooltip: "If enabled, the AI will automatically generate and update a separate 'Detailed Context Info' specific to this character during the chat. This is useful for tracking individual character knowledge, inventory, or status.",
+        type: "select",
+        options: [{ value: "yes" }, { value: "no" }],
+        defaultValue: promptedCharacter?.customData?.characterContextInfo?.enabled === "yes" ? "yes" : "no"
       },
-      detailedContextInfoPrompt: {
-        label: `🔮 Detailed Context Info Prompt. <i style="opacity:0.7;">This prompt is used to dynamically generate the detailed context info when needed.</i>`,
-        infoTooltip: `Use this prompt to instruct the AI to dynamically generate detailed context info based on specific requests. This is useful when you want to automate the creation of detailed lore or complex information, allowing for dynamic and adaptive content generation.`,
+      characterContextInfoPrompt: {
+        label: `🔮 Character's Context Info Prompt. <i style="opacity:0.7;">Instructions for how the AI should update this character's specific context.</i>`,
+        infoTooltip: `The instructions the AI will follow to generate the character-specific context. You can use placeholders like {{InputInformation}} (the recent chat) and {{PreviousDetailedContextInformation}} (the old context).`,
         type: "text",
         height: "fit-content",
-        minHeight: "2rem",
-        maxHeight: "8rem",
-        placeholder: "Provide a prompt to instruct the AI to generate detailed context info dynamically.",
-        defaultValue: promptedCharacter?.customData?.contextInfo?.detailed?.prompt || `Using the previous detailed context information, messages, and other input information, update the detailed context with the latest actions, stats, and any character-specific events. Update any relevant character details such as health, inventory, or status effects. Any new interactions, decisions, or changes in character stats should be reflected in this detailed update.
-
+        minHeight: "4rem",
+        maxHeight: "12rem",
+        placeholder: "Provide a prompt to instruct the AI to generate the character's detailed context info dynamically.",
+        defaultValue: promptedCharacter?.customData?.characterContextInfo?.prompt || `Using the previous context information, messages, and other input information, update the detailed context for THIS character.
+  
   Input Information:
   {{InputInformation}}
-
-  Previous Detailed Context Information:
+  
+  Previous Context:
   {{PreviousDetailedContextInformation}}
-
-  FORMATTING WITH EXAMPLES BELOW:
-  Example Detailed Context Information Output:
-  Current Location Details: The adventurer stands at the city gates of Verdenfell, surrounded by the towering walls of the city. A bustling market lies ahead, with merchants selling their wares and travelers crossing the cobblestone streets. The aroma of fresh bread fills the air. 
-
-  [Character 1 Name] Stats: 
-  - Strength: [Stat Value]
-  - Dexterity: [Stat Value]
-  - Money: [Stat Value]
-  - Inventory: 
-    - [Item, Count, Description, Stats]
-    - [Item, Count, Description, Stats]
-    - [Item, Count, Description, Stats]
-  - Properties: [Properties Owned, Descriptions, Costs]
-  - Active Effects: None
-  - Health: [Stat Value]/[Max Stat Value]
-  - Energy: [Stat Value]/[Max Stat Value]
-  - [Stat Name]: [Stat Value]
-  - [Stat Name]: [Stat Value]
-  - [Stat Name]: [Stat Value]...
-
-  [Character 2 Name] Stats:
-  - [Stat Name]: [Stat Value]
-  - [Stat Name]: [Stat Value]
-  - [Stat Name]: [Stat Value]...
-
-  Recent Actions/Events:
-  - March 26, 2025, 1:30 PM: The adventurer purchased some food from a stall and conversed with a traveling merchant, learning about rumors of a nearby dungeon. (Example)
-  - March 26, 2025, 5:20 PM: They felt the urge to explore the city before heading toward the dungeon but decided to stay in the market for now. (Example)
-  - [Date], [Time]: "[Action or Event]"
-  - [Date], [Time]: "[Action or Event]"...
-
-  Past Interactions:
-  - March 25, 2025, 10:30 AM: The adventurer helped a merchant in Greenhearth by defending his cart from bandits, gaining a small reward of 10 gold. (Example)
-  - March 24, 2025, 7:00 PM: The adventurer had a brief discussion with a mysterious cloaked figure in Ravenspire, who offered a cryptic warning about the coming storm. (Example)
-  - [Date], [Time]: "[Action or Event]"
-  - [Date], [Time]: "[Action or Event]"...
-
-  Character's Current Goals:
-  - Investigate the rumors about a hidden dungeon near Verdenfell. (Example)
-  - Visit the local tavern to gather more information. (Example)
-  IMPORTANT NOTE: These are just examples, while you need to include stats for different characters, only do relevant stats.`
+  
+  Update the following:
+  - Current Location & Status
+  - Inventory & Equipment
+  - Physical Condition (Health/Energy)
+  - Current Goals
+  - Recent Key Interactions`
       },
-      detailedContextInfoToggle: { label: "Enable detailed context info updates?:", type: "select", options: [{ value: "yes" }, { value: "no" }], defaultValue: promptedCharacter.customData?.contextInfo?.detailed?.enabled === "yes" ? "yes" : "no" },
       initialMessagesText: { label: `💬 Initial chat messages. <i style="opacity:0.7;">You can use this to teach the AI how this character typically speaks, and/or to define an initial scenario. Follow the "<b>[AI]:</b> ... <b>[USER]:</b> ..." format which is fully explained <a href="https://rentry.org/uws8dv" target='blank'>here</a>.</i>`, infoTooltip:"During the creation of every new chat thread with this character, these messages will be created and placed at the start of the thread. Note that the summarization algorithm will eventually summarize these messages - so they won't stay around forever (unlike the description/instruction and reminder note, which *do* stay around forever). Also note that if you edit the initial messages in the box below, only *new* chat threads that you create will have the updated initial messages. Existing/old threads will have the old initial messages.", type:"text", height:"fit-content", placeholder: "[USER]: hey\n[AI]: um hi\n[SYSTEM; hiddenFrom=ai]: The AI can't see this message. Useful for user instructions / welcome messages / credits / etc.", defaultValue: initialMessagesText ?? "" },
       userCharacterReminderMessage: { hidden:true, label: `💭 User reminder note. <i style="opacity:0.7;">In case you get the AI to write on your behalf, this is the reminder note used in that case.</i>`, height:"fit-content", minHeight:"3rem", type:"text", placeholder: `(optional) e.g. "Responses should be short and creative. Always stay in character."`, defaultValue: defaultValues.userCharacter?.reminderMessage || "" },
       sceneBackgroundUrl: { hidden:true, label: `🖼️ Chat background image/video URL. <i style="opacity:0.7;">(jpg, webp, webm, mp4, etc.)</i>`, type:"textLine", defaultValue: defaultValues.scene?.background?.url ?? "" },
@@ -7815,36 +7794,37 @@ fitMessagesInContextMethod: "dropOld",
         // db.characters.update(promptedCharacter.id, {customData: result.customData});
       }
     } catch (e) { }
+    try {
+      if (result.characterContextInfoToggle) {
+        result.customData ??= {};
+        result.customData.characterContextInfo ??= {};
+        result.customData.characterContextInfo.enabled = result.characterContextInfoToggle;
+      }
+    } catch (e) { }
+
+    try {
+      if (result.characterContextInfoPrompt?.trim() !== "") {
+        result.customData ??= {};
+        result.customData.characterContextInfo ??= {};
+        result.customData.characterContextInfo.prompt = result.characterContextInfoPrompt;
+      }
+    } catch (e) { }
     console.log("Character Details Checkpoint 1");
 
+    // Handle Character Context Info Settings
     try {
-      // Handle detailedContextInfo and detailedContextInfoPrompt
-      if (result.detailedContextInfo?.trim() !== "") {
+      if (result.characterContextInfoToggle) {
         result.customData ??= {};
-        result.customData.contextInfo ??= {}; // Create contextInfo only if needed
-        result.customData.contextInfo.detailed ??= {}; // Create detailed only if needed
-        result.customData.contextInfo.detailed.info = result.detailedContextInfo;
-        // db.characters.update(promptedCharacter.id, {customData: result.customData});
+        result.customData.characterContextInfo ??= {};
+        result.customData.characterContextInfo.enabled = result.characterContextInfoToggle;
       }
     } catch (e) { }
 
     try {
-      if (result.detailedContextInfoPrompt?.trim() !== "") {
+      if (result.characterContextInfoPrompt?.trim() !== "") {
         result.customData ??= {};
-        result.customData.contextInfo ??= {}; // Create contextInfo only if needed
-        result.customData.contextInfo.detailed ??= {}; // Create detailed only if needed
-        result.customData.contextInfo.detailed.prompt = result.detailedContextInfoPrompt;
-        // db.characters.update(promptedCharacter.id, {customData: result.customData});
-      }
-    } catch (e) { }
-
-    try {
-      if (result.detailedContextInfoToggle?.trim() !== "") {
-        result.customData ??= {};
-        result.customData.contextInfo ??= {}; // Create contextInfo only if needed
-        result.customData.contextInfo.detailed ??= {}; // Create detailed only if needed
-        result.customData.contextInfo.detailed.enabled = result.detailedContextInfoToggle;
-        // db.characters.update(promptedCharacter.id, {customData: result.customData});
+        result.customData.characterContextInfo ??= {};
+        result.customData.characterContextInfo.prompt = result.characterContextInfoPrompt;
       }
     } catch (e) { }
 
@@ -8033,7 +8013,7 @@ fitMessagesInContextMethod: "dropOld",
   // }
 
 
-  function createMessageObj({threadId, message, characterId, hiddenFrom, variants, creationTime, expectsReply, memoryIdBatchesUsed, loreIdsUsed, summaryHashUsed, summariesUsed, summariesEndingHere, memoriesEndingHere, memoryQueriesUsed, messageIdsUsed, scene, avatar, name, customData, wrapperStyle, order, instruction}) {
+  function createMessageObj({threadId, message, characterId, hiddenFrom, variants, creationTime, expectsReply, memoryIdBatchesUsed, loreIdsUsed, summaryHashUsed, summariesUsed, summariesEndingHere, memoriesEndingHere, memoryQueriesUsed, messageIdsUsed, scene, avatar, name, customData, wrapperStyle, order, instruction, promptText, tokensUsed}) {
     if(threadId === undefined || message === undefined || typeof characterId !== "number") throw new Error(`createMessageObj: threadId, message, and characterId are required: ${threadId}, ${message}, ${characterId}`);
     
     return {
@@ -8059,6 +8039,8 @@ fitMessagesInContextMethod: "dropOld",
       wrapperStyle: wrapperStyle ?? "",
       order: order ?? undefined,
       instruction: instruction ?? null,
+      promptText: promptText ?? null,
+      tokensUsed: tokensUsed ?? null,
       // RE `order` being undefined - this can happen if it's just being created (but not when e.g. being called from messagesFromCustomCodeFormat)
     };
   }
@@ -9239,7 +9221,15 @@ fitMessagesInContextMethod: "dropOld",
         maxParagraphCountPerMessage = thread.maxParagraphCountPerMessage;
       }
 
-      let generalWritingInstructions = threadCharacter.generalWritingInstructions || "@roleplay1";
+      let generalWritingInstructions;
+      
+      // Check if the character currently replying has specific instructions
+      if (replyingCharacter.characterWritingInstructions && replyingCharacter.characterWritingInstructions.trim().length > 0) {
+        generalWritingInstructions = replyingCharacter.characterWritingInstructions;
+      } else {
+        // Fallback to the General instructions (Thread/Main Character settings)
+        generalWritingInstructions = threadCharacter.generalWritingInstructions || "@roleplay1";
+      }
 
       // Handle presets:
       if(generalWritingInstructions === "@roleplay1") {
@@ -9859,7 +9849,10 @@ fitMessagesInContextMethod: "dropOld",
       let vitalRoleInstructions = threadCharacter?.customData?.userCharacter?.vitalRoleInstructions || null;
       let writingFormat = threadCharacter?.customData?.writingFormat || null;
       let contextInfo = threadCharacter?.customData?.contextInfo?.basic?.info || null;
-      let detailedContextInfo = threadCharacter?.customData?.contextInfo?.detailed?.info || null;
+      // Load detailed context specifically for the replying character from the THREAD custom data
+      let characterContexts = thread.customData?.characterContexts || {};
+      let charSpecificData = characterContexts[replyingCharacter.id] || {};
+      let detailedContextInfo = charSpecificData.detailedInfo || null;
 
       let allMessagesTextForImageMentionDetection = messageArrayToMessagesText(messagesArr) + potentiallyRelevantMemoriesAndLoreText + roleInstructionText;
       window.napUseReminderAsReplyInstruction = (await db.misc.get("napUseReminderAsReplyInstruction"))?.value || "no";
@@ -10013,7 +10006,9 @@ fitMessagesInContextMethod: "dropOld",
         result = result.slice(replyingCharacterName.length+1).trim();
       }
 
-      return {message:result, memoryIdBatchesUsed, loreIdsUsed, summaryHashUsed:null, summariesUsed, memoryQueriesUsed, messageIdsUsed};
+      let promptTokenCount = countTokens(instruction + "\n\n" + startWith);
+      let maxContextTokens = window.idealMaxContextTokens || 6000;
+      return {message:result, memoryIdBatchesUsed, loreIdsUsed, summaryHashUsed:null, summariesUsed, memoryQueriesUsed, messageIdsUsed, promptText: instruction + "\n\n" + startWith, tokensUsed: `${promptTokenCount}/${maxContextTokens}`};
     } finally {
       $.sendButton.disabled = originalSendButtonDisabledState;
     }
@@ -10140,6 +10135,9 @@ fitMessagesInContextMethod: "dropOld",
     const hasCustomDialogueColor = messageEl.style.cssText.includes('--custom-dialog-color');
 
     streamedMessageText = hasCustomDialogueColor ? colorDialogue(streamedMessageText) : streamedMessageText;
+
+    const hasCustomTextColor = messageEl.style.cssText.includes('--custom-text-color');
+    streamedMessageText = hasCustomTextColor ? applyCustomTextColor(streamedMessageText, messageEl.style.cssText) : streamedMessageText;
 
     messageTextEl.innerHTML = DOMPurify.sanitize(marked.parse(streamedMessageText), domPurifyOptions);
     // messageTextEl.querySelectorAll("pre > code").forEach(el => el.outerHTML = el.innerHTML); // not sure why `marked` is adding <pre><code>...</code></pre> around code blocks, but this fixes it
@@ -10299,7 +10297,7 @@ fitMessagesInContextMethod: "dropOld",
       }
 
       const onProgressMessage = (e) => messageEl.querySelector(".statusMessage").innerHTML=e.message;
-      let {message, memoryIdBatchesUsed, loreIdsUsed, summaryHashUsed, summariesUsed, memoryQueriesUsed, messageIdsUsed} = await getBotReply({messages, replyingCharacter:character, startMessageWith, replyingCharacterNameOverride:messageNameOverride, extraStopSequences, threadId, replyInstruction, onProgressMessage, onStreamingReplyChunk, signals}).catch(e => {
+      let {message, memoryIdBatchesUsed, loreIdsUsed, summaryHashUsed, summariesUsed, memoryQueriesUsed, messageIdsUsed, promptText, tokensUsed} = await getBotReply({messages, replyingCharacter:character, startMessageWith, replyingCharacterNameOverride:messageNameOverride, extraStopSequences, threadId, replyInstruction, onProgressMessage, onStreamingReplyChunk, signals}).catch(e => {
         if(e.name !== "AbortError") {
           console.error("doBotReplyIfNeeded --> getBotReply:", e);
           alert("There was an error during doBotReplyIfNeeded:\n\n"+e.stack);
@@ -10323,6 +10321,8 @@ fitMessagesInContextMethod: "dropOld",
       messageObj.summariesUsed = summariesUsed;
       messageObj.memoryQueriesUsed = memoryQueriesUsed;
       messageObj.messageIdsUsed = messageIdsUsed;
+      messageObj.promptText = promptText ?? null;
+      messageObj.tokensUsed = tokensUsed ?? null;
 
       messageObj.expectsReply = expectsReply;
 
@@ -10950,8 +10950,23 @@ fitMessagesInContextMethod: "dropOld",
       }
 
       prompt2({
-        display:{html:`<div style="white-space:pre-wrap;">Here's some data that the character used to generate this message:\n\n${content.join("\n\n")}</div>`, type:"none"},
+        display:{html:`<div style="white-space:pre-wrap;">Here's some data that the character used to generate this message:${message.tokensUsed ? `\n\n<span style="border-bottom:1px solid currentColor; cursor:pointer;" id="tokensUsedLink_${message.id}">Tokens Used: ${message.tokensUsed}</span>` : ""}\n\n${content.join("\n\n")}</div>`, type:"none"},
       }, { submitButtonText: "close", cancelButtonText: null });
+
+      if(message.tokensUsed) {
+        setTimeout(() => {
+          let link = document.getElementById(`tokensUsedLink_${message.id}`);
+          if(link) {
+            link.addEventListener("click", function() {
+              let promptContent = message.promptText || "(Prompt not available — this message was generated before prompt logging was added)";
+              prompt2({
+                display:{html:`<div style="white-space:pre-wrap; font-family:monospace; font-size:0.85em; max-height:70vh; overflow-y:auto;">${sanitizeHtml(promptContent)}</div>`, type:"none"},
+                title: `Full Prompt (${message.tokensUsed} tokens)`,
+              }, { submitButtonText: "close", cancelButtonText: null });
+            });
+          }
+        }, 50);
+      }
     });
   }
 
@@ -11440,6 +11455,9 @@ fitMessagesInContextMethod: "dropOld",
 
     messageText = hasCustomDialogueColor ? colorDialogue(messageText) : messageText;
 
+    const hasCustomTextColor = customCssVariables.has('--custom-text-color');
+    messageText = hasCustomTextColor ? applyCustomTextColor(messageText, wrapperStyle) : messageText;
+
     let messageHtml = DOMPurify.sanitize(marked.parse(messageText), domPurifyOptions);
     
     // // text-to-image parsing:
@@ -11569,6 +11587,12 @@ fitMessagesInContextMethod: "dropOld",
     let threadCharacter = await db.characters.get(thread.characterId);
     // console.log("Pre messageCharacter:", messageCharacter);
     console.log("Pre Reminder Message:", messageCharacter?.reminderMessage);
+	
+	// Fetch the detailed context for the character who sent this message
+    let threadCustomData = thread.customData || {};
+    let charContexts = threadCustomData.characterContexts || {};
+    let msgCharId = originalMessage.characterId;
+    let existingDetailedInfo = charContexts[msgCharId]?.detailedInfo || "";
 
     Object.assign(promptOpts, {
       // CAUTION: All types other than "none" and "buttons" must have a defaultValue, since we use it for change detection, below
@@ -11583,9 +11607,18 @@ fitMessagesInContextMethod: "dropOld",
         placeholder: `(optional) e.g. "Responses should be short and creative. Always stay in character."`, 
         defaultValue: messageCharacter?.reminderMessage || "" 
       },
+	  detailedContextInfo: { 
+        label: `📖 Character's Detailed Context Info (Thread Specific). <i style="opacity:0.7;">This info is unique to <b>${messageCharacter ? messageCharacter.name : "this character"}</b> in this specific chat. It will not affect other characters or other chats.</i>`, 
+        type: "text", 
+        height: "fit-content", 
+        minHeight: "4rem",
+        maxHeight: "12rem",
+        placeholder: "Enter specific detailed context for this character here...", 
+        defaultValue: existingDetailedInfo
+      },
       contextInfo: { 
         hidden:true,
-        label: `📜 Context Info. <i style="opacity:0.7;">This should ideally be a brief overview (under 500 words). For a more detailed explanation, see the 'Detailed Context Info' section below.</i>`, 
+        label: `📜 Context Info. <i style="opacity:0.7;">This should ideally be a brief overview (under 500 words).</i>`, 
         infoTooltip: `This section provides a quick summary of the essential context the AI should be aware of during the chat. It ensures that the AI stays aligned with the intended scenario, setting, or theme. Keep it concise and to the point to maximize efficiency.`, 
         type: "text", 
         height: "fit-content", 
@@ -11600,6 +11633,22 @@ fitMessagesInContextMethod: "dropOld",
     
     const result = await prompt2(promptOpts, {submitButtonText:"save"});
     if(!result) return;
+    
+    if (result.detailedContextInfo !== undefined) {
+        // Reload thread to ensure we don't overwrite concurrent changes
+        let currentThread = await db.threads.get(threadId);
+        let currentCustomData = currentThread.customData || {};
+        currentCustomData.characterContexts = currentCustomData.characterContexts || {};
+        currentCustomData.characterContexts[originalMessage.characterId] = currentCustomData.characterContexts[originalMessage.characterId] || {};
+        
+        // Save the new text
+        currentCustomData.characterContexts[originalMessage.characterId].detailedInfo = result.detailedContextInfo;
+        
+        await db.threads.update(threadId, { customData: currentCustomData });
+        
+        // Remove it from result so it doesn't try to save to the message object
+        delete result.detailedContextInfo; 
+    }
 
     let noChangesMade = true;
     for(let key of Object.keys(result)) {
@@ -12696,7 +12745,7 @@ fitMessagesInContextMethod: "dropOld",
           $.messageInput.value = "";
         } else if(message.trim() === "/image" || /^\/image[ ]+--num=[0-9]+$/.test(message.trim())) { // plain `/image` command or with number of images after it - so we need to generate the caption based on the context
           let characterToReplyWith = await getSystemCharacterObj();
-          let replyInstruction = window.imageInstructions || `In one paragraph, describe all visual details of the above, current situation in the above chat/story/rp. Use visually descriptive language.`;
+          let replyInstruction = window.imageInstructions || `In one paragraph, vividly describe every visual element of the current situation in the chat, story, or roleplay above, including characters' appearances, expressions, clothing, poses, surroundings, lighting, colors, textures, and any objects or actions. Focus solely on observable details to create a complete, detailed scene suitable for image generation, using rich, precise, and evocative language without including thoughts, dialogue, sounds, or non-visual aspects.`;
           console.log("Image Prompt Instruction:", replyInstruction);
           let extraStopSequences = ["\n\n"];
           let messageNameOverride = `Narrator`;
@@ -13027,83 +13076,90 @@ fitMessagesInContextMethod: "dropOld",
           recentMessages = recentMessages.join("\n");
 
           async function updateContextInfo() {
-            // Get Recent Conversation for Context
-            let recentConversation = `Messages: \n\n<MESSAGES>\n${recentMessages}\n</MESSAGES>`;
+      // Get Recent Conversation for Context
+      let recentConversation = `Messages: \n\n<MESSAGES>\n${recentMessages}\n</MESSAGES>`;
 
-            if (napThreadCharacter.customData?.contextInfo && napThreadCharacter.customData.contextInfo.basic.enabled === "yes") {
-              // Select the textarea element
-              let textarea = document.querySelector("#messageFeedTopContextInfo");
-              if (!textarea) return; // Exit if the textarea is not found
+      if (napThreadCharacter.customData?.contextInfo && napThreadCharacter.customData.contextInfo.basic.enabled === "yes") {
+        // Select the textarea element
+        let textarea = document.querySelector("#messageFeedTopContextInfo");
+        if (textarea) {
+          textarea.value = "\n\nGenerating... Please wait.";
+          
+          let inputInformation = recentConversation || "";
+          let previousContextInformation = napThreadCharacter.customData.contextInfo.basic.info || "";
 
-              textarea.value = "\n\nGenerating... Please wait.";
+          let replacements = {
+            "{{InputInformation}}": inputInformation,
+            "{{PreviousContextInformation}}": previousContextInformation
+          };
 
-              let inputInformation = recentConversation || ""; //messages
-              let previousContextInformation = napThreadCharacter.customData.contextInfo.basic.info || "";
-
-              // Define the replacements
-              let replacements = {
-                "{{InputInformation}}": inputInformation,
-                "{{PreviousContextInformation}}": previousContextInformation
-              };
-
-              // Replace each placeholder in the prompt
-              let prompt = napThreadCharacter.customData.contextInfo.basic.prompt;
-
-              for (let key in replacements) {
-                prompt = prompt.replace(new RegExp(key, "g"), replacements[key]);
-              }
-
-              // Pass the updated prompt to the AI plugin
-              let streamObj = root.aiTextPlugin({
-                instruction: prompt,
-                startWith: "",
-                hideStartWith: true,
-                stopSequences: [`\nMAIN`, "### Response"] // Prevents AI from running on too long
-              });
-
-              let data = await streamObj;
-              let newContextInfoResult = data.generatedText;
-
-              // Preserve the first line and update the rest with generated text
-              napThreadCharacter.customData.contextInfo.basic.info = newContextInfoResult;
-              db.characters.update(napThreadCharacter.id, { customData: napThreadCharacter.customData });
-              textarea.value = napThreadCharacter.customData.contextInfo.basic.info;
-            }
-
-            if (napThreadCharacter.customData?.contextInfo && napThreadCharacter.customData.contextInfo.detailed.enabled === "yes") {
-
-              let inputInformation = recentConversation || ""; //messages
-              let previousDetailedContextInformation = napThreadCharacter.customData.contextInfo.detailed.info || "";
-
-              // Define the replacements
-              let replacements = {
-                "{{InputInformation}}": inputInformation,
-                "{{PreviousDetailedContextInformation}}": previousDetailedContextInformation
-              };
-
-              // Replace each placeholder in the prompt
-              let prompt = napThreadCharacter.customData.contextInfo.detailed.prompt;
-
-              for (let key in replacements) {
-                prompt = prompt.replace(new RegExp(key, "g"), replacements[key]);
-              }
-
-              // Pass the updated prompt to the AI plugin
-              let streamObj = root.aiTextPlugin({
-                instruction: prompt,
-                startWith: "",
-                hideStartWith: true,
-                stopSequences: [`\nMAIN`, "### Response"] // Prevents AI from running on too long
-              });
-
-              let data = await streamObj;
-              let newDetailedContextInfoResult = data.generatedText;
-
-              // Preserve the first line and update the rest with generated text
-              napThreadCharacter.customData.contextInfo.detailed.info = newDetailedContextInfoResult;
-              db.characters.update(napThreadCharacter.id, { customData: napThreadCharacter.customData });
-            }
+          let prompt = napThreadCharacter.customData.contextInfo.basic.prompt;
+          for (let key in replacements) {
+            prompt = prompt.replace(new RegExp(key, "g"), replacements[key]);
           }
+
+          let streamObj = root.aiTextPlugin({
+            instruction: prompt,
+            startWith: "",
+            hideStartWith: true,
+            stopSequences: [`\nMAIN`, "### Response"]
+          });
+
+          let data = await streamObj;
+          let newContextInfoResult = data.generatedText;
+
+          napThreadCharacter.customData.contextInfo.basic.info = newContextInfoResult;
+          db.characters.update(napThreadCharacter.id, {
+            customData: napThreadCharacter.customData
+          });
+          textarea.value = napThreadCharacter.customData.contextInfo.basic.info;
+        }
+      }
+
+      // Determine which character is currently acting/replying
+      let targetCharId = characterOverride ? characterOverride.id : napThreadCharacter.id;
+      let targetCharacter = characterOverride || napThreadCharacter;
+
+      // Check if this specific character has updates enabled
+      if (targetCharacter.customData?.characterContextInfo?.enabled === "yes") {
+        let inputInformation = recentConversation || "";
+        
+        // Load previous info from THREAD custom data specific to this character
+        let threadCustomData = thread.customData || {};
+        threadCustomData.characterContexts = threadCustomData.characterContexts || {};
+        threadCustomData.characterContexts[targetCharId] = threadCustomData.characterContexts[targetCharId] || {};
+        
+        let previousDetailedContextInformation = threadCustomData.characterContexts[targetCharId].detailedInfo || "";
+
+        let replacements = {
+          "{{InputInformation}}": inputInformation,
+          "{{PreviousDetailedContextInformation}}": previousDetailedContextInformation
+        };
+
+        // USE: The character's specific prompt from their settings
+        let prompt = targetCharacter.customData?.characterContextInfo?.prompt || 
+                     `Using the previous context information, messages, and other input information, update the detailed context for THIS character.`;
+
+        for (let key in replacements) {
+          prompt = prompt.replace(new RegExp(key, "g"), replacements[key]);
+        }
+
+        let streamObj = root.aiTextPlugin({
+          instruction: prompt,
+          startWith: "",
+          hideStartWith: true,
+          stopSequences: [`\nMAIN`, "### Response"]
+        });
+
+        let data = await streamObj;
+        let newDetailedContextInfoResult = data.generatedText;
+
+        // Save to THREAD custom data specific to this character
+        threadCustomData.characterContexts[targetCharId].detailedInfo = newDetailedContextInfoResult;
+        
+        await db.threads.update(thread.id, { customData: threadCustomData });
+      }
+    }
 
           // Pass the characterOverride to the bot reply
           // console.log("AutoReply | napChar", napChar);
@@ -13397,6 +13453,7 @@ fitMessagesInContextMethod: "dropOld",
     // maxTokens: "maxTokens",
     stopSequences: "stopSequences",
     modelName: "modelName",
+    characterWritingInstructions: "characterWritingInstructions",
     userCharacter: "userCharacter",
     // scene: "scene", // TODO: expose this. but devs can edit scene by adding to messages anyway so no rush here.
     streamingResponse: "streamingResponse",
@@ -15742,7 +15799,7 @@ fitMessagesInContextMethod: "dropOld",
     let napAggressiveAutoRepliesOriginal = (await db.misc.get("napAggressiveAutoReplies"))?.value || "semi";
     let mainInstructionsOriginal = (await db.misc.get("mainInstructions"))?.value || "";
     let additionalInstructionsOriginal = (await db.misc.get("additionalInstructions"))?.value || "";
-    let imageInstructionsOriginal = (await db.misc.get("imageInstructions"))?.value || "In one paragraph, describe all visual details of the above, current situation in the above chat/story/rp. Use visually descriptive language.";
+    let imageInstructionsOriginal = (await db.misc.get("imageInstructions"))?.value || "In one paragraph, vividly describe every visual element of the current situation in the chat, story, or roleplay above, including characters' appearances, expressions, clothing, poses, surroundings, lighting, colors, textures, and any objects or actions. Focus solely on observable details to create a complete, detailed scene suitable for image generation, using rich, precise, and evocative language without including thoughts, dialogue, sounds, or non-visual aspects.";
     let napMaxMessagesOriginal = (await db.misc.get("napMaxMessages"))?.value || "100";
     let napUseReminderAsReplyInstructionOriginal = (await db.misc.get("napUseReminderAsReplyInstruction"))?.value || "no";
     let napDefaultMessageStyleOriginal = (await db.misc.get("napDefaultMessageStyle"))?.value || "";
@@ -17101,6 +17158,40 @@ fitMessagesInContextMethod: "dropOld",
   
   if(window.innerWidth < 500) setTimeout(() => root.aiTextPlugin({preload:true}), 5000);
   else root.aiTextPlugin({preload:true}); 
+
+  function applyCustomTextColor(content, styleString) {
+    // Regex to capture the value of --custom-text-color
+    // Handles values that might be quoted.
+    // Example: --custom-text-color: "EnCyCloPedia, #ADD8E6";
+    const regex = /--custom-text-color\s*:\s*([^;]+)/i;
+    const match = styleString.match(regex);
+    
+    if (match) {
+        let val = match[1].trim();
+        // Remove outer quotes if both present
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+            val = val.slice(1, -1);
+        }
+        
+        // Split by the last comma to separate text from color
+        // This assumes the format: "TextToMatch, ColorCode"
+        const splitIndex = val.lastIndexOf(',');
+        if (splitIndex !== -1) {
+            const textTarget = val.substring(0, splitIndex).trim();
+            const colorSpec = val.substring(splitIndex + 1).trim();
+            
+            if (textTarget && colorSpec) {
+                // Escape regex characters in textTarget to ensure literal matching
+                const escapedTarget = textTarget.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                // Create a global regex for replacement
+                const re = new RegExp(escapedTarget, 'g');
+                // Wrap the target text in a span with the specified color
+                return content.replace(re, `<span style="color: ${colorSpec}">$&</span>`);
+            }
+        }
+    }
+    return content;
+  }
 
   function colorDialogue(content) {
     // Applies a different color to dialogue that is between double quotes or smart quotes
