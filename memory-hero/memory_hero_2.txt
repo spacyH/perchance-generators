@@ -259,6 +259,35 @@ notes to self:
 <script>
   const aiTextPluginMetaObject = root.aiTextPlugin({getMetaObject:true});
   window.countTokens = aiTextPluginMetaObject.countTokens;
+  // Token-aware trim preserving as much as possible: binary-search the longest fitting run (O(log n) tokenizer calls),
+  // then snap to a clean paragraph/sentence/word boundary so we never cut mid-word. opts.keepEnd keeps the NEWEST tail
+  // (drop-oldest) instead of the head. Replaces crude char-cap ceilings; falls back to a chars/4 proxy with no tokenizer.
+  window.trimToTokenBudget = function(text, budgetTokens, count, opts){
+    text = String(text == null ? "" : text);
+    count = (typeof count === "function") ? count : (window.countTokens || function(s){ return Math.ceil(String(s||"").length/4); });
+    opts = opts || {};
+    if (budgetTokens <= 0) return "";
+    if (!text || count(text) <= budgetTokens) return text;
+    var target = Math.max(1, budgetTokens - 3);
+    if (opts.keepEnd) {
+      var lo = 0, hi = text.length, cutAt = text.length;
+      while (lo <= hi) { var mid = (lo + hi) >> 1; if (count(text.slice(mid)) <= target) { cutAt = mid; hi = mid - 1; } else { lo = mid + 1; } }
+      var tail = text.slice(cutAt);
+      var np = tail.indexOf("\n\n"); if (np >= 0 && np < tail.length * 0.4) return tail.slice(np + 2).replace(/^\s+/, "");
+      var nl = tail.indexOf("\n"); if (nl >= 0 && nl < tail.length * 0.4) return tail.slice(nl + 1).replace(/^\s+/, "");
+      var spE = tail.indexOf(" "); return (spE >= 0 ? tail.slice(spE + 1) : tail).replace(/^\s+/, "");
+    }
+    var lo2 = 0, hi2 = text.length, best = 0;
+    while (lo2 <= hi2) { var mid2 = (lo2 + hi2) >> 1; if (count(text.slice(0, mid2)) <= target) { best = mid2; lo2 = mid2 + 1; } else { hi2 = mid2 - 1; } }
+    var cut = text.slice(0, best);
+    var p = cut.lastIndexOf("\n\n"); if (p > best * 0.6) return cut.slice(0, p).replace(/\s+$/, "") + " [...]";
+    var sent = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "), cut.lastIndexOf(".\n"));
+    if (sent > best * 0.6) return cut.slice(0, sent + 1).replace(/\s+$/, "") + " [...]";
+    var sp = cut.lastIndexOf(" "); return (sp > 0 ? cut.slice(0, sp) : cut).replace(/\s+$/, "") + " [...]";
+  };
+  // host-compat: legacy fork features read window.currentChatId, which this host never sets (it uses activeThreadId).
+  // Alias it so those features resolve the active thread instead of undefined. Explicit writes still win.
+  try { if (!Object.getOwnPropertyDescriptor(window, "currentChatId")) { var __ccid = null; Object.defineProperty(window, "currentChatId", { configurable: true, get: function(){ return __ccid != null ? __ccid : window.activeThreadId; }, set: function(v){ __ccid = v; } }); } } catch(e){}
   window.idealMaxContextTokens = aiTextPluginMetaObject.idealMaxContextTokens;
   
   // TODO: swipe animation - slide it all the way off the screen, and slide a "..." dummy onto the screen
@@ -7286,11 +7315,8 @@ Use this template for your response:
       }
       let roleInstructionText = getRoleInstructionText();
       if(countTokens(roleInstructionText) > window.idealMaxContextTokens*0.3) {
-        console.warn("Character descriptions being trimmed due to large combined length.");
-        roleInstructionText = getRoleInstructionText({limitLengths:3000});
-        if(countTokens(roleInstructionText) > window.idealMaxContextTokens*0.3) roleInstructionText = getRoleInstructionText({limitLengths:2000});
-        if(countTokens(roleInstructionText) > window.idealMaxContextTokens*0.3) roleInstructionText = getRoleInstructionText({limitLengths:1000});
-        if(countTokens(roleInstructionText) > window.idealMaxContextTokens*0.3) roleInstructionText = getRoleInstructionText({limitLengths:500});
+        console.warn("Character descriptions over budget — trimming token-aware (boundary-snapped, preserving as much of the start as possible).");
+        roleInstructionText = window.trimToTokenBudget(roleInstructionText, Math.floor(window.idealMaxContextTokens*0.3), function(t){ return countTokens(t); });
       }
 
 
@@ -7326,6 +7352,7 @@ Use this template for your response:
       }
       // let reminderMessageText = reminderMessageItems.length > 0 ? reminderMessageItems.join("\n") : null;
       let reminderMessageText = reminderMessageItems.length > 0 ? reminderMessageItems.join("\n") : "";
+      let __brainSteer = ""; { let __m = reminderMessageText.match(/Direction for your next reply:\s*([\s\S]*)$/); if(__m){ __brainSteer = __m[1].trim(); reminderMessageText = reminderMessageText.slice(0, __m.index).replace(/\n+$/, "").trim(); } }   // lift the brain steer into its own framed slot (survives makeReaderHappy)
       
       // reminderMessageText = "If relevant, remember the 'Break Out Of Bad Writing Patterns' guideline, and the other guidelines. Don't talk about writing guidelines in your response - always stay in character, and maintain the immersion. "+reminderMessageText
       let makeReaderHappyInstruction = null;
@@ -7478,14 +7505,11 @@ Use this template for your response:
 
       let messagesInInstructionText = messagesInInstruction.length > 0 ? messageArrayToMessagesText(messagesInInstruction) : "(Nothing yet. You're writing the start of the chat.)";
       if(fitMessagesInContextMethod === "dropOld") {
-        let didDrop = false;
-        let charsPerTokenApprox = messagesInInstructionText.length / countTokens(messagesInInstructionText);
-        let chunkRemovalSize = Math.round(window.idealMaxContextTokens*0.20*charsPerTokenApprox); // remove large chunks to prevent prefix cache thrashing
-        while(countTokens(messagesInInstructionText) > window.idealMaxContextTokens*0.95) {
-          messagesInInstructionText = messagesInInstructionText.slice(chunkRemovalSize); 
-          didDrop = true;
+        let budgetT = Math.floor(window.idealMaxContextTokens*0.95);
+        if(countTokens(messagesInInstructionText) > budgetT) {
+          // token-aware drop-oldest: binary-search the newest run of messages that fits, snapped to a message boundary (replaces an O(n^2) char-chunk slice loop)
+          messagesInInstructionText = `[...][earlier messages in this chat were removed][...]\n` + window.trimToTokenBudget(messagesInInstructionText, budgetT, function(t){ return countTokens(t); }, {keepEnd:true});
         }
-        if(didDrop) messagesInInstructionText = `[...][earlier messages in this chat were removed][...]${messagesInInstructionText}`;
       }
 
       let sharedPrefixContextText = [
@@ -7928,6 +7952,7 @@ Use this template for your response:
         replyingCharacterName.toLowerCase() === "narrator" ? null : `Note: All story characters should speak/act for themselves only. Keep each character's actions contained within their *own* messages.`,
         replyInstruction ? `IMPORTANT: A message below (by ${replyingCharacterName}) should be a rewritten/expanded version of the following instruction/idea (creatively interpret and expand upon *all* details from this instruction in the message you write) - REPLY_INSTRUCTION: "${replyInstruction}"` : null,
         reminderMessageText ? `\nREMINDER for writing ${replyingCharacterName}'s messages: "${reminderMessageText}"` : null,
+        __brainSteer ? `\nIN-CHARACTER IMPULSE for ${replyingCharacterName} this turn: ${__brainSteer} Let this pull surface through ${replyingCharacterName}'s actions, voice, and choices — show it, don't announce it.` : null,
         ``,
         `>>> TASK: Your task is to write the next 3 messages in this chat.${messageLengthNote || ""}`,
       ].filter(item => item !== null).join("\n").trim();
@@ -8907,7 +8932,7 @@ Use this template for your response:
         content.push(`<b>Instruction Used:</b> ${message.instruction}`);
       }
       try {
-        let __bs = String(message.instruction||"").match(/Direction for your next reply:\s*([\s\S]*?)"/);
+        let __bs = String(message.instruction||"").match(/IN-CHARACTER IMPULSE for [^:]*? this turn:\s*([\s\S]*?) Let this pull surface/);
         if(__bs) content.push(`<b>🧠 Brain steer (council):</b> ${sanitizeHtml(__bs[1].trim())}`);
       } catch(e){}
       
@@ -9351,7 +9376,7 @@ Use this template for your response:
           };
           await db.messages.put(messageObj);
           el.style.display = "none";
-          iframe.outerHTML = `<img src="${iframe._textToImageResultDataUrl}" style="max-width:450px; max-height:450px;">`;
+          iframe.outerHTML = `<img src="${iframe._textToImageResultDataUrl}" alt="${String(corePrompt||'').slice(0,140).replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" style="max-width:450px; max-height:450px;">`;
           
           let deleteButton = generatedImageContainer.querySelector(".delete-generated-image-button");
           if(deleteButton) deleteButton.style.display = "none";
@@ -10246,6 +10271,29 @@ Use this template for your response:
           }
           window.userIsCurrentlyEditingMemories = false;
           $.messageInput.value = "";
+        } else if(message.trim() === "/help") {
+          $.messageInput.value = "";
+          try {
+            let __cmds = [["/ai [text]","insert or generate an AI message"],["/user [text]","insert a user message"],["/sys [text]","insert a system message"],["/nar [text]","insert a narrator line"],["/sum","summarize the conversation so far"],["/import","import messages"],["/mem","open the memory editor"],["/lore","open the Memory & Lore manager"],["/image --num=N","generate image(s)"],["/brain","the character's brain \u2014 stance, ask, remember"],["/forget <thing>","make the brain forget a learned fact (/forget me wipes all)"],["/help","show this list"]];
+            let __html = "<b>Slash commands</b><div style='font-size:90%;line-height:1.7;margin-top:6px'>" + __cmds.map(c => `<code>${sanitizeHtml(c[0])}</code> \u2014 ${sanitizeHtml(c[1])}`).join("<br>") + "</div>";
+            await prompt2({ info:{ type:"none", html: __html } }, { cancelButtonText:null, submitButtonText:"Close" });
+          } catch(e){}
+          return;
+        } else if(message.trim() === "/forget" || message.trim().startsWith("/forget ")) {
+          $.messageInput.value = "";
+          try {
+            let __arg = message.trim().slice("/forget".length).trim();
+            let __MHB = window.MemHeroBrain;
+            if(!__MHB || !__MHB.forgetLearned) { await prompt2({ info:{ type:"none", html:"The brain isn\u2019t active, so there\u2019s nothing learned to forget." } }, { cancelButtonText:null, submitButtonText:"Close" }); return; }
+            if(__arg === "" || __arg.toLowerCase() === "me" || __arg.toLowerCase() === "everything") {
+              __MHB.forgetLearned();
+              await prompt2({ info:{ type:"none", html:"Cleared everything the brain has learned about you." } }, { cancelButtonText:null, submitButtonText:"OK" });
+            } else {
+              if(__MHB.forgetMatching) __MHB.forgetMatching(__arg);
+              await prompt2({ info:{ type:"none", html:`Forgot anything learned matching: <i>${sanitizeHtml(__arg)}</i>` } }, { cancelButtonText:null, submitButtonText:"OK" });
+            }
+          } catch(e){}
+          return;
         } else if(message.trim() === "/brain" || message.trim().startsWith("/brain ")) {
           $.messageInput.value = "";
           try {
@@ -12482,6 +12530,7 @@ Use this template for your response:
     let userNameOriginal = (await db.misc.get("userName"))?.value || defaultUserName;
     let userAvatarUrlOriginal = (await db.misc.get("userAvatarUrl"))?.value || "";
     let userRoleInstructionOriginal = (await db.misc.get("userRoleInstruction"))?.value || "";
+    try { if(window.MemHeroBrain && window.MemHeroBrain.stripLearnedBlock) userRoleInstructionOriginal = window.MemHeroBrain.stripLearnedBlock(userRoleInstructionOriginal); } catch(e){}   // editor shows only the user's own text; the brain re-appends its learned block next turn
     // let openAiApiKeyOriginal = (await db.misc.get("openAiApiKey"))?.value || "";
     // let customModelConfigsOriginal = (await db.misc.get("customModelConfigs"))?.value || [];
     let showInlineReminderOriginal = (await db.misc.get("showInlineReminder"))?.value || "yes";
@@ -24575,6 +24624,10 @@ Use this template for your response:
   .pf-tok-danger .pf-tok-fill { background: var(--pf-palette-danger, #e06060); }
   .pf-tok-warn .pf-tok-text { color: var(--pf-accent, #d8a040); opacity: 1; }
   .pf-tok-danger .pf-tok-text { color: var(--pf-palette-danger, #e06060); opacity: 1; }
+  /* compression-ratio chip — minimal, colorful, reacts to the usage tier; only shown when memory is actually compressing */
+  .pf-tok-ratio { display:inline-block; margin-left:4px; padding:0 5px; border-radius:6px; font-weight:700; font-size:9.5px; letter-spacing:0.02em; color:#0b0b0b; background:linear-gradient(90deg, var(--pf-palette-green,#6ab87c) 0%, var(--pf-accent,#d8b36a) 100%); box-shadow:0 0 6px rgba(106,184,124,0.45); transition:background 0.25s ease, box-shadow 0.25s ease; }
+  .pf-tok-warn .pf-tok-ratio { background:linear-gradient(90deg, var(--pf-palette-green,#6ab87c) 0%, var(--pf-accent,#d8a040) 100%); box-shadow:0 0 6px rgba(216,160,64,0.5); }
+  .pf-tok-danger .pf-tok-ratio { color:#fff; background:linear-gradient(90deg, var(--pf-palette-blue,#4a90e2) 0%, var(--pf-palette-danger,#e06060) 100%); box-shadow:0 0 8px rgba(224,96,96,0.55); }
 
   /* Floating pill — fixed, on top of everything, never blocks clicks. */
   /* Host thread-options menu carries no z-index of its own; lift it above the
@@ -29842,7 +29895,7 @@ Use this template for your response:
   function initMessageControls() {
     if (initMessageControls._done) return;
 
-    const chatEl = document.getElementById('chatMessagesEl');
+    const chatEl = (document.getElementById('chatMessagesEl') || document.getElementById('messageFeed'));
     if (!chatEl) {
       // Chat DOM not ready yet — caller can retry later.
       return;
@@ -29861,7 +29914,7 @@ Use this template for your response:
 
       // Copy
       if (btn.dataset.action === 'copy') {
-        const text = (message.querySelector('.content') || {}).innerText || '';
+        const text = (message.querySelector('.messageText, .content') || {}).innerText || '';
         if (!text) return;
         try {
           if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -30278,14 +30331,14 @@ Use this template for your response:
       if (!glossaryText) return '';
 
       // Scan recent messages from the DOM
-      const chatEl = document.getElementById('chatMessagesEl');
+      const chatEl = (document.getElementById('chatMessagesEl') || document.getElementById('messageFeed'));
       if (!chatEl) return '';
       const messages = chatEl.querySelectorAll('.message');
       const recent = Array.from(messages)
         .filter(m => !m.id.startsWith('typing-') && m.id !== 'personality-selector-message')
         .slice(-SCAN_LAST_N);
       const scanText = recent
-        .map(m => (m.querySelector('.content') || {}).innerText || '')
+        .map(m => (m.querySelector('.messageText, .content') || {}).innerText || '')
         .join('\n');
 
       return getGlossaryContext(scanText, glossaryText);
@@ -30332,7 +30385,7 @@ Use this template for your response:
     }
 
     function exportChat() {
-      const chatEl = document.getElementById('chatMessagesEl');
+      const chatEl = (document.getElementById('chatMessagesEl') || document.getElementById('messageFeed'));
       if (!chatEl) return;
 
       const messages = chatEl.querySelectorAll('.message');
@@ -30358,7 +30411,7 @@ Use this template for your response:
         }
 
         // Get content
-        const contentEl = msg.querySelector('.content');
+        const contentEl = msg.querySelector('.messageText, .content');
         const text = contentEl ? contentEl.innerText.trim() : '';
         if (!text) continue;
 
@@ -31006,7 +31059,7 @@ Use this template for your response:
 
     // ---- Apply visibility ----
     function applyVisibility() {
-      const chatEl = document.getElementById('chatMessagesEl');
+      const chatEl = (document.getElementById('chatMessagesEl') || document.getElementById('messageFeed'));
       if (!chatEl) return;
 
       // Find thinking/reasoning blocks: <think>, <details> with
@@ -31043,7 +31096,7 @@ Use this template for your response:
     applyVisibility();
 
     // Re-apply on new messages
-    const chatEl = document.getElementById('chatMessagesEl');
+    const chatEl = (document.getElementById('chatMessagesEl') || document.getElementById('messageFeed'));
     if (chatEl) {
       const observer = new MutationObserver(() => {
         clearTimeout(applyVisibility._t);
@@ -31187,7 +31240,7 @@ Use this template for your response:
     else root.style.removeProperty('--pf-font-size');
 
     // Apply to chat messages area
-    const chatEl = document.getElementById('chatMessagesEl');
+    const chatEl = (document.getElementById('chatMessagesEl') || document.getElementById('messageFeed'));
     if (chatEl) {
       if (family) chatEl.style.fontFamily = family;
       else chatEl.style.fontFamily = '';
@@ -31379,7 +31432,7 @@ Use this template for your response:
 
     initImageGen._done = true;
 
-    const chatEl = document.getElementById('chatMessagesEl');
+    const chatEl = (document.getElementById('chatMessagesEl') || document.getElementById('messageFeed'));
     if (!chatEl) return;
 
     // ---- Delegated click handler for image gen buttons ----
@@ -31390,7 +31443,7 @@ Use this template for your response:
       const message = btn.closest('.message');
       if (!message) return;
 
-      const text = (message.querySelector('.content') || {}).innerText || '';
+      const text = (message.querySelector('.messageText, .content') || {}).innerText || '';
       if (!text) return;
 
       btn.disabled = true;
@@ -31417,7 +31470,7 @@ Use this template for your response:
               const dataUrl = result.canvas.toDataURL('image/jpeg');
               const iframe = imgContainer.querySelector('iframe');
               if (iframe) {
-                iframe.outerHTML = `<img src="${dataUrl}" style="max-width:300px; max-height:300px; border-radius:8px; cursor:pointer;" onclick="window.open(this.src)">`;
+                iframe.outerHTML = `<img src="${dataUrl}" alt="${String(prompt||'').slice(0,140).replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" style="max-width:300px; max-height:300px; border-radius:8px; cursor:pointer;" onclick="window.open(this.src)">`;
               }
             } catch {}
           },
@@ -31652,7 +31705,7 @@ Use this template for your response:
   }
 
   function applyBg(value) {
-    const chatEl = document.getElementById('chatMessagesEl');
+    const chatEl = (document.getElementById('chatMessagesEl') || document.getElementById('messageFeed'));
     if (!chatEl) return;
     if (!value) {
       chatEl.style.backgroundImage = '';
@@ -31737,7 +31790,7 @@ Use this template for your response:
       if (threadId == null) return;
       if (!window.root || typeof window.root.aiTextPlugin !== 'function') return;
 
-      const chatEl = document.getElementById('chatMessagesEl');
+      const chatEl = (document.getElementById('chatMessagesEl') || document.getElementById('messageFeed'));
       if (!chatEl) return;
 
       const messages = Array.from(chatEl.querySelectorAll('.message'))
@@ -31756,7 +31809,7 @@ Use this template for your response:
         const isUser = m.classList.contains('user');
         const nameEl = m.querySelector('.chat-username');
         const name = nameEl ? nameEl.textContent.trim() : (isUser ? 'User' : 'AI');
-        const text = (m.querySelector('.content') || {}).innerText || '';
+        const text = (m.querySelector('.messageText, .content') || {}).innerText || '';
         return `[${name}]: ${text}`;
       }).join('\n\n');
 
@@ -31788,7 +31841,7 @@ Use this template for your response:
     if (initAutoSummary._done) return;
     initAutoSummary._done = true;
 
-    const chatEl = document.getElementById('chatMessagesEl');
+    const chatEl = (document.getElementById('chatMessagesEl') || document.getElementById('messageFeed'));
     if (!chatEl) return;
 
     // Watch for new messages, debounce summary check
@@ -32126,7 +32179,7 @@ Use this template for your response:
     if (initBranching._done) return;
     initBranching._done = true;
 
-    const chatEl = document.getElementById('chatMessagesEl');
+    const chatEl = (document.getElementById('chatMessagesEl') || document.getElementById('messageFeed'));
     if (!chatEl) return;
 
     // ---- Monkey-patch deleteMessage to capture content before deletion ----
@@ -32137,7 +32190,7 @@ Use this template for your response:
         try {
           const threadId = window.currentChatId;
           const messageId = messageEl && messageEl.id;
-          const content = messageEl && messageEl.querySelector('.content');
+          const content = messageEl && messageEl.querySelector('.messageText, .content');
           const text = content ? content.innerText.trim() : '';
           if (threadId && messageId && text) {
             saveBranch(threadId, messageId, text);
@@ -32159,7 +32212,7 @@ Use this template for your response:
       if (branches.length === 0) return;
 
       // Current content is the "live" version (not stored in branches)
-      const content = messageEl.querySelector('.content');
+      const content = messageEl.querySelector('.messageText, .content');
       const currentText = content ? content.innerText.trim() : '';
       const allVersions = [...branches];
       if (currentText && !allVersions.includes(currentText)) {
@@ -32392,7 +32445,7 @@ Use this template for your response:
    */
   function detectRepeatedPhrases() {
     try {
-      const chatEl = document.getElementById('chatMessagesEl');
+      const chatEl = (document.getElementById('chatMessagesEl') || document.getElementById('messageFeed'));
       if (!chatEl) return [];
 
       const messages = Array.from(chatEl.querySelectorAll('.message.ai'))
@@ -32400,7 +32453,7 @@ Use this template for your response:
         .slice(-AUTO_DETECT_LAST_N);
 
       const allText = messages
-        .map(m => (m.querySelector('.content') || {}).innerText || '')
+        .map(m => (m.querySelector('.messageText, .content') || {}).innerText || '')
         .join(' ')
         .toLowerCase();
 
@@ -32661,7 +32714,7 @@ Use this template for your response:
   function initTimestamps() {
     if (initTimestamps._done) return;
 
-    const chatEl = document.getElementById('chatMessagesEl');
+    const chatEl = (document.getElementById('chatMessagesEl') || document.getElementById('messageFeed'));
     if (!chatEl) return;
 
     initTimestamps._done = true;
@@ -32762,7 +32815,7 @@ Use this template for your response:
       const threadId = window.currentChatId;
       if (threadId == null) return;
 
-      const chatEl = document.getElementById('chatMessagesEl');
+      const chatEl = (document.getElementById('chatMessagesEl') || document.getElementById('messageFeed'));
       if (!chatEl) return;
 
       // Gather recent messages
@@ -32774,7 +32827,7 @@ Use this template for your response:
         const isUser = m.classList.contains('user');
         const nameEl = m.querySelector('.chat-username');
         const name = nameEl ? nameEl.textContent.trim() : (isUser ? 'User' : 'AI');
-        const text = (m.querySelector('.content') || {}).innerText || '';
+        const text = (m.querySelector('.messageText, .content') || {}).innerText || '';
         return `[${name}]: ${text}`;
       }).join('\n\n');
 
@@ -33571,7 +33624,7 @@ Use this template for your response:
     if (initBookmarks._done) return;
     initBookmarks._done = true;
 
-    const chatEl = document.getElementById('chatMessagesEl');
+    const chatEl = (document.getElementById('chatMessagesEl') || document.getElementById('messageFeed'));
     if (!chatEl) return;
 
     function addBookmarkButton(messageEl) {
@@ -33694,7 +33747,7 @@ Use this template for your response:
 
     if (!window.root || typeof window.root.aiTextPlugin !== 'function') return;
 
-    const chatEl = document.getElementById('chatMessagesEl');
+    const chatEl = (document.getElementById('chatMessagesEl') || document.getElementById('messageFeed'));
     const inputEl = document.querySelector('#messageInputEl') ||
                     document.querySelector('.chat-input textarea') ||
                     document.querySelector('textarea[placeholder]');
@@ -33798,7 +33851,7 @@ Use this template for your response:
           const isUser = m.classList.contains('user');
           const nameEl = m.querySelector('.chat-username');
           const name = nameEl ? nameEl.textContent.trim() : (isUser ? 'User' : 'AI');
-          const text = (m.querySelector('.content') || {}).innerText || '';
+          const text = (m.querySelector('.messageText, .content') || {}).innerText || '';
           return `[${name}]: ${text}`;
         }).join('\n\n');
 
@@ -34217,7 +34270,7 @@ Use this template for your response:
     if (initTokenMeter._done) return;
     // This host names the message container #messageFeed; older/other hosts
     // use #chatMessagesEl. Resolve whichever exists so the meter actually mounts.
-    const chatEl = document.getElementById('chatMessagesEl') || document.getElementById('messageFeed');
+    const chatEl = (document.getElementById('chatMessagesEl') || document.getElementById('messageFeed')) || document.getElementById('messageFeed');
     if (!chatEl) return;
     initTokenMeter._done = true;
 
@@ -34272,7 +34325,7 @@ Use this template for your response:
       for (const node of nodes) {
         // This host renders message text in .messageText (not .content) and keeps
         // the message id in data-id (not id). Read both so the count isn't stuck at 0.
-        const content = node.querySelector('.messageText') || node.querySelector('.content');
+        const content = node.querySelector('.messageText') || node.querySelector('.messageText, .content');
         const id = (node.dataset && node.dataset.id) ? node.dataset.id : (node.id || '');
         out.push({ id: id, text: content ? (content.innerText || '') : '' });
       }
@@ -34314,6 +34367,15 @@ Use this template for your response:
       const txt = document.createElement('span');
       txt.className = 'pf-tok-text';
       txt.textContent = '~' + tmFormat(used) + ' / ' + tmFormat(maxTokens);
+      const ratio = used > 0 ? Math.max(1, used / budget) : 1;   // raw context vs the prompt budget = how hard memory is compressing to fit
+      if (ratio >= 1.05) {
+        const rc = document.createElement('span');
+        rc.className = 'pf-tok-ratio';
+        rc.textContent = (ratio >= 9.95 ? Math.round(ratio) : ratio.toFixed(1)) + '×';
+        rc.title = 'Memory compression — a ~' + tmFormat(used) + '-token conversation squeezed into the ~' + tmFormat(budget) + '-token window the model actually sees';
+        txt.appendChild(document.createTextNode(' '));
+        txt.appendChild(rc);
+      }
       el.appendChild(txt);
       const barWrap = document.createElement('div');
       barWrap.className = 'pf-tok-bar';
@@ -34950,7 +35012,7 @@ Use this template for your response:
   function initCodeHighlight() {
     if (initCodeHighlight._done) return;
 
-    const chatEl = document.getElementById('chatMessagesEl');
+    const chatEl = (document.getElementById('chatMessagesEl') || document.getElementById('messageFeed'));
     if (!chatEl) return;
     initCodeHighlight._done = true;
 
@@ -35112,7 +35174,7 @@ Use this template for your response:
       parent.appendChild(speakerBtn);
 
       // Watch for new AI messages and read them aloud
-      const chatEl = document.getElementById('chatMessagesEl');
+      const chatEl = (document.getElementById('chatMessagesEl') || document.getElementById('messageFeed'));
       if (chatEl) {
         const observer = new MutationObserver((mutations) => {
           if (!voiceEnabled) return;
@@ -35133,7 +35195,7 @@ Use this template for your response:
 
       function speakMessage(msgEl) {
         if (!voiceEnabled) return;
-        const content = msgEl.querySelector('.content');
+        const content = msgEl.querySelector('.messageText, .content');
         if (!content) return;
 
         // Strip code blocks, markdown formatting, HTML tags
@@ -42248,7 +42310,7 @@ Use this template for your response:
     // Waits a tick for chatMessagesEl to be in the DOM (it may not exist
     // at the exact moment start() runs if the chat UI initializes async).
     try {
-      if (document.getElementById('chatMessagesEl')) {
+      if ((document.getElementById('chatMessagesEl') || document.getElementById('messageFeed'))) {
         initMessageControls();
       } else {
         // Retry after a short delay — chat DOM might still be loading
@@ -42281,7 +42343,7 @@ Use this template for your response:
     // a header dropdown. Replaces the old token_display that got covered by
     // chat content.
     try {
-      if (document.getElementById('chatMessagesEl') || document.getElementById('messageFeed')) {
+      if ((document.getElementById('chatMessagesEl') || document.getElementById('messageFeed')) || document.getElementById('messageFeed')) {
         initTokenMeter();
       } else {
         setTimeout(() => { try { initTokenMeter(); } catch { /* non-fatal */ } }, 1500);
@@ -42336,7 +42398,7 @@ Use this template for your response:
 
     // Image generation (Batch 4) — 🖼 button on AI messages
     try {
-      if (document.getElementById('chatMessagesEl') && window.root && window.root.textToImagePlugin) {
+      if ((document.getElementById('chatMessagesEl') || document.getElementById('messageFeed')) && window.root && window.root.textToImagePlugin) {
         initImageGen();
       } else {
         setTimeout(() => { try { initImageGen(); } catch { /* non-fatal */ } }, 3000);
@@ -42351,7 +42413,7 @@ Use this template for your response:
 
     // Auto-summary (Batch 2) — compress older messages
     try {
-      if (document.getElementById('chatMessagesEl')) {
+      if ((document.getElementById('chatMessagesEl') || document.getElementById('messageFeed'))) {
         initAutoSummary();
       } else {
         setTimeout(() => { try { initAutoSummary(); } catch { /* non-fatal */ } }, 1500);
@@ -42372,7 +42434,7 @@ Use this template for your response:
 
     // Conversation branching (Batch 6)
     try {
-      if (document.getElementById('chatMessagesEl')) {
+      if ((document.getElementById('chatMessagesEl') || document.getElementById('messageFeed'))) {
         initBranching();
       } else {
         setTimeout(() => { try { initBranching(); } catch { /* non-fatal */ } }, 1500);
@@ -42390,7 +42452,7 @@ Use this template for your response:
 
     // Message timestamps (Batch 8)
     try {
-      if (document.getElementById('chatMessagesEl')) {
+      if ((document.getElementById('chatMessagesEl') || document.getElementById('messageFeed'))) {
         initTimestamps();
       } else {
         setTimeout(() => { try { initTimestamps(); } catch { /* non-fatal */ } }, 1500);
@@ -42420,7 +42482,7 @@ Use this template for your response:
 
     // Code syntax highlighting (Batch 3)
     try {
-      if (document.getElementById('chatMessagesEl')) {
+      if ((document.getElementById('chatMessagesEl') || document.getElementById('messageFeed'))) {
         initCodeHighlight();
       } else {
         setTimeout(() => { try { initCodeHighlight(); } catch { /* non-fatal */ } }, 1500);
@@ -42453,7 +42515,7 @@ Use this template for your response:
 
     // Message bookmarks — star important messages
     try {
-      if (document.getElementById('chatMessagesEl')) {
+      if ((document.getElementById('chatMessagesEl') || document.getElementById('messageFeed'))) {
         initBookmarks();
       } else {
         setTimeout(() => { try { initBookmarks(); } catch { /* non-fatal */ } }, 1500);
@@ -44244,7 +44306,7 @@ Use this template for your response:
     }
 
     function watch() {
-      const chatEl = document.getElementById('chatMessagesEl') ||
+      const chatEl = (document.getElementById('chatMessagesEl') || document.getElementById('messageFeed')) ||
                      document.querySelector('.chat-messages, .chat-area');
       if (!chatEl) {
         // Try again shortly — chat may not be mounted yet
@@ -44797,7 +44859,7 @@ Use this template for your response:
     }
 
     function watchMessages() {
-      const chatEl = document.getElementById('chatMessagesEl') ||
+      const chatEl = (document.getElementById('chatMessagesEl') || document.getElementById('messageFeed')) ||
                      document.querySelector('.chat-messages, .chat-area');
       if (!chatEl) {
         setTimeout(watchMessages, 800);
@@ -46514,7 +46576,8 @@ Use this template for your response:
     else if (d.__memheroBrain === 'feedback') { try { army().ingestReaction({ kind: d.kind, toward: d.toward || charName() }); } catch (e) {} }   // UI signal -> the live brain
     else if (d.__memheroBrain === 'recall-get') { sendRecall(); }                                  // iframe wants the stored memory/lore
     else if (d.__memheroBrain === 'recall-data') { _recall = { lore: d.lore || [], memories: d.memories || [], summaries: d.summaries || [] }; }   // cache it
-    else if (d.__memheroBrain === 'forget') { _userObs = []; _userVisual = []; _lorePromoted = {}; }   // /brain forget -> clear this session's learning
+    else if (d.__memheroBrain === 'forget') { _userObs = []; _userVisual = []; _lorePromoted = {}; pushUserDesc(); }   // clear all learning
+    else if (d.__memheroBrain === 'forget-match') { var _q = String(d.q || '').toLowerCase(); if (_q) { _userObs = _userObs.filter(function (x) { return x.toLowerCase().indexOf(_q) < 0; }); _userVisual = _userVisual.filter(function (x) { return x.toLowerCase().indexOf(_q) < 0; }); pushUserDesc(); } }   // forget a specific learned thing
   }
 
   /* ---- settings bridge: the custom-code iframe is sandboxed (allow-scripts, no same-origin),
@@ -46595,6 +46658,7 @@ Use this template for your response:
         if (s.useForReplies && last.author === 'user' && last.expectsReply !== false) {
           var dir = await decide(last.content); _lastRead = dir;
           var ground = ''; try { ground = relevantEntry(last.content); } catch (e) {}
+          if (ground && ground.length > 240) { ground = ground.slice(0, 240).replace(/\s+\S*$/, '') + '\u2026'; }   // bound the grounding snippet so a long summary can't bloat the send (iframe has no tokenizer; ~60-token char proxy)
           var steer = dir + (ground ? ' Draw on what is established: ' + ground : '');   // grounded in the thread's stored memory/lore
           oc.character.reminderMessage = steer ? ((base ? base + '\n\n' : '') + LEAD + ' ' + steer) : base;
           _descTurns++; if (_descTurns === 2 || _descTurns % 4 === 0) { pushUserDesc(); pushLore(); }   // refresh the learned description + lore as the story moves
@@ -46633,21 +46697,27 @@ Use this template for your response:
   }
   function wcount(x) { return String(x || '').trim().split(/\s+/).filter(Boolean).length; }
   function stripLearned(s) { s = String(s || ''); var h = s.indexOf(LEARN_HEAD), lb = s.indexOf(LB); var cut = (h >= 0 && lb >= 0) ? Math.min(h, lb) : (h >= 0 ? h : lb); if (cut < 0) return s.trim(); return s.slice(0, cut).replace(/\n+$/, '').trim(); }
-  function buildLearnedBlock(obs, visual, budget) {
+  // token-aware budgeting: use the app's real tokenizer (window.countTokens) when present, else a chars/4 proxy
+  function countTok(s) { try { if (typeof window.countTokens === 'function') return window.countTokens(String(s || '')); } catch (e) {} return Math.ceil(String(s || '').length / 4); }
+  function idealCtx() { var n = Number(window.idealMaxContextTokens); return (n && n > 0) ? n : 4096; }
+  function buildLearnedBlock(obs, visual, budgetTok, count) {
     obs = obs || []; visual = visual || []; if (!obs.length && !visual.length) return '';
-    var lines = [LEARN_HEAD + ' about {{user}}:'], used = 8;
-    for (var i = 0; i < obs.length && used < budget; i++) { var b = '- ' + obs[i]; lines.push(b); used += wcount(b); }
-    if (visual.length) { var vis = '# Visual Description:\n' + visual.join(', '); if (used + wcount(vis) < budget) { lines.push(vis); } }   // feeds the portrait pipeline (it parses this heading)
-    return lines.join('\n');
+    count = count || wcount;
+    var head = LEARN_HEAD + ' about {{user}}:', lines = [head], used = count(head);
+    for (var i = 0; i < obs.length; i++) { var b = '- ' + obs[i], t = count(b); if (used + t > budgetTok) break; lines.push(b); used += t; }
+    if (visual.length) { var vis = '# Visual Description:\n' + visual.join(', '); if (used + count(vis) <= budgetTok) lines.push(vis); }   // feeds the portrait pipeline (it parses this heading)
+    return lines.length > 1 ? lines.join('\n') : '';
   }
-  /* main-pane side: merge the learned block into the user's GLOBAL default description and persist it */
+  /* main-pane side: merge the learned block into the user's GLOBAL default description and persist it (token-budgeted on the way to Perchance, via the app's countTokens) */
   function writeUserDesc(obs, visual) {
     try {
       var db = window.db; if (!db || !db.misc) return;
       db.misc.get('userRoleInstruction').then(function (rec) {
         var base = stripLearned((rec && rec.value) || '');
-        var budget = Math.max(0, 500 - wcount(base) - 4);
-        var block = budget > 12 ? buildLearnedBlock(obs, visual, budget) : '';
+        var ctx = idealCtx();
+        // mirror the app's roleInstruction trim (<=0.3*ctx): the user's own text plus our block stay under that ceiling; the block itself capped modestly
+        var blockBudget = Math.max(0, Math.min(Math.floor(ctx * 0.12), 400, Math.floor(ctx * 0.3) - countTok(base)));
+        var block = blockBudget > 8 ? buildLearnedBlock(obs, visual, blockBudget, countTok) : '';
         var value = (base + (block ? (base ? '\n\n' : '') + block : '')).trim();
         return db.misc.put({ key: 'userRoleInstruction', value: value });
       }).catch(function () {});
@@ -46675,7 +46745,10 @@ Use this template for your response:
     pool.forEach(function (e) { var sc = 0, seen = {}; _toks(e).forEach(function (x) { if (w[x] && !seen[x]) { seen[x] = 1; sc++; } }); if (sc > bs) { bs = sc; best = e; } });
     return bs >= 2 ? best : '';
   }
-  /* main-pane side: hand the iframe the thread's lorebook + current memories */
+  /* main-pane side: hand the iframe the thread's lorebook + memories + summaries.
+     Memories are read from message.memoriesEndingHere — the SAME source the app's prompt
+     assembly and the Memory/Lore manager use — NOT the dead db.memories table (the app's
+     db.memories retrieval is commented out), so curating in the manager now reaches the brain. */
   function sendRecall() {
     try {
       var db = window.db; if (!db || !db.lore || window.activeThreadId == null) return;
@@ -46683,12 +46756,20 @@ Use this template for your response:
       db.threads.get(tid).then(function (thread) {
         if (!thread) return;
         var loreP = db.lore.where({ bookId: thread.loreBookId }).toArray().catch(function () { return []; });
-        var memP = db.memories ? db.memories.where({ threadId: tid }).toArray().catch(function () { return []; }) : Promise.resolve([]);
-        var sumP = db.messages ? db.messages.where('threadId').equals(tid).toArray().catch(function () { return []; }) : Promise.resolve([]);
-        return Promise.all([loreP, memP, sumP]).then(function (r) {
+        var msgP = db.messages ? db.messages.where('threadId').equals(tid).toArray().catch(function () { return []; }) : Promise.resolve([]);
+        return Promise.all([loreP, msgP]).then(function (r) {
           var lore = (r[0] || []).map(function (e) { return e.text; }).filter(Boolean).slice(-40);
-          var mem = (r[1] || []).filter(function (m) { return !m.status || m.status === 'current'; }).map(function (m) { return m.text; }).filter(Boolean).slice(-40);
-          var summaries = (r[2] || []).map(function (m) { var h = m && m.summariesEndingHere; if (!h) return null; var lv = Object.keys(h).map(Number); if (!lv.length) return null; return h[Math.max.apply(null, lv)]; }).filter(Boolean).slice(-20);   // highest-level summary per covered span
+          var msgs = (r[1] || []); msgs.sort(function (a, b) { return (a.id || 0) - (b.id || 0); });
+          var mem = [];
+          msgs.forEach(function (m) {
+            var meh = m && m.memoriesEndingHere; if (!meh || typeof meh !== 'object') return;
+            Object.keys(meh).forEach(function (lvl) {
+              var arr = meh[lvl]; if (!Array.isArray(arr)) return;
+              arr.forEach(function (x) { if (x && typeof x.text === 'string') mem.push(x.text); });   // null slots are delete tombstones — skip (same rule the manager uses)
+            });
+          });
+          mem = mem.filter(Boolean).slice(-40);
+          var summaries = msgs.map(function (m) { var h = m && m.summariesEndingHere; if (!h) return null; var lv = Object.keys(h).map(Number); if (!lv.length) return null; return h[Math.max.apply(null, lv)]; }).filter(Boolean).slice(-20);   // highest-level summary per covered span
           postToIframes({ __memheroBrain: 'recall-data', lore: lore, memories: mem, summaries: summaries });
         });
       }).catch(function () {});
@@ -46912,7 +46993,9 @@ Use this template for your response:
     bot: botAPI, user: userAPI, signal: signal, setCharacter: setCharacter, setUserChar: setUserChar,
     recall: function () { return _recall; }, refreshRecall: refreshRecall, relevantEntry: relevantEntry, sendRecall: sendRecall,
     askAsync: askAsync, feeling: function () { return _mood; }, help: brainHelpHtml, forgetLearned: forgetLearned,
-    imageKept: imageKept, imageDeleted: imageDeleted, imageStyles: imageStyles
+    imageKept: imageKept, imageDeleted: imageDeleted, imageStyles: imageStyles,
+    stripLearnedBlock: stripLearned,   // editors call this to hide the brain's auto-injected learned block
+    forgetMatching: function (t) { postToIframes({ __memheroBrain: 'forget-match', q: String(t || '') }); }
   };
 })();
 
