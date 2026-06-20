@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Marinara T2I Host</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --ink: #e8eef7;
+      --muted: #8b9cb3;
+      --accent: #ff6b4a;
+      --accent2: #4ecdc4;
+      --border: rgba(255,255,255,.08);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      --sans: system-ui, -apple-system, Segoe UI, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; }
+    body {
+      min-height: 100vh;
+      background: radial-gradient(1200px 600px at 10% -10%, rgba(255,107,74,.12), transparent),
+                  radial-gradient(900px 500px at 100% 0%, rgba(78,205,196,.10), transparent),
+                  var(--bg);
+      color: var(--ink);
+      font: 15px/1.5 var(--sans);
+      padding: 24px;
+    }
+    .wrap { max-width: 920px; margin: 0 auto; }
+    h1 { font-size: 1.35rem; letter-spacing: -.02em; margin-bottom: 6px; }
+    .sub { color: var(--muted); margin-bottom: 20px; font-size: .92rem; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      font: 600 11px var(--mono); padding: 4px 10px; border-radius: 999px;
+      border: 1px solid var(--border); color: var(--muted);
+    }
+    .pill.on { color: #7dffb0; border-color: rgba(125,255,176,.35); }
+    .pill.off { color: var(--muted); }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    label { display: block; font: 600 12px var(--mono); color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .06em; }
+    textarea, select, input {
+      width: 100%;
+      background: #0c1118;
+      color: var(--ink);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font: 14px var(--sans);
+      outline: none;
+    }
+    textarea { min-height: 96px; resize: vertical; }
+    textarea:focus, select:focus, input:focus { border-color: rgba(78,205,196,.45); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+    button {
+      border: 0; border-radius: 8px; padding: 10px 16px;
+      font: 600 14px var(--sans); cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), #ff8f6b);
+      color: #1a0d08;
+    }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--border); }
+    #preview {
+      margin-top: 12px;
+      min-height: 120px;
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      overflow: hidden;
+    }
+    #preview img { max-width: 100%; max-height: 480px; display: block; }
+    #log {
+      font: 12px/1.5 var(--mono);
+      white-space: pre-wrap;
+      color: var(--muted);
+      min-height: 48px;
+    }
+    .note { font-size: 12px; color: var(--muted); margin-top: 8px; }
+    code { font-family: var(--mono); font-size: 12px; color: var(--accent2); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Marinara T2I Host</h1>
+    <p class="sub">Perchance text-to-image adapter for <strong>Marinara Engine</strong>. Embed this generator in Marinara with <code>?marinara=1</code> to accept remote generation requests.</p>
+
+    <div class="row">
+      <span class="pill" id="pill-bridge"><span class="dot"></span><span id="bridge-txt">bridge: checking…</span></span>
+      <span class="pill" id="pill-frame"><span class="dot"></span><span id="frame-txt">frame: …</span></span>
+      <span class="pill" id="pill-opt"><span class="dot"></span><span id="opt-txt">opt-in: …</span></span>
+    </div>
+
+    <div class="panel">
+      <label for="prompt">Prompt</label>
+      <textarea id="prompt" placeholder="A cozy tavern at dusk, warm lantern light, painterly fantasy art"></textarea>
+      <div class="grid" style="margin-top:12px">
+        <div>
+          <label for="resolution">Resolution</label>
+          <select id="resolution">
+            <option value="768x768">768 × 768 (square)</option>
+            <option value="512x768">512 × 768 (portrait)</option>
+            <option value="768x512">768 × 512 (landscape)</option>
+            <option value="512x512">512 × 512 (small)</option>
+          </select>
+        </div>
+        <div>
+          <label for="guidance">Guidance</label>
+          <input id="guidance" type="number" min="1" max="30" step="0.5" value="7">
+        </div>
+        <div>
+          <label for="seed">Seed (-1 = random)</label>
+          <input id="seed" type="number" value="-1">
+        </div>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button id="go">Generate locally</button>
+        <button class="ghost" id="copy-url" type="button">Copy Marinara embed URL</button>
+      </div>
+      <div id="preview"><span id="preview-ph">No image yet</span></div>
+      <div class="note">Local button uses the same <code>text-to-image-plugin</code> path the bridge calls. Marinara drives the bridge via <code>postMessage</code> — see protocol below.</div>
+    </div>
+
+    <div class="panel">
+      <label>Bridge log</label>
+      <div id="log">—</div>
+    </div>
+
+    <div class="panel">
+      <label>Parent integration (Marinara)</label>
+      <pre id="proto" style="font:12px/1.55 var(--mono);white-space:pre-wrap;color:var(--muted);overflow:auto"></pre>
+    </div>
+  </div>
+
+<script>
+(function () {
+  var MSG = 'marinara.bridge';
+
+  function $(id) { return document.getElementById(id); }
+  function log(line) {
+    var el = $('log');
+    var t = new Date().toISOString().slice(11, 19);
+    el.textContent = (el.textContent === '—' ? '' : el.textContent + '\n') + '[' + t + '] ' + line;
+  }
+  function setPill(id, on, text) {
+    var el = $(id);
+    el.className = 'pill ' + (on ? 'on' : 'off');
+    el.querySelector('span:last-child').textContent = text;
+  }
+
+  // Imported plugins do not auto-run $output — trigger explicitly.
+  try {
+    if (typeof root !== 'undefined' && typeof root.marinaraBridge === 'function') root.marinaraBridge();
+  } catch (e) { log('root.marinaraBridge() failed: ' + (e && e.message)); }
+
+  var bridge = (window.marinara && window.marinara.bridge) || null;
+
+  function refreshStatus() {
+    var framed = false;
+    try { framed = window.parent !== window; } catch (e) { framed = true; }
+    var opted = bridge && bridge.isOptedIn ? bridge.isOptedIn() : false;
+    var active = bridge && bridge.isActive ? bridge.isActive() : false;
+    setPill('pill-bridge', active, 'bridge: ' + (active ? 'listening' : 'idle'));
+    setPill('pill-frame', framed, 'frame: ' + (framed ? 'embedded' : 'top'));
+    setPill('pill-opt', opted, 'opt-in: ' + (opted ? 'yes' : 'add ?marinara=1'));
+    if (active) log('bridge ready — waiting for Marinara requests');
+    else if (!opted) log('not in bridge mode — append ?marinara=1 for Marinara embed');
+    else if (!framed) log('open inside Marinara iframe to activate bridge');
+  }
+
+  function readOpts() {
+    return {
+      prompt: $('prompt').value.trim(),
+      resolution: $('resolution').value,
+      guidanceScale: Number($('guidance').value) || 7,
+      seed: Number($('seed').value)
+    };
+  }
+
+  function showImage(dataUrl) {
+    var box = $('preview');
+    box.innerHTML = '';
+    if (!dataUrl) { box.textContent = 'No image returned'; return; }
+    var img = new Image();
+    img.src = String(dataUrl);
+    img.alt = 'generated';
+    box.appendChild(img);
+  }
+
+  async function generateLocal() {
+    if (!bridge || typeof bridge.generate !== 'function') {
+      log('bridge.generate unavailable');
+      return;
+    }
+    var opts = readOpts();
+    if (!opts.prompt) { log('prompt required'); return; }
+    $('go').disabled = true;
+    log('local generate: ' + opts.resolution);
+    try {
+      var r = await bridge.generate(opts);
+      if (!r.ok) { log('failed: ' + (r.reason || 'unknown')); return; }
+      showImage(r.value && r.value.dataUrl);
+      log('done (' + (r.value && r.value.inputs && r.value.inputs.resolution || opts.resolution) + ')');
+    } catch (e) {
+      log('error: ' + (e && e.message));
+    } finally {
+      $('go').disabled = false;
+    }
+  }
+
+  function embedUrl() {
+    var base = 'https://perchance.org/marinara-t2i-host';
+    try {
+      if (typeof window.generatorName === 'string') base = 'https://perchance.org/' + window.generatorName;
+    } catch (e) {}
+    return base + '?marinara=1';
+  }
+
+  $('go').addEventListener('click', generateLocal);
+  $('copy-url').addEventListener('click', function () {
+    var url = embedUrl();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function () { log('copied embed URL'); });
+    } else {
+      prompt('Copy Marinara embed URL:', url);
+    }
+  });
+
+  $('proto').textContent = [
+    'Channel: ' + MSG,
+    'Child → parent: { channel, type: "ready", proto, build, generatorName, capabilities: ["image"] }',
+    'Parent → child: { channel, type: "request", cap: "image", nonce, payload: { prompt, resolution, guidanceScale, seed } }',
+    'Child → parent: { channel, type: "reply", nonce, result: { ok, value: { dataUrl, inputs } } | { ok:false, reason } }',
+    '',
+    'Embed URL: ' + embedUrl(),
+    'Queue: one image job at a time (Perchance t2i broker is serial).'
+  ].join('\n');
+
+  refreshStatus();
+  setInterval(refreshStatus, 2000);
+})();
+</script>
+</body>
+</html>
