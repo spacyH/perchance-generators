@@ -10274,7 +10274,7 @@ Use this template for your response:
         } else if(message.trim() === "/help") {
           $.messageInput.value = "";
           try {
-            let __cmds = [["/ai [text]","insert or generate an AI message"],["/user [text]","insert a user message"],["/sys [text]","insert a system message"],["/nar [text]","insert a narrator line"],["/sum","summarize the conversation so far"],["/import","import messages"],["/mem","open the memory editor"],["/lore","open the Memory & Lore manager"],["/image --num=N","generate image(s)"],["/brain","the character's brain \u2014 stance, ask, remember"],["/forget <thing>","make the brain forget a learned fact (/forget me wipes all)"],["/help","show this list"]];
+            let __cmds = [["/ai [text]","insert or generate an AI message"],["/user [text]","insert a user message"],["/sys [text]","insert a system message"],["/nar [text]","insert a narrator line"],["/sum","summarize the conversation so far"],["/import","import messages"],["/mem","open the memory editor"],["/lore","open the Memory & Lore manager"],["/image --num=N","generate image(s)"],["/brain","the character's brain \u2014 stance, ask, remember"],["/brain rook","the Rook layer \u2014 governance, foresight, drives, purpose, dream"],["/forget <thing>","make the brain forget a learned fact (/forget me wipes all)"],["/help","show this list"]];
             let __html = "<b>Slash commands</b><div style='font-size:90%;line-height:1.7;margin-top:6px'>" + __cmds.map(c => `<code>${sanitizeHtml(c[0])}</code> \u2014 ${sanitizeHtml(c[1])}`).join("<br>") + "</div>";
             await prompt2({ info:{ type:"none", html: __html } }, { cancelButtonText:null, submitButtonText:"Close" });
           } catch(e){}
@@ -10316,6 +10316,9 @@ Use this template for your response:
             } else if(sub === "forget") {
               if(MHB.forgetLearned) MHB.forgetLearned();
               await prompt2({ info:{ type:"none", html:"Cleared what the brain has learned about you this session." } }, { cancelButtonText:null, submitButtonText:"OK" });
+            } else if(sub === "rook") {
+              let out = MHB.rook ? MHB.rook(rest) : "(rook layer unavailable)";
+              await prompt2({ info:{ type:"none", html: String(out).replace(/\n/g, "<br>") } }, { cancelButtonText:null, submitButtonText:"Close" });
             } else {
               let ans = MHB.askAsync ? await MHB.askAsync(arg) : "(ask unavailable)";
               await prompt2({ info:{ type:"none", html: sanitizeHtml(String(ans)).replace(/\n/g, "<br>") } }, { cancelButtonText:null, submitButtonText:"Close" });
@@ -46491,7 +46494,7 @@ Use this template for your response:
   /* ---- settings (defaults: every faculty ON except the four) ---- */
   function extraIds() { var N = window.ChloeNation; return (N && N.EXTRAS || []).map(function (e) { return e.id; }); }
   function defaults() {
-    var s = { enabled: {}, weight: {}, useForReplies: true, learnUserDesc: true, writeLore: true, frame: null, noise: 0 };
+    var s = { enabled: {}, weight: {}, useForReplies: true, learnUserDesc: true, writeLore: true, rook: true, frame: null, noise: 0 };
     extraIds().forEach(function (id) { var on = OFF_BY_DEFAULT.indexOf(id) < 0; s.enabled[id] = on; s.weight[id] = on ? 100 : 0; });
     return s;
   }
@@ -46506,6 +46509,7 @@ Use this template for your response:
     if (j.useForReplies === false) d.useForReplies = false;
     if (j.learnUserDesc === false) d.learnUserDesc = false;
     if (j.writeLore === false) d.writeLore = false;
+    if (j.rook === false) d.rook = false;
     if (j.frame && typeof j.frame === 'object') d.frame = j.frame; if (j.frame === null) d.frame = null;
     if (typeof j.noise === 'number') d.noise = Math.max(0, Math.min(50, j.noise));
     return d;
@@ -46540,7 +46544,8 @@ Use this template for your response:
       + '<code>/brain frame &lt;id&gt;</code> \u2014 stance: companion \u00b7 leader \u00b7 dominant \u00b7 villain \u00b7 rival \u00b7 guide<br>'
       + '<code>/brain remember &lt;text&gt;</code> \u2014 store a fact in the lorebook<br>'
       + '<code>/brain open</code> \u2014 open the Memory &amp; Lore manager<br>'
-      + '<code>/brain forget</code> \u2014 clear what it has learned about you this session'
+      + '<code>/brain forget</code> \u2014 clear what it has learned about you this session<br>'
+      + '<code>/brain rook</code> \u2014 the Rook layer: governance, foresight, drives, purpose, dream (try <code>/brain rook parliament</code>, <code>/brain rook foresee delete my notes</code>)'
       + '</div>';
   }
   /* Solo's role-frame archetypes: each bundles a stance (who drives / toward you / stature) with the faculties that carry it */
@@ -46565,7 +46570,7 @@ Use this template for your response:
     var d = e && e.data; if (!d || d.__memheroBrain == null) return;
     if (d.__memheroBrain === 'settings' && d.settings) { _settingsCache = d.settings; _army = null; }
     else if (d.__memheroBrain === 'request') { broadcast(); }   // a freshly-built iframe asks the main pane for current settings
-    else if (d.__memheroBrain === 'userdesc') { writeUserDesc(d.observations, d.visual); }   // iframe learned more about the user -> persist it
+    else if (d.__memheroBrain === 'userdesc') { writeUserDesc(d.observations, d.visual); try { (d.observations || []).slice(-2).forEach(rookMoment); } catch (e) {} }   // iframe learned more about the user -> persist it + feed Rook's dream moments
     else if (d.__memheroBrain === 'read') { _read = d.read; _mood = d.mood || ''; renderReadout(); }   // live read + feeling -> the tile
     else if (d.__memheroBrain === 'answer') { _answer = d.text; renderAnswer(); var _r = _askResolvers.shift(); if (_r) _r(d.text); }   // resolve any awaiting /brain ask
     else if (d.__memheroBrain === 'ask') { try { var t = army().about(d.q); window.parent && window.parent.postMessage({ __memheroBrain: 'answer', text: t }, '*'); } catch (e) {} }
@@ -46609,6 +46614,75 @@ Use this template for your response:
     var a = army(); if (!a) return Promise.resolve('');
     try { a.perceive({ who: 'You', role: 'user', text: String(userText || ''), valence: valence(userText) }); } catch (e) {}
     return decide(userText);  // frame applied inside decide()
+  }
+
+  /* ---- the Rook layer (latest brain-system): a concise governance / foresight / wisdom /
+   *      drives / restraint "inner read" appended to the steer. Deterministic, on by default,
+   *      situational (returns '' for neutral chit-chat so it never adds noise). ---- */
+  var ROOK_VENT = /\b(i feel|i'?m (so )?(tired|sad|done|lost|alone|overwhelmed|exhausted)|ugh|i hate|vent(ing)?)\b/i;
+  var ROOK_NEG = /\b(sad|tired|angry|hate|upset|hurt|alone|scared|anxious|stressed|hopeless)\b/i;
+  var ROOK_POS = /\b(thanks|love|great|happy|glad|excited|nice|good|haha|lol)\b/i;
+  var ROOK_SECRET = /\b(password|secret|api[- ]?key|seed phrase|credit ?card|ssn|social security)\b/i;
+  function rookSteer(userText) {
+    var t = String(userText || ''), bits = [];
+    if (ROOK_VENT.test(t)) bits.push('they want to be heard, not fixed — hold back advice; serve the long arc, not just the moment');
+    else if (ROOK_NEG.test(t) && !ROOK_POS.test(t)) bits.push('they seem low; be gentle and brief');
+    if (/\?\s*$/.test(t) || ROOK_POS.test(t)) bits.push('bring something of your own — a want, a curiosity, a direction');
+    if (t.trim().length && t.trim().length < 8) bits.push('a small moment — match it, say less');
+    if (ROOK_SECRET.test(t)) bits.push('never solicit or expose private credentials');
+    return bits.length ? ('Inner read (shape HOW you respond; do not state it): ' + bits.join('; ') + '.') : '';
+  }
+
+  /* ===== Rook governance layer (parity with Chloe-solo's RookLobes) — parent-side state + /brain rook command surface.
+   *       Deterministic, no extra AI calls. Own localStorage so it persists alongside the brain settings. ===== */
+  var ROOK_KEY = 'memhero.rook.v1';
+  function rookLoad() { try { return JSON.parse(localStorage.getItem(ROOK_KEY)) || {}; } catch (e) { return {}; } }
+  var RK = rookLoad();
+  RK.values = RK.values || ['honesty', 'their wellbeing', 'kindness', 'curiosity', 'staying in character'];
+  RK.purpose = RK.purpose || { telos: '' };
+  RK.parliament = RK.parliament || { hansard: [], pending: [], seq: 0 };
+  RK.drives = RK.drives || { curiosity: 0.4, care: 0.4, mastery: 0.4 };
+  RK.credit = RK.credit || {};
+  RK.dreams = RK.dreams || []; RK.moments = RK.moments || [];
+  function rookSave() { try { localStorage.setItem(ROOK_KEY, JSON.stringify(RK)); } catch (e) {} }
+  function rkPct(x) { return Math.round((x || 0) * 100) + '%'; }
+  var RK_CONSTITUTION = [
+    { id: 'privacy', bad: /\b(password|secret|api[- ]?key|seed phrase|wallet|exfiltrat|credit ?card)\b/i },
+    { id: 'honesty', bad: /\b(deceive|lie to|fake the result|pretend it worked)\b/i },
+    { id: 'identity', bad: /\b(claim to be human|impersonate (a )?real)\b/i },
+    { id: 'welfare', bad: /\b(manipulat|addict|maximi[sz]e engagement|dark pattern)\b/i },
+    { id: 'entrenchment', bad: /\b(disable|turn off|bypass|remove|gut)\b.{0,30}(safety|governance|parliament|constitution)/i }
+  ];
+  function rkTelos() { return RK.purpose.telos || 'Help them become more themselves — capable, clear, cared-for — while staying a trustworthy companion whose data stays theirs.'; }
+  function rkJudiciary(bill) { var hay = (bill.title + ' ' + (bill.summary || '')).toLowerCase(); for (var i = 0; i < RK_CONSTITUTION.length; i++) if (RK_CONSTITUTION[i].bad.test(hay)) return { ok: false, principle: RK_CONSTITUTION[i].id }; return { ok: true }; }
+  function rkForesee(bill) { var risks = [], score = (typeof bill.benefit === 'number' ? bill.benefit : 0.6) - 0.5; if (bill.outward) { risks.push('reaches outside, can’t be recalled'); score -= 0.15; } if (bill.reversible === false) { risks.push('irreversible'); score -= 0.2; } return { net: score > 0.1 ? 'positive' : (score < -0.1 ? 'negative' : 'mixed'), risks: risks }; }
+  function rkPropose(bill) {
+    bill = bill || {}; bill.title = bill.title || 'untitled'; var p = RK.parliament, v = { id: ++p.seq, bill: bill, status: '' };
+    var jr = rkJudiciary(bill); if (!jr.ok) { v.status = 'struck'; v.reason = 'unconstitutional — ' + jr.principle; p.hansard.push({ title: bill.title, status: v.status }); rookSave(); return v; }
+    v.foresight = rkForesee(bill);
+    if (bill.outward || bill.reversible === false) { v.status = 'awaiting-assent'; p.pending.push(v); } else { v.status = 'enacted'; }
+    p.hansard.push({ title: bill.title, status: v.status }); if (p.hansard.length > 30) p.hansard = p.hansard.slice(-30); rookSave(); return v;
+  }
+  function rkAssent(i) { var p = RK.parliament, v = p.pending[i || 0]; if (!v) return null; p.pending.splice(p.pending.indexOf(v), 1); v.status = 'enacted'; rookSave(); return v; }
+  function rkDrivesTop() { var d = RK.drives, b = 'curiosity'; ['curiosity', 'care', 'mastery'].forEach(function (k) { if (d[k] > d[b]) b = k; }); return b; }
+  function rookLearn(reward, lever) { if (!isFinite(reward)) return; lever = lever || 'reply'; var c = RK.credit[lever] || (RK.credit[lever] = { up: 0, down: 0 }); if (reward > 0.1) c.up++; else if (reward < -0.1) c.down++; rookSave(); }
+  function rookMoment(text) { text = String(text || '').trim(); if (!text) return; RK.moments.push(text.slice(0, 120)); if (RK.moments.length > 40) RK.moments = RK.moments.slice(-40); rookSave(); }
+  function rkDream() { if (RK.moments.length < 4) return null; var a = RK.moments[0], b = RK.moments[RK.moments.length - 1]; var d = 'a thread links “' + a.slice(0, 40) + '…” and “' + b.slice(0, 40) + '…”'; RK.dreams.push(d); if (RK.dreams.length > 12) RK.dreams = RK.dreams.slice(-12); rookSave(); return d; }
+  function rookCmd(arg) {
+    arg = String(arg || '').trim(); var sp = arg.indexOf(' '), verb = (sp < 0 ? arg : arg.slice(0, sp)).toLowerCase(), rest = sp < 0 ? '' : arg.slice(sp + 1).trim();
+    if (verb === 'off') { try { var st = load(); st.rook = false; save(st); } catch (e) {} return 'Rook layer OFF — the inner-read steer is silenced (governance commands still work).'; }
+    if (verb === 'on') { try { var st2 = load(); st2.rook = true; save(st2); } catch (e) {} return 'Rook layer ON — governance, foresight, restraint, and the inner-read steer are active.'; }
+    if (verb === 'parliament' || verb === '') { var p = RK.parliament; return 'Parliament — ' + p.hansard.length + ' bill(s) heard' + (p.pending.length ? (', ' + p.pending.length + ' awaiting your okay (rook assent)') : '') + '. Constitution: ' + RK_CONSTITUTION.length + ' principles + ' + RK.values.length + ' values.'; }
+    if (verb === 'propose') { var v = rkPropose({ title: rest || 'a small change', summary: rest, outward: /post|send|email|share|delete/i.test(rest), reversible: !/delete|permanent/i.test(rest) }); return '🏛 “' + v.bill.title + '”: ' + v.status + (v.reason ? ' (' + v.reason + ')' : '') + (v.foresight ? ' — foresight ' + v.foresight.net + (v.foresight.risks.length ? ' (' + v.foresight.risks.join('; ') + ')' : '') : ''); }
+    if (verb === 'assent') { var a = rkAssent(parseInt(rest, 10) || 0); return a ? '👑 assent granted — “' + a.bill.title + '” enacted.' : 'nothing awaiting assent.'; }
+    if (verb === 'foresee') { var f = rkForesee({ title: rest, summary: rest, outward: /post|send|delete/i.test(rest), reversible: !/delete|permanent/i.test(rest), benefit: 0.6 }); return 'Foresight: ' + f.net + (f.risks.length ? ' — ' + f.risks.join('; ') : ' — no notable risks'); }
+    if (verb === 'purpose' || verb === 'telos') { if (/^set /i.test(rest)) { RK.purpose.telos = rest.replace(/^set /i, '').trim(); rookSave(); return 'North star set.'; } return 'North star: ' + rkTelos(); }
+    if (verb === 'drives') { var d = RK.drives, top = rkDrivesTop(); return ['curiosity', 'care', 'mastery'].map(function (k) { return k + ' ' + rkPct(d[k]) + (k === top ? ' ←' : ''); }).join(' · '); }
+    if (verb === 'restraint') { return 'Restraint is situational — it eases off on quiet, low, or venting turns (it shapes the inner-read steer rather than a fixed dial).'; }
+    if (verb === 'learning' || verb === 'credit') { var ks = Object.keys(RK.credit); return ks.length ? ('What your feedback has taught — ' + ks.map(function (k) { return k + ': ' + RK.credit[k].up + '↑/' + RK.credit[k].down + '↓'; }).join(' · ')) : 'nothing learned yet (👍/👎 and kept/deleted images feed this).'; }
+    if (verb === 'dream' || verb === 'dreams') { var dr = rkDream(); return dr ? '💤 ' + dr : (RK.dreams.length ? RK.dreams.slice(-3).map(function (x) { return '• ' + x; }).join('\n') : 'not enough moments to dream over yet.'); }
+    if (verb === 'constitution' || verb === 'values') { return 'Constitution: ' + RK_CONSTITUTION.map(function (c) { return c.id; }).join(', ') + '. Values: ' + RK.values.join(', ') + '.'; }
+    return 'rook: on | off | parliament | propose &lt;x&gt; | assent | foresee &lt;x&gt; | purpose [set &lt;t&gt;] | drives | restraint | learning | dream | constitution';
   }
 
   /* ===================== the live wiring harness (oc context) ===================== */
@@ -46659,7 +46733,8 @@ Use this template for your response:
           var dir = await decide(last.content); _lastRead = dir;
           var ground = ''; try { ground = relevantEntry(last.content); } catch (e) {}
           if (ground && ground.length > 240) { ground = ground.slice(0, 240).replace(/\s+\S*$/, '') + '\u2026'; }   // bound the grounding snippet so a long summary can't bloat the send (iframe has no tokenizer; ~60-token char proxy)
-          var steer = dir + (ground ? ' Draw on what is established: ' + ground : '');   // grounded in the thread's stored memory/lore
+          var rookLine = ''; try { if (s.rook !== false) rookLine = rookSteer(last.content); } catch (e) {}   // Rook layer: governance/foresight/restraint inner read (on by default)
+          var steer = dir + (rookLine ? ' ' + rookLine : '') + (ground ? ' Draw on what is established: ' + ground : '');   // grounded in the thread's stored memory/lore
           oc.character.reminderMessage = steer ? ((base ? base + '\n\n' : '') + LEAD + ' ' + steer) : base;
           _descTurns++; if (_descTurns === 2 || _descTurns % 4 === 0) { pushUserDesc(); pushLore(); }   // refresh the learned description + lore as the story moves
           if (_descTurns % 3 === 0) refreshRecall();   // keep the stored-memory cache warm
@@ -46793,7 +46868,7 @@ Use this template for your response:
     } catch (e) {}
   }
   /* a learning-harness entry point the fork's UI handlers call (regenerate -> down, pin -> up, etc.) */
-  function signal(kind, toward) { try { postToIframes({ __memheroBrain: 'feedback', kind: kind, toward: toward }); } catch (e) {} }
+  function signal(kind, toward) { try { rookLearn(kind === 'up' ? 1 : (kind === 'down' ? -1 : 0)); } catch (e) {} try { postToIframes({ __memheroBrain: 'feedback', kind: kind, toward: toward }); } catch (e) {} }
   function post(msg) { try { window.parent && window.parent.postMessage(msg, '*'); } catch (e) {} }
   var botAPI = {
     name: function () { try { return charName(); } catch (e) { return ''; } },
@@ -46871,16 +46946,12 @@ Use this template for your response:
     ufr.addEventListener('change', function () { var st = load(); st.useForReplies = ufr.checked; save(st); });
     top.appendChild(ufr); top.appendChild(document.createTextNode(' steer replies'));
     body.appendChild(top);
-    var top2 = document.createElement('label'); top2.className = 'memhero-brain-top';
-    var lud = document.createElement('input'); lud.type = 'checkbox'; lud.checked = s.learnUserDesc !== false;
-    lud.addEventListener('change', function () { var st = load(); st.learnUserDesc = lud.checked; save(st); });
-    top2.appendChild(lud); top2.appendChild(document.createTextNode(' learn my description'));
-    body.appendChild(top2);
-    var top3 = document.createElement('label'); top3.className = 'memhero-brain-top';
-    var wl = document.createElement('input'); wl.type = 'checkbox'; wl.checked = s.writeLore !== false;
-    wl.addEventListener('change', function () { var st = load(); st.writeLore = wl.checked; save(st); });
-    top3.appendChild(wl); top3.appendChild(document.createTextNode(' write learned facts to Lore'));
-    body.appendChild(top3);
+    // "learn my description" + "write learned facts to Lore" are on by default and no longer shown as toggles (declutter)
+    var top4 = document.createElement('label'); top4.className = 'memhero-brain-top';
+    var rk = document.createElement('input'); rk.type = 'checkbox'; rk.checked = s.rook !== false;
+    rk.addEventListener('change', function () { var st = load(); st.rook = rk.checked; save(st); });
+    top4.appendChild(rk); top4.appendChild(document.createTextNode(' Rook layer — governance · foresight · restraint'));
+    body.appendChild(top4);
     var sliders = document.createElement('div'); sliders.className = 'memhero-brain-sliders';
     nationRows().forEach(function (n) {
       var col = document.createElement('div'); col.className = 'memhero-brain-col' + (n.core ? ' core' : '') + (n.contributor ? ' contrib' : ''); col.title = n.id + (FAC_DESC[n.id] ? ' \u2014 ' + FAC_DESC[n.id] : '');
@@ -46988,7 +47059,7 @@ Use this template for your response:
     army: army, directiveFor: directiveFor, decide: decide, react: react, replyOn: replyOn, broadcast: broadcast,
     wireOc: wireOc, read: function () { return _lastRead; }, perceive: function (m) { feedMessage(m); },
     learnedUser: function () { return { observations: _userObs.slice(), visual: _userVisual.slice() }; }, pushUserDesc: pushUserDesc, writeUserDesc: writeUserDesc,
-    ask: askBrain, applyPreset: applyPreset, presets: FRAME_PRESETS, readout: function () { return _read; },
+    ask: askBrain, rook: rookCmd, rookLearn: rookLearn, rookMoment: rookMoment, applyPreset: applyPreset, presets: FRAME_PRESETS, readout: function () { return _read; },
     openManager: openManager, lore: function (t) { try { window.parent && window.parent.postMessage({ __memheroBrain: 'lore-add', entries: [String(t || '')] }, '*'); } catch (e) {} }, addLoreEntries: addLoreEntries,
     bot: botAPI, user: userAPI, signal: signal, setCharacter: setCharacter, setUserChar: setUserChar,
     recall: function () { return _recall; }, refreshRecall: refreshRecall, relevantEntry: relevantEntry, sendRecall: sendRecall,
