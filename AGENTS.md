@@ -41,7 +41,7 @@ Perchance has **no public API** for `text-to-image-plugin`. Images only run insi
 
 After editing `marinara-bridge-dsl.txt`, **republish** the plugin on perchance.org and **save** any generator that imports it (Perchance caches imports by `__generatorLastEditTime`).
 
-Current plugin build id (in DSL): `mb-plugin/2026-06-10.5` — confirm with `ping()`; it should return `value.build`.
+Current plugin build id (in DSL): `mb-plugin/2026-06-21.1` — confirm with `ping()`; it should return `value.build`.
 
 ---
 
@@ -72,7 +72,7 @@ Current plugin build id (in DSL): `mb-plugin/2026-06-10.5` — confirm with `pin
 | `type` | Purpose |
 |--------|---------|
 | `ping` | Liveness; replies `{ pong: true, build }` |
-| `request` | `cap: 'image'`, `payload: { prompt, resolution, guidanceScale, seed }` |
+| `request` | `cap: 'image'`, `payload: { prompt, resolution, guidanceScale, seed, referenceImage? }` |
 | `configure` | Optional `allowedOrigins` allowlist |
 
 **Sandbox → parent**
@@ -87,6 +87,7 @@ Current plugin build id (in DSL): `mb-plugin/2026-06-10.5` — confirm with `pin
 - Resolutions: `512x512`, `512x768`, `768x512`, `768x768` only.
 - Replies must be **structured-cloneable** — no `HTMLCanvasElement` in `postMessage` payloads (extract `dataUrl` first).
 - Empty prompts hang forever; bridge rejects them up front.
+- **Reference image (optional):** `referenceImage: { url, blur }` forwarded to `text-to-image-plugin` for character consistency. `blur` is 0–1 (default `0.35` if omitted); lower = stronger likeness. `url` should be a Perchance upload URL (`user.uploads.dev` / `user-uploads.perchance.org`) or a `data:` URL. One reference per job. Prefer hosted URLs over large inline `data:` in `postMessage` payloads.
 
 ---
 
@@ -101,8 +102,13 @@ Perchance blocks embedding `perchance.org` from `file://` or localhost. Testing 
 
 ```javascript
 await marinaraBridgeTest.connect()
-await marinaraBridgeTest.ping()    // expect build mb-plugin/2026-06-10.5
+await marinaraBridgeTest.ping()    // expect build mb-plugin/2026-06-21.1
 await marinaraBridgeTest.generate({ prompt: 'a red apple on a wooden table' })
+// With character reference:
+await marinaraBridgeTest.generate({
+  prompt: 'the same character walking through a rainy street',
+  referenceImage: { url: 'https://user.uploads.dev/file/…', blur: 0.35 },
+})
 ```
 
 Success: ping shows build id; generate logs `dataUrl length …` and a console image preview (~15–45s). A small **“marinara.bridge rendering…”** panel appears bottom-right in the generator during t2i.
@@ -152,6 +158,29 @@ Sibling repo: `../Marinara-Engine`. Proposal: `docs/feature-proposals/04-web-ui-
 | Marinara core (later) | Marinara | `client_image_job` SSE, fulfill API, optional `perchance-illustrator` agent |
 
 Server-side Marinara agents **cannot** complete the image loop alone (no `postMessage` from server). The browser extension or a perchance tab is required.
+
+### Character reference images (Marinara side — not implemented here)
+
+The bridge and `marinara-t2i-host` now accept optional `referenceImage` in the image request payload. Marinara Engine still needs to supply it.
+
+**What Marinara should do:**
+
+1. **Source the portrait** — Use an existing character avatar URL from the character library (`character.avatar.url`), or upload a portrait once via Perchance `upload-plugin` in a perchance tab and cache the CDN URL on the character record.
+2. **Pass through the client** — When fulfilling a `client_image_job` (or equivalent), include in `generateImage()` / bridge `request` payload:
+   ```js
+   {
+     prompt: builtPrompt,
+     resolution: '512x768',
+     referenceImage: { url: characterAvatarUrl, blur: 0.35 }
+   }
+   ```
+3. **Default blur** — Start with `0.35`; expose per-character or per-job tuning later (0 = strongest likeness, 1 = weakest).
+4. **Avoid huge `data:` URLs** — `postMessage` can carry `data:` strings but multi‑MB portraits slow the RPC; prefer `user.uploads.dev` URLs.
+5. **No upload from Marinara server** — Uploads require a real perchance.org browser session (Turnstile on first anonymous upload). The extension/content-script path must host or reuse uploaded URLs.
+6. **Job schema** — Extend the image job model (SSE payload / fulfill API) with optional `referenceImageUrl` and `referenceBlur`; map to bridge payload in the extension before `postMessage`.
+7. **Prompt forks** — Generators like `n8n-style` may still apply their own `createPrompt()` / style presets; reference image is orthogonal to prompt text — both can be sent together.
+
+**Not in scope for Marinara yet:** multi-character refs per image, automatic portrait generation on first chat, or server-side upload proxy.
 
 ---
 

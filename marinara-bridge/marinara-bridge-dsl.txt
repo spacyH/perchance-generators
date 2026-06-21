@@ -22,7 +22,7 @@ $output() =>
 
   var MSG = 'marinara.bridge';
   var PROTO = 1;
-  var BUILD = 'mb-plugin/2026-06-10.5';
+  var BUILD = 'mb-plugin/2026-06-21.1';
   var REQUEST_TIMEOUT = 180000; // t2i can take ~15s; allow headroom for queue
   var VALID_WH = { '512x512': 1, '512x768': 1, '768x512': 1, '768x768': 1 };
 
@@ -91,6 +91,19 @@ $output() =>
       if (VALID_WH[wh]) return wh;
     }
     return null;
+  }
+
+  // text-to-image-plugin referenceImage: { url, blur } — blur 0–1, required when url set.
+  function normalizeReferenceImage(opts) {
+    if (!opts || !opts.referenceImage) return null;
+    var ref = opts.referenceImage;
+    var url = ref.url != null ? String(ref.url).trim() : '';
+    if (!url) return { error: 'referenceImage.url required when referenceImage is set' };
+    var blur = ref.blur != null ? Number(ref.blur) : 0.35;
+    if (isNaN(blur) || blur < 0 || blur > 1) {
+      return { error: 'referenceImage.blur must be between 0 and 1' };
+    }
+    return { url: url, blur: blur };
   }
 
   function normalizeResult(data) {
@@ -191,6 +204,11 @@ $output() =>
       var callOpts = Object.assign({}, opts);
       if (res) callOpts.resolution = res;
       if (!callOpts.resolution) callOpts.resolution = '768x768';
+
+      var refNorm = normalizeReferenceImage(callOpts);
+      if (refNorm && refNorm.error) { reject(new Error(refNorm.error)); return; }
+      if (refNorm) callOpts.referenceImage = refNorm;
+      else delete callOpts.referenceImage;
 
       var fn = getT2i();
       var settled = false;

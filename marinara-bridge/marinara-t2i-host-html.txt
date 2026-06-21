@@ -78,6 +78,23 @@
       overflow: hidden;
     }
     #preview img { max-width: 100%; max-height: 480px; display: block; }
+    #ref-preview {
+      margin-top: 8px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      min-height: 56px;
+    }
+    #ref-preview img {
+      width: 72px;
+      height: 72px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      display: block;
+    }
+    #ref-preview .ref-meta { font-size: 12px; color: var(--muted); line-height: 1.45; }
+    input[type="range"] { width: 100%; padding: 0; border: 0; background: transparent; }
     #log {
       font: 12px/1.5 var(--mono);
       white-space: pre-wrap;
@@ -102,6 +119,26 @@
     <div class="panel">
       <label for="prompt">Prompt</label>
       <textarea id="prompt" placeholder="A cozy tavern at dusk, warm lantern light, painterly fantasy art"></textarea>
+
+      <div style="margin-top:14px">
+        <label for="ref-file">Character reference image (optional)</label>
+        <div class="row" style="margin-top:6px;margin-bottom:8px">
+          <input id="ref-file" type="file" accept="image/*" style="width:auto;flex:1;min-width:180px">
+          <button class="ghost" id="ref-clear" type="button">Clear ref</button>
+        </div>
+        <label for="ref-url">Or paste an upload URL</label>
+        <input id="ref-url" type="url" placeholder="https://user.uploads.dev/file/…" style="margin-top:6px">
+        <div class="grid" style="margin-top:10px">
+          <div>
+            <label for="ref-blur">Reference strength (blur 0–1)</label>
+            <input id="ref-blur" type="range" min="0" max="1" step="0.05" value="0.35">
+            <div class="note" id="ref-blur-val">0.35 — lower = stronger likeness</div>
+          </div>
+        </div>
+        <div id="ref-preview"><span class="ref-meta">No reference image</span></div>
+        <div class="note">Uploads via <code>upload-plugin</code> (Perchance CDN). The bridge forwards <code>referenceImage</code> to <code>text-to-image-plugin</code> for character consistency.</div>
+      </div>
+
       <div class="grid" style="margin-top:12px">
         <div>
           <label for="resolution">Resolution</label>
@@ -156,6 +193,75 @@
     el.querySelector('span:last-child').textContent = text;
   }
 
+  function grabPlugin(name) {
+    try { if (typeof root !== 'undefined' && root[name] !== undefined) return root[name]; } catch (e) {}
+    try { if (window[name] !== undefined) return window[name]; } catch (e2) {}
+    return null;
+  }
+
+  var refState = { url: '', preview: '' };
+
+  function updateRefPreview() {
+    var box = $('ref-preview');
+    box.innerHTML = '';
+    var src = refState.preview || refState.url;
+    if (!src) {
+      box.innerHTML = '<span class="ref-meta">No reference image</span>';
+      return;
+    }
+    var img = new Image();
+    img.src = src;
+    img.alt = 'reference';
+    var meta = document.createElement('div');
+    meta.className = 'ref-meta';
+    var blur = Number($('ref-blur').value) || 0.35;
+    meta.textContent = refState.url
+      ? 'URL: ' + refState.url.replace(/^(.{48}).+/, '$1…') + '\nblur: ' + blur
+      : 'preview only';
+    box.appendChild(img);
+    box.appendChild(meta);
+  }
+
+  function setRefUrl(url, preview) {
+    refState.url = url || '';
+    refState.preview = preview || url || '';
+    if (url) $('ref-url').value = url;
+    updateRefPreview();
+  }
+
+  function clearRef() {
+    refState = { url: '', preview: '' };
+    $('ref-file').value = '';
+    $('ref-url').value = '';
+    updateRefPreview();
+    log('reference image cleared');
+  }
+
+  async function uploadRefFile(file) {
+    var uploadFn = grabPlugin('uploadPlugin');
+    if (!uploadFn) throw new Error('upload-plugin not available');
+    log('uploading reference…');
+    var result = await uploadFn(file);
+    if (result && result.error) throw new Error(String(result.error));
+    return String(result.url);
+  }
+
+  async function onRefFileChange(ev) {
+    var file = ev.target.files && ev.target.files[0];
+    if (!file) return;
+    try {
+      var localPreview = URL.createObjectURL(file);
+      refState.preview = localPreview;
+      updateRefPreview();
+      var url = await uploadRefFile(file);
+      setRefUrl(url, url);
+      log('reference uploaded: ' + url);
+    } catch (e) {
+      log('reference upload failed: ' + (e && e.message));
+      clearRef();
+    }
+  }
+
   // Imported plugins do not auto-run $output — trigger explicitly.
   try {
     if (typeof root !== 'undefined' && typeof root.marinaraBridge === 'function') root.marinaraBridge();
@@ -177,12 +283,20 @@
   }
 
   function readOpts() {
-    return {
+    var opts = {
       prompt: $('prompt').value.trim(),
       resolution: $('resolution').value,
       guidanceScale: Number($('guidance').value) || 7,
       seed: Number($('seed').value)
     };
+    var refUrl = (refState.url || $('ref-url').value || '').trim();
+    if (refUrl) {
+      opts.referenceImage = {
+        url: refUrl,
+        blur: Number($('ref-blur').value)
+      };
+    }
+    return opts;
   }
 
   function showImage(dataUrl) {
@@ -203,7 +317,7 @@
     var opts = readOpts();
     if (!opts.prompt) { log('prompt required'); return; }
     $('go').disabled = true;
-    log('local generate: ' + opts.resolution);
+    log('local generate: ' + opts.resolution + (opts.referenceImage ? ' + ref' : ''));
     try {
       var r = await bridge.generate(opts);
       if (!r.ok) { log('failed: ' + (r.reason || 'unknown')); return; }
@@ -233,11 +347,23 @@
       prompt('Copy Marinara embed URL:', url);
     }
   });
+  $('ref-file').addEventListener('change', onRefFileChange);
+  $('ref-clear').addEventListener('click', clearRef);
+  $('ref-url').addEventListener('change', function () {
+    var url = $('ref-url').value.trim();
+    if (url) setRefUrl(url, url);
+    else clearRef();
+  });
+  $('ref-blur').addEventListener('input', function () {
+    $('ref-blur-val').textContent = (Number($('ref-blur').value).toFixed(2)) + ' — lower = stronger likeness';
+    updateRefPreview();
+  });
 
   $('proto').textContent = [
     'Channel: ' + MSG,
     'Child → parent: { channel, type: "ready", proto, build, generatorName, capabilities: ["image"] }',
-    'Parent → child: { channel, type: "request", cap: "image", nonce, payload: { prompt, resolution, guidanceScale, seed } }',
+    'Parent → child: { channel, type: "request", cap: "image", nonce, payload: { prompt, resolution, guidanceScale, seed, referenceImage? } }',
+    '  referenceImage: { url: string, blur: number }  // blur 0–1; url = upload CDN or data: URL',
     'Child → parent: { channel, type: "reply", nonce, result: { ok, value: { dataUrl, inputs } } | { ok:false, reason } }',
     '',
     'Embed URL: ' + embedUrl(),

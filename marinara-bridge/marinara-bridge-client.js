@@ -16,6 +16,10 @@
  *     resolution: '768x768',
  *     guidanceScale: 7,
  *     seed: -1,
+ *     referenceImage: {
+ *       url: 'https://user.uploads.dev/file/abc123.jpeg', // character portrait
+ *       blur: 0.35,  // 0–1; lower = stronger likeness (default 0.35 if omitted)
+ *     },
  *   });
  *
  * This is reference code for Marinara Engine — not executed on Perchance.
@@ -110,6 +114,7 @@ export class MarinaraPerchanceBridge {
   }
 
   async generateImage(payload) {
+    // payload.referenceImage?: { url: string, blur?: number } — Perchance t2i character ref
     const result = await this.request('image', payload);
     if (!result?.ok) throw new Error(result?.reason ?? 'image generation failed');
     return result.value;

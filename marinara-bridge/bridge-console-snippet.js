@@ -14,6 +14,10 @@
  *   4. await marinaraBridgeTest.connect()
  *   5. await marinaraBridgeTest.ping()
  *   6. await marinaraBridgeTest.generate({ prompt: 'a red apple on wood' })
+ *   7. await marinaraBridgeTest.generate({
+ *        prompt: 'same character in a forest',
+ *        referenceImage: { url: 'https://user.uploads.dev/file/…', blur: 0.35 },
+ *      })
  */
 (function () {
   const CHANNEL = 'marinara.bridge';
@@ -211,7 +215,7 @@
       console.log('%c ', `font-size:1px;padding:120px 200px;background:url(${dataUrl}) no-repeat;background-size:contain;`);
       console.log('[marinara.bridge test] dataUrl length', dataUrl.length);
     } else {
-      console.warn('[marinara.bridge test] no dataUrl in response — republish plugin build mb-plugin/2026-06-10.4+', value);
+      console.warn('[marinara.bridge test] no dataUrl in response — republish plugin build mb-plugin/2026-06-21.1+', value);
     }
     return value;
   }
@@ -226,7 +230,7 @@
       iframeSrc: src,
       marinaraInIframeUrl: hasMarinara,
       hint: hasMarinara
-        ? 'URL looks correct — if ping fails, republish marinara-bridge-plugin (build mb-plugin/2026-06-10.5+)'
+        ? 'URL looks correct — if ping fails, republish marinara-bridge-plugin (build mb-plugin/2026-06-21.1+)'
         : 'Add ?marinara=1 to the perchance.org tab URL and reload',
     });
     return { frame, hasMarinara };
