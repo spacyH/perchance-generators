@@ -3,6 +3,11 @@
 //    marinaraBridge = {import:marinara-bridge-plugin}
 //
 // 2) HTML panel — run once during init (near other plugin bootstrapping):
+//
+// Optional: if the fork uses a non-standard prompt field id, set before start():
+//   window.MARINARA_BRIDGE_PROMPT_SELECTOR = '#positivePromptInput';
+// Do not set MARINARA_BRIDGE_MIRROR_EVENTS = true unless you know the fork
+// tolerates synthetic input/change events (they can reload the page).
 
 try {
   if (typeof root !== 'undefined' && typeof root.marinaraBridge === 'function') {

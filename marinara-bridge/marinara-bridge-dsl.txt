@@ -22,8 +22,10 @@ $output() =>
 
   var MSG = 'marinara.bridge';
   var PROTO = 1;
-  var BUILD = 'mb-plugin/2026-06-21.1';
+  var BUILD = 'mb-plugin/2026-06-21.3';
   var REQUEST_TIMEOUT = 180000; // t2i can take ~15s; allow headroom for queue
+  var ERROR_BAY_HOLD_MS = 15000;
+  var SUCCESS_BAY_HOLD_MS = 2000;
   var VALID_WH = { '512x512': 1, '512x768': 1, '768x512': 1, '768x768': 1 };
 
   var t2iFn = null;
@@ -169,20 +171,158 @@ $output() =>
     });
   }
 
+  function stripHtml(s) {
+    return String(s || '').replace(/<[^>]*>/g, '').trim();
+  }
+
+  function isT2iIframeHtml(html) {
+    return String(html || '').indexOf('<iframe') !== -1;
+  }
+
+  function parseT2iSyncError(html) {
+    if (isT2iIframeHtml(html)) return null;
+    var text = stripHtml(html);
+    return text || 'text-to-image-plugin returned no iframe';
+  }
+
+  function extractIframeClass(html) {
+    var m = String(html || '').match(/\s(id[0-9][0-9a-z.]*)\s/);
+    return m ? m[1] : null;
+  }
+
+  function findPromptField() {
+    try {
+      if (typeof window.MARINARA_BRIDGE_PROMPT_SELECTOR === 'string') {
+        var custom = document.querySelector(window.MARINARA_BRIDGE_PROMPT_SELECTOR);
+        if (custom && !custom.closest('[data-marinara-t2i-bay]')) return custom;
+      }
+    } catch (e) {}
+    var selectors = [
+      '#positivePromptInput',
+      '#promptInput',
+      '#prompt',
+      'textarea[name="prompt"]',
+      'textarea.prompt-input',
+      'textarea.promptInput'
+    ];
+    for (var si = 0; si < selectors.length; si++) {
+      try {
+        var el = document.querySelector(selectors[si]);
+        if (el && !el.closest('[data-marinara-t2i-bay]')) return el;
+      } catch (e2) {}
+    }
+    return null;
+  }
+
+  function setFieldValueSilently(el, value) {
+    var text = String(value || '');
+    try {
+      var proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype
+        : (el instanceof HTMLInputElement ? HTMLInputElement.prototype : null);
+      if (proto) {
+        var desc = Object.getOwnPropertyDescriptor(proto, 'value');
+        if (desc && desc.set) {
+          desc.set.call(el, text);
+          return;
+        }
+      }
+    } catch (e) {}
+    el.value = text;
+  }
+
+  function mirrorPromptToPage(text) {
+    var prompt = String(text || '').trim();
+    if (!prompt) return false;
+    try {
+      var el = findPromptField();
+      if (!el) { dbg('no prompt field found for mirror'); return false; }
+      if ('value' in el) {
+        if (String(el.value || '').trim() === prompt) {
+          dbg('prompt already mirrored');
+          return true;
+        }
+        setFieldValueSilently(el, prompt);
+        // Do not dispatch input/change — many generators (n8n-style, Perchance
+        // paragraph inputs) treat those as user edits and re-render or reload.
+        if (window.MARINARA_BRIDGE_MIRROR_EVENTS === true) {
+          try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {}
+          try { el.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {}
+        }
+      } else if (el.isContentEditable) {
+        el.textContent = prompt;
+      }
+      dbg('mirrored prompt (' + prompt.length + ' chars)');
+      return true;
+    } catch (e3) { dbg('mirrorPromptToPage failed', e3); return false; }
+  }
+
+  var lastErrorToast = null;
+
+  function clearErrorToast() {
+    try {
+      if (lastErrorToast && lastErrorToast.parentNode) lastErrorToast.parentNode.removeChild(lastErrorToast);
+    } catch (e) {}
+    lastErrorToast = null;
+  }
+
+  function reportStatus(level, message, detail) {
+    postParent({
+      channel: MSG,
+      type: 'status',
+      proto: PROTO,
+      level: level,
+      message: message,
+      detail: detail || null
+    });
+  }
+
+  function showErrorToast(message) {
+    var msg = stripHtml(message) || 'image generation failed';
+    try { console.error('marinara.bridge:', msg); } catch (e) {}
+    reportStatus('error', msg);
+    try {
+      if (!lastErrorToast) {
+        lastErrorToast = document.createElement('div');
+        lastErrorToast.setAttribute('data-marinara-bridge-error', '1');
+        lastErrorToast.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);max-width:min(520px,92vw);z-index:2147483647;background:#3d1515;border:1px solid #e55;color:#fcc;padding:10px 14px;font:600 12px/1.45 system-ui,sans-serif;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.5);cursor:pointer;white-space:pre-wrap;word-break:break-word;';
+        lastErrorToast.title = 'Click to dismiss';
+        lastErrorToast.addEventListener('click', function() { clearErrorToast(); });
+        document.body.appendChild(lastErrorToast);
+      }
+      lastErrorToast.textContent = 'marinara.bridge error: ' + msg;
+    } catch (e2) {}
+  }
+
   function removeT2iBay(bay) {
     try { if (bay && bay.parentNode) bay.parentNode.removeChild(bay); } catch (e) {}
   }
 
+  function dismissBay(bay, opts) {
+    if (!bay) return;
+    opts = opts || {};
+    var hold = opts.error ? ERROR_BAY_HOLD_MS : SUCCESS_BAY_HOLD_MS;
+    if (opts.error && opts.capEl) {
+      opts.capEl.textContent = 'error: ' + stripHtml(opts.error).slice(0, 140);
+      opts.capEl.style.color = '#ffb4b4';
+      opts.capEl.style.background = '#2a1010';
+    }
+    setTimeout(function() { removeT2iBay(bay); }, hold);
+  }
+
   // Perchance t2i only runs when its broker iframe is in a visible on-screen element
   // (a 1px off-screen mount silently never fires onFinish — same lesson as weld.swarm).
-  function mountT2iBay(html) {
+  function mountT2iBay(html, promptLabel) {
     if (!html || html.indexOf('iframe') === -1) return null;
     var bay = document.createElement('div');
     bay.setAttribute('data-marinara-t2i-bay', '1');
     bay.style.cssText = 'position:fixed;bottom:8px;right:8px;width:320px;height:240px;z-index:2147483646;background:#111;border:1px solid rgba(255,255,255,.15);box-shadow:0 8px 32px rgba(0,0,0,.45);overflow:hidden;pointer-events:none;';
     var cap = document.createElement('div');
-    cap.textContent = 'marinara.bridge rendering\u2026';
-    cap.style.cssText = 'font:600 11px system-ui,sans-serif;padding:5px 8px;color:#8bdcff;border-bottom:1px solid rgba(255,255,255,.1);';
+    var label = String(promptLabel || '').trim();
+    cap.textContent = label
+      ? ('rendering: ' + label.slice(0, 72) + (label.length > 72 ? '\u2026' : ''))
+      : 'marinara.bridge rendering\u2026';
+    cap.style.cssText = 'font:600 11px system-ui,sans-serif;padding:5px 8px;color:#8bdcff;border-bottom:1px solid rgba(255,255,255,.1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+    bay.__marinaraCap = cap;
     bay.appendChild(cap);
     var slot = document.createElement('div');
     slot.style.cssText = 'width:100%;height:calc(100% - 28px);';
@@ -210,29 +350,82 @@ $output() =>
       if (refNorm) callOpts.referenceImage = refNorm;
       else delete callOpts.referenceImage;
 
+      clearErrorToast();
+      try { window.__marinaraBridgeGenerating = true; } catch (e0) {}
+      mirrorPromptToPage(prompt);
+      reportStatus('info', 'generating', { prompt: prompt, resolution: callOpts.resolution });
+
       var fn = getT2i();
       var settled = false;
       var bay = null;
-      var enriched = Object.assign({}, callOpts, {
-        onFinish: function(data) {
-          if (settled) return;
-          settled = true;
-          removeT2iBay(bay);
-          resolve(normalizeResult(data));
+      var cap = null;
+      var brokerUnsub = null;
+      var timeoutId = null;
+
+      function finishJob() {
+        try { window.__marinaraBridgeGenerating = false; } catch (e0) {}
+      }
+
+      function fail(err) {
+        if (settled) return;
+        settled = true;
+        finishJob();
+        if (brokerUnsub) brokerUnsub();
+        if (timeoutId) clearTimeout(timeoutId);
+        var msg = (err && err.message) ? err.message : String(err);
+        log('generate failed:', msg);
+        showErrorToast(msg);
+        dismissBay(bay, { error: msg, capEl: cap });
+        reject(err instanceof Error ? err : new Error(msg));
+      }
+
+      function succeed(data) {
+        if (settled) return;
+        settled = true;
+        finishJob();
+        if (brokerUnsub) brokerUnsub();
+        if (timeoutId) clearTimeout(timeoutId);
+        var norm = normalizeResult(data);
+        if (!norm.dataUrl) {
+          fail(new Error('generation finished without image data'));
+          return;
         }
+        dismissBay(bay, { capEl: cap });
+        resolve(norm);
+      }
+
+      var enriched = Object.assign({}, callOpts, {
+        onFinish: function(data) { succeed(data); }
       });
 
       var html;
-      try { html = String(fn(enriched)); } catch (e) { reject(e); return; }
+      try { html = String(fn(enriched)); } catch (e) { fail(e); return; }
 
-      try { bay = mountT2iBay(html); } catch (e2) { dbg('mountT2iBay failed', e2); }
+      var syncErr = parseT2iSyncError(html);
+      if (syncErr) { fail(new Error(syncErr)); return; }
 
-      setTimeout(function() {
-        if (!settled) {
-          settled = true;
-          removeT2iBay(bay);
-          reject(new Error('image generation timeout'));
+      var iframeClass = extractIframeClass(html);
+      if (iframeClass) {
+        function onBrokerMsg(ev) {
+          var d = ev && ev.data;
+          if (!d || typeof d !== 'object') return;
+          if (d.id !== iframeClass && d.iframeId !== iframeClass) return;
+          if (d.type === 'error' || d.error) {
+            fail(new Error(d.error || d.message || d.reason || 'broker error'));
+            return;
+          }
+          if (d.type === 'finished' && !d.dataUrl) {
+            fail(new Error(d.message || d.error || d.reason || 'broker finished without image'));
+          }
         }
+        window.addEventListener('message', onBrokerMsg);
+        brokerUnsub = function() { window.removeEventListener('message', onBrokerMsg); };
+      }
+
+      try { bay = mountT2iBay(html, prompt); cap = bay && bay.__marinaraCap; } catch (e2) { dbg('mountT2iBay failed', e2); }
+
+      timeoutId = setTimeout(function() {
+        fail(new Error('image generation timeout (' + Math.round(REQUEST_TIMEOUT / 1000) + 's)'));
       }, REQUEST_TIMEOUT);
     });
   }
@@ -332,6 +525,7 @@ $output() =>
     setT2i: setT2i,
     start: start,
     generate: enqueueImage,
+    mirrorPrompt: mirrorPromptToPage,
     isActive: function() { return active; },
     isOptedIn: bridgeOptIn,
     isFramed: isFramed,

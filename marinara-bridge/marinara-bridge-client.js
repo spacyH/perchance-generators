@@ -72,6 +72,20 @@ export class MarinaraPerchanceBridge {
       return;
     }
 
+    if (d.type === 'status') {
+      const win = this._targetWindow();
+      if (win && ev.source !== win) return;
+      const msg = d.message ?? '';
+      if (d.level === 'error') {
+        console.error('[marinara.bridge]', msg, d.detail ?? '');
+      } else if (d.level === 'info') {
+        console.log('[marinara.bridge]', msg, d.detail ?? '');
+      } else {
+        console.log('[marinara.bridge] status', d.level, msg, d.detail ?? '');
+      }
+      return;
+    }
+
     if (d.type === 'reply') {
       const id = String(d.nonce ?? '');
       const entry = this._pending.get(id);
@@ -116,7 +130,11 @@ export class MarinaraPerchanceBridge {
   async generateImage(payload) {
     // payload.referenceImage?: { url: string, blur?: number } — Perchance t2i character ref
     const result = await this.request('image', payload);
-    if (!result?.ok) throw new Error(result?.reason ?? 'image generation failed');
+    if (!result?.ok) {
+      const reason = result?.reason ?? 'image generation failed';
+      console.error('[marinara.bridge] generate failed:', reason);
+      throw new Error(reason);
+    }
     return result.value;
   }
 

@@ -75,6 +75,20 @@
         return;
       }
 
+      if (d.type === 'status') {
+        const win = this._targetWindow();
+        if (win && ev.source !== win) return;
+        const msg = d.message ?? '';
+        if (d.level === 'error') {
+          console.error('[marinara.bridge]', msg, d.detail ?? '');
+        } else if (d.level === 'info') {
+          console.log('[marinara.bridge]', msg, d.detail ?? '');
+        } else {
+          console.log('[marinara.bridge] status', d.level, msg, d.detail ?? '');
+        }
+        return;
+      }
+
       if (d.type === 'reply') {
         const id = String(d.nonce ?? '');
         const entry = this._pending.get(id);
@@ -201,23 +215,29 @@
 
   async function generate(payload = {}) {
     if (!client) throw new Error('call connect() first');
-    console.log('[marinara.bridge test] generating (typically 15–45s; do not re-run connect())…');
-    const value = await client.generateImage({
-      prompt: payload.prompt ?? 'a cozy fantasy tavern interior, warm light',
-      resolution: payload.resolution ?? '512x512',
-      guidanceScale: payload.guidanceScale ?? 7,
-      seed: payload.seed ?? -1,
-      ...payload,
-    });
-    const dataUrl = value?.dataUrl || (typeof value?.text === 'string' && value.text.startsWith('data:') ? value.text : null);
-    console.log('[marinara.bridge test] image', { ms: 'see network', inputs: value?.inputs });
-    if (dataUrl) {
-      console.log('%c ', `font-size:1px;padding:120px 200px;background:url(${dataUrl}) no-repeat;background-size:contain;`);
-      console.log('[marinara.bridge test] dataUrl length', dataUrl.length);
-    } else {
-      console.warn('[marinara.bridge test] no dataUrl in response — republish plugin build mb-plugin/2026-06-21.1+', value);
+    const prompt = payload.prompt ?? 'a cozy fantasy tavern interior, warm light';
+    console.log('[marinara.bridge test] generating (typically 15–45s; do not re-run connect())…', { prompt });
+    try {
+      const value = await client.generateImage({
+        prompt,
+        resolution: payload.resolution ?? '512x512',
+        guidanceScale: payload.guidanceScale ?? 7,
+        seed: payload.seed ?? -1,
+        ...payload,
+      });
+      const dataUrl = value?.dataUrl || (typeof value?.text === 'string' && value.text.startsWith('data:') ? value.text : null);
+      console.log('[marinara.bridge test] image', { inputs: value?.inputs });
+      if (dataUrl) {
+        console.log('%c ', `font-size:1px;padding:120px 200px;background:url(${dataUrl}) no-repeat;background-size:contain;`);
+        console.log('[marinara.bridge test] dataUrl length', dataUrl.length);
+      } else {
+        console.warn('[marinara.bridge test] no dataUrl in response — republish plugin build mb-plugin/2026-06-21.3+', value);
+      }
+      return value;
+    } catch (err) {
+      console.error('[marinara.bridge test] generate failed:', err && err.message ? err.message : err);
+      throw err;
     }
-    return value;
   }
 
   function diagnose() {
@@ -230,7 +250,7 @@
       iframeSrc: src,
       marinaraInIframeUrl: hasMarinara,
       hint: hasMarinara
-        ? 'URL looks correct — if ping fails, republish marinara-bridge-plugin (build mb-plugin/2026-06-21.1+)'
+        ? 'URL looks correct — if ping fails, republish marinara-bridge-plugin (build mb-plugin/2026-06-21.3+)'
         : 'Add ?marinara=1 to the perchance.org tab URL and reload',
     });
     return { frame, hasMarinara };

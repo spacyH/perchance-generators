@@ -41,7 +41,7 @@ Perchance has **no public API** for `text-to-image-plugin`. Images only run insi
 
 After editing `marinara-bridge-dsl.txt`, **republish** the plugin on perchance.org and **save** any generator that imports it (Perchance caches imports by `__generatorLastEditTime`).
 
-Current plugin build id (in DSL): `mb-plugin/2026-06-21.1` — confirm with `ping()`; it should return `value.build`.
+Current plugin build id (in DSL): `mb-plugin/2026-06-21.3` — confirm with `ping()`; it should return `value.build`.
 
 ---
 
@@ -81,6 +81,12 @@ Current plugin build id (in DSL): `mb-plugin/2026-06-21.1` — confirm with `pin
 |--------|---------|
 | `ready` | Announced on start (+ periodic re-announce ~12s) |
 | `reply` | `{ ok, value \| reason }` matched by `nonce` |
+| `status` | Optional progress/error: `{ level: 'info' \| 'error', message, detail? }` — parent client logs these |
+
+**UX (sandbox)**
+
+- On each bridge job, the **prompt sent to t2i** is mirrored into the page prompt field (`#positivePromptInput`, `#prompt`, etc.) **silently** (no `input`/`change` events — those can trigger generator reloads). Override selector: `window.MARINARA_BRIDGE_PROMPT_SELECTOR`. Opt into events with `window.MARINARA_BRIDGE_MIRROR_EVENTS = true`. `window.__marinaraBridgeGenerating` is true while a job runs.
+- On failure: `console.error('marinara.bridge:', …)` in the generator iframe, a **click-to-dismiss red toast** at top of page, render bay caption turns red and stays **15s** (vs 2s on success). Sync t2i validation errors (no iframe HTML) fail immediately with the plugin message text.
 
 **Image constraints**
 
@@ -102,7 +108,7 @@ Perchance blocks embedding `perchance.org` from `file://` or localhost. Testing 
 
 ```javascript
 await marinaraBridgeTest.connect()
-await marinaraBridgeTest.ping()    // expect build mb-plugin/2026-06-21.1
+await marinaraBridgeTest.ping()    // expect build mb-plugin/2026-06-21.3
 await marinaraBridgeTest.generate({ prompt: 'a red apple on a wooden table' })
 // With character reference:
 await marinaraBridgeTest.generate({
@@ -129,9 +135,11 @@ Success: ping shows build id; generate logs `dataUrl length …` and a console i
 
 5. **Reply matching on the client** — Accept `reply` messages by **`nonce`**, not strict `ev.source === iframe.contentWindow` (iframe can reload during long t2i jobs).
 
-6. **Fork DRM** — `n8n-style` shipped anti-fork scripts after `</html>` that wipe the page unless the URL is `/n8n-style`. Remove them in any fork or the UI breaks silently.
+6. **Prompt mirror must be silent** — writing the bridge prompt into the page textbox must not dispatch `input`/`change` events. Generators like n8n-style treat those as user edits and can reload or re-render, killing the in-flight job before the parent/sidecar receives the image.
 
-7. **`connect()` without `await`** — Leaves a floating `waitForReady` promise that rejects with `ready timeout` ~60s later. Always `await connect()`; snippet falls back to ping if `ready` announcements expired.
+7. **Fork DRM** — `n8n-style` shipped anti-fork scripts after `</html>` that wipe the page unless the URL is `/n8n-style`. Remove them in any fork or the UI breaks silently.
+
+8. **`connect()` without `await`** — Leaves a floating `waitForReady` promise that rejects with `ready timeout` ~60s later. Always `await connect()`; snippet falls back to ping if `ready` announcements expired.
 
 ---
 
