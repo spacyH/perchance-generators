@@ -103,6 +103,22 @@
     }
     .note { font-size: 12px; color: var(--muted); margin-top: 8px; }
     code { font-family: var(--mono); font-size: 12px; color: var(--accent2); }
+    .content-guard-box { margin-top: 10px; font-size: 13px; line-height: 1.5; }
+    .content-guard-title { text-align: center; color: var(--muted); margin: 0 0 10px; font-size: 12px; }
+    .content-guard-box select { margin-bottom: 8px; }
+    .cg-over18 {
+      display: flex; gap: 8px; align-items: center; margin-top: 10px;
+      opacity: 0.35; pointer-events: none; cursor: pointer;
+    }
+    .cg-over18.on { opacity: 1; pointer-events: auto; }
+    .cg-over18 span { user-select: none; font-size: 13px; }
+    #content-guard-message {
+      padding: 12px; border-radius: 8px;
+      border: 1px solid rgba(255, 107, 74, .35);
+      background: rgba(255, 107, 74, .08);
+    }
+    #content-guard-message p { margin: 0 0 8px; }
+    #content-guard-message p:last-of-type { margin-bottom: 10px; }
   </style>
 </head>
 <body>
@@ -164,6 +180,35 @@
       </div>
       <div id="preview"><span id="preview-ph">No image yet</span></div>
       <div class="note">Local button uses the same <code>text-to-image-plugin</code> path the bridge calls. Marinara drives the bridge via <code>postMessage</code> — see protocol below.</div>
+    </div>
+
+    <div class="panel" id="content-safety-panel">
+      <label>Content safety</label>
+      <p class="note">Perchance stores consent on the image broker (<code>image-generation.perchance.org</code>) as <code>localStorage.okayToShowNsfwUntil</code>. When a generation is blocked, use &quot;change settings&quot; in the render panel (bottom-right) or save here, then retry.</p>
+
+      <div id="content-guard-message" hidden>
+        <p><strong>Your safety settings have blocked this image.</strong></p>
+        <p class="note">The generated image may contain themes not appropriate for all audiences (graphic violence, sexual content, etc.). This can happen due to model randomness or specific words in your prompt.</p>
+        <button class="ghost" id="cg-show-settings" type="button">Show safety settings</button>
+      </div>
+
+      <div id="content-guard-settings" class="content-guard-box">
+        <p class="content-guard-title">– Content Safety Settings –</p>
+        <select id="cg-duration">
+          <option value="0">Enable PG-13 filter</option>
+          <option value="900000">Disable filter for 15 minutes</option>
+          <option value="3600000">Disable filter for 1 hour</option>
+          <option value="86400000">Disable filter for 24h</option>
+          <option value="315360000000">Disable filter permanently</option>
+        </select>
+        <div id="cg-over18-area" class="cg-over18">
+          <input id="cg-over18" type="checkbox">
+          <span id="cg-over18-label">I am over 18 years old</span>
+        </div>
+        <div class="row" style="margin-top:12px;margin-bottom:0">
+          <button id="cg-save" type="button">Save safety settings</button>
+        </div>
+      </div>
     </div>
 
     <div class="panel">
@@ -309,6 +354,49 @@
     box.appendChild(img);
   }
 
+  function showSafetyBlockedUi(reason) {
+    if ($('content-guard-message')) $('content-guard-message').hidden = false;
+    log('safety blocked: ' + (reason || 'change settings and retry'));
+  }
+
+  function syncContentGuardOver18Area() {
+    var ms = Number($('cg-duration').value) || 0;
+    var area = $('cg-over18-area');
+    if (!area) return;
+    area.classList.toggle('on', ms > 0);
+  }
+
+  function saveContentGuardSettings() {
+    var ms = Number($('cg-duration').value) || 0;
+    var over18 = $('cg-over18') && $('cg-over18').checked;
+    if (ms > 0 && !over18) {
+      alert('Sorry, you must be over 18 to disable the filter. If you are, click the checkbox.');
+      return;
+    }
+    var b = (window.marinara && window.marinara.bridge) || null;
+    if (!b || typeof b.applyContentGuardSettings !== 'function') {
+      log('content safety: bridge.applyContentGuardSettings unavailable');
+      return;
+    }
+    var r = b.applyContentGuardSettings(ms, over18);
+    if (!r.ok) {
+      log('content safety: ' + (r.reason || 'failed'));
+      return;
+    }
+    var label = ms === 0 ? 'PG-13 filter enabled' : ('filter relaxed for ' + ms + 'ms');
+    log('content safety saved — ' + label + ' (relayed to ' + (r.relayed || 0) + ' broker iframe(s))');
+    if (!r.relayed) {
+      log('tip: after a blocked image, use change settings in the render panel (bottom-right), or generate once then save here again');
+    }
+    if ($('content-guard-message')) $('content-guard-message').hidden = true;
+  }
+
+  function isSafetyBlockedReason(reason) {
+    var b = (window.marinara && window.marinara.bridge) || null;
+    if (b && typeof b.isSafetyBlockError === 'function') return b.isSafetyBlockError(reason);
+    return /safety settings have blocked this image/i.test(String(reason || ''));
+  }
+
   async function generateLocal() {
     if (!bridge || typeof bridge.generate !== 'function') {
       log('bridge.generate unavailable');
@@ -320,7 +408,11 @@
     log('local generate: ' + opts.resolution + (opts.referenceImage ? ' + ref' : ''));
     try {
       var r = await bridge.generate(opts);
-      if (!r.ok) { log('failed: ' + (r.reason || 'unknown')); return; }
+      if (!r.ok) {
+        if (isSafetyBlockedReason(r.reason)) showSafetyBlockedUi(r.reason);
+        log('failed: ' + (r.reason || 'unknown'));
+        return;
+      }
       showImage(r.value && r.value.dataUrl);
       log('done (' + (r.value && r.value.inputs && r.value.inputs.resolution || opts.resolution) + ')');
     } catch (e) {
@@ -339,6 +431,14 @@
   }
 
   $('go').addEventListener('click', generateLocal);
+  $('cg-save').addEventListener('click', saveContentGuardSettings);
+  $('cg-show-settings').addEventListener('click', function () {
+    if ($('content-guard-message')) $('content-guard-message').hidden = true;
+    if ($('content-guard-settings')) $('content-guard-settings').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+  $('cg-duration').addEventListener('change', syncContentGuardOver18Area);
+  $('cg-over18-label').addEventListener('click', function () { $('cg-over18').click(); });
+  syncContentGuardOver18Area();
   $('copy-url').addEventListener('click', function () {
     var url = embedUrl();
     if (navigator.clipboard && navigator.clipboard.writeText) {

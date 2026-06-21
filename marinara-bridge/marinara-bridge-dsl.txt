@@ -22,10 +22,13 @@ $output() =>
 
   var MSG = 'marinara.bridge';
   var PROTO = 1;
-  var BUILD = 'mb-plugin/2026-06-21.3';
+  var BUILD = 'mb-plugin/2026-06-21.4';
   var REQUEST_TIMEOUT = 180000; // t2i can take ~15s; allow headroom for queue
   var ERROR_BAY_HOLD_MS = 15000;
+  var SAFETY_BAY_HOLD_MS = 300000;
   var SUCCESS_BAY_HOLD_MS = 2000;
+  var SAFETY_BLOCK_RE = /safety settings have blocked this image/i;
+  var IMAGE_BROKER_ORIGIN = 'https://image-generation.perchance.org';
   var VALID_WH = { '512x512': 1, '512x768': 1, '768x512': 1, '768x768': 1 };
 
   var t2iFn = null;
@@ -175,6 +178,52 @@ $output() =>
     return String(s || '').replace(/<[^>]*>/g, '').trim();
   }
 
+  function isSafetyBlockError(msg) {
+    return SAFETY_BLOCK_RE.test(String(msg || ''));
+  }
+
+  // Perchance image broker stores consent on image-generation.perchance.org:
+  // localStorage.okayToShowNsfwUntil = Date.now() + durationMs (0 = PG-13 on).
+  // Relay to mounted broker iframes; user can also use the native UI in an interactive render bay.
+  function applyContentGuardSettings(durationMs, over18) {
+    var ms = Number(durationMs);
+    if (isNaN(ms)) ms = 0;
+    if (ms > 0 && !over18) return { ok: false, reason: 'over_18_required' };
+    var until = Date.now() + ms;
+    var payload = {
+      type: 'setOkayToShowNsfwUntil',
+      okayToShowNsfwUntil: until,
+      perchanceSetOkayToShowNsfwUntil: until
+    };
+    var relayed = 0;
+    try {
+      var frames = document.querySelectorAll('iframe');
+      for (var i = 0; i < frames.length; i++) {
+        var fr = frames[i];
+        try {
+          if (!fr.src || String(fr.src).indexOf('image-generation.perchance.org') === -1) continue;
+          fr.contentWindow.postMessage(payload, IMAGE_BROKER_ORIGIN);
+          relayed++;
+        } catch (e) {}
+      }
+    } catch (e2) {}
+    reportStatus('info', 'content_guard_updated', { until: until, relayed: relayed });
+    return { ok: true, until: until, relayed: relayed };
+  }
+
+  function makeBayInteractive(bay, cap, safetyBlocked) {
+    if (!bay) return;
+    bay.style.pointerEvents = 'auto';
+    bay.style.width = '360px';
+    bay.style.height = '320px';
+    if (!cap) return;
+    if (safetyBlocked) {
+      cap.textContent = 'blocked by safety filter \u2014 click \u2699\ufe0f in panel, save, retry';
+      cap.style.color = '#ffb86b';
+      cap.style.background = '#2a1f10';
+    }
+  }
+
   function isT2iIframeHtml(html) {
     return String(html || '').indexOf('<iframe') !== -1;
   }
@@ -300,7 +349,7 @@ $output() =>
   function dismissBay(bay, opts) {
     if (!bay) return;
     opts = opts || {};
-    var hold = opts.error ? ERROR_BAY_HOLD_MS : SUCCESS_BAY_HOLD_MS;
+    var hold = opts.safetyBlocked ? SAFETY_BAY_HOLD_MS : (opts.error ? ERROR_BAY_HOLD_MS : SUCCESS_BAY_HOLD_MS);
     if (opts.error && opts.capEl) {
       opts.capEl.textContent = 'error: ' + stripHtml(opts.error).slice(0, 140);
       opts.capEl.style.color = '#ffb4b4';
@@ -311,11 +360,15 @@ $output() =>
 
   // Perchance t2i only runs when its broker iframe is in a visible on-screen element
   // (a 1px off-screen mount silently never fires onFinish — same lesson as weld.swarm).
-  function mountT2iBay(html, promptLabel) {
+  function mountT2iBay(html, promptLabel, bayOpts) {
     if (!html || html.indexOf('iframe') === -1) return null;
+    bayOpts = bayOpts || {};
     var bay = document.createElement('div');
     bay.setAttribute('data-marinara-t2i-bay', '1');
-    bay.style.cssText = 'position:fixed;bottom:8px;right:8px;width:320px;height:240px;z-index:2147483646;background:#111;border:1px solid rgba(255,255,255,.15);box-shadow:0 8px 32px rgba(0,0,0,.45);overflow:hidden;pointer-events:none;';
+    var w = bayOpts.width || '320px';
+    var h = bayOpts.height || '240px';
+    var pe = bayOpts.interactive ? 'auto' : 'none';
+    bay.style.cssText = 'position:fixed;bottom:8px;right:8px;width:' + w + ';height:' + h + ';z-index:2147483646;background:#111;border:1px solid rgba(255,255,255,.15);box-shadow:0 8px 32px rgba(0,0,0,.45);overflow:hidden;pointer-events:' + pe + ';';
     var cap = document.createElement('div');
     var label = String(promptLabel || '').trim();
     cap.textContent = label
@@ -351,6 +404,9 @@ $output() =>
       else delete callOpts.referenceImage;
 
       clearErrorToast();
+      try {
+        document.querySelectorAll('[data-marinara-t2i-bay]').forEach(function(el) { removeT2iBay(el); });
+      } catch (eBay) {}
       try { window.__marinaraBridgeGenerating = true; } catch (e0) {}
       mirrorPromptToPage(prompt);
       reportStatus('info', 'generating', { prompt: prompt, resolution: callOpts.resolution });
@@ -366,13 +422,37 @@ $output() =>
         try { window.__marinaraBridgeGenerating = false; } catch (e0) {}
       }
 
-      function fail(err) {
+      function armTimeout(ms, message) {
+        if (timeoutId) clearTimeout(timeoutId);
+        timeoutId = setTimeout(function() {
+          fail(new Error(message || ('image generation timeout (' + Math.round(ms / 1000) + 's)')));
+        }, ms);
+      }
+
+      function enterSafetyBlockWait(msg) {
         if (settled) return;
         settled = true;
         finishJob();
         if (brokerUnsub) brokerUnsub();
         if (timeoutId) clearTimeout(timeoutId);
+        log('safety block:', msg);
+        reportStatus('info', 'safety_blocked', { message: msg });
+        showErrorToast(msg + '\n\nUse \u2699\ufe0f change settings in the render panel (bottom-right), save, then generate again.');
+        makeBayInteractive(bay, cap, true);
+        reject(new Error(msg));
+      }
+
+      function fail(err) {
+        if (settled) return;
         var msg = (err && err.message) ? err.message : String(err);
+        if (isSafetyBlockError(msg)) {
+          enterSafetyBlockWait(msg);
+          return;
+        }
+        settled = true;
+        finishJob();
+        if (brokerUnsub) brokerUnsub();
+        if (timeoutId) clearTimeout(timeoutId);
         log('generate failed:', msg);
         showErrorToast(msg);
         dismissBay(bay, { error: msg, capEl: cap });
@@ -411,11 +491,15 @@ $output() =>
           if (!d || typeof d !== 'object') return;
           if (d.id !== iframeClass && d.iframeId !== iframeClass) return;
           if (d.type === 'error' || d.error) {
-            fail(new Error(d.error || d.message || d.reason || 'broker error'));
+            var errMsg = d.error || d.message || d.reason || 'broker error';
+            if (isSafetyBlockError(errMsg)) enterSafetyBlockWait(String(errMsg));
+            else fail(new Error(errMsg));
             return;
           }
           if (d.type === 'finished' && !d.dataUrl) {
-            fail(new Error(d.message || d.error || d.reason || 'broker finished without image'));
+            var finMsg = d.message || d.error || d.reason || 'broker finished without image';
+            if (isSafetyBlockError(finMsg)) enterSafetyBlockWait(String(finMsg));
+            else fail(new Error(finMsg));
           }
         }
         window.addEventListener('message', onBrokerMsg);
@@ -424,9 +508,7 @@ $output() =>
 
       try { bay = mountT2iBay(html, prompt); cap = bay && bay.__marinaraCap; } catch (e2) { dbg('mountT2iBay failed', e2); }
 
-      timeoutId = setTimeout(function() {
-        fail(new Error('image generation timeout (' + Math.round(REQUEST_TIMEOUT / 1000) + 's)'));
-      }, REQUEST_TIMEOUT);
+      armTimeout(REQUEST_TIMEOUT);
     });
   }
 
@@ -526,6 +608,8 @@ $output() =>
     start: start,
     generate: enqueueImage,
     mirrorPrompt: mirrorPromptToPage,
+    applyContentGuardSettings: applyContentGuardSettings,
+    isSafetyBlockError: isSafetyBlockError,
     isActive: function() { return active; },
     isOptedIn: bridgeOptIn,
     isFramed: isFramed,
